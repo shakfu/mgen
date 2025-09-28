@@ -200,7 +200,7 @@ MIT License - see LICENSE file for details.
 
 ## Roadmap
 
-- [ ] C++ backend implementation
+- [x] C++ backend implementation
 - [ ] Advanced type inference
 - [ ] Container operations support
 - [ ] Cross-language interop

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""CGen - Simple CLI for Python-to-C Pipeline.
+"""MGen - Multi-Language Code Generator CLI.
 
 A streamlined command-line interface that provides easy access to the complete
-Python-to-C translation pipeline with structured build directory management.
+Python-to-multiple-languages translation pipeline with structured build directory management.
 
 Usage:
-    cgen convert input.py                 # Convert to C (generates build/src/input.c)
-    cgen build input.py                   # Convert and create Makefile
-    cgen compile input.py                 # Convert and compile to executable
-    cgen clean                            # Clean build directory
+    mgen convert input.py --target c      # Convert to C (generates build/src/input.c)
+    mgen convert input.py --target rust   # Convert to Rust (generates build/src/input.rs)
+    mgen build input.py --target cpp      # Convert to C++ and create Makefile
+    mgen build input.py --target go       # Convert to Go and compile
+    mgen backends                         # List available language backends
+    mgen clean                            # Clean build directory
 """
 
 import argparse
@@ -98,7 +100,7 @@ Build Directory Structure:
             default="moderate",
             help="Optimization level (default: moderate)",
         )
-        build_parser.add_argument("--compiler", default="gcc", help="C compiler to use (default: gcc)")
+        build_parser.add_argument("--compiler", help="Compiler to use (uses backend default if not specified)")
 
         # Clean command
         subparsers.add_parser("clean", help="Clean build directory")
@@ -110,14 +112,14 @@ Build Directory Structure:
         batch_parser = subparsers.add_parser(
             "batch",
             help="Batch translate all Python files in a directory",
-            description="Translate all Python files in a directory to C code in build/src",
+            description="Translate all Python files in a directory to target language in build/src",
         )
         batch_parser.add_argument("-s", "--source-dir", default=".", help="Directory containing Python files to translate (default: current directory)")
         batch_parser.add_argument(
             "-o",
             "--output-dir",
             default="build/src",
-            help="Output directory for generated C files (default: build/src)",
+            help="Output directory for generated files (default: build/src)",
         )
         batch_parser.add_argument(
             "-c", "--continue-on-error", action="store_true", help="Continue processing other files if one fails"
@@ -133,9 +135,9 @@ Build Directory Structure:
             help="Optimization level (default: moderate)",
         )
         batch_parser.add_argument(
-            "-b", "--build", action="store_true", help="Build (compile) C files after translation"
+            "-b", "--build", action="store_true", help="Build (compile) files after translation"
         )
-        batch_parser.add_argument("--compiler", default="gcc", help="C compiler to use (default: gcc)")
+        batch_parser.add_argument("--compiler", help="Compiler to use (uses backend default if not specified)")
 
         return parser
 
@@ -163,59 +165,54 @@ Build Directory Structure:
             self.log.debug(f"Build directory: {build_dir}")
             self.log.debug(f"Source directory: {src_dir}")
 
-    def copy_stc_library(self, build_dir: Path) -> None:
-        """Copy relevant STC library components to build directory."""
-        src_stc_include_dir = Path(__file__).parent.parent / "ext" / "stc" / "include"
-        if src_stc_include_dir.exists():
-            # Copy the contents of /ext/stc/include/ to /build/src/ so that
-            # #include "stc/types.h" works with -I/build/src/
-            dest_base_dir = build_dir / "src"
-            dest_stc_dir = dest_base_dir / "stc"
+    def copy_runtime_libraries(self, build_dir: Path, target_language: str) -> None:
+        """Copy relevant runtime library components to build directory."""
+        dest_base_dir = build_dir / "src"
 
-            if dest_stc_dir.exists():
-                shutil.rmtree(dest_stc_dir)
+        # Only copy C-specific libraries for C target
+        if target_language == "c":
+            # Copy STC library if available
+            src_stc_include_dir = Path(__file__).parent.parent / "ext" / "stc" / "include"
+            if src_stc_include_dir.exists():
+                dest_stc_dir = dest_base_dir / "stc"
+                if dest_stc_dir.exists():
+                    shutil.rmtree(dest_stc_dir)
 
-            # Copy the stc directory from include/stc to src/stc
-            src_stc_headers = src_stc_include_dir / "stc"
-            if src_stc_headers.exists():
-                shutil.copytree(src_stc_headers, dest_stc_dir)
-                self.log.debug(f"Copied STC library to: {dest_stc_dir}")
+                src_stc_headers = src_stc_include_dir / "stc"
+                if src_stc_headers.exists():
+                    shutil.copytree(src_stc_headers, dest_stc_dir)
+                    self.log.debug(f"Copied STC library to: {dest_stc_dir}")
 
-            # Also copy c11 if it exists
-            src_c11_headers = src_stc_include_dir / "c11"
-            dest_c11_dir = dest_base_dir / "c11"
-            if src_c11_headers.exists():
-                if dest_c11_dir.exists():
-                    shutil.rmtree(dest_c11_dir)
-                shutil.copytree(src_c11_headers, dest_c11_dir)
-                self.log.debug(f"Copied C11 library to: {dest_c11_dir}")
+                # Also copy c11 if it exists
+                src_c11_headers = src_stc_include_dir / "c11"
+                dest_c11_dir = dest_base_dir / "c11"
+                if src_c11_headers.exists():
+                    if dest_c11_dir.exists():
+                        shutil.rmtree(dest_c11_dir)
+                    shutil.copytree(src_c11_headers, dest_c11_dir)
+                    self.log.debug(f"Copied C11 library to: {dest_c11_dir}")
 
-        # Copy runtime string operations library
-        src_runtime_dir = Path(__file__).parent.parent / "runtime"
-        if src_runtime_dir.exists():
-            dest_base_dir = build_dir / "src"
-            string_ops_files = [
-                "cgen_string_ops.h",
-                "cgen_string_ops.c",
-                "cgen_error_handling.h",
-                "cgen_error_handling.c",
-                "cgen_python_ops.h",
-                "cgen_python_ops.c",
-                "cgen_file_ops.h",
-                "cgen_file_ops.c",
-                "cgen_stc_bridge.h",
-                "cgen_stc_bridge.c",
-                "cgen_memory_ops.h",
-                "cgen_memory_ops.c",
-                "cgen_container_ops.h",
-                "cgen_container_ops.c",
-            ]
-            for filename in string_ops_files:
-                src_file = src_runtime_dir / filename
-                if src_file.exists():
-                    dest_file = dest_base_dir / filename
-                    shutil.copy2(src_file, dest_file)
-                    self.log.debug(f"Copied runtime file: {filename}")
+            # Copy C runtime library files
+            src_runtime_dir = Path(__file__).parent.parent / "runtime"
+            if src_runtime_dir.exists():
+                c_runtime_files = [
+                    "cgen_string_ops.h", "cgen_string_ops.c",
+                    "cgen_error_handling.h", "cgen_error_handling.c",
+                    "cgen_python_ops.h", "cgen_python_ops.c",
+                    "cgen_file_ops.h", "cgen_file_ops.c",
+                    "cgen_stc_bridge.h", "cgen_stc_bridge.c",
+                    "cgen_memory_ops.h", "cgen_memory_ops.c",
+                    "cgen_container_ops.h", "cgen_container_ops.c",
+                ]
+                for filename in c_runtime_files:
+                    src_file = src_runtime_dir / filename
+                    if src_file.exists():
+                        dest_file = dest_base_dir / filename
+                        shutil.copy2(src_file, dest_file)
+                        self.log.debug(f"Copied C runtime file: {filename}")
+
+        # For other languages, runtime libraries are typically handled by the language ecosystem
+        # (e.g., Cargo for Rust, go mod for Go, standard library for C++)
 
     def convert_command(self, args) -> int:
         """Execute convert command."""
@@ -266,10 +263,17 @@ Build Directory Structure:
             return 1
 
     def build_command(self, args) -> int:
-        """Execute build command (compile directly or generate Makefile based on -m flag)."""
+        """Execute build command (compile directly or generate build file based on -m flag)."""
         input_path = Path(args.input_file)
         if not input_path.exists():
             self.log.error(f"Input file not found: {input_path}")
+            return 1
+
+        # Validate target language
+        target = args.target
+        if not registry.has_backend(target):
+            available = ', '.join(registry.list_backends())
+            self.log.error(f"Unsupported target language '{target}'. Available: {available}")
             return 1
 
         build_dir = Path(args.build_dir)
@@ -281,20 +285,25 @@ Build Directory Structure:
         else:
             build_mode = BuildMode.DIRECT
 
-        # Copy STC library first (needed for build phase)
-        self.copy_stc_library(build_dir)
+        # Copy runtime libraries (language-specific)
+        self.copy_runtime_libraries(build_dir, target)
 
-        # Configure pipeline with STC include path
+        # Configure pipeline
+        include_dirs = []
+        if target == "c":
+            include_dirs = [str(build_dir / "src")]  # Add runtime include path for C
+
         config = PipelineConfig(
             optimization_level=self.get_optimization_level(args.optimization),
             output_dir=str(build_dir / "src"),
             build_mode=build_mode,
-            compiler=getattr(args, "compiler", "gcc"),
-            include_dirs=[str(build_dir / "src")],  # Add STC include path
+            target_language=target,
+            compiler=getattr(args, "compiler", None),  # Use backend default if not specified
+            include_dirs=include_dirs,
         )
 
-        # Run pipeline
-        pipeline = CGenPipeline(config)
+        # Run MGen pipeline
+        pipeline = MGenPipeline(config)
         result = pipeline.convert(input_path)
 
         if not result.success:
@@ -305,21 +314,22 @@ Build Directory Structure:
             return 1
 
         if args.makefile:
-            # Makefile generation mode
-            # Move Makefile to build root
-            if "makefile" in result.output_files:
-                makefile_src = Path(result.output_files["makefile"])
-                makefile_dest = build_dir / "Makefile"
-                if makefile_src != makefile_dest:
-                    shutil.move(str(makefile_src), str(makefile_dest))
-                    result.output_files["makefile"] = str(makefile_dest)
+            # Build file generation mode
+            build_file_key = "build_file"
+            if build_file_key in result.output_files:
+                build_file_src = Path(result.output_files[build_file_key])
+                build_file_name = self._get_build_file_name(target)
+                build_file_dest = build_dir / build_file_name
+                if build_file_src != build_file_dest:
+                    shutil.move(str(build_file_src), str(build_file_dest))
+                    result.output_files[build_file_key] = str(build_file_dest)
 
-            self.log.info(
-                f"Build preparation successful! C source: {result.output_files.get('c_source', 'N/A')}, Makefile: {result.output_files.get('makefile', 'N/A')}"
-            )
+            source_key = f"{target}_source"
+            source_file = result.output_files.get(source_key, "N/A")
+            build_file = result.output_files.get(build_file_key, "N/A")
+            self.log.info(f"Build preparation successful! {target.upper()} source: {source_file}, Build file: {build_file}")
         else:
             # Direct compilation mode
-            # Move executable to build root
             if result.executable_path:
                 exe_src = Path(result.executable_path)
                 exe_dest = build_dir / exe_src.name
@@ -328,14 +338,22 @@ Build Directory Structure:
                     result.executable_path = str(exe_dest)
 
             self.log.info(f"Compilation successful! Executable: {result.executable_path}")
-            if result.executable_path:
-                pass  # Executable is available for use
 
         if result.warnings:
             for warning in result.warnings:
                 self.log.warning(f"Warning: {warning}")
 
         return 0
+
+    def _get_build_file_name(self, target_language: str) -> str:
+        """Get the appropriate build file name for the target language."""
+        build_file_names = {
+            "c": "Makefile",
+            "cpp": "Makefile",
+            "rust": "Cargo.toml",
+            "go": "go.mod",
+        }
+        return build_file_names.get(target_language, "Makefile")
 
     def clean_command(self, args) -> int:
         """Execute clean command."""
@@ -353,6 +371,13 @@ Build Directory Structure:
         """Execute batch command."""
         import os
 
+        # Validate target language
+        target = args.target
+        if not registry.has_backend(target):
+            available = ', '.join(registry.list_backends())
+            self.log.error(f"Unsupported target language '{target}'. Available: {available}")
+            return 1
+
         source_dir = args.source_dir
         output_dir = args.output_dir
         continue_on_error = args.continue_on_error
@@ -360,9 +385,9 @@ Build Directory Structure:
         build_after_translation = args.build
 
         if build_after_translation:
-            self.log.info("Starting CGen batch translation with build")
+            self.log.info(f"Starting MGen batch translation to {target.upper()} with build")
         else:
-            self.log.info("Starting CGen batch translation")
+            self.log.info(f"Starting MGen batch translation to {target.upper()}")
 
         # Check if source_dir directory exists
         if not os.path.exists(source_dir):
@@ -376,11 +401,11 @@ Build Directory Structure:
             self.log.error(f"Failed to create output directory {output_dir}: {e}")
             return 1
 
-        # If building, set up build directory and copy STC library
+        # If building, set up build directory and copy runtime libraries
         if build_after_translation:
             build_dir = Path(args.build_dir)
             self.setup_build_directory(build_dir)
-            self.copy_stc_library(build_dir)
+            self.copy_runtime_libraries(build_dir, target)
 
         # Find all Python files in source_dir directory
         python_files = []
@@ -406,7 +431,8 @@ Build Directory Structure:
 
         for i, input_file in enumerate(python_files, 1):
             filename = os.path.basename(input_file)
-            output_filename = filename.replace(".py", ".c")
+            backend = registry.get_backend(target)
+            output_filename = filename.replace(".py", backend.get_file_extension())
             output_file = os.path.join(output_dir, output_filename)
 
             if not summary_only:
@@ -417,12 +443,17 @@ Build Directory Structure:
                 if build_after_translation:
                     # Use DIRECT build mode to compile after translation
                     build_dir = Path(args.build_dir)
+                    include_dirs = []
+                    if target == "c":
+                        include_dirs = [str(build_dir / "src")]  # Add runtime include path for C
+
                     config = PipelineConfig(
                         optimization_level=self.get_optimization_level(args.optimization),
                         output_dir=str(build_dir / "src"),
                         build_mode=BuildMode.DIRECT,
-                        compiler=getattr(args, "compiler", "gcc"),
-                        include_dirs=[str(build_dir / "src")],  # Add STC include path
+                        target_language=target,
+                        compiler=getattr(args, "compiler", None),
+                        include_dirs=include_dirs,
                     )
                 else:
                     # Translation only mode
@@ -430,18 +461,19 @@ Build Directory Structure:
                         optimization_level=self.get_optimization_level(args.optimization),
                         output_dir=output_dir,
                         build_mode=BuildMode.NONE,
+                        target_language=target,
                     )
 
-                pipeline = CGenPipeline(config)
+                pipeline = MGenPipeline(config)
                 result = pipeline.convert(Path(input_file))
 
                 if result.success:
                     successful_translations += 1
 
-                    # Count lines in generated C file
-                    c_file_path = output_file if not build_after_translation else str(build_dir / "src" / output_filename)
+                    # Count lines in generated file
+                    generated_file_path = output_file if not build_after_translation else str(build_dir / "src" / output_filename)
                     try:
-                        with open(c_file_path) as f:
+                        with open(generated_file_path) as f:
                             lines_generated = len(f.readlines())
                     except Exception:
                         lines_generated = 0
@@ -515,7 +547,7 @@ Build Directory Structure:
 
         # if successful_translations > 0:
         #     total_lines = sum(result['lines'] for result in translation_results if result['status'] == 'SUCCESS')
-        #     print(f"Total C code lines generated: {total_lines}")
+        #     print(f"Total {target.upper()} code lines generated: {total_lines}")
 
         return 0 if failed_translations == 0 else 1
 
