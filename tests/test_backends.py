@@ -6,6 +6,7 @@ from mgen.backends.base import LanguageBackend
 from mgen.backends.c.backend import CBackend
 from mgen.backends.rust.backend import RustBackend
 from mgen.backends.go.backend import GoBackend
+from mgen.backends.cpp.backend import CppBackend
 
 
 class TestBackendRegistry:
@@ -19,7 +20,7 @@ class TestBackendRegistry:
         assert "c" in backends
 
         # Check if other backends are available
-        expected_backends = {"c", "rust", "go"}
+        expected_backends = {"c", "rust", "go", "cpp"}
         available_backends = set(backends)
 
         # At least C should be available
@@ -51,6 +52,12 @@ class TestBackendRegistry:
             assert go_backend.get_name() == "go"
             assert go_backend.get_file_extension() == ".go"
 
+        if registry.has_backend("cpp"):
+            cpp_backend = registry.get_backend("cpp")
+            assert isinstance(cpp_backend, CppBackend)
+            assert cpp_backend.get_name() == "cpp"
+            assert cpp_backend.get_file_extension() == ".cpp"
+
     def test_unknown_backend_raises_error(self):
         """Test that unknown backend raises appropriate error."""
         with pytest.raises(ValueError, match="Unknown backend: nonexistent"):
@@ -60,7 +67,7 @@ class TestBackendRegistry:
 class TestBackendInterfaces:
     """Test backend interface implementations."""
 
-    @pytest.mark.parametrize("backend_name", ["c", "rust", "go"])
+    @pytest.mark.parametrize("backend_name", ["c", "rust", "go", "cpp"])
     def test_backend_implements_interface(self, backend_name):
         """Test that backend properly implements LanguageBackend interface."""
         if not registry.has_backend(backend_name):
@@ -85,7 +92,7 @@ class TestBackendInterfaces:
         assert builder is not None
         assert container_system is not None
 
-    @pytest.mark.parametrize("backend_name", ["c", "rust", "go"])
+    @pytest.mark.parametrize("backend_name", ["c", "rust", "go", "cpp"])
     def test_factory_creates_code_elements(self, backend_name):
         """Test that factory can create basic code elements."""
         if not registry.has_backend(backend_name):
@@ -110,7 +117,7 @@ class TestBackendInterfaces:
         comment = factory.create_comment("test comment")
         assert "test comment" in comment
 
-    @pytest.mark.parametrize("backend_name", ["c", "rust", "go"])
+    @pytest.mark.parametrize("backend_name", ["c", "rust", "go", "cpp"])
     def test_type_mapping(self, backend_name):
         """Test Python to target language type mapping."""
         if not registry.has_backend(backend_name):
@@ -135,7 +142,7 @@ class TestBackendInterfaces:
         types = {int_type, float_type, bool_type, str_type}
         assert len(types) >= 3  # At least 3 different types
 
-    @pytest.mark.parametrize("backend_name", ["c", "rust", "go"])
+    @pytest.mark.parametrize("backend_name", ["c", "rust", "go", "cpp"])
     def test_container_system(self, backend_name):
         """Test container system provides appropriate types."""
         if not registry.has_backend(backend_name):
@@ -158,7 +165,7 @@ class TestBackendInterfaces:
         assert "int" in dict_type
         assert "int" in set_type
 
-    @pytest.mark.parametrize("backend_name", ["c", "rust", "go"])
+    @pytest.mark.parametrize("backend_name", ["c", "rust", "go", "cpp"])
     def test_builder_configuration(self, backend_name):
         """Test builder provides build configuration."""
         if not registry.has_backend(backend_name):
