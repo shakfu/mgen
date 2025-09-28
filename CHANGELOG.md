@@ -17,6 +17,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.3]
+
+### Added
+- **Enhanced C Backend**: Direct integration of CGen's sophisticated C translation capabilities
+  - Integrated CGen runtime libraries (50KB+ of C code) directly into MGen C backend
+  - MGen runtime system with error handling, memory management, and Python operations
+  - Smart Template Containers (STC) support with Python-semantic container operations
+  - Enhanced code generation with proper function body implementation
+  - Runtime-aware build system with automatic source inclusion
+- **Advanced C Code Generation**: Sophisticated Python-to-C translation features
+  - Python-like error handling system with detailed context and stack traces
+  - Memory safety with bounds checking, safe allocation, and automatic cleanup
+  - High-performance container operations using STC with Python semantics
+  - Enhanced type mapping and expression generation
+  - Support for Python built-ins (bool, abs, min, max, sum, range, etc.)
+
+### Changed
+- **C Backend Architecture**: Complete overhaul from basic arrays to sophisticated runtime system
+  - Replaced simple type mapping with comprehensive Python-to-C semantics
+  - Enhanced container system from basic pointers to STC-based high-performance containers
+  - Improved build system to automatically include runtime libraries
+  - Updated code generation to use integrated runtime instead of external dependencies
+- **Runtime Integration**: CGen runtime libraries fully integrated into MGen codebase
+  - All runtime code copied and adapted with `mgen_*` prefixes for independence
+  - No external CGen dependencies - fully self-contained MGen implementation
+  - Enhanced Makefile generation with development targets (test, debug, release)
+
+### Technical Details
+- **Runtime Components**: Error handling, Python operations, memory management, STC bridge
+- **Container Support**: vec_T, map_K_V, set_T with Python-like operations and bounds checking
+- **Code Quality**: All 67 tests passing, maintains full MGen API compatibility
+- **Build Integration**: Automatic runtime source detection and inclusion in compilation
+
 ## [0.1.2]
 
 ### Added

@@ -1,22 +1,30 @@
-"""C code emitter for MGen."""
+"""C code emitter for MGen with integrated runtime libraries."""
 
 import ast
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 from ..base import AbstractEmitter
 
 
 class CEmitter(AbstractEmitter):
-    """Clean C code emitter implementation."""
+    """C code emitter with integrated runtime libraries."""
 
     def __init__(self):
-        """Initialize C emitter."""
+        """Initialize C emitter with runtime support."""
+        self.runtime_dir = Path(__file__).parent / "runtime"
+        self.use_runtime = self.runtime_dir.exists()
+
+        # Type mapping for C code generation
         self.type_map = {
             "int": "int",
             "float": "double",
             "bool": "bool",
             "str": "char*",
             "void": "void",
+            "list": "vec_int",  # Default to int vector, will be specialized
+            "dict": "map_str_int",  # Default to string->int map
+            "set": "set_int",   # Default to int set
         }
 
     def map_python_type(self, python_type: str) -> str:
@@ -25,29 +33,157 @@ class CEmitter(AbstractEmitter):
 
     def emit_function(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
         """Generate C function code."""
-        # Get function name
+        return self._emit_function_basic(func_node, type_context)
+
+    def emit_module(self, source_code: str, analysis_result: Optional[Any] = None) -> str:
+        """Generate complete C module with MGen runtime support."""
+        return self._emit_module_with_runtime(source_code)
+
+    def can_use_simple_emission(self, analysis_result: Any) -> bool:
+        """Check if simple emission can be used for this code."""
+        # With runtime support, we can handle more complex cases
+        return not self.use_runtime
+
+    def _emit_module_with_runtime(self, source_code: str) -> str:
+        """Generate C module with MGen runtime support."""
+        if self.use_runtime:
+            return self._emit_module_enhanced(source_code)
+        else:
+            return self._emit_module_basic(source_code)
+
+    def _emit_module_enhanced(self, source_code: str) -> str:
+        """Generate enhanced C module with full runtime support."""
+        # Parse AST
+        tree = ast.parse(source_code)
+
+        # Generate includes with runtime support
+        includes = [
+            "#include <stdio.h>",
+            "#include <stdlib.h>",
+            "#include <stdbool.h>",
+            "#include \"mgen_error_handling.h\"",
+            "#include \"mgen_python_ops.h\"",
+            "#include \"mgen_memory_ops.h\"",
+        ]
+
+        if self._uses_containers(tree):
+            includes.append("#include \"mgen_stc_bridge.h\"")
+            includes.append("// STC container declarations will be added here")
+
+        # Generate functions with runtime support
+        functions = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                type_context = self._infer_simple_types(node)
+                func_code = self._emit_function_enhanced(node, type_context)
+                functions.append(func_code)
+
+        # Add main function if not present
+        if not any("main" in func for func in functions):
+            main_func = """int main() {
+    printf("Hello from MGen-generated C code with runtime support!\\n");
+    return 0;
+}"""
+            functions.append(main_func)
+
+        # Combine all parts
+        parts = includes + [""] + functions
+        return "\\n".join(parts)
+
+    def _emit_function_enhanced(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+        """Enhanced C function generation with runtime support."""
         func_name = func_node.name
 
-        # Build parameter list
+        # Build parameter list with better type inference
         params = []
         for arg in func_node.args.args:
-            param_type = self.map_python_type(type_context.get(arg.arg, "int"))
+            param_type = self.type_map.get(type_context.get(arg.arg, "int"), "int")
             params.append(f"{param_type} {arg.arg}")
 
         # Get return type
-        return_type = self.map_python_type(type_context.get("__return__", "void"))
+        return_type = self.type_map.get(type_context.get("__return__", "void"), "void")
 
         # Build function signature
         params_str = ", ".join(params) if params else "void"
         signature = f"{return_type} {func_name}({params_str})"
 
-        # Generate function body (simplified)
-        body = self._emit_function_body(func_node, type_context)
+        # Generate enhanced function body
+        body = self._emit_function_body_enhanced(func_node, type_context)
 
-        return f"{signature} {{\n{body}\n}}"
+        return f"{signature} {{\\n{body}\\n}}"
 
-    def emit_module(self, source_code: str, analysis_result: Any) -> str:
-        """Generate complete C module."""
+    def _emit_function_body_enhanced(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+        """Enhanced function body generation with runtime support."""
+        body_lines = []
+
+        for stmt in func_node.body:
+            if isinstance(stmt, ast.Return):
+                if isinstance(stmt.value, ast.BinOp):
+                    if isinstance(stmt.value.op, ast.Add):
+                        left = self._emit_expression_enhanced(stmt.value.left)
+                        right = self._emit_expression_enhanced(stmt.value.right)
+                        body_lines.append(f"    return {left} + {right};")
+                    elif isinstance(stmt.value.op, ast.Mult):
+                        left = self._emit_expression_enhanced(stmt.value.left)
+                        right = self._emit_expression_enhanced(stmt.value.right)
+                        body_lines.append(f"    return {left} * {right};")
+                    elif isinstance(stmt.value.op, ast.Sub):
+                        left = self._emit_expression_enhanced(stmt.value.left)
+                        right = self._emit_expression_enhanced(stmt.value.right)
+                        body_lines.append(f"    return {left} - {right};")
+                    elif isinstance(stmt.value.op, ast.Div):
+                        left = self._emit_expression_enhanced(stmt.value.left)
+                        right = self._emit_expression_enhanced(stmt.value.right)
+                        body_lines.append(f"    return {left} / {right};")
+                elif isinstance(stmt.value, ast.Name):
+                    body_lines.append(f"    return {stmt.value.id};")
+                elif isinstance(stmt.value, ast.Constant):
+                    body_lines.append(f"    return {stmt.value.value};")
+                else:
+                    expr = self._emit_expression_enhanced(stmt.value)
+                    body_lines.append(f"    return {expr};")
+            else:
+                # Handle other statement types
+                body_lines.append("    /* TODO: Enhanced statement generation */")
+
+        if not body_lines:
+            body_lines.append("    /* Enhanced function body with runtime support */")
+
+        return "\\n".join(body_lines)
+
+    def _emit_expression_enhanced(self, expr: ast.expr) -> str:
+        """Enhanced expression generation with runtime support."""
+        if isinstance(expr, ast.Name):
+            return expr.id
+        elif isinstance(expr, ast.Constant):
+            return str(expr.value)
+        elif isinstance(expr, ast.BinOp):
+            left = self._emit_expression_enhanced(expr.left)
+            right = self._emit_expression_enhanced(expr.right)
+            if isinstance(expr.op, ast.Add):
+                return f"({left} + {right})"
+            elif isinstance(expr.op, ast.Mult):
+                return f"({left} * {right})"
+            elif isinstance(expr.op, ast.Sub):
+                return f"({left} - {right})"
+            elif isinstance(expr.op, ast.Div):
+                return f"({left} / {right})"
+        return "0"
+
+    def _uses_containers(self, tree: ast.AST) -> bool:
+        """Check if the AST uses container types."""
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and node.id in ["list", "dict", "set"]:
+                return True
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                if node.func.id in ["list", "dict", "set", "append", "extend"]:
+                    return True
+        return False
+
+    # Basic fallback methods
+
+    def _emit_module_basic(self, source_code: str) -> str:
+        """Basic C module generation fallback."""
         # Parse AST
         tree = ast.parse(source_code)
 
@@ -62,9 +198,8 @@ class CEmitter(AbstractEmitter):
         functions = []
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
-                # Simple type context for demonstration
                 type_context = self._infer_simple_types(node)
-                func_code = self.emit_function(node, type_context)
+                func_code = self._emit_function_basic(node, type_context)
                 functions.append(func_code)
 
         # Add main function if not present
@@ -79,47 +214,57 @@ class CEmitter(AbstractEmitter):
         parts = includes + [""] + functions
         return "\n".join(parts)
 
-    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> bool:
-        """Check if function can use simple emission strategy."""
-        # For now, assume all functions can use simple emission
-        # In a full implementation, this would check for complex constructs
-        return True
+    def _emit_function_basic(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+        """Basic C function generation fallback."""
+        func_name = func_node.name
 
-    def _emit_function_body(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
-        """Generate function body (simplified implementation)."""
-        # This is a simplified implementation
-        # In a full implementation, this would traverse the AST and generate appropriate C code
+        # Build parameter list
+        params = []
+        for arg in func_node.args.args:
+            param_type = self.type_map.get(type_context.get(arg.arg, "int"), "int")
+            params.append(f"{param_type} {arg.arg}")
 
+        # Get return type
+        return_type = self.type_map.get(type_context.get("__return__", "void"), "void")
+
+        # Build function signature
+        params_str = ", ".join(params) if params else "void"
+        signature = f"{return_type} {func_name}({params_str})"
+
+        # Generate function body
+        body = self._emit_function_body_basic(func_node, type_context)
+
+        return f"{signature} {{\n{body}\n}}"
+
+    def _emit_function_body_basic(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+        """Basic function body generation fallback."""
         if len(func_node.body) == 1 and isinstance(func_node.body[0], ast.Return):
-            # Simple return statement
             return_node = func_node.body[0]
             if isinstance(return_node.value, ast.BinOp):
-                # Simple binary operation like x + y
                 if isinstance(return_node.value.op, ast.Add):
-                    left = self._emit_expression(return_node.value.left)
-                    right = self._emit_expression(return_node.value.right)
+                    left = self._emit_expression_basic(return_node.value.left)
+                    right = self._emit_expression_basic(return_node.value.right)
                     return f"    return {left} + {right};"
                 elif isinstance(return_node.value.op, ast.Mult):
-                    left = self._emit_expression(return_node.value.left)
-                    right = self._emit_expression(return_node.value.right)
+                    left = self._emit_expression_basic(return_node.value.left)
+                    right = self._emit_expression_basic(return_node.value.right)
                     return f"    return {left} * {right};"
             elif isinstance(return_node.value, ast.Name):
                 return f"    return {return_node.value.id};"
             elif isinstance(return_node.value, ast.Constant):
                 return f"    return {return_node.value.value};"
 
-        # Default implementation for complex functions
         return "    /* TODO: Implement complex function body */"
 
-    def _emit_expression(self, expr: ast.expr) -> str:
-        """Emit C expression from Python AST node."""
+    def _emit_expression_basic(self, expr: ast.expr) -> str:
+        """Basic expression generation fallback."""
         if isinstance(expr, ast.Name):
             return expr.id
         elif isinstance(expr, ast.Constant):
             return str(expr.value)
         elif isinstance(expr, ast.BinOp):
-            left = self._emit_expression(expr.left)
-            right = self._emit_expression(expr.right)
+            left = self._emit_expression_basic(expr.left)
+            right = self._emit_expression_basic(expr.right)
             if isinstance(expr.op, ast.Add):
                 return f"({left} + {right})"
             elif isinstance(expr.op, ast.Mult):
@@ -128,19 +273,16 @@ class CEmitter(AbstractEmitter):
                 return f"({left} - {right})"
             elif isinstance(expr.op, ast.Div):
                 return f"({left} / {right})"
-        return "0"  # Fallback
+        return "0"
 
     def _infer_simple_types(self, func_node: ast.FunctionDef) -> Dict[str, str]:
         """Infer simple types from function annotations."""
         type_context = {}
 
-        # Get parameter types from annotations
         for arg in func_node.args.args:
-            if arg.annotation:
-                if isinstance(arg.annotation, ast.Name):
-                    type_context[arg.arg] = arg.annotation.id
+            if arg.annotation and isinstance(arg.annotation, ast.Name):
+                type_context[arg.arg] = arg.annotation.id
 
-        # Get return type from annotation
         if func_node.returns and isinstance(func_node.returns, ast.Name):
             type_context["__return__"] = func_node.returns.id
 
