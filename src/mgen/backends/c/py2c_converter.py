@@ -81,6 +81,9 @@ class MGenPythonToCConverter:
             if isinstance(stmt, ast.FunctionDef):
                 parts.append(self._convert_function(stmt))
                 parts.append("")
+            elif isinstance(stmt, ast.ClassDef):
+                parts.append(self._convert_class(stmt))
+                parts.append("")
 
         # Add main function if not present
         if not any("main" in part for part in parts):
@@ -203,6 +206,8 @@ class MGenPythonToCConverter:
             return self._convert_for(stmt)
         elif isinstance(stmt, ast.Expr):
             return self._convert_expression_statement(stmt)
+        elif isinstance(stmt, ast.ClassDef):
+            return self._convert_class(stmt)
         else:
             return f"/* TODO: Unsupported statement {type(stmt).__name__} */"
 
@@ -220,36 +225,73 @@ class MGenPythonToCConverter:
             raise UnsupportedFeatureError("Multiple assignment targets not supported")
 
         target = stmt.targets[0]
-        if not isinstance(target, ast.Name):
-            raise UnsupportedFeatureError("Only simple variable assignment supported")
 
-        var_name = target.id
-        value_expr = self._convert_expression(stmt.value)
+        # Handle attribute assignment (e.g., self.attr = value or obj.attr = value)
+        if isinstance(target, ast.Attribute):
+            obj = self._convert_expression(target.value)
+            attr_name = target.attr
+            value_expr = self._convert_expression(stmt.value)
 
-        # Infer type from value if not known
-        if var_name not in self.variable_context:
-            inferred_type = self._infer_expression_type(stmt.value)
-            self.variable_context[var_name] = inferred_type
-            return f"{inferred_type} {var_name} = {value_expr};"
+            # If this is a self reference in a method, use pointer access
+            if (isinstance(target.value, ast.Name) and target.value.id == "self" and
+                self.current_function and "_" in self.current_function):
+                return f"self->{attr_name} = {value_expr};"
+            else:
+                return f"{obj}.{attr_name} = {value_expr};"
+
+        # Handle simple variable assignment
+        elif isinstance(target, ast.Name):
+            var_name = target.id
+            value_expr = self._convert_expression(stmt.value)
+
+            # Infer type from value if not known
+            if var_name not in self.variable_context:
+                inferred_type = self._infer_expression_type(stmt.value)
+                self.variable_context[var_name] = inferred_type
+                return f"{inferred_type} {var_name} = {value_expr};"
+            else:
+                return f"{var_name} = {value_expr};"
+
         else:
-            return f"{var_name} = {value_expr};"
+            raise UnsupportedFeatureError("Only simple variable and attribute assignment supported")
 
     def _convert_annotated_assignment(self, stmt: ast.AnnAssign) -> str:
-        """Convert annotated assignment (e.g., x: int = 5)."""
-        if not isinstance(stmt.target, ast.Name):
-            raise UnsupportedFeatureError("Only simple variable assignment supported")
+        """Convert annotated assignment (e.g., x: int = 5 or self.x: int = 5)."""
+        # Handle attribute annotation (e.g., self.attr: type = value)
+        if isinstance(stmt.target, ast.Attribute):
+            obj = self._convert_expression(stmt.target.value)
+            attr_name = stmt.target.attr
+            type_annotation = self._get_type_annotation(stmt.annotation)
+            c_type = self.type_mapping.get(type_annotation, type_annotation)
 
-        var_name = stmt.target.id
-        type_annotation = self._get_type_annotation(stmt.annotation)
-        c_type = self.type_mapping.get(type_annotation, type_annotation)
+            if stmt.value:
+                value_expr = self._convert_expression(stmt.value)
+                # If this is a self reference in a method, use pointer access
+                if (isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self" and
+                    self.current_function and "_" in self.current_function):
+                    return f"self->{attr_name} = {value_expr};"
+                else:
+                    return f"{obj}.{attr_name} = {value_expr};"
+            else:
+                # Just a type annotation without assignment
+                return f"/* {attr_name}: {c_type} */"
 
-        self.variable_context[var_name] = c_type
+        # Handle simple variable annotation
+        elif isinstance(stmt.target, ast.Name):
+            var_name = stmt.target.id
+            type_annotation = self._get_type_annotation(stmt.annotation)
+            c_type = self.type_mapping.get(type_annotation, type_annotation)
 
-        if stmt.value:
-            value_expr = self._convert_expression(stmt.value)
-            return f"{c_type} {var_name} = {value_expr};"
+            self.variable_context[var_name] = c_type
+
+            if stmt.value:
+                value_expr = self._convert_expression(stmt.value)
+                return f"{c_type} {var_name} = {value_expr};"
+            else:
+                return f"{c_type} {var_name};"
+
         else:
-            return f"{c_type} {var_name};"
+            raise UnsupportedFeatureError("Only simple variable and attribute annotation supported")
 
     def _convert_expression(self, expr: ast.expr) -> str:
         """Convert Python expression to C expression."""
@@ -357,14 +399,25 @@ class MGenPythonToCConverter:
             func_name = expr.func.id
             args = [self._convert_expression(arg) for arg in expr.args]
 
+            # Check if this is a class instantiation
+            if func_name in self.defined_structs:
+                # Class instantiation: ClassName() -> ClassName_new()
+                args_str = ", ".join(args)
+                return f"{func_name}_new({args_str})"
+
             # Handle built-in functions with runtime support
-            if func_name in ["len", "bool", "abs", "min", "max", "sum"] and self.use_runtime:
+            elif func_name in ["len", "bool", "abs", "min", "max", "sum"] and self.use_runtime:
                 return self._convert_builtin_with_runtime(func_name, args)
             else:
                 args_str = ", ".join(args)
                 return f"{func_name}({args_str})"
+
+        elif isinstance(expr.func, ast.Attribute):
+            # Method call: obj.method() -> ClassName_method(&obj)
+            return self._convert_method_call(expr)
+
         else:
-            raise UnsupportedFeatureError("Only simple function calls supported")
+            raise UnsupportedFeatureError("Only simple function calls and method calls supported")
 
     def _convert_builtin_with_runtime(self, func_name: str, args: List[str]) -> str:
         """Convert built-in functions using MGen runtime."""
@@ -378,6 +431,38 @@ class MGenPythonToCConverter:
             return f"mgen_{func_name}_int_array({args[0]}, {args[1]})"  # Simplified
         else:
             return f"{func_name}({', '.join(args)})"
+
+    def _convert_method_call(self, expr: ast.Call) -> str:
+        """Convert method calls: obj.method(args) -> ClassName_method(&obj, args)."""
+        if not isinstance(expr.func, ast.Attribute):
+            raise UnsupportedFeatureError("Expected attribute access for method call")
+
+        obj_expr = expr.func.value
+        method_name = expr.func.attr
+
+        # Convert the object and arguments
+        obj = self._convert_expression(obj_expr)
+        args = [self._convert_expression(arg) for arg in expr.args]
+
+        # Try to determine the class type from the object
+        # For now, we'll use a simple heuristic - look for known class names
+        class_name = None
+        if isinstance(obj_expr, ast.Name):
+            var_name = obj_expr.id
+            # Look in our variable context for the type
+            if var_name in self.variable_context:
+                var_type = self.variable_context[var_name]
+                if var_type in self.defined_structs:
+                    class_name = var_type
+
+        if class_name:
+            # Method call with known class type
+            args_str = ", ".join([f"&{obj}"] + args)
+            return f"{class_name}_{method_name}({args_str})"
+        else:
+            # Fallback - assume it's a simple method call
+            args_str = ", ".join(args)
+            return f"{obj}_{method_name}({args_str})"
 
     def _get_type_annotation(self, annotation: ast.expr) -> str:
         """Extract type from annotation."""
@@ -537,6 +622,13 @@ class MGenPythonToCConverter:
     def _convert_attribute(self, expr: ast.Attribute) -> str:
         """Convert attribute access."""
         obj = self._convert_expression(expr.value)
+
+        # If this is a self reference in a method, use pointer access
+        if (isinstance(expr.value, ast.Name) and expr.value.id == "self" and
+            self.current_function and "_" in self.current_function):
+            return f"self->{expr.attr}"
+
+        # Regular struct member access
         return f"{obj}.{expr.attr}"
 
     def _convert_subscript(self, expr: ast.Subscript) -> str:
@@ -547,3 +639,229 @@ class MGenPythonToCConverter:
         else:  # Python >= 3.9
             index = self._convert_expression(expr.slice)
         return f"{obj}[{index}]"
+
+    def _convert_class(self, node: ast.ClassDef) -> str:
+        """Convert Python class to C struct with associated methods."""
+        class_name = node.name
+
+        # Analyze class to extract instance variables and methods
+        instance_vars = self._extract_instance_variables(node)
+        methods = self._extract_methods(node)
+
+        parts = []
+
+        # Generate struct definition
+        struct_def = self._generate_struct_definition(class_name, instance_vars)
+        parts.append(struct_def)
+        parts.append("")
+
+        # Store struct info for later use
+        self.defined_structs[class_name] = {
+            'instance_vars': instance_vars,
+            'methods': [m.name for m in methods]
+        }
+
+        # Generate method declarations
+        for method in methods:
+            if method.name == "__init__":
+                # Constructor
+                constructor = self._generate_constructor(class_name, method, instance_vars)
+                parts.append(constructor)
+            else:
+                # Regular method
+                method_def = self._generate_method(class_name, method)
+                parts.append(method_def)
+            parts.append("")
+
+        return "\n".join(parts)
+
+    def _extract_instance_variables(self, class_node: ast.ClassDef) -> Dict[str, str]:
+        """Extract instance variables from class definition."""
+        instance_vars = {}
+
+        # Look for __init__ method to find instance variable assignments
+        for stmt in class_node.body:
+            if isinstance(stmt, ast.FunctionDef) and stmt.name == "__init__":
+                for body_stmt in stmt.body:
+                    if isinstance(body_stmt, ast.Assign):
+                        # Look for self.var = value assignments
+                        for target in body_stmt.targets:
+                            if (isinstance(target, ast.Attribute) and
+                                isinstance(target.value, ast.Name) and
+                                target.value.id == "self"):
+                                var_name = target.attr
+                                # Try to infer type from the assignment
+                                var_type = self._infer_expression_type(body_stmt.value)
+                                instance_vars[var_name] = var_type
+                    elif isinstance(body_stmt, ast.AnnAssign):
+                        # Look for self.var: type = value assignments
+                        if (isinstance(body_stmt.target, ast.Attribute) and
+                            isinstance(body_stmt.target.value, ast.Name) and
+                            body_stmt.target.value.id == "self"):
+                            var_name = body_stmt.target.attr
+                            if body_stmt.annotation:
+                                var_type = self._get_type_annotation(body_stmt.annotation)
+                                var_type = self.type_mapping.get(var_type, var_type)
+                            else:
+                                var_type = self._infer_expression_type(body_stmt.value)
+                            instance_vars[var_name] = var_type
+
+        return instance_vars
+
+    def _extract_methods(self, class_node: ast.ClassDef) -> List[ast.FunctionDef]:
+        """Extract method definitions from class."""
+        methods = []
+        for stmt in class_node.body:
+            if isinstance(stmt, ast.FunctionDef):
+                methods.append(stmt)
+        return methods
+
+    def _generate_struct_definition(self, class_name: str, instance_vars: Dict[str, str]) -> str:
+        """Generate C struct definition for Python class."""
+        lines = [f"typedef struct {class_name} {{"]
+
+        if instance_vars:
+            for var_name, var_type in instance_vars.items():
+                lines.append(f"    {var_type} {var_name};")
+        else:
+            # Empty struct needs at least one member in C
+            lines.append("    char _dummy;  // Empty struct placeholder")
+
+        lines.append(f"}} {class_name};")
+
+        return "\n".join(lines)
+
+    def _generate_constructor(self, class_name: str, init_method: ast.FunctionDef,
+                            instance_vars: Dict[str, str]) -> str:
+        """Generate constructor function for class."""
+        # Build parameter list (skip 'self')
+        params = []
+        for arg in init_method.args.args[1:]:  # Skip 'self'
+            param_type = self._get_type_annotation(arg.annotation) if arg.annotation else "int"
+            c_type = self.type_mapping.get(param_type, param_type)
+            params.append(f"{c_type} {arg.arg}")
+
+        params_str = ", ".join(params) if params else "void"
+        signature = f"{class_name} {class_name}_new({params_str})"
+
+        # Generate constructor body
+        body_lines = [f"    {class_name} obj;"]
+
+        # Add initialization code from __init__ body
+        old_function = self.current_function
+        self.current_function = f"{class_name}_new"
+
+        # Set up parameter context
+        for arg in init_method.args.args[1:]:
+            param_type = self._get_type_annotation(arg.annotation) if arg.annotation else "int"
+            c_type = self.type_mapping.get(param_type, param_type)
+            self.variable_context[arg.arg] = c_type
+
+        for stmt in init_method.body:
+            if isinstance(stmt, ast.Assign):
+                # Convert self.var = value to obj.var = value
+                for target in stmt.targets:
+                    if (isinstance(target, ast.Attribute) and
+                        isinstance(target.value, ast.Name) and
+                        target.value.id == "self"):
+                        var_name = target.attr
+                        value_expr = self._convert_expression(stmt.value)
+                        body_lines.append(f"    obj.{var_name} = {value_expr};")
+            elif isinstance(stmt, ast.AnnAssign):
+                # Convert self.var: type = value to obj.var = value
+                if (isinstance(stmt.target, ast.Attribute) and
+                    isinstance(stmt.target.value, ast.Name) and
+                    stmt.target.value.id == "self"):
+                    var_name = stmt.target.attr
+                    if stmt.value:
+                        value_expr = self._convert_expression(stmt.value)
+                        body_lines.append(f"    obj.{var_name} = {value_expr};")
+
+        body_lines.append("    return obj;")
+
+        self.current_function = old_function
+
+        body = "\n".join(body_lines)
+        return f"{signature} {{\n{body}\n}}"
+
+    def _generate_method(self, class_name: str, method: ast.FunctionDef) -> str:
+        """Generate C function for class method."""
+        method_name = f"{class_name}_{method.name}"
+
+        # Build parameter list (convert 'self' to struct pointer)
+        params = [f"{class_name}* self"]
+        for arg in method.args.args[1:]:  # Skip 'self'
+            param_type = self._get_type_annotation(arg.annotation) if arg.annotation else "int"
+            c_type = self.type_mapping.get(param_type, param_type)
+            params.append(f"{c_type} {arg.arg}")
+            self.variable_context[arg.arg] = c_type
+
+        # Get return type
+        return_type = "void"
+        if method.returns:
+            py_return_type = self._get_type_annotation(method.returns)
+            return_type = self.type_mapping.get(py_return_type, py_return_type)
+
+        params_str = ", ".join(params)
+        signature = f"{return_type} {method_name}({params_str})"
+
+        # Convert method body
+        old_function = self.current_function
+        self.current_function = method_name
+
+        body_lines = []
+        for stmt in method.body:
+            converted = self._convert_method_statement(stmt, class_name)
+            if converted:
+                body_lines.extend(converted.split('\n'))
+
+        body = "\n".join(f"    {line}" if line.strip() else "" for line in body_lines)
+
+        self.current_function = old_function
+        return f"{signature} {{\n{body}\n}}"
+
+    def _convert_method_statement(self, stmt: ast.stmt, class_name: str) -> str:
+        """Convert statement inside a method, handling self references."""
+        if isinstance(stmt, ast.Assign):
+            return self._convert_method_assignment(stmt, class_name)
+        elif isinstance(stmt, ast.Return):
+            return self._convert_method_return(stmt, class_name)
+        else:
+            # For other statements, use regular conversion but handle self references
+            return self._convert_statement(stmt)
+
+    def _convert_method_assignment(self, stmt: ast.Assign, class_name: str) -> str:
+        """Convert assignment in method context."""
+        if len(stmt.targets) != 1:
+            raise UnsupportedFeatureError("Multiple assignment targets not supported")
+
+        target = stmt.targets[0]
+
+        # Handle self.attr = value
+        if (isinstance(target, ast.Attribute) and
+            isinstance(target.value, ast.Name) and
+            target.value.id == "self"):
+            attr_name = target.attr
+            value_expr = self._convert_expression(stmt.value)
+            return f"self->{attr_name} = {value_expr};"
+
+        # Regular assignment
+        return self._convert_assignment(stmt)
+
+    def _convert_method_return(self, stmt: ast.Return, class_name: str) -> str:
+        """Convert return statement in method context."""
+        if stmt.value is None:
+            return "return;"
+
+        value_expr = self._convert_method_expression(stmt.value, class_name)
+        return f"return {value_expr};"
+
+    def _convert_method_expression(self, expr: ast.expr, class_name: str) -> str:
+        """Convert expression in method context, handling self references."""
+        if isinstance(expr, ast.Attribute):
+            if (isinstance(expr.value, ast.Name) and expr.value.id == "self"):
+                # self.attr becomes self->attr
+                return f"self->{expr.attr}"
+
+        # For other expressions, use regular conversion
+        return self._convert_expression(expr)

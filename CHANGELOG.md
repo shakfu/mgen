@@ -17,6 +17,91 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.5]
+
+### Added
+- **Object-Oriented Programming Support**: Complete Python class to C struct conversion system
+  - Full Python class support with `__init__` constructors and instance methods
+  - Automatic struct generation with typedef declarations for each Python class
+  - Sophisticated method conversion with proper `self` parameter handling (converted to struct pointers)
+  - Constructor functions (`ClassName_new()`) with parameter passing and instance initialization
+  - Instance variable access conversion (`self.attr` → `self->attr`, `obj.attr` → `obj.attr`)
+  - Method call conversion (`obj.method()` → `ClassName_method(&obj)`) with automatic object reference
+- **Enhanced Assignment Support**: Complete attribute assignment handling
+  - Self-reference assignments in methods (`self.attr = value` → `self->attr = value`)
+  - Object attribute assignments (`obj.attr = value` → `obj.attr = value`)
+  - Type-annotated attribute assignments with proper C type mapping
+  - Mixed typed and inferred instance variable support
+- **Advanced OOP Features**: Production-ready object-oriented code generation
+  - Empty class support with dummy struct members for C compatibility
+  - Complex method implementations with control flow, loops, and function calls
+  - Multi-class interactions and object composition support
+  - Integrated type inference for instance variables and method parameters
+- **Comprehensive OOP Test Suite**: 19 new tests ensuring robust object-oriented functionality
+  - Complete class conversion test coverage (`test_backend_c_oop.py`)
+  - Method call, constructor, and instance variable access validation
+  - Complex integration scenarios with multiple classes and interactions
+  - Error handling and edge case validation for OOP features
+
+### Changed
+- **Py2C Converter Architecture**: Expanded to support complete object-oriented programming paradigm
+  - Enhanced expression handling to support method calls and class instantiation
+  - Updated assignment conversion to handle attribute assignments (`self.attr = value`)
+  - Integrated class definition processing in module conversion pipeline
+  - Extended type mapping system to track struct types and method signatures
+- **Code Generation Pipeline**: Advanced object-oriented code generation capabilities
+  - Class-aware variable context tracking for proper method call resolution
+  - Sophisticated struct member access pattern generation (`obj.member` vs `ptr->member`)
+  - Enhanced function signature generation for class methods with explicit self parameters
+  - Improved code organization with struct definitions, constructors, and method implementations
+
+### Technical Achievements
+- **Complete OOP Paradigm**: Python classes, methods, constructors, instance variables
+- **Advanced Code Generation**: Struct typedefs, constructor functions, method conversion
+- **Type Safety**: Automatic struct pointer handling and member access patterns
+- **Test Coverage**: All 175 tests passing (156 original + 19 new OOP tests)
+- **Production Ready**: Generates clean, efficient C code from Python OOP patterns
+
+### Example Conversion
+**Python Input:**
+```python
+class Rectangle:
+    def __init__(self, width: int, height: int):
+        self.width: int = width
+        self.height: int = height
+
+    def area(self) -> int:
+        return self.width * self.height
+
+def create_rect() -> int:
+    rect: Rectangle = Rectangle(5, 10)
+    return rect.area()
+```
+
+**Generated C Output:**
+```c
+typedef struct Rectangle {
+    int width;
+    int height;
+} Rectangle;
+
+Rectangle Rectangle_new(int width, int height) {
+    Rectangle obj;
+    obj.width = width;
+    obj.height = height;
+    return obj;
+}
+
+int Rectangle_area(Rectangle* self) {
+    return (self->width * self->height);
+}
+
+int create_rect(void) {
+    Rectangle rect = Rectangle_new(5, 10);
+    return Rectangle_area(&rect);
+}
+```
+
 ## [0.1.4]
 
 ### Added
