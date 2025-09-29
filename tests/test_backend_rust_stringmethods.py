@@ -226,7 +226,7 @@ class MessageBuilder:
         rust_code = self.converter.convert_code(python_code)
 
         assert "let mut clean_content = StrOps::upper(&StrOps::strip(&content));" in rust_code
-        assert "(self.prefix + (clean_content + self.suffix))" in rust_code
+        assert "((self.prefix + clean_content) + self.suffix)" in rust_code
 
 
 class TestRustStringMethodsAdvanced:

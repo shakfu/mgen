@@ -724,6 +724,16 @@ class MGenPythonToRustConverter:
             return self._convert_dict_comprehension(expr)
         elif isinstance(expr, ast.SetComp):
             return self._convert_set_comprehension(expr)
+        elif isinstance(expr, ast.BoolOp):
+            return self._convert_boolop(expr)
+        elif isinstance(expr, ast.IfExp):
+            return self._convert_ternary(expr)
+        elif isinstance(expr, ast.List):
+            return self._convert_list_literal(expr)
+        elif isinstance(expr, ast.Dict):
+            return self._convert_dict_literal(expr)
+        elif isinstance(expr, ast.Subscript):
+            return self._convert_subscript(expr)
         elif isinstance(expr, ast.GeneratorExp):
             raise UnsupportedFeatureError(f"Generator expressions are not supported in Rust backend")
         else:
@@ -794,6 +804,63 @@ class MGenPythonToRustConverter:
             result = f"({result} {op_str} {comp_expr})"
 
         return result
+
+    def _convert_boolop(self, expr: ast.BoolOp) -> str:
+        """Convert boolean operations (and, or)."""
+        values = [self._convert_expression(val) for val in expr.values]
+
+        if isinstance(expr.op, ast.And):
+            # Convert 'a and b' to '(a && b)'
+            return f"({' && '.join(values)})"
+        elif isinstance(expr.op, ast.Or):
+            # Convert 'a or b' to '(a || b)'
+            return f"({' || '.join(values)})"
+        else:
+            raise UnsupportedFeatureError(f"Boolean operator {type(expr.op).__name__} is not supported")
+
+    def _convert_ternary(self, expr: ast.IfExp) -> str:
+        """Convert ternary expressions (if-else)."""
+        # Convert 'a if condition else b' to 'if condition { a } else { b }'
+        condition = self._convert_expression(expr.test)
+        true_val = self._convert_expression(expr.body)
+        false_val = self._convert_expression(expr.orelse)
+
+        return f"if {condition} {{ {true_val} }} else {{ {false_val} }}"
+
+    def _convert_list_literal(self, expr: ast.List) -> str:
+        """Convert list literals."""
+        if not expr.elts:
+            # Empty list
+            return "vec![]"
+
+        elements = [self._convert_expression(elt) for elt in expr.elts]
+        return f"vec![{', '.join(elements)}]"
+
+    def _convert_dict_literal(self, expr: ast.Dict) -> str:
+        """Convert dictionary literals."""
+        if not expr.keys:
+            # Empty dictionary
+            return "std::collections::HashMap::new()"
+
+        # Convert key-value pairs
+        pairs = []
+        for key, value in zip(expr.keys, expr.values):
+            key_expr = self._convert_expression(key)
+            value_expr = self._convert_expression(value)
+            pairs.append(f"({key_expr}, {value_expr})")
+
+        # Create HashMap using collect()
+        return f"[{', '.join(pairs)}].iter().cloned().collect::<std::collections::HashMap<_, _>>()"
+
+    def _convert_subscript(self, expr: ast.Subscript) -> str:
+        """Convert subscript operations (indexing)."""
+        value = self._convert_expression(expr.value)
+        slice_expr = self._convert_expression(expr.slice)
+
+        # For now, treat all subscripts as HashMap/dict access with get()
+        # This is a simplification - in a full implementation we'd need to
+        # distinguish between lists, dicts, etc.
+        return f"{value}.get(&{slice_expr}).unwrap().clone()"
 
     def _convert_call(self, expr: ast.Call) -> str:
         """Convert function calls."""

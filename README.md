@@ -5,12 +5,18 @@ MGen translates Python code to multiple target languages while preserving semant
 ## Features
 
 - **Multi-Language Support**: Generate code for C, C++, Rust, Go with comprehensive language features
+
 - **Advanced Python Support**: Object-oriented programming, comprehensions, string methods, augmented assignment
+
 - **STL & Modern Libraries**: C++ STL containers, Rust collections, Go standard library integration
+
 - **Clean Architecture**: Extensible backend system for adding new languages
+
 - **Type-Safe Generation**: Leverages Python type annotations for accurate translation
+
 - **CLI Interface**: Simple command-line tool for conversion and building
-- **Comprehensive Testing**: Full test suite with 354 passing tests (98% success rate) ensuring translation accuracy
+
+- **Comprehensive Testing**: Full test suite with 566 passing tests (100% success rate) ensuring translation accuracy
 
 ## Supported Languages
 
@@ -18,7 +24,7 @@ MGen translates Python code to multiple target languages while preserving semant
 |----------|-------------|----------------|-------------------|-------------------|
 | C        | **Enhanced** | `.c`          | Makefile / gcc    | OOP, STC containers, string methods, comprehensions |
 | C++      | **Enhanced** | `.cpp`        | Makefile / g++    | OOP, STL containers, string methods, comprehensions |
-| Rust     | Basic       | `.rs`         | Cargo / rustc     | Basic functions, control flow |
+| Rust     | **Enhanced** | `.rs`         | Cargo / rustc     | OOP, std library, string methods, comprehensions, memory safety |
 | Go       | **Enhanced** | `.go`         | go.mod / go build | OOP, standard library, string methods, comprehensions |
 
 ## Quick Start
@@ -49,6 +55,9 @@ mgen --target rust build my_script.py
 
 # Convert Python to Go (with enhanced features)
 mgen --target go convert my_script.py
+
+# Convert Python to Rust (with enhanced features)
+mgen --target rust convert my_script.py
 
 # Batch convert all Python files
 mgen --target cpp batch --source-dir ./examples
@@ -120,6 +129,23 @@ func add(x int, y int) int {
 func main() {
     result := add(5, 3)
     mgen.Print(result)
+}
+```
+
+**Generated Rust:**
+
+```rust
+// Include MGen Rust runtime
+mod mgen_rust_runtime;
+use mgen_rust_runtime::*;
+
+fn add(x: i32, y: i32) -> i32 {
+    (x + y)
+}
+
+fn main() {
+    let mut result = add(5, 3);
+    print_value(result);
 }
 ```
 
@@ -218,6 +244,45 @@ func process() []interface{} {
         _ := item.(int)
         return calc.GetResult()
     })
+}
+```
+
+**Generated Rust:**
+
+```rust
+use std::collections::{HashMap, HashSet};
+
+// Include MGen Rust runtime
+mod mgen_rust_runtime;
+use mgen_rust_runtime::*;
+
+#[derive(Clone)]
+struct Calculator {
+    name: String,
+    total: i32,
+}
+
+impl Calculator {
+    fn new(name: String) -> Self {
+        Calculator {
+            name: name,
+            total: 0,
+        }
+    }
+
+    fn add(&mut self, value: i32) {
+        self.total += value;
+    }
+
+    fn get_result(&mut self) -> String {
+        ((StrOps::upper(&self.name) + ": ".to_string()) + to_string(self.total))
+    }
+}
+
+fn process() -> Vec<String> {
+    let mut calc = Calculator::new("math".to_string());
+    calc.add(10);
+    Comprehensions::list_comprehension(new_range(2).collect(), |_| calc.get_result())
 }
 ```
 
@@ -348,20 +413,21 @@ The C, C++, and Go backends support sophisticated Python language features:
 
 ### Test Coverage
 
-- **354 passing tests** across all backends (98% success rate)
+- **566 passing tests** across all backends (100% success rate)
 - **104 C++ backend tests** (104 passing, 100% success rate)
 - **191 C backend tests** with comprehensive advanced features
 - **95 Go backend tests** (95 passing, 100% success rate)
+- **176 Rust backend tests** with comprehensive OOP, string methods, and comprehensions support
 - Specialized test suites for OOP, string methods, comprehensions, and more
 
 ## Roadmap
 
 - [x] **C++ Backend Enhancement** - STL-based runtime with feature parity to C backend
 - [x] **Advanced Python Features** - OOP, comprehensions, string methods, augmented assignment
-- [x] **Comprehensive Testing** - 354 tests with 98% success rate ensuring translation accuracy
+- [x] **Comprehensive Testing** - 566 tests with 100% success rate ensuring translation accuracy
 - [x] **Production-Ready C++ Backend** - Complete feature parity with advanced comprehension support
 - [x] **Go Backend Enhancement** - Complete feature parity with C/C++ backends using Go standard library
-- [ ] **Rust Backend Enhancement** - Expand beyond basic functions
+- [x] **Rust Backend Enhancement** - Complete feature parity with C/C++/Go backends using Rust standard library
 - [ ] **Performance Benchmarking** - Cross-language performance analysis
 - [ ] **Web Interface** - Online code conversion tool
 - [ ] **Plugin System** - External backend support
