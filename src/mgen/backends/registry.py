@@ -62,6 +62,13 @@ class BackendRegistry:
         except ImportError:
             pass  # C++ backend not yet implemented
 
+        # Try to register Haskell backend
+        try:
+            from .haskell.backend import HaskellBackend
+            self.register_backend("haskell", HaskellBackend)
+        except ImportError:
+            pass  # Haskell backend not yet implemented
+
 
 # Global registry instance
 registry = BackendRegistry()

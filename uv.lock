@@ -159,7 +159,7 @@ wheels = [
 
 [[package]]
 name = "mgen"
-version = "0.0.1"
+version = "0.1.12"
 source = { editable = "." }
 dependencies = [
     { name = "typing-extensions" },
