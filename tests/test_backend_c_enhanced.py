@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 from mgen.backends.c.emitter import CEmitter
-from mgen.backends.c.py2c_converter import MGenPythonToCConverter, UnsupportedFeatureError
+from mgen.backends.c.emitter import MGenPythonToCConverter, UnsupportedFeatureError
 from mgen.backends.c.factory import CFactory
 from mgen.backends.c.builder import CBuilder
 from mgen.backends.c.containers import CContainerSystem

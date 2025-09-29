@@ -17,6 +17,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.6]
+
+### Changed
+- **Architecture Consolidation**: Complete merger of py2c converter functionality into emitter module
+  - Merged `src/mgen/backends/c/py2c_converter.py` into `src/mgen/backends/c/emitter.py` (1,160 total lines)
+  - Consolidated `MGenPythonToCConverter` class, exception classes, and all OOP functionality in single module
+  - Simplified import structure by removing separate py2c_converter dependency
+  - Updated all test files to import from unified emitter module
+- **Code Organization**: Enhanced C backend architecture with streamlined module structure
+  - Eliminated redundant file separation while preserving all functionality
+  - Improved maintainability with related functionality grouped in single location
+  - Reduced module complexity and import dependencies across the codebase
+
+### Technical Improvements
+- **Unified C Backend**: All 866 lines of sophisticated Python-to-C conversion code now integrated in emitter.py
+- **Preserved API Compatibility**: All existing functionality maintained with identical interface
+- **Test Coverage**: All 175 tests continue to pass with zero regressions after merge
+- **Clean Architecture**: Consolidated sophisticated OOP support, runtime integration, and code generation in one module
+
 ## [0.1.5]
 
 ### Added

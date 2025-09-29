@@ -3,7 +3,7 @@
 import pytest
 import ast
 
-from mgen.backends.c.py2c_converter import (
+from mgen.backends.c.emitter import (
     MGenPythonToCConverter,
     UnsupportedFeatureError,
     TypeMappingError
