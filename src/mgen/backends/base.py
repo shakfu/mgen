@@ -4,9 +4,15 @@ import ast
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
+from .preferences import BackendPreferences
+
 
 class LanguageBackend(ABC):
     """Abstract base for all language backends in MGen."""
+
+    def __init__(self, preferences: Optional[BackendPreferences] = None):
+        """Initialize backend with optional preferences."""
+        self.preferences = preferences
 
     @abstractmethod
     def get_name(self) -> str:
@@ -55,6 +61,10 @@ class AbstractFactory(ABC):
 
 class AbstractEmitter(ABC):
     """Abstract emitter for generating language-specific code."""
+
+    def __init__(self, preferences: Optional[BackendPreferences] = None):
+        """Initialize emitter with optional preferences."""
+        self.preferences = preferences
 
     @abstractmethod
     def emit_function(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:

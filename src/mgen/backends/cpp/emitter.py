@@ -1196,12 +1196,14 @@ class MGenPythonToCppConverter:
 class CppEmitter(AbstractEmitter):
     """Enhanced C++ emitter using MGen Python-to-C++ converter."""
 
-    def __init__(self):
+    def __init__(self, preferences=None):
         """Initialize the C++ emitter."""
+        super().__init__(preferences)
         self.factory = CppFactory()
         self.converter = MGenPythonToCppConverter()
         self.indent_level = 0
-        self.indent_size = 4
+        # Use preferences for indent size if available
+        self.indent_size = preferences.get('indent_size', 4) if preferences else 4
 
     def emit_module(self, source_code: str, analysis_result: Optional[Any] = None) -> str:
         """Emit a complete C++ module from Python source."""

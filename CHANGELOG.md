@@ -17,6 +17,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.15]
+
+### Added
+
+- **Universal Backend Preference System**: Complete preference system generalized to all MGen backends
+  - **All-Backend Support**: Preferences now available for Haskell, C, C++, Rust, and Go backends
+  - **Comprehensive Preference Classes**:
+    - `HaskellPreferences`: 12 Haskell-specific preferences (comprehensions, type system, style)
+    - `CPreferences`: 12 C-specific preferences (STC containers, memory management, style)
+    - `CppPreferences`: 15 C++ preferences (C++ standard, modern features, STL usage)
+    - `RustPreferences`: 19 Rust preferences (edition, ownership patterns, idioms)
+    - `GoPreferences`: 18 Go preferences (version, concurrency, Go-specific features)
+  - **Universal CLI Integration**: `--prefer KEY=VALUE` flag works with all backends
+  - **PreferencesRegistry**: Automatic preference class creation and management
+  - **Type-Safe Configuration**: Boolean, string, numeric, and list preference support
+
+### Enhanced
+
+- **Backend Architecture**: All backends updated to support preference-driven code generation
+  - **Constructor Updates**: All backend classes accept optional `BackendPreferences` parameter
+  - **Emitter Integration**: All emitters receive and utilize preferences for customized output
+  - **Pipeline Integration**: Complete preference flow from CLI through pipeline to code generation
+  - **Default Behavior**: Seamless fallback to sensible defaults when no preferences specified
+
+- **CLI System**: Enhanced command-line interface with universal preference support
+  - **Multi-Backend Examples**: Usage examples for all supported backends
+  - **Preference Parsing**: Intelligent type conversion for all preference value types
+  - **Debug Logging**: Detailed preference setting confirmation in verbose mode
+
+- **Documentation**: Comprehensive preference system documentation
+  - **PREFERENCES.md**: Complete guide with examples for all backends
+  - **CLI Help**: Updated help text with preference usage examples
+  - **Design Philosophy**: Documented trade-offs between consistency vs. idiomaticity
+
+### Examples
+
+```bash
+# Haskell with native comprehensions
+mgen convert app.py --target haskell --prefer use_native_comprehensions=true
+
+# C with custom container settings
+mgen convert app.py --target c --prefer use_stc_containers=false --prefer indent_size=2
+
+# C++ with modern features
+mgen convert app.py --target cpp --prefer cpp_standard=c++20 --prefer use_modern_cpp=true
+
+# Rust with edition targeting
+mgen convert app.py --target rust --prefer rust_edition=2018 --prefer clone_strategy=explicit
+
+# Go with version control
+mgen convert app.py --target go --prefer go_version=1.19 --prefer use_generics=false
+```
+
 ## [0.1.14]
 
 ### Fixed

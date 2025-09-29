@@ -997,8 +997,9 @@ class MGenPythonToGoConverter:
 class GoEmitter(AbstractEmitter):
     """Enhanced Go code emitter implementation with comprehensive Python support."""
 
-    def __init__(self):
+    def __init__(self, preferences=None):
         """Initialize Go emitter."""
+        super().__init__(preferences)
         self.converter = MGenPythonToGoConverter()
 
     def map_python_type(self, python_type: str) -> str:

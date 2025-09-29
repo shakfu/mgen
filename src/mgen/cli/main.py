@@ -17,13 +17,14 @@ import argparse
 import shutil
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from ..common import log
 
 # Import the pipeline and backends
 from ..pipeline import BuildMode, MGenPipeline, OptimizationLevel, PipelineConfig
 from ..backends.registry import registry
+from ..backends.preferences import PreferencesRegistry
 
 BUILD_DIR = "build"
 
@@ -48,6 +49,8 @@ class MGenCLI:
             epilog=f"""
 Examples:
   mgen convert my_module.py --target c     # Generate C code in build/src/
+  mgen convert my_module.py --target haskell --prefer use_native_comprehensions=true
+  mgen build example.py --target haskell --prefer use_native_comprehensions=true --prefer camel_case_conversion=false
   mgen convert my_module.py --target rust  # Generate Rust code in build/src/
   mgen build my_module.py --target go      # Generate Go code and compile
   mgen build my_module.py -m --target cpp  # Generate C++ code and Makefile
@@ -70,6 +73,8 @@ Build Directory Structure:
         parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
         parser.add_argument("--target", "-t", type=str, default="c",
                           help=f"Target language (default: c, available: {backends_str})")
+        parser.add_argument("--prefer", "-p", action="append", metavar="KEY=VALUE",
+                          help="Set backend preferences (e.g., --prefer use_native_comprehensions=true)")
 
         # Subcommands
         subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -151,6 +156,36 @@ Build Directory Structure:
         }
         return mapping.get(level_str, OptimizationLevel.MODERATE)
 
+    def parse_preferences(self, backend_name: str, preference_args: Optional[List[str]] = None):
+        """Parse preference arguments and create backend preferences."""
+        # Create default preferences for the backend
+        preferences = PreferencesRegistry.create_preferences(backend_name)
+
+        if preference_args:
+            for pref_arg in preference_args:
+                if "=" not in pref_arg:
+                    self.log.warning(f"Ignoring invalid preference format: {pref_arg} (expected KEY=VALUE)")
+                    continue
+
+                key, value_str = pref_arg.split("=", 1)
+                key = key.strip()
+                value_str = value_str.strip()
+
+                # Convert string values to appropriate types
+                if value_str.lower() in ("true", "false"):
+                    value = value_str.lower() == "true"
+                elif value_str.isdigit():
+                    value = int(value_str)
+                elif "." in value_str and value_str.replace(".", "").isdigit():
+                    value = float(value_str)
+                else:
+                    value = value_str
+
+                preferences.set(key, value)
+                self.log.debug(f"Set {backend_name} preference: {key} = {value}")
+
+        return preferences
+
     def setup_build_directory(self, build_dir: Path) -> None:
         """Set up the build directory structure."""
         # Create build directory structure
@@ -228,6 +263,9 @@ Build Directory Structure:
             self.log.error(f"Unsupported target language '{target}'. Available: {available}")
             return 1
 
+        # Parse backend preferences
+        preferences = self.parse_preferences(target, args.prefer)
+
         build_dir = Path(args.build_dir)
         self.setup_build_directory(build_dir)
 
@@ -237,6 +275,7 @@ Build Directory Structure:
             output_dir=str(build_dir / "src"),
             build_mode=BuildMode.NONE,
             target_language=target,
+            backend_preferences=preferences,
         )
 
         try:
@@ -276,6 +315,9 @@ Build Directory Structure:
             self.log.error(f"Unsupported target language '{target}'. Available: {available}")
             return 1
 
+        # Parse backend preferences
+        preferences = self.parse_preferences(target, args.prefer)
+
         build_dir = Path(args.build_dir)
         self.setup_build_directory(build_dir)
 
@@ -300,6 +342,7 @@ Build Directory Structure:
             target_language=target,
             compiler=getattr(args, "compiler", None),  # Use backend default if not specified
             include_dirs=include_dirs,
+            backend_preferences=preferences,
         )
 
         # Run MGen pipeline
@@ -378,6 +421,9 @@ Build Directory Structure:
             self.log.error(f"Unsupported target language '{target}'. Available: {available}")
             return 1
 
+        # Parse backend preferences
+        preferences = self.parse_preferences(target, args.prefer)
+
         source_dir = args.source_dir
         output_dir = args.output_dir
         continue_on_error = args.continue_on_error
@@ -431,7 +477,7 @@ Build Directory Structure:
 
         for i, input_file in enumerate(python_files, 1):
             filename = os.path.basename(input_file)
-            backend = registry.get_backend(target)
+            backend = registry.get_backend(target, preferences)
             output_filename = filename.replace(".py", backend.get_file_extension())
             output_file = os.path.join(output_dir, output_filename)
 
@@ -562,7 +608,7 @@ Build Directory Structure:
         self.log.info("Available language backends:")
         for backend_name in sorted(available_backends):
             try:
-                backend = registry.get_backend(backend_name)
+                backend = registry.get_backend(backend_name)  # Use default preferences for listing
                 extension = backend.get_file_extension()
                 self.log.info(f"  {backend_name:8} - generates {extension} files")
             except Exception as e:

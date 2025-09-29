@@ -4,29 +4,31 @@ MGen translates Python code to multiple target languages while preserving semant
 
 ## Features
 
-- **Multi-Language Support**: Generate code for C, C++, Rust, Go with comprehensive language features
+- **Multi-Language Support**: Generate code for C, C++, Rust, Go, Haskell with comprehensive language features
+
+- **Universal Preference System**: Customize code generation for each backend with language-specific preferences
 
 - **Advanced Python Support**: Object-oriented programming, comprehensions, string methods, augmented assignment
 
-- **Modern Libraries**: C++ STL containers, Rust collections, Go standard library integration
+- **Modern Libraries**: C++ STL containers, Rust collections, Go standard library integration, Haskell standard library
 
-- **Clean Architecture**: Extensible backend system for adding new languages
+- **Clean Architecture**: Extensible backend system for adding new languages with preference support
 
 - **Type-Safe Generation**: Leverages Python type annotations for accurate translation
 
-- **CLI Interface**: Simple command-line tool for conversion and building
+- **CLI Interface**: Simple command-line tool with preference customization for conversion and building
 
 - **Comprehensive Testing**: Full test suite with 659 passing tests (100% success rate) ensuring translation accuracy
 
 ## Supported Languages
 
-| Language | Status      | File Extension | Build System      | Advanced Features |
-|----------|-------------|----------------|-------------------|-------------------|
-| C        | **Enhanced** | `.c`          | Makefile / gcc    | OOP, STC containers, string methods, comprehensions |
-| C++      | **Enhanced** | `.cpp`        | Makefile / g++    | OOP, STL containers, string methods, comprehensions |
-| Rust     | **Enhanced** | `.rs`         | Cargo / rustc     | OOP, std library, string methods, comprehensions, memory safety |
-| Go       | **Enhanced** | `.go`         | go.mod / go build | OOP, standard library, string methods, comprehensions |
-| Haskell  | **Enhanced** | `.hs`         | Cabal / ghc       | OOP, pure functions, string methods, comprehensions, type safety |
+| Language | Status      | File Extension | Build System      | Advanced Features | Preferences |
+|----------|-------------|----------------|-------------------|-------------------|-------------|
+| C        | **Enhanced** | `.c`          | Makefile / gcc    | OOP, STC containers, string methods, comprehensions | 12 settings (containers, memory, style) |
+| C++      | **Enhanced** | `.cpp`        | Makefile / g++    | OOP, STL containers, string methods, comprehensions | 15 settings (C++ standard, modern features, STL) |
+| Rust     | **Enhanced** | `.rs`         | Cargo / rustc     | OOP, std library, string methods, comprehensions, memory safety | 19 settings (edition, ownership, idioms) |
+| Go       | **Enhanced** | `.go`         | go.mod / go build | OOP, standard library, string methods, comprehensions | 18 settings (version, concurrency, Go patterns) |
+| Haskell  | **Enhanced** | `.hs`         | Cabal / ghc       | OOP, pure functions, string methods, comprehensions, type safety | 12 settings (comprehensions, type system, style) |
 
 ## Quick Start
 
@@ -57,15 +59,81 @@ mgen --target rust build my_script.py
 # Convert Python to Go (with enhanced features)
 mgen --target go convert my_script.py
 
-# Convert Python to Rust (with enhanced features)
-mgen --target rust convert my_script.py
-
 # Convert Python to Haskell (with functional programming features)
 mgen --target haskell convert my_script.py
 
 # Batch convert all Python files
 mgen --target cpp batch --source-dir ./examples
 ```
+
+### Backend Preferences
+
+Customize code generation for each target language with the `--prefer` flag:
+
+```bash
+# Haskell with native comprehensions (idiomatic)
+mgen --target haskell convert my_script.py --prefer use_native_comprehensions=true
+
+# C with custom settings
+mgen --target c convert my_script.py --prefer use_stc_containers=false --prefer indent_size=2
+
+# C++ with modern features
+mgen --target cpp convert my_script.py --prefer cpp_standard=c++20 --prefer use_modern_cpp=true
+
+# Rust with specific edition
+mgen --target rust convert my_script.py --prefer rust_edition=2018 --prefer clone_strategy=explicit
+
+# Go with version targeting
+mgen --target go convert my_script.py --prefer go_version=1.19 --prefer use_generics=false
+
+# Multiple preferences
+mgen --target haskell build my_script.py \
+  --prefer use_native_comprehensions=true \
+  --prefer camel_case_conversion=false \
+  --prefer strict_data_types=true
+```
+
+## Preference System
+
+MGen features a comprehensive preference system that allows you to choose between **cross-language consistency** (default) and **language-specific idiomatic optimizations**.
+
+### Design Philosophy
+
+- **Default (Consistent)**: Uses runtime library functions for predictable behavior across all languages
+- **Idiomatic (Optimized)**: Uses native language features for better performance and familiarity
+
+### Available Preference Categories
+
+| Backend | Key Preferences | Description |
+|---------|-----------------|-------------|
+| **Haskell** | `use_native_comprehensions`, `camel_case_conversion`, `strict_data_types` | Native vs runtime comprehensions, naming, type system |
+| **C** | `use_stc_containers`, `brace_style`, `indent_size` | Container choice, code style, memory management |
+| **C++** | `cpp_standard`, `use_modern_cpp`, `use_stl_containers` | Language standard, modern features, STL usage |
+| **Rust** | `rust_edition`, `clone_strategy`, `use_iterators` | Edition targeting, ownership patterns, functional style |
+| **Go** | `go_version`, `use_generics`, `naming_convention` | Version compatibility, language features, Go idioms |
+
+### Example: Haskell Comprehensions
+
+**Python Source:**
+
+```python
+def filter_numbers(numbers):
+    return [x * 2 for x in numbers if x > 5]
+```
+
+**Default (Runtime Consistency):**
+
+```haskell
+filterNumbers numbers = listComprehensionWithFilter numbers (\x -> x > 5) (\x -> x * 2)
+```
+
+**Native (Idiomatic Haskell):**
+
+```haskell
+filterNumbers numbers = [x * 2 | x <- numbers, x > 5]
+```
+
+For complete preference documentation, see [PREFERENCES.md](PREFERENCES.md).
 
 ## Examples
 
@@ -487,6 +555,7 @@ The C, C++, and Go backends support sophisticated Python language features:
 - [x] **Go Backend Enhancement** - Complete feature parity with C/C++ backends using Go standard library
 - [x] **Rust Backend Enhancement** - Complete feature parity with C/C++/Go backends using Rust standard library
 - [x] **Haskell Backend Enhancement** - Complete functional programming backend with type safety and Haskell standard library
+- [x] **Universal Preference System** - Language-specific customization for all backends with CLI integration
 - [ ] **Performance Benchmarking** - Cross-language performance analysis
 - [ ] **Web Interface** - Online code conversion tool
 - [ ] **Plugin System** - External backend support

@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass
 
 from .backends.registry import registry
+from .backends.preferences import BackendPreferences
 from .common import log
 
 # Import frontend analysis components
@@ -90,6 +91,7 @@ class PipelineConfig:
     libraries: Optional[List[str]] = None
     enable_advanced_analysis: bool = True
     enable_optimizations: bool = True
+    backend_preferences: Optional[BackendPreferences] = None
 
     def __post_init__(self) -> None:
         """Initialize default values."""
@@ -155,7 +157,7 @@ class MGenPipeline:
         """Initialize pipeline components."""
         # Get backend for target language
         try:
-            self.backend = registry.get_backend(self.config.target_language)
+            self.backend = registry.get_backend(self.config.target_language, self.config.backend_preferences)
             self.emitter = self.backend.get_emitter()
             self.builder = self.backend.get_builder()
             self.factory = self.backend.get_factory()

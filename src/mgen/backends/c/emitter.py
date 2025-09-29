@@ -1326,8 +1326,9 @@ class MGenPythonToCConverter:
 class CEmitter(AbstractEmitter):
     """C code emitter with integrated runtime libraries and sophisticated py2c conversion."""
 
-    def __init__(self):
+    def __init__(self, preferences=None):
         """Initialize C emitter with sophisticated py2c conversion and runtime support."""
+        super().__init__(preferences)
         self.runtime_dir = Path(__file__).parent / "runtime"
         self.use_runtime = self.runtime_dir.exists()
 

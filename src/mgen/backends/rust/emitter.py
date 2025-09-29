@@ -1165,8 +1165,9 @@ class MGenPythonToRustConverter:
 class RustEmitter(AbstractEmitter):
     """Enhanced Rust code emitter using the MGenPythonToRustConverter."""
 
-    def __init__(self):
+    def __init__(self, preferences=None):
         """Initialize Rust emitter."""
+        super().__init__(preferences)
         self.converter = MGenPythonToRustConverter()
 
     def map_python_type(self, python_type: str) -> str:

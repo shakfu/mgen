@@ -1,6 +1,9 @@
 """Haskell backend implementation for MGen."""
 
+from typing import Optional
+
 from ..base import LanguageBackend, AbstractFactory, AbstractEmitter, AbstractBuilder, AbstractContainerSystem
+from ..preferences import BackendPreferences, HaskellPreferences
 from .factory import HaskellFactory
 from .emitter import HaskellEmitter
 from .builder import HaskellBuilder
@@ -9,6 +12,12 @@ from .containers import HaskellContainerSystem
 
 class HaskellBackend(LanguageBackend):
     """Haskell backend implementation for MGen."""
+
+    def __init__(self, preferences: Optional[BackendPreferences] = None):
+        """Initialize Haskell backend with preferences."""
+        if preferences is None:
+            preferences = HaskellPreferences()
+        super().__init__(preferences)
 
     def get_name(self) -> str:
         """Return backend name."""
@@ -24,7 +33,7 @@ class HaskellBackend(LanguageBackend):
 
     def get_emitter(self) -> AbstractEmitter:
         """Get Haskell code emitter."""
-        return HaskellEmitter()
+        return HaskellEmitter(self.preferences)
 
     def get_builder(self) -> AbstractBuilder:
         """Get Haskell build system."""

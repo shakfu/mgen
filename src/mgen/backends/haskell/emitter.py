@@ -1,9 +1,10 @@
 """Enhanced Haskell code emitter for MGen with comprehensive Python language support."""
 
 import ast
-from typing import Any, Dict, List, Union, Set
+from typing import Any, Dict, List, Union, Set, Optional
 
 from ..base import AbstractEmitter
+from ..preferences import BackendPreferences
 
 
 class UnsupportedFeatureError(Exception):
@@ -19,8 +20,9 @@ class TypeMappingError(Exception):
 class MGenPythonToHaskellConverter:
     """Sophisticated Python-to-Haskell converter with comprehensive language support."""
 
-    def __init__(self):
-        """Initialize the converter."""
+    def __init__(self, preferences: Optional[BackendPreferences] = None):
+        """Initialize the converter with optional preferences."""
+        self.preferences = preferences
         self.type_map = {
             "int": "Int",
             "float": "Double",
@@ -702,7 +704,11 @@ main = printValue "Generated Haskell code executed successfully"'''
 
     def _convert_list_comprehension(self, node: ast.ListComp) -> str:
         """Convert Python list comprehension to Haskell."""
-        # [expr for target in iter if conditions]
+        # Check preferences for comprehension style
+        use_native = False
+        if self.preferences and self.preferences.get('use_native_comprehensions', False):
+            use_native = True
+
         expr = self._convert_expression(node.elt)
 
         if len(node.generators) != 1:
@@ -712,17 +718,30 @@ main = printValue "Generated Haskell code executed successfully"'''
         target = self._to_haskell_var_name(gen.target.id) if isinstance(gen.target, ast.Name) else "x"
         iterable = self._convert_expression(gen.iter)
 
-        if gen.ifs:
-            # List comprehension with filter
-            conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
-            condition = " && ".join(conditions)
-            return f"listComprehensionWithFilter {iterable} (\\{target} -> {condition}) (\\{target} -> {expr})"
+        if use_native:
+            # Use native Haskell list comprehension syntax
+            if gen.ifs:
+                conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
+                condition = " && ".join(conditions)
+                return f"[{expr} | {target} <- {iterable}, {condition}]"
+            else:
+                return f"[{expr} | {target} <- {iterable}]"
         else:
-            # Simple list comprehension
-            return f"listComprehension {iterable} (\\{target} -> {expr})"
+            # Use runtime library functions (default for consistency)
+            if gen.ifs:
+                conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
+                condition = " && ".join(conditions)
+                return f"listComprehensionWithFilter {iterable} (\\{target} -> {condition}) (\\{target} -> {expr})"
+            else:
+                return f"listComprehension {iterable} (\\{target} -> {expr})"
 
     def _convert_dict_comprehension(self, node: ast.DictComp) -> str:
         """Convert Python dict comprehension to Haskell."""
+        # Check preferences for comprehension style
+        use_native = False
+        if self.preferences and self.preferences.get('use_native_comprehensions', False):
+            use_native = True
+
         key_expr = self._convert_expression(node.key)
         value_expr = self._convert_expression(node.value)
 
@@ -733,15 +752,30 @@ main = printValue "Generated Haskell code executed successfully"'''
         target = self._to_haskell_var_name(gen.target.id) if isinstance(gen.target, ast.Name) else "x"
         iterable = self._convert_expression(gen.iter)
 
-        if gen.ifs:
-            conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
-            condition = " && ".join(conditions)
-            return f"dictComprehensionWithFilter {iterable} (\\{target} -> {condition}) (\\{target} -> {key_expr}) (\\{target} -> {value_expr})"
+        if use_native:
+            # Use native Haskell with Map.fromList
+            if gen.ifs:
+                conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
+                condition = " && ".join(conditions)
+                return f"Map.fromList [({key_expr}, {value_expr}) | {target} <- {iterable}, {condition}]"
+            else:
+                return f"Map.fromList [({key_expr}, {value_expr}) | {target} <- {iterable}]"
         else:
-            return f"dictComprehension {iterable} (\\{target} -> {key_expr}) (\\{target} -> {value_expr})"
+            # Use runtime library functions (default for consistency)
+            if gen.ifs:
+                conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
+                condition = " && ".join(conditions)
+                return f"dictComprehensionWithFilter {iterable} (\\{target} -> {condition}) (\\{target} -> {key_expr}) (\\{target} -> {value_expr})"
+            else:
+                return f"dictComprehension {iterable} (\\{target} -> {key_expr}) (\\{target} -> {value_expr})"
 
     def _convert_set_comprehension(self, node: ast.SetComp) -> str:
         """Convert Python set comprehension to Haskell."""
+        # Check preferences for comprehension style
+        use_native = False
+        if self.preferences and self.preferences.get('use_native_comprehensions', False):
+            use_native = True
+
         expr = self._convert_expression(node.elt)
 
         if len(node.generators) != 1:
@@ -751,12 +785,22 @@ main = printValue "Generated Haskell code executed successfully"'''
         target = self._to_haskell_var_name(gen.target.id) if isinstance(gen.target, ast.Name) else "x"
         iterable = self._convert_expression(gen.iter)
 
-        if gen.ifs:
-            conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
-            condition = " && ".join(conditions)
-            return f"setComprehensionWithFilter {iterable} (\\{target} -> {condition}) (\\{target} -> {expr})"
+        if use_native:
+            # Use native Haskell with Set.fromList
+            if gen.ifs:
+                conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
+                condition = " && ".join(conditions)
+                return f"Set.fromList [{expr} | {target} <- {iterable}, {condition}]"
+            else:
+                return f"Set.fromList [{expr} | {target} <- {iterable}]"
         else:
-            return f"setComprehension {iterable} (\\{target} -> {expr})"
+            # Use runtime library functions (default for consistency)
+            if gen.ifs:
+                conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
+                condition = " && ".join(conditions)
+                return f"setComprehensionWithFilter {iterable} (\\{target} -> {condition}) (\\{target} -> {expr})"
+            else:
+                return f"setComprehension {iterable} (\\{target} -> {expr})"
 
     def _convert_ternary_expression(self, node: ast.IfExp) -> str:
         """Convert Python ternary expression to Haskell if-then-else."""
@@ -877,9 +921,10 @@ main = printValue "Generated Haskell code executed successfully"'''
 class HaskellEmitter(AbstractEmitter):
     """Haskell code emitter using the Python-to-Haskell converter."""
 
-    def __init__(self):
-        """Initialize Haskell emitter."""
-        self.converter = MGenPythonToHaskellConverter()
+    def __init__(self, preferences: Optional[BackendPreferences] = None):
+        """Initialize Haskell emitter with optional preferences."""
+        super().__init__(preferences)
+        self.converter = MGenPythonToHaskellConverter(preferences)
 
     def emit_code(self, ast_node: ast.AST) -> str:
         """Generate Haskell code from Python AST."""
