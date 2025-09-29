@@ -1,0 +1,11 @@
+Hello world! This is a simple test file.
+
+It contains multiple sentences. Some sentences are short. Others are longer and contain more complex vocabulary and grammatical structures.
+
+The purpose of this file is to demonstrate the text analysis capabilities of both the Python and C versions of our program.
+
+We can analyze word frequency, calculate reading time, and determine text complexity. The program should handle various types of content effectively.
+
+Programming languages like Python and C each have their own strengths. Python excels at rapid development and readability. C provides performance and low-level control.
+
+This test demonstrates the successful translation between these two paradigms using the CGen framework.
