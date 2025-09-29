@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [0.1.10]
 
 ### Fixed
+
 - **C++ Backend Comprehensive Fixes**: Achieved 100% test coverage (104/104 tests passing)
   - **Method Statement Handling**: Complete fix for `self` to `this` conversion in all method contexts
     - Enhanced if statement handling in method context with proper attribute conversion
@@ -39,6 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
     - Fixed expression conversion to handle complex nested method calls and attribute access
 
 ### Enhanced
+
 - **Test Suite Reliability**: Comprehensive test fixes achieving perfect success rate
   - Updated integration tests to handle both specific and inferred type declarations
   - Enhanced error handling tests to accept flexible return type annotations
@@ -47,6 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [0.1.9]
 
 ### Added
+
 - **Enhanced C++ Backend**: Complete C++ backend overhaul to match C backend feature parity using modern STL
   - **STL-Based Runtime System**: Comprehensive `mgen_cpp_runtime.hpp` with STL containers and Python-like operations
     - String operations using C++ STL string methods (`StringOps::upper`, `lower`, `strip`, `find`, `replace`, `split`)
@@ -64,10 +67,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
     - Modern C++ memory management with RAII and smart pointers where appropriate
 
 ### Enhanced
+
 - **Advanced Language Features**: Complete feature parity with C backend using STL equivalents
   - **Augmented Assignment**: All operators (`+=`, `-=`, `*=`, etc.) with proper `this->` conversion in methods
   - **String Methods**: Native C++ string operations with STL integration and automatic type inference
   - **Comprehensions**: List, dict, and set comprehensions using STL containers and lambda expressions
+
     ```cpp
     // List comprehension: [x*2 for x in range(n) if x > 5]
     auto result = list_comprehension(Range(n), [](x) { return x*2; }, [](x) { return x > 5; });
@@ -75,10 +80,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
     // Dict comprehension: {k: v for k in range(n)}
     auto mapping = dict_comprehension(Range(n), [](k) { return std::make_pair(k, k*k); });
     ```
+
   - **Type System**: Enhanced type inference with C++ type mapping and automatic template specialization
   - **Build Integration**: Enhanced builder with STL include detection and header-only runtime setup
 
 ### Technical Achievements
+
 - **Comprehensive Test Coverage**: 104 C++ backend tests across 6 specialized test files (104 passing, 100% success rate)
   - `test_backend_cpp_basics.py`: Core functionality and basic conversions
   - `test_backend_cpp_oop.py`: Object-oriented programming features
@@ -91,7 +98,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **Production-Ready Code**: Clean, efficient C++ code generation with proper RAII and modern practices
 
 ### Example Conversion
+
 **Python Input:**
+
 ```python
 class BankAccount:
     def __init__(self, account_number: str, initial_balance: float):
@@ -111,6 +120,7 @@ def process_accounts() -> list:
 ```
 
 **Generated C++ Output:**
+
 ```cpp
 #include <iostream>
 #include <vector>
@@ -150,6 +160,7 @@ std::vector<std::string> process_accounts() {
 ```
 
 ### Performance Impact
+
 - **Build Quality**: Overall test suite now shows 349 passed, 10 failed (vs 338 passed, 21 failed)
 - **Feature Parity**: C++ backend matches C backend capabilities with modern STL implementation
 - **Code Quality**: Header-only runtime eliminates compilation complexity while maintaining performance
@@ -157,6 +168,7 @@ std::vector<std::string> process_accounts() {
 ## [0.1.8]
 
 ### Added
+
 - **Advanced Assignment Operators**: Complete augmented assignment support with comprehensive operator mapping
   - All Python augmented assignment operators: `+=`, `-=`, `*=`, `/=`, `//=`, `%=`, `|=`, `^=`, `&=`, `<<=`, `>>=`
   - Support for simple variables (`x += 5`) and object attributes (`self.count *= 2`, `obj.value += amount`)
@@ -172,6 +184,7 @@ std::vector<std::string> process_accounts() {
   - Support for string literals (`"hello".upper()`) and variables with proper type inference
 
 ### Technical Achievements
+
 - **Augmented Assignment Engine**: Complete AST.AugAssign handling with operator mapping and type validation
 - **String Operations Runtime**: Lightweight C library (`mgen_string_ops.h/.c`) with proper memory management
 - **Enhanced Type System**: Advanced `_is_string_type()` method supporting complex attribute access patterns
@@ -181,7 +194,9 @@ std::vector<std::string> process_accounts() {
 - **Production-Ready Code Generation**: Clean, efficient C code with proper error handling and type safety
 
 ### Example Conversion
+
 **Python Input:**
+
 ```python
 class Calculator:
     def __init__(self, initial: int):
@@ -200,6 +215,7 @@ def test_operations() -> str:
 ```
 
 **Generated C Output:**
+
 ```c
 #include "mgen_string_ops.h"
 
@@ -224,6 +240,7 @@ char* test_operations(void) {
 ## [0.1.7]
 
 ### Added
+
 - **Advanced Python Language Features**: Complete comprehensions support for sophisticated data processing
   - List comprehensions with range iteration and conditional filtering (`[x*2 for x in range(n) if x > 5]`)
   - Dictionary comprehensions with key-value mappings (`{k: v for k in range(n) if condition}`)
@@ -244,6 +261,7 @@ char* test_operations(void) {
   - Memory-safe container operations with STC's optimized implementations
 
 ### Technical Achievements
+
 - **Sophisticated AST Conversion**: Complete `ast.ListComp`, `ast.DictComp`, and `ast.SetComp` support
 - **Advanced Code Generation**: Multi-line C code blocks with proper loop and condition generation
 - **Complete STC Integration**: Full Smart Template Container library with 864KB of optimized C code
@@ -254,7 +272,9 @@ char* test_operations(void) {
 - **Performance**: Efficient C loops with STC's high-performance container implementations
 
 ### Example Conversion
+
 **Python Input:**
+
 ```python
 def process_numbers(n: int) -> dict:
     # List comprehension with condition
@@ -270,6 +290,7 @@ def process_numbers(n: int) -> dict:
 ```
 
 **Generated C Output:**
+
 ```c
 dict process_numbers(int n) {
     // List comprehension becomes C loop with vector operations
@@ -295,6 +316,7 @@ dict process_numbers(int n) {
 ```
 
 ### Test Suite Reorganization
+
 - **Eliminated Duplication**: Removed 20+ duplicate tests from overlapping files
 - **Professional Structure**: Reorganized C backend tests into focused, single-responsibility files
   - `test_backend_c_basics.py` (39 tests): Core Python-to-C conversion functionality
@@ -310,6 +332,7 @@ dict process_numbers(int n) {
 ## [0.1.6]
 
 ### Changed
+
 - **Architecture Consolidation**: Complete merger of py2c converter functionality into emitter module
   - Merged `src/mgen/backends/c/py2c_converter.py` into `src/mgen/backends/c/emitter.py` (1,160 total lines)
   - Consolidated `MGenPythonToCConverter` class, exception classes, and all OOP functionality in single module
@@ -321,6 +344,7 @@ dict process_numbers(int n) {
   - Reduced module complexity and import dependencies across the codebase
 
 ### Technical Improvements
+
 - **Unified C Backend**: All 866 lines of sophisticated Python-to-C conversion code now integrated in emitter.py
 - **Preserved API Compatibility**: All existing functionality maintained with identical interface
 - **Test Coverage**: All 175 tests continue to pass with zero regressions after merge
@@ -329,6 +353,7 @@ dict process_numbers(int n) {
 ## [0.1.5]
 
 ### Added
+
 - **Object-Oriented Programming Support**: Complete Python class to C struct conversion system
   - Full Python class support with `__init__` constructors and instance methods
   - Automatic struct generation with typedef declarations for each Python class
@@ -353,6 +378,7 @@ dict process_numbers(int n) {
   - Error handling and edge case validation for OOP features
 
 ### Changed
+
 - **Py2C Converter Architecture**: Expanded to support complete object-oriented programming paradigm
   - Enhanced expression handling to support method calls and class instantiation
   - Updated assignment conversion to handle attribute assignments (`self.attr = value`)
@@ -365,6 +391,7 @@ dict process_numbers(int n) {
   - Improved code organization with struct definitions, constructors, and method implementations
 
 ### Technical Achievements
+
 - **Complete OOP Paradigm**: Python classes, methods, constructors, instance variables
 - **Advanced Code Generation**: Struct typedefs, constructor functions, method conversion
 - **Type Safety**: Automatic struct pointer handling and member access patterns
@@ -372,7 +399,9 @@ dict process_numbers(int n) {
 - **Production Ready**: Generates clean, efficient C code from Python OOP patterns
 
 ### Example Conversion
+
 **Python Input:**
+
 ```python
 class Rectangle:
     def __init__(self, width: int, height: int):
@@ -388,6 +417,7 @@ def create_rect() -> int:
 ```
 
 **Generated C Output:**
+
 ```c
 typedef struct Rectangle {
     int width;
@@ -414,6 +444,7 @@ int create_rect(void) {
 ## [0.1.4]
 
 ### Added
+
 - **Advanced Python-to-C Converter**: Sophisticated py2c conversion engine with complex Python support
   - Complete `MGenPythonToCConverter` class with advanced AST-to-C translation
   - Complex control flow support: if/elif/else chains, while loops, for loops with range()
@@ -433,6 +464,7 @@ int create_rect(void) {
   - Error handling and edge case validation
 
 ### Changed
+
 - **C Backend Architecture**: Complete transformation to sophisticated code generation
   - Replaced basic code emission with advanced py2c converter integration
   - Enhanced emitter with fallback system for unsupported features
@@ -445,6 +477,7 @@ int create_rect(void) {
   - Improved code formatting and C standard compliance
 
 ### Technical Achievements
+
 - **Complex Python Feature Support**: if/elif/else, while loops, for-range loops, recursion
 - **Advanced Type System**: Automatic inference, annotation support, container type mapping
 - **Expression Engine**: Full operator support with proper precedence and parenthesization
@@ -454,6 +487,7 @@ int create_rect(void) {
 ## [0.1.3]
 
 ### Added
+
 - **Enhanced C Backend**: Direct integration of CGen's sophisticated C translation capabilities
   - Integrated CGen runtime libraries (50KB+ of C code) directly into MGen C backend
   - MGen runtime system with error handling, memory management, and Python operations
@@ -468,6 +502,7 @@ int create_rect(void) {
   - Support for Python built-ins (bool, abs, min, max, sum, range, etc.)
 
 ### Changed
+
 - **C Backend Architecture**: Complete overhaul from basic arrays to sophisticated runtime system
   - Replaced simple type mapping with comprehensive Python-to-C semantics
   - Enhanced container system from basic pointers to STC-based high-performance containers
@@ -479,6 +514,7 @@ int create_rect(void) {
   - Enhanced Makefile generation with development targets (test, debug, release)
 
 ### Technical Details
+
 - **Runtime Components**: Error handling, Python operations, memory management, STC bridge
 - **Container Support**: vec_T, map_K_V, set_T with Python-like operations and bounds checking
 - **Code Quality**: All 67 tests passing, maintains full MGen API compatibility
@@ -487,6 +523,7 @@ int create_rect(void) {
 ## [0.1.2]
 
 ### Added
+
 - **C++ Backend**: Complete C++ backend implementation following MGen architecture
   - Full C++ code generation with modern C++17 features
   - STL container support (std::vector, std::map, std::set, etc.)
@@ -508,6 +545,7 @@ int create_rect(void) {
   - Consistent command interface across all target languages
 
 ### Changed
+
 - **Pipeline Architecture**: Enhanced pipeline with comprehensive phase tracking and error handling
   - Language-agnostic constraint checking (C-specific rules only apply to C targets)
   - Advanced optimization phases for both Python-level and target-language-level optimizations
@@ -522,6 +560,7 @@ int create_rect(void) {
   - Enhanced error messages and user feedback
 
 ### Fixed
+
 - **Test Compatibility**: Updated all backend tests to include C++ backend
   - Fixed constraint checking conflicts with non-C backends
   - Resolved abstract method implementation issues in C++ backend
@@ -531,10 +570,12 @@ int create_rect(void) {
   - Corrected type annotation requirements for multi-language validation
 
 ### Technical Details
+
 - **Supported Languages**: C, C++, Rust, Go (all with full pipeline support)
 - **Build Systems**: Makefile (C/C++), Cargo.toml (Rust), go.mod (Go), CMake (C++ alternative)
 - **Code Quality**: 67/67 tests passing, comprehensive error handling, phase-by-phase progress tracking
 - **CLI Commands**:
+
   ```bash
   mgen --target cpp convert file.py        # Generate C++ code
   mgen --target rust build file.py -m      # Generate Rust + Cargo.toml
@@ -544,4 +585,4 @@ int create_rect(void) {
 
 ## [0.0.1]
 
-- Project created as a generalize of the [CGen](https://github.com/shakfu/cgen) project. 
+- Project created as a generalize of the [CGen](https://github.com/shakfu/cgen) project.

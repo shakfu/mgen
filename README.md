@@ -59,6 +59,7 @@ mgen --target cpp batch --source-dir ./examples
 ### Simple Functions
 
 **Python Input:**
+
 ```python
 def add(x: int, y: int) -> int:
     return x + y
@@ -69,6 +70,7 @@ def main() -> None:
 ```
 
 **Generated C++:**
+
 ```cpp
 #include <iostream>
 #include <vector>
@@ -89,6 +91,7 @@ void main() {
 ```
 
 **Generated C:**
+
 ```c
 #include <stdio.h>
 #include "mgen_runtime.h"
@@ -106,6 +109,7 @@ void main() {
 ### Advanced Features (Object-Oriented Programming)
 
 **Python Input:**
+
 ```python
 class Calculator:
     def __init__(self, name: str):
@@ -125,6 +129,7 @@ def process() -> list:
 ```
 
 **Generated C++:**
+
 ```cpp
 #include <iostream>
 #include <string>
@@ -167,16 +172,19 @@ std::vector<std::string> process() {
 MGen follows a clean, extensible architecture with three main components:
 
 ### Frontend (Language-Agnostic)
+
 - **Type Inference**: Analyzes Python type annotations
 - **Static Analysis**: Validates code compatibility
 - **AST Processing**: Parses and transforms Python syntax
 
 ### Backends (Language-Specific)
+
 - **Abstract Interfaces**: Common API for all target languages
 - **Code Generation**: Language-specific syntax and idioms
 - **Build Systems**: Native toolchain integration
 
 ### Pipeline
+
 - **Multi-Phase Processing**: Validation → Analysis → Generation → Build
 - **Error Handling**: Comprehensive error reporting and recovery
 - **Optimization**: Language-specific performance optimizations
@@ -184,14 +192,18 @@ MGen follows a clean, extensible architecture with three main components:
 ## CLI Commands
 
 ### Convert
+
 Convert Python files to target language:
+
 ```bash
 mgen --target <language> convert <input.py>
 mgen --target rust convert example.py
 ```
 
 ### Build
+
 Convert and compile/build the result:
+
 ```bash
 mgen --target <language> build <input.py>
 mgen --target go build --makefile example.py  # Generate build file
@@ -199,20 +211,26 @@ mgen --target c build example.py              # Direct compilation
 ```
 
 ### Batch
+
 Process multiple files:
+
 ```bash
 mgen --target <language> batch --source-dir <dir>
 mgen --target rust batch --source-dir ./src --build
 ```
 
 ### Backends
+
 List available language backends:
+
 ```bash
 mgen backends
 ```
 
 ### Clean
+
 Clean build artifacts:
+
 ```bash
 mgen clean
 ```
@@ -220,6 +238,7 @@ mgen clean
 ## Development
 
 ### Running Tests
+
 ```bash
 make test           # Run all tests
 make test-unit      # Run unit tests only
@@ -260,6 +279,7 @@ MIT License - see LICENSE file for details.
 ## Advanced Features
 
 ### C/C++ Backends
+
 Both C and C++ backends support sophisticated Python language features:
 
 - **Object-Oriented Programming**: Classes, methods, constructors, inheritance
@@ -272,6 +292,7 @@ Both C and C++ backends support sophisticated Python language features:
   - C++: STL containers (`std::vector`, `std::unordered_map`, `std::unordered_set`)
 
 ### Test Coverage
+
 - **359 passing tests** across all backends (100% success rate)
 - **104 C++ backend tests** (104 passing, 100% success rate)
 - **191 C backend tests** with comprehensive advanced features
