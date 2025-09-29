@@ -7,7 +7,7 @@ including automatic cleanup, error handling, and memory safety guarantees.
 import ast
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 class MemoryScope(Enum):
@@ -55,7 +55,7 @@ class STCMemoryManager:
     - RAII-style resource management
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Track all container allocations
         self.allocations: Dict[str, ContainerAllocation] = {}
 
@@ -73,7 +73,7 @@ class STCMemoryManager:
         self.function_parameters: Dict[str, Set[str]] = {}
         self.function_returns: Dict[str, Set[str]] = {}
 
-    def enter_scope(self, scope_type: MemoryScope = MemoryScope.BLOCK):
+    def enter_scope(self, scope_type: MemoryScope = MemoryScope.BLOCK) -> None:
         """Enter a new scope (function, block, loop, etc.)."""
         self.scope_stack.append({})
 
@@ -111,7 +111,7 @@ class STCMemoryManager:
 
         return allocation
 
-    def register_parameter(self, name: str, container_type: str):
+    def register_parameter(self, name: str, container_type: str) -> None:
         """Register a container parameter (doesn't need cleanup in this function)."""
         allocation = self.register_container(name, container_type, MemoryScope.FUNCTION)
         allocation.is_parameter = True
@@ -143,14 +143,14 @@ class STCMemoryManager:
 
         return None
 
-    def mark_moved(self, name: str):
+    def mark_moved(self, name: str) -> None:
         """Mark a container as moved (no longer needs cleanup)."""
         if name in self.allocations:
             self.allocations[name].is_moved = True
             self.allocations[name].requires_cleanup = False
             self.moved_containers.add(name)
 
-    def enter_function(self, function_name: str):
+    def enter_function(self, function_name: str) -> None:
         """Enter a function scope."""
         self.current_function = function_name
         self.enter_scope(MemoryScope.FUNCTION)
@@ -209,10 +209,10 @@ class STCMemoryManager:
         self.memory_errors = []
 
         class MemoryAnalyzer(ast.NodeVisitor):
-            def __init__(self, manager):
+            def __init__(self, manager) -> None:
                 self.manager = manager
 
-            def visit_FunctionDef(self, node):
+            def visit_FunctionDef(self, node) -> None:
                 self.manager.enter_function(node.name)
 
                 # Check for missing cleanup in function
@@ -228,14 +228,14 @@ class STCMemoryManager:
                         node.lineno,
                     )
 
-            def visit_Return(self, node):
+            def visit_Return(self, node) -> None:
                 # Check if returning container without proper transfer
                 if isinstance(node.value, ast.Name):
                     var_name = node.value.id
                     if var_name in self.manager.allocations:
                         self.manager.register_return_value(var_name)
 
-            def visit_Call(self, node):
+            def visit_Call(self, node) -> None:
                 # Check for potential allocation failures
                 if isinstance(node.func, ast.Attribute):
                     method_name = node.func.attr
@@ -248,7 +248,7 @@ class STCMemoryManager:
                                 node.lineno,
                             )
 
-            def _check_function_cleanup(self, node):
+            def _check_function_cleanup(self, node) -> None:
                 # Check if function properly cleans up local containers
                 has_cleanup = False
                 for stmt in ast.walk(node):
@@ -327,7 +327,7 @@ class STCMemoryManager:
         error_code = []
 
         # Check for common error patterns
-        current_containers = []
+        current_containers: List[str] = []
         for scope_containers in self.scope_stack:
             current_containers.extend(scope_containers.keys())
 
@@ -344,25 +344,25 @@ class STCMemoryManager:
 
         return error_code
 
-    def _add_error(self, error_type: str, message: str, line_number: int):
+    def _add_error(self, error_type: str, message: str, line_number: int) -> None:
         """Add a memory error."""
         self.memory_errors.append(
             MemoryError(error_type=error_type, message=message, line_number=line_number, severity="error")
         )
 
-    def _add_warning(self, error_type: str, message: str, line_number: int):
+    def _add_warning(self, error_type: str, message: str, line_number: int) -> None:
         """Add a memory warning."""
         self.memory_errors.append(
             MemoryError(error_type=error_type, message=message, line_number=line_number, severity="warning")
         )
 
-    def _add_info(self, error_type: str, message: str, line_number: int):
+    def _add_info(self, error_type: str, message: str, line_number: int) -> None:
         """Add a memory info message."""
         self.memory_errors.append(
             MemoryError(error_type=error_type, message=message, line_number=line_number, severity="info")
         )
 
-    def generate_cleanup_summary(self) -> Dict[str, any]:
+    def generate_cleanup_summary(self) -> Dict[str, Any]:
         """Generate summary of memory management."""
         return {
             "total_allocations": len(self.allocations),
@@ -376,7 +376,7 @@ class STCMemoryManager:
 
     def _get_allocations_by_type(self) -> Dict[str, int]:
         """Get allocation counts by container type."""
-        counts = {}
+        counts: Dict[str, int] = {}
         for allocation in self.allocations.values():
             container_type = allocation.container_type
             counts[container_type] = counts.get(container_type, 0) + 1

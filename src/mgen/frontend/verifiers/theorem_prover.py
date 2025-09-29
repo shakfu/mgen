@@ -4,6 +4,8 @@ This module provides integration with the Z3 theorem prover for formal verificat
 of code properties, memory safety, and algorithm correctness.
 """
 
+from __future__ import annotations
+
 import ast
 import time
 from dataclasses import dataclass
@@ -29,6 +31,9 @@ class z3:
             def model(self):
                 return None
 
+            def set(self, param, value):
+                pass
+
         @staticmethod
         def Not(expr):
             return None
@@ -43,6 +48,27 @@ class z3:
         class Int:
             def __init__(self, name):
                 self.name = name
+
+            def __add__(self, other):
+                return z3.Int(f"({self.name} + {other})")
+
+            def __sub__(self, other):
+                return z3.Int(f"({self.name} - {other})")
+
+            def __mul__(self, other):
+                return z3.Int(f"({self.name} * {other})")
+
+            def __le__(self, other):
+                return f"({self.name} <= {other})"
+
+            def __lt__(self, other):
+                return f"({self.name} < {other})"
+
+            def __ge__(self, other):
+                return f"({self.name} >= {other})"
+
+            def __gt__(self, other):
+                return f"({self.name} > {other})"
 
         class Bool:
             def __init__(self, name):
@@ -116,7 +142,7 @@ class ProofResult:
     counterexample: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
     z3_model: Optional[Any] = None
-    verification_steps: List[str] = None
+    verification_steps: Optional[List[str]] = None
 
     def __post_init__(self):
         if self.verification_steps is None:
@@ -386,11 +412,11 @@ class TheoremProver:
         """Template for null pointer safety properties."""
         # Implementation for null pointer checks
         return ProofProperty(
-            property_type=PropertyType.SAFETY,
+            name="null_pointer_safety",
+            property_type=PropertyType.NULL_POINTER_SAFETY,
             description="Null pointer safety check",
-            formula="true",  # Placeholder formula
-            constraints=[],
-            metadata=kwargs
+            z3_formula="true",  # Placeholder formula
+            context=kwargs
         )
 
     def _create_overflow_template(self, **kwargs) -> ProofProperty:
@@ -401,11 +427,11 @@ class TheoremProver:
         """Template for loop invariant properties."""
         # Implementation for loop invariants
         return ProofProperty(
-            property_type=PropertyType.CORRECTNESS,
+            name="loop_invariant",
+            property_type=PropertyType.LOOP_INVARIANT,
             description="Loop invariant property",
-            formula="true",  # Placeholder formula
-            constraints=[],
-            metadata=kwargs
+            z3_formula="true",  # Placeholder formula
+            context=kwargs
         )
 
 

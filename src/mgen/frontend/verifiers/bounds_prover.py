@@ -8,7 +8,7 @@ import ast
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 try:
     # import z3  # TODO: Fix missing z3 dependency
@@ -22,6 +22,28 @@ class z3:
     class Int:
         def __init__(self, name):
             self.name = name
+
+        def __add__(self, other):
+            return z3.Int(f"({self.name} + {other})")
+
+        def __sub__(self, other):
+            return z3.Int(f"({self.name} - {other})")
+
+        def __mul__(self, other):
+            return z3.Int(f"({self.name} * {other})")
+
+        def __le__(self, other):
+            return f"({self.name} <= {other})"
+
+        def __lt__(self, other):
+            return f"({self.name} < {other})"
+
+        def __ge__(self, other):
+            return f"({self.name} >= {other})"
+
+        def __gt__(self, other):
+            return f"({self.name} > {other})"
+
     @staticmethod
     def And(*args):
         return None
@@ -207,7 +229,7 @@ class BoundsProver:
         results = []
 
         # Group accesses by memory region
-        region_accesses = {}
+        region_accesses: Dict[str, List[MemoryAccess]] = {}
         for access in self.memory_accesses:
             region_name = access.region.name
             if region_name not in region_accesses:
@@ -359,17 +381,17 @@ class BoundsProver:
 class MemoryOperationExtractor(ast.NodeVisitor):
     """Extract memory operations and regions from Python AST."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.memory_regions: Dict[str, MemoryRegion] = {}
         self.memory_accesses: List[MemoryAccess] = []
         self.current_function = None
 
-    def visit_FunctionDef(self, node):
+    def visit_FunctionDef(self, node) -> None:
         """Track function context."""
         self.current_function = node.name
         self.generic_visit(node)
 
-    def visit_Assign(self, node):
+    def visit_Assign(self, node) -> None:
         """Extract memory region declarations."""
         if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
             var_name = node.targets[0].id
@@ -393,11 +415,11 @@ class MemoryOperationExtractor(ast.NodeVisitor):
                 if isinstance(node.value.func, ast.Name) and node.value.func.id == "list":
                     # list(size) or similar
                     if node.value.args:
-                        size = self._extract_size_info(node.value.args[0])
+                        list_size = self._extract_size_info(node.value.args[0])
                         region = MemoryRegion(
                             name=var_name,
                             base_address=f"&{var_name}",
-                            size=size,
+                            size=list_size,
                             element_type="unknown",
                             initialization_status="uninitialized",
                         )
@@ -405,7 +427,7 @@ class MemoryOperationExtractor(ast.NodeVisitor):
 
         self.generic_visit(node)
 
-    def visit_Subscript(self, node):
+    def visit_Subscript(self, node) -> None:
         """Extract memory access operations."""
         if isinstance(node.value, ast.Name):
             array_name = node.value.id
@@ -459,7 +481,10 @@ class MemoryOperationExtractor(ast.NodeVisitor):
     def _extract_size_info(self, size_node: ast.expr) -> Union[str, int]:
         """Extract size information from AST node."""
         if isinstance(size_node, ast.Constant):
-            return size_node.value
+            if isinstance(size_node.value, (int, str)):
+                return size_node.value
+            else:
+                return str(size_node.value) if size_node.value is not None else "unknown"
         elif isinstance(size_node, ast.Name):
             return size_node.id
         else:
@@ -468,7 +493,10 @@ class MemoryOperationExtractor(ast.NodeVisitor):
     def _extract_offset_info(self, slice_node: ast.expr) -> Union[str, int]:
         """Extract offset information from slice node."""
         if isinstance(slice_node, ast.Constant):
-            return slice_node.value
+            if isinstance(slice_node.value, (int, str)):
+                return slice_node.value
+            else:
+                return str(slice_node.value) if slice_node.value is not None else "unknown"
         elif isinstance(slice_node, ast.Name):
             return slice_node.id
         else:
