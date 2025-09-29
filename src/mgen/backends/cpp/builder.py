@@ -14,6 +14,8 @@ class CppBuilder(AbstractBuilder):
         """Initialize the C++ builder."""
         self.compiler = "g++"
         self.default_flags = ["-std=c++17", "-Wall", "-O2"]
+        self.runtime_sources = []
+        self.runtime_headers_dir = None
 
     def get_build_filename(self) -> str:
         """Get the build file name (Makefile for C++)."""
@@ -189,5 +191,70 @@ install(TARGETS {target_name} DESTINATION bin)
         return cmake_content
 
     def get_compile_flags(self) -> List[str]:
-        """Get default compilation flags."""
-        return self.default_flags.copy()
+        """Get default compilation flags with runtime includes."""
+        flags = self.default_flags.copy()
+        if self.runtime_headers_dir:
+            flags.append(f"-I{self.runtime_headers_dir}")
+        return flags
+
+    def _detect_runtime_sources(self, source_files: List[str]) -> List[str]:
+        """Detect if runtime sources are needed based on generated code analysis."""
+        runtime_sources = []
+
+        # Check if any source files use MGen runtime features
+        for source_file in source_files:
+            try:
+                with open(source_file, 'r') as f:
+                    content = f.read()
+                    # Check for MGen runtime usage patterns
+                    if ('mgen_cpp_runtime.hpp' in content or
+                        'mgen::' in content or
+                        'StringOps::' in content or
+                        'Range(' in content or
+                        'list_comprehension' in content or
+                        'dict_comprehension' in content or
+                        'set_comprehension' in content):
+                        # Runtime is needed, but it's header-only for C++
+                        # Just ensure the include path is set
+                        source_dir = Path(source_file).parent
+                        runtime_dir = source_dir / "runtime"
+                        if runtime_dir.exists():
+                            self.runtime_headers_dir = str(runtime_dir)
+                        break
+            except FileNotFoundError:
+                continue
+
+        return runtime_sources
+
+    def _setup_runtime_environment(self, output_dir: str) -> None:
+        """Setup runtime environment in the output directory."""
+        output_path = Path(output_dir)
+        runtime_dir = output_path / "runtime"
+
+        # Create runtime directory if it doesn't exist
+        runtime_dir.mkdir(exist_ok=True)
+
+        # Check if we need to copy runtime headers from the backend
+        backend_runtime = Path(__file__).parent / "runtime"
+        if backend_runtime.exists():
+            # Copy runtime headers to build directory
+            import shutil
+            for header_file in backend_runtime.glob("*.hpp"):
+                target_file = runtime_dir / header_file.name
+                if not target_file.exists():
+                    shutil.copy2(header_file, target_file)
+
+        self.runtime_headers_dir = str(runtime_dir)
+
+    def set_runtime_directory(self, runtime_dir: str) -> None:
+        """Set the runtime headers directory."""
+        self.runtime_headers_dir = runtime_dir
+
+    def get_runtime_sources(self) -> List[str]:
+        """Get list of runtime source files (empty for header-only C++ runtime)."""
+        return self.runtime_sources.copy()
+
+    def requires_runtime_library(self, source_files: List[str]) -> bool:
+        """Check if the project requires MGen C++ runtime library."""
+        runtime_sources = self._detect_runtime_sources(source_files)
+        return len(runtime_sources) > 0 or self.runtime_headers_dir is not None
