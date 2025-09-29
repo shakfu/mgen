@@ -27,7 +27,7 @@ import ast
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .backends.registry import registry
 from .backends.preferences import BackendPreferences
@@ -46,6 +46,7 @@ try:
         VectorizationDetector,
         analyze_python_code,
     )
+    from .frontend.base import OptimizationLevel as FrontendOptimizationLevel
     FRONTEND_AVAILABLE = True
 except ImportError:
     # Fallback if frontend components not available
@@ -122,21 +123,25 @@ class PipelineResult:
     generated_code: Optional[str] = None
     build_file_content: Optional[str] = None
     executable_path: Optional[str] = None
-    phase_results: Optional[Dict[PipelinePhase, Any]] = None
-    errors: Optional[List[str]] = None
-    warnings: Optional[List[str]] = None
-    generated_files: Optional[List[str]] = None
+    phase_results: Dict[PipelinePhase, Any] = field(default_factory=dict)
+    errors: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    generated_files: List[str] = field(default_factory=list)
 
-    def __post_init__(self) -> None:
-        """Initialize optional fields if not provided."""
-        if self.phase_results is None:
-            self.phase_results = {}
-        if self.errors is None:
-            self.errors = []
-        if self.warnings is None:
-            self.warnings = []
-        if self.generated_files is None:
-            self.generated_files = []
+
+
+def _map_optimization_level(pipeline_level: OptimizationLevel) -> 'FrontendOptimizationLevel':
+    """Map pipeline OptimizationLevel to frontend OptimizationLevel."""
+    if not FRONTEND_AVAILABLE:
+        return None  # type: ignore
+
+    mapping = {
+        OptimizationLevel.NONE: FrontendOptimizationLevel.NONE,
+        OptimizationLevel.BASIC: FrontendOptimizationLevel.BASIC,
+        OptimizationLevel.MODERATE: FrontendOptimizationLevel.MODERATE,
+        OptimizationLevel.AGGRESSIVE: FrontendOptimizationLevel.AGGRESSIVE,
+    }
+    return mapping.get(pipeline_level, FrontendOptimizationLevel.MODERATE)
 
 
 class MGenPipeline:
@@ -153,7 +158,7 @@ class MGenPipeline:
         self.log = log.config(self.__class__.__name__)
         self._init_components()
 
-    def _init_components(self):
+    def _init_components(self) -> None:
         """Initialize pipeline components."""
         # Get backend for target language
         try:
@@ -239,7 +244,7 @@ class MGenPipeline:
 
             # Phase 3: Python Optimization
             self.log.debug("Starting Python optimization phase")
-            optimized_analysis = self._python_optimization_phase(analysis_result, result)
+            optimized_analysis = self._python_optimization_phase(source_code, analysis_result, result)
 
             # Phase 4: Mapping (language-agnostic to target-specific)
             self.log.debug("Starting mapping phase")
@@ -251,7 +256,7 @@ class MGenPipeline:
 
             # Phase 6: Generation
             self.log.debug("Starting generation phase")
-            if not self._generation_phase(target_optimized, output_dir, result):
+            if not self._generation_phase(source_code, target_optimized, output_dir, result):
                 self.log.error("Generation phase failed")
                 return result
 
@@ -334,8 +339,7 @@ class MGenPipeline:
                     return None
 
                 # Store additional data for later phases
-                analysis_result.source_code = source_code
-                analysis_result.ast_root = ast.parse(source_code)
+                # Note: Additional data (source_code, ast_root) stored in phase_results
                 return analysis_result
             else:
                 # Simple analysis using built-in frontend function
@@ -345,7 +349,7 @@ class MGenPipeline:
 
                     # Create a simple analysis result object
                     class SimpleAnalysisResult:
-                        def __init__(self, code, analysis):
+                        def __init__(self, code: str, analysis: Any) -> None:
                             self.source_code = code
                             self.ast_root = ast.parse(code)
                             self.analysis = analysis
@@ -371,16 +375,16 @@ class MGenPipeline:
             result.errors.append(f"Analysis phase error: {str(e)}")
             return None
 
-    def _python_optimization_phase(self, analysis_result: Any, result: PipelineResult) -> Any:
+    def _python_optimization_phase(self, source_code: str, analysis_result: Any, result: PipelineResult) -> Any:
         """Phase 3: Python-level optimizations."""
         try:
             if FRONTEND_AVAILABLE and self.config.enable_optimizations:
                 # Create analysis context
                 context = AnalysisContext(
-                    source_code=analysis_result.source_code,
-                    ast_node=analysis_result.ast_root,
+                    source_code=source_code,
+                    ast_node=ast.parse(source_code),
                     analysis_result=analysis_result,
-                    optimization_level=self.config.optimization_level,
+                    optimization_level=_map_optimization_level(self.config.optimization_level),
                 )
 
                 optimizations = {}
@@ -453,11 +457,11 @@ class MGenPipeline:
             result.warnings.append(f"Target optimization phase warning: {str(e)}")
             return analysis_result
 
-    def _generation_phase(self, analysis_result: Any, output_dir: Path, result: PipelineResult) -> bool:
+    def _generation_phase(self, source_code: str, analysis_result: Any, output_dir: Path, result: PipelineResult) -> bool:
         """Phase 6: Target language code generation."""
         try:
             # Generate code using selected backend
-            generated_code = self.emitter.emit_module(analysis_result.source_code, analysis_result)
+            generated_code = self.emitter.emit_module(source_code, analysis_result)
 
             # Write source file with correct extension
             file_extension = self.backend.get_file_extension()

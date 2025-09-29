@@ -18,6 +18,8 @@ class OCamlBackend(LanguageBackend):
         if preferences is None:
             preferences = OCamlPreferences()
         super().__init__(preferences)
+        # Ensure preferences is never None after initialization
+        assert self.preferences is not None
 
     def get_name(self) -> str:
         """Return backend name."""
@@ -90,22 +92,24 @@ class OCamlBackend(LanguageBackend):
         ]
 
         # Add preference-specific features
-        if self.preferences.get('use_pattern_matching'):
+        if self.preferences is not None and self.preferences.get('use_pattern_matching'):
             features.append("Idiomatic pattern matching syntax")
 
-        if self.preferences.get('curried_functions'):
+        if self.preferences is not None and self.preferences.get('curried_functions'):
             features.append("Curried function style")
 
-        if self.preferences.get('tail_recursion_opt'):
+        if self.preferences is not None and self.preferences.get('tail_recursion_opt'):
             features.append("Tail recursion optimization")
 
-        if self.preferences.get('polymorphic_variants'):
+        if self.preferences is not None and self.preferences.get('polymorphic_variants'):
             features.append("Polymorphic variant support")
 
         return features
 
     def get_preference_summary(self) -> dict:
         """Get a summary of current preferences."""
+        if self.preferences is None:
+            return {}
         return {
             'OCaml Version': self.preferences.get('ocaml_version', '4.14'),
             'Modern Syntax': self.preferences.get('use_modern_syntax', True),

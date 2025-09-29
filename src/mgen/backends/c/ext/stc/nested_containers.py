@@ -24,7 +24,7 @@ class NestedTypeInfo:
 class NestedContainerManager:
     """Manages complex nested container type generation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.type_registry: Dict[str, NestedTypeInfo] = {}
         self.dependency_graph: Dict[str, Set[str]] = {}
         self.instantiation_order: List[str] = []

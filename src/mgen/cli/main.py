@@ -17,14 +17,14 @@ import argparse
 import shutil
 import sys
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Union, Any
 
 from ..common import log
 
 # Import the pipeline and backends
 from ..pipeline import BuildMode, MGenPipeline, OptimizationLevel, PipelineConfig
 from ..backends.registry import registry
-from ..backends.preferences import PreferencesRegistry
+from ..backends.preferences import PreferencesRegistry, BackendPreferences
 
 BUILD_DIR = "build"
 
@@ -32,7 +32,7 @@ BUILD_DIR = "build"
 class MGenCLI:
     """Multi-language CLI for MGen pipeline operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the CLI."""
         self.log = log.config(self.__class__.__name__)
         self.default_build_dir = Path(BUILD_DIR)
@@ -156,7 +156,7 @@ Build Directory Structure:
         }
         return mapping.get(level_str, OptimizationLevel.MODERATE)
 
-    def parse_preferences(self, backend_name: str, preference_args: Optional[List[str]] = None):
+    def parse_preferences(self, backend_name: str, preference_args: Optional[List[str]] = None) -> BackendPreferences:
         """Parse preference arguments and create backend preferences."""
         # Create default preferences for the backend
         preferences = PreferencesRegistry.create_preferences(backend_name)
@@ -172,6 +172,7 @@ Build Directory Structure:
                 value_str = value_str.strip()
 
                 # Convert string values to appropriate types
+                value: Union[bool, int, float, str]
                 if value_str.lower() in ("true", "false"):
                     value = value_str.lower() == "true"
                 elif value_str.isdigit():
@@ -249,7 +250,7 @@ Build Directory Structure:
         # For other languages, runtime libraries are typically handled by the language ecosystem
         # (e.g., Cargo for Rust, go mod for Go, standard library for C++)
 
-    def convert_command(self, args) -> int:
+    def convert_command(self, args: argparse.Namespace) -> int:
         """Execute convert command."""
         input_path = Path(args.input_file)
         if not input_path.exists():
@@ -285,8 +286,9 @@ Build Directory Structure:
 
             if not result.success:
                 self.log.error("Conversion failed")
-                for error in result.errors:
-                    self.log.error(f"Error: {error}")
+                if result.errors:
+                    for error in result.errors:
+                        self.log.error(f"Error: {error}")
                 return 1
 
             source_key = f"{target}_source"
@@ -301,7 +303,7 @@ Build Directory Structure:
             self.log.error(f"Pipeline error: {e}")
             return 1
 
-    def build_command(self, args) -> int:
+    def build_command(self, args: argparse.Namespace) -> int:
         """Execute build command (compile directly or generate build file based on -m flag)."""
         input_path = Path(args.input_file)
         if not input_path.exists():
@@ -352,8 +354,9 @@ Build Directory Structure:
         if not result.success:
             error_msg = "Build failed:" if args.makefile else "Compilation failed:"
             self.log.error(error_msg)
-            for error in result.errors:
-                self.log.error(f"Error: {error}")
+            if result.errors:
+                for error in result.errors:
+                    self.log.error(f"Error: {error}")
             return 1
 
         if args.makefile:
@@ -398,7 +401,7 @@ Build Directory Structure:
         }
         return build_file_names.get(target_language, "Makefile")
 
-    def clean_command(self, args) -> int:
+    def clean_command(self, args: argparse.Namespace) -> int:
         """Execute clean command."""
         build_dir = Path(args.build_dir)
 
@@ -410,7 +413,7 @@ Build Directory Structure:
 
         return 0
 
-    def batch_command(self, args) -> int:
+    def batch_command(self, args: argparse.Namespace) -> int:
         """Execute batch command."""
         import os
 
@@ -597,7 +600,7 @@ Build Directory Structure:
 
         return 0 if failed_translations == 0 else 1
 
-    def backends_command(self, args) -> int:
+    def backends_command(self, args: argparse.Namespace) -> int:
         """Execute backends command."""
         available_backends = registry.list_backends()
 

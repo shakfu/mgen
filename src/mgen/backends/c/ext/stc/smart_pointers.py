@@ -103,7 +103,7 @@ class SmartPointerManager:
     - Integration with STC containers
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Track all smart pointer allocations
         self.allocations: Dict[str, SmartPointerAllocation] = {}
 
@@ -177,7 +177,7 @@ class SmartPointerManager:
         return type_def, include
 
     def generate_smart_pointer_operation(
-        self, operation: str, pointer_name: str, args: List[str] = None
+        self, operation: str, pointer_name: str, args: Optional[List[str]] = None
     ) -> Optional[str]:
         """Generate smart pointer operation code."""
         if pointer_name not in self.allocations:
@@ -215,7 +215,7 @@ class SmartPointerManager:
             return f"{type_name}_{stc_operation}(&{pointer_name})"
 
     def generate_make_smart_pointer(
-        self, pointer_type: SmartPointerType, element_type: str, args: List[str] = None
+        self, pointer_type: SmartPointerType, element_type: str, args: Optional[List[str]] = None
     ) -> str:
         """Generate make_unique, make_shared, etc. calls."""
         args = args or []
@@ -230,7 +230,7 @@ class SmartPointerManager:
             type_name = f"{pointer_type.value}_{element_type}"
             return f"{type_name}_create({args_str})"
 
-    def track_assignment(self, target: str, source: str):
+    def track_assignment(self, target: str, source: str) -> None:
         """Track smart pointer assignments for reference counting."""
         if source in self.allocations and target in self.allocations:
             source_alloc = self.allocations[source]

@@ -37,9 +37,9 @@ class MGenPythonToOCamlConverter:
         }
 
         # Track class definitions and variables
-        self.classes = {}
-        self.variables = {}
-        self.current_class = None
+        self.classes: Dict[str, Any] = {}
+        self.variables: Dict[str, str] = {}
+        self.current_class: Optional[str] = None
 
     def convert_code(self, python_code: str) -> str:
         """Convert Python source code to OCaml."""
@@ -230,6 +230,8 @@ class MGenPythonToOCamlConverter:
 
     def _convert_constructor(self, node: ast.FunctionDef, params: List[tuple]) -> List[str]:
         """Convert __init__ method to constructor function."""
+        if self.current_class is None:
+            raise ValueError("Constructor called outside of class context")
         class_name = self.current_class.lower()
 
         # Extract constructor parameters (excluding self)
@@ -279,6 +281,8 @@ class MGenPythonToOCamlConverter:
 
     def _convert_method(self, node: ast.FunctionDef, params: List[tuple], return_type: str) -> List[str]:
         """Convert class method to OCaml function."""
+        if self.current_class is None:
+            raise ValueError("Method called outside of class context")
         method_name = self._to_ocaml_var_name(node.name)
         class_name = self.current_class.lower()
 
@@ -469,7 +473,7 @@ class MGenPythonToOCamlConverter:
         else:
             raise UnsupportedFeatureError(f"Unsupported function call: {type(node.func).__name__}")
 
-    def _convert_builtin_call(self, func_name: str, args: List[ast.AST]) -> str:
+    def _convert_builtin_call(self, func_name: str, args: List[ast.expr]) -> str:
         """Convert built-in function calls."""
         if not args:
             raise UnsupportedFeatureError(f"Function {func_name} requires arguments")
@@ -487,7 +491,7 @@ class MGenPythonToOCamlConverter:
 
         return builtin_map.get(func_name, f"{func_name}' {arg}")
 
-    def _convert_range_call(self, args: List[ast.AST]) -> str:
+    def _convert_range_call(self, args: List[ast.expr]) -> str:
         """Convert range() call to OCaml."""
         if len(args) == 1:
             stop = self._convert_expression(args[0])
@@ -506,7 +510,7 @@ class MGenPythonToOCamlConverter:
 
     def _convert_method_call(self, node: ast.Call) -> str:
         """Convert method call to OCaml function call."""
-        if isinstance(node.func.value, ast.Name):
+        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
             obj_name = self._to_ocaml_var_name(node.func.value.id)
             method_name = node.func.attr
 
@@ -523,7 +527,7 @@ class MGenPythonToOCamlConverter:
         else:
             raise UnsupportedFeatureError("Complex method calls not supported")
 
-    def _convert_string_method(self, obj_name: str, method_name: str, args: List[ast.AST]) -> str:
+    def _convert_string_method(self, obj_name: str, method_name: str, args: List[ast.expr]) -> str:
         """Convert string method calls."""
         if method_name == "upper":
             return f"upper {obj_name}"
@@ -571,6 +575,8 @@ class MGenPythonToOCamlConverter:
         """Convert Python dict literal to OCaml association list."""
         pairs = []
         for key, value in zip(node.keys, node.values):
+            if key is None:
+                raise UnsupportedFeatureError("Dictionary unpacking (**) not supported")
             key_expr = self._convert_expression(key)
             value_expr = self._convert_expression(value)
             pairs.append(f"({key_expr}, {value_expr})")
@@ -791,6 +797,13 @@ class MGenPythonToOCamlConverter:
             "(string * 'a) list": "[]"
         }
         return defaults.get(type_name, "failwith \"default value not implemented\"")
+
+    def _convert_subscript(self, node: ast.Subscript) -> str:
+        """Convert subscript access (e.g., list[0], dict[key])."""
+        value = self._convert_expression(node.value)
+        slice_expr = self._convert_expression(node.slice)
+        # For OCaml, we'll use List.nth for lists or other appropriate access
+        return f"List.nth {value} {slice_expr}"
 
 
 class OCamlEmitter(AbstractEmitter):

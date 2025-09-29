@@ -1,7 +1,7 @@
 """Backend preference system for MGen language-specific optimizations."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Type
 from dataclasses import dataclass, field
 
 
@@ -30,7 +30,7 @@ class BackendPreferences:
 class HaskellPreferences(BackendPreferences):
     """Haskell-specific backend preferences."""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize Haskell-specific default preferences."""
         self.language_specific.update({
             # Comprehension generation preferences
@@ -55,7 +55,7 @@ class HaskellPreferences(BackendPreferences):
 class CPreferences(BackendPreferences):
     """C-specific backend preferences."""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize C-specific default preferences."""
         self.language_specific.update({
             # Code generation preferences
@@ -80,7 +80,7 @@ class CPreferences(BackendPreferences):
 class CppPreferences(BackendPreferences):
     """C++-specific backend preferences."""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize C++-specific default preferences."""
         self.language_specific.update({
             # Language standard preferences
@@ -116,7 +116,7 @@ class CppPreferences(BackendPreferences):
 class RustPreferences(BackendPreferences):
     """Rust-specific backend preferences."""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize Rust-specific default preferences."""
         self.language_specific.update({
             # Language edition preferences
@@ -159,7 +159,7 @@ class RustPreferences(BackendPreferences):
 class GoPreferences(BackendPreferences):
     """Go-specific backend preferences."""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize Go-specific default preferences."""
         self.language_specific.update({
             # Language version preferences
@@ -202,7 +202,7 @@ class GoPreferences(BackendPreferences):
 class OCamlPreferences(BackendPreferences):
     """OCaml-specific backend preferences."""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize OCaml-specific default preferences."""
         self.language_specific.update({
             # Language version preferences
@@ -246,7 +246,7 @@ class OCamlPreferences(BackendPreferences):
 class PreferencesRegistry:
     """Registry for backend preference classes."""
 
-    _preferences_map = {
+    _preferences_map: Dict[str, Type[BackendPreferences]] = {
         'haskell': HaskellPreferences,
         'c': CPreferences,
         'cpp': CppPreferences,
@@ -256,17 +256,17 @@ class PreferencesRegistry:
     }
 
     @classmethod
-    def get_preferences_class(cls, backend_name: str) -> type:
+    def get_preferences_class(cls, backend_name: str) -> Type[BackendPreferences]:
         """Get preference class for a backend."""
         return cls._preferences_map.get(backend_name, BackendPreferences)
 
     @classmethod
-    def create_preferences(cls, backend_name: str, **kwargs) -> BackendPreferences:
+    def create_preferences(cls, backend_name: str, **kwargs: Any) -> BackendPreferences:
         """Create preferences instance for a backend."""
         prefs_class = cls.get_preferences_class(backend_name)
         return prefs_class(**kwargs)
 
     @classmethod
-    def register_backend(cls, backend_name: str, preferences_class: type) -> None:
+    def register_backend(cls, backend_name: str, preferences_class: Type[BackendPreferences]) -> None:
         """Register a new backend preference class."""
         cls._preferences_map[backend_name] = preferences_class
