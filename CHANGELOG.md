@@ -17,6 +17,71 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.7]
+
+### Added
+- **Advanced Python Language Features**: Complete comprehensions support for sophisticated data processing
+  - List comprehensions with range iteration and conditional filtering (`[x*2 for x in range(n) if x > 5]`)
+  - Dictionary comprehensions with key-value mappings (`{k: v for k in range(n) if condition}`)
+  - Set comprehensions with unique value generation (`{x*x for x in range(n) if x % 2 == 0}`)
+  - Support for complex expressions within comprehensions (arithmetic, function calls, etc.)
+  - Conditional filtering with `if` clauses for selective element inclusion
+  - Range-based iteration with start, stop, and step parameters
+- **Enhanced STC Integration**: Smart Template Container operations for comprehensions
+  - Automatic vector initialization and push operations for list comprehensions
+  - HashMap insert operations for dictionary comprehensions with proper key-value handling
+  - HashSet insert operations for set comprehensions with duplicate elimination
+  - Type inference for container element types and proper C type mapping
+  - Memory-safe container operations with bounds checking and error handling
+
+### Technical Achievements
+- **Sophisticated AST Conversion**: Complete `ast.ListComp`, `ast.DictComp`, and `ast.SetComp` support
+- **Advanced Code Generation**: Multi-line C code blocks with proper loop and condition generation
+- **Type Safety**: Automatic type inference for comprehension elements and container specialization
+- **Test Coverage**: 29 new comprehensive tests ensuring robust comprehensions functionality (204 total tests passing)
+- **Performance**: Efficient C loops with minimal overhead compared to Python equivalents
+
+### Example Conversion
+**Python Input:**
+```python
+def process_numbers(n: int) -> dict:
+    # List comprehension with condition
+    evens: list = [x * 2 for x in range(n) if x % 2 == 0]
+
+    # Dictionary comprehension
+    squares: dict = {i: i * i for i in range(5)}
+
+    # Set comprehension with complex expression
+    unique_values: set = {x * x + 1 for x in range(10) if x > 3}
+
+    return squares
+```
+
+**Generated C Output:**
+```c
+dict process_numbers(int n) {
+    // List comprehension becomes C loop with vector operations
+    vec_int evens = {0};
+    for (int x = 0; x < n; x += 1) {
+        if ((x % 2) == 0) vec_int_push(&evens, (x * 2));
+    }
+
+    // Dictionary comprehension becomes hashmap operations
+    map_int_int squares = {0};
+    for (int i = 0; i < 5; i += 1) {
+        map_int_int_insert(&squares, i, (i * i));
+    }
+
+    // Set comprehension becomes hashset operations
+    set_int unique_values = {0};
+    for (int x = 0; x < 10; x += 1) {
+        if ((x > 3)) set_int_insert(&unique_values, ((x * x) + 1));
+    }
+
+    return squares;
+}
+```
+
 ## [0.1.6]
 
 ### Changed

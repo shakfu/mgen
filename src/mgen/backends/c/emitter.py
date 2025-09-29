@@ -14,6 +14,7 @@ Supported Features:
 - Container operations (list, dict, set)
 - Object-oriented programming (classes, methods, constructors)
 - Memory management with runtime support
+- Comprehensions (list, dict, set) with range iteration and conditional filtering
 """
 
 import ast
@@ -314,6 +315,12 @@ class MGenPythonToCConverter:
             return self._convert_attribute(expr)
         elif isinstance(expr, ast.Subscript):
             return self._convert_subscript(expr)
+        elif isinstance(expr, ast.ListComp):
+            return self._convert_list_comprehension(expr)
+        elif isinstance(expr, ast.DictComp):
+            return self._convert_dict_comprehension(expr)
+        elif isinstance(expr, ast.SetComp):
+            return self._convert_set_comprehension(expr)
         else:
             return f"/* Unsupported expression {type(expr).__name__} */"
 
@@ -865,6 +872,248 @@ class MGenPythonToCConverter:
 
         # For other expressions, use regular conversion
         return self._convert_expression(expr)
+
+    def _convert_list_comprehension(self, node: ast.ListComp) -> str:
+        """Convert list comprehension to C loop with STC list operations.
+
+        [expr for target in iter if condition] becomes:
+        vec_type result = {0};
+        for (...) {
+            if (condition) {
+                vec_type_push(&result, expr);
+            }
+        }
+        """
+        # Generate unique temporary variable name for the result
+        temp_var = self._generate_temp_var_name("comp_result")
+
+        # Infer result element type from the expression
+        result_element_type = self._infer_expression_type(node.elt)
+        result_container_type = f"vec_{self._sanitize_type_name(result_element_type)}"
+
+        # Process the single generator (comprehensions can have multiple, but we'll start simple)
+        if len(node.generators) != 1:
+            raise UnsupportedFeatureError("Multiple generators in list comprehensions not yet supported")
+
+        generator = node.generators[0]
+
+        # Extract loop variable and iterable
+        if not isinstance(generator.target, ast.Name):
+            raise UnsupportedFeatureError("Only simple loop variables supported in comprehensions")
+
+        loop_var = generator.target.id
+
+        # Handle range-based iteration (most common case)
+        if (isinstance(generator.iter, ast.Call) and
+            isinstance(generator.iter.func, ast.Name) and
+            generator.iter.func.id == "range"):
+
+            # Generate range-based for loop
+            range_args = generator.iter.args
+            if len(range_args) == 1:
+                start = "0"
+                end = self._convert_expression(range_args[0])
+                step = "1"
+            elif len(range_args) == 2:
+                start = self._convert_expression(range_args[0])
+                end = self._convert_expression(range_args[1])
+                step = "1"
+            elif len(range_args) == 3:
+                start = self._convert_expression(range_args[0])
+                end = self._convert_expression(range_args[1])
+                step = self._convert_expression(range_args[2])
+            else:
+                raise UnsupportedFeatureError("Invalid range() arguments in comprehension")
+
+            loop_code = f"for (int {loop_var} = {start}; {loop_var} < {end}; {loop_var} += {step})"
+        else:
+            raise UnsupportedFeatureError("Non-range iterables in comprehensions not yet supported")
+
+        # Handle conditions (if any)
+        condition_code = ""
+        if generator.ifs:
+            if len(generator.ifs) > 1:
+                raise UnsupportedFeatureError("Multiple conditions in comprehensions not yet supported")
+
+            condition = generator.ifs[0]
+            condition_expr = self._convert_expression(condition)
+            condition_code = f"if ({condition_expr}) "
+
+        # Convert the expression
+        expr_str = self._convert_expression(node.elt)
+
+        # Generate the comprehension code
+        comp_code = f"""{{
+    {result_container_type} {temp_var} = {{0}};
+    {loop_code} {{
+        {condition_code}vec_{self._sanitize_type_name(result_element_type)}_push(&{temp_var}, {expr_str});
+    }}
+    {temp_var}}}"""
+
+        return comp_code
+
+    def _convert_dict_comprehension(self, node: ast.DictComp) -> str:
+        """Convert dictionary comprehension to C loop with STC hashmap operations.
+
+        {key_expr: value_expr for target in iter if condition} becomes:
+        map_key_value result = {0};
+        for (...) {
+            if (condition) {
+                map_key_value_insert(&result, key_expr, value_expr);
+            }
+        }
+        """
+        # Generate unique temporary variable name
+        temp_var = self._generate_temp_var_name("dict_comp_result")
+
+        # Infer key and value types
+        key_type = self._infer_expression_type(node.key)
+        value_type = self._infer_expression_type(node.value)
+        result_container_type = f"map_{self._sanitize_type_name(key_type)}_{self._sanitize_type_name(value_type)}"
+
+        # Process the single generator
+        if len(node.generators) != 1:
+            raise UnsupportedFeatureError("Multiple generators in dict comprehensions not yet supported")
+
+        generator = node.generators[0]
+
+        # Extract loop variable and iterable
+        if not isinstance(generator.target, ast.Name):
+            raise UnsupportedFeatureError("Only simple loop variables supported in comprehensions")
+
+        loop_var = generator.target.id
+
+        # Handle range-based iteration
+        if (isinstance(generator.iter, ast.Call) and
+            isinstance(generator.iter.func, ast.Name) and
+            generator.iter.func.id == "range"):
+
+            range_args = generator.iter.args
+            if len(range_args) == 1:
+                start = "0"
+                end = self._convert_expression(range_args[0])
+                step = "1"
+            elif len(range_args) == 2:
+                start = self._convert_expression(range_args[0])
+                end = self._convert_expression(range_args[1])
+                step = "1"
+            elif len(range_args) == 3:
+                start = self._convert_expression(range_args[0])
+                end = self._convert_expression(range_args[1])
+                step = self._convert_expression(range_args[2])
+            else:
+                raise UnsupportedFeatureError("Invalid range() arguments in comprehension")
+
+            loop_code = f"for (int {loop_var} = {start}; {loop_var} < {end}; {loop_var} += {step})"
+        else:
+            raise UnsupportedFeatureError("Non-range iterables in dict comprehensions not yet supported")
+
+        # Handle conditions (if any)
+        condition_code = ""
+        if generator.ifs:
+            if len(generator.ifs) > 1:
+                raise UnsupportedFeatureError("Multiple conditions in dict comprehensions not yet supported")
+
+            condition = generator.ifs[0]
+            condition_expr = self._convert_expression(condition)
+            condition_code = f"if ({condition_expr}) "
+
+        # Convert the key and value expressions
+        key_str = self._convert_expression(node.key)
+        value_str = self._convert_expression(node.value)
+
+        # Generate the comprehension code
+        comp_code = f"""{{
+    {result_container_type} {temp_var} = {{0}};
+    {loop_code} {{
+        {condition_code}{result_container_type}_insert(&{temp_var}, {key_str}, {value_str});
+    }}
+    {temp_var}}}"""
+
+        return comp_code
+
+    def _convert_set_comprehension(self, node: ast.SetComp) -> str:
+        """Convert set comprehension to C loop with STC hset operations.
+
+        {expr for target in iter if condition} becomes:
+        set_type result = {0};
+        for (...) {
+            if (condition) {
+                set_type_insert(&result, expr);
+            }
+        }
+        """
+        # Generate unique temporary variable name
+        temp_var = self._generate_temp_var_name("set_comp_result")
+
+        # Infer element type from the expression
+        element_type = self._infer_expression_type(node.elt)
+        result_container_type = f"set_{self._sanitize_type_name(element_type)}"
+
+        # Process the single generator
+        if len(node.generators) != 1:
+            raise UnsupportedFeatureError("Multiple generators in set comprehensions not yet supported")
+
+        generator = node.generators[0]
+
+        # Extract loop variable and iterable
+        if not isinstance(generator.target, ast.Name):
+            raise UnsupportedFeatureError("Only simple loop variables supported in set comprehensions")
+
+        loop_var = generator.target.id
+
+        # Handle range-based iteration
+        if (isinstance(generator.iter, ast.Call) and
+            isinstance(generator.iter.func, ast.Name) and
+            generator.iter.func.id == "range"):
+
+            range_args = generator.iter.args
+            if len(range_args) == 1:
+                start = "0"
+                end = self._convert_expression(range_args[0])
+                step = "1"
+            elif len(range_args) == 2:
+                start = self._convert_expression(range_args[0])
+                end = self._convert_expression(range_args[1])
+                step = "1"
+            elif len(range_args) == 3:
+                start = self._convert_expression(range_args[0])
+                end = self._convert_expression(range_args[1])
+                step = self._convert_expression(range_args[2])
+            else:
+                raise UnsupportedFeatureError("Invalid range() arguments in comprehension")
+
+            loop_code = f"for (int {loop_var} = {start}; {loop_var} < {end}; {loop_var} += {step})"
+        else:
+            raise UnsupportedFeatureError("Non-range iterables in set comprehensions not yet supported")
+
+        # Handle conditions (if any)
+        condition_code = ""
+        if generator.ifs:
+            if len(generator.ifs) > 1:
+                raise UnsupportedFeatureError("Multiple conditions in set comprehensions not yet supported")
+
+            condition = generator.ifs[0]
+            condition_expr = self._convert_expression(condition)
+            condition_code = f"if ({condition_expr}) "
+
+        # Convert the expression
+        expr_str = self._convert_expression(node.elt)
+
+        # Generate the comprehension code
+        comp_code = f"""{{
+    {result_container_type} {temp_var} = {{0}};
+    {loop_code} {{
+        {condition_code}{result_container_type}_insert(&{temp_var}, {expr_str});
+    }}
+    {temp_var}}}"""
+
+        return comp_code
+
+    def _generate_temp_var_name(self, prefix: str) -> str:
+        """Generate a unique temporary variable name."""
+        import time
+        return f"{prefix}_{int(time.time() * 1000000) % 1000000}"
 
 
 class CEmitter(AbstractEmitter):
