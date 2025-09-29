@@ -1,190 +1,14 @@
-"""Comprehensive tests for enhanced C backend with py2c converter."""
+"""Integration tests for C backend components (emitter, builder, containers, factory)."""
 
-import pytest
 import tempfile
 from pathlib import Path
 
-from mgen.backends.c.emitter import CEmitter
-from mgen.backends.c.emitter import MGenPythonToCConverter, UnsupportedFeatureError
-from mgen.backends.c.factory import CFactory
+import pytest
+
 from mgen.backends.c.builder import CBuilder
 from mgen.backends.c.containers import CContainerSystem
-
-
-class TestMGenPythonToCConverter:
-    """Test MGen's sophisticated Python-to-C converter."""
-
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.converter = MGenPythonToCConverter()
-
-    def test_simple_function_conversion(self):
-        """Test conversion of a simple function."""
-        python_code = """
-def add(x: int, y: int) -> int:
-    return x + y
-"""
-        c_code = self.converter.convert_code(python_code)
-
-        assert "int add(int x, int y)" in c_code
-        assert "return (x + y);" in c_code
-        assert "#include \"mgen_error_handling.h\"" in c_code
-
-    def test_function_with_variables(self):
-        """Test function with local variable declarations."""
-        python_code = """
-def calculate(x: int, y: float) -> float:
-    result: float = x * y
-    return result
-"""
-        c_code = self.converter.convert_code(python_code)
-
-        assert "double calculate(int x, double y)" in c_code
-        assert "double result = " in c_code
-        assert "return result;" in c_code
-
-    def test_void_function(self):
-        """Test function with no return type."""
-        python_code = """
-def print_hello():
-    pass
-"""
-        c_code = self.converter.convert_code(python_code)
-
-        assert "void print_hello(void)" in c_code
-
-    def test_multiple_operations(self):
-        """Test function with multiple arithmetic operations."""
-        python_code = """
-def complex_calc(a: int, b: int, c: int) -> int:
-    return a + b * c - 10
-"""
-        c_code = self.converter.convert_code(python_code)
-
-        assert "int complex_calc(int a, int b, int c)" in c_code
-        assert "return" in c_code
-        assert "+ " in c_code and "* " in c_code and "- " in c_code
-
-    def test_type_mapping(self):
-        """Test Python type to C type mapping."""
-        assert self.converter.type_mapping["int"] == "int"
-        assert self.converter.type_mapping["float"] == "double"
-        assert self.converter.type_mapping["bool"] == "bool"
-        assert self.converter.type_mapping["str"] == "char*"
-
-    def test_comparison_operations(self):
-        """Test comparison operations."""
-        python_code = """
-def compare(x: int, y: int) -> bool:
-    return x > y
-"""
-        c_code = self.converter.convert_code(python_code)
-
-        assert "bool compare(int x, int y)" in c_code
-        assert "(x > y)" in c_code
-
-    def test_if_statement(self):
-        """Test if statement conversion."""
-        python_code = """
-def check_positive(x: int) -> int:
-    if x > 0:
-        return 1
-    else:
-        return 0
-"""
-        c_code = self.converter.convert_code(python_code)
-
-        assert "if ((x > 0))" in c_code
-        assert "} else {" in c_code
-
-    def test_while_loop(self):
-        """Test while loop conversion."""
-        python_code = """
-def countdown(n: int) -> int:
-    while n > 0:
-        n = n - 1
-    return n
-"""
-        c_code = self.converter.convert_code(python_code)
-
-        assert "while ((n > 0))" in c_code
-        assert "n = (n - 1);" in c_code
-
-    def test_for_range_loop(self):
-        """Test for loop with range."""
-        python_code = """
-def sum_range(n: int) -> int:
-    total: int = 0
-    for i in range(n):
-        total = total + i
-    return total
-"""
-        c_code = self.converter.convert_code(python_code)
-
-        assert "for (int i = 0; i < n; i += 1)" in c_code
-        assert "total = (total + i);" in c_code
-
-    def test_builtin_functions_with_runtime(self):
-        """Test built-in functions using MGen runtime."""
-        python_code = """
-def use_builtins(x: int) -> int:
-    return abs(x)
-"""
-        c_code = self.converter.convert_code(python_code)
-
-        assert "mgen_abs_int(x)" in c_code
-
-    def test_unsupported_feature_error(self):
-        """Test handling of unsupported Python features."""
-        python_code = """
-def use_generator():
-    for x in (y for y in range(10)):
-        yield x
-"""
-        # Should not raise exception but handle gracefully
-        try:
-            c_code = self.converter.convert_code(python_code)
-            # Should contain some conversion, even if partial
-            assert c_code is not None
-        except UnsupportedFeatureError:
-            # This is also acceptable
-            pass
-
-    def test_runtime_includes(self):
-        """Test that runtime includes are generated."""
-        python_code = """
-def simple() -> int:
-    return 42
-"""
-        c_code = self.converter.convert_code(python_code)
-
-        assert "#include \"mgen_error_handling.h\"" in c_code
-        assert "#include \"mgen_python_ops.h\"" in c_code
-        assert "#include \"mgen_memory_ops.h\"" in c_code
-
-    def test_main_function_generation(self):
-        """Test that main function is generated when not present."""
-        python_code = """
-def helper() -> int:
-    return 1
-"""
-        c_code = self.converter.convert_code(python_code)
-
-        assert "int main()" in c_code
-        assert "Hello from MGen-enhanced C code!" in c_code
-
-    @pytest.mark.parametrize("python_type,c_type", [
-        ("int", "int"),
-        ("float", "double"),
-        ("bool", "bool"),
-        ("str", "char*"),
-        ("list", "vec_int"),
-        ("dict", "map_str_int"),
-        ("set", "set_int"),
-    ])
-    def test_type_mapping_parametrized(self, python_type, c_type):
-        """Test comprehensive type mapping."""
-        assert self.converter.type_mapping[python_type] == c_type
+from mgen.backends.c.emitter import CEmitter, MGenPythonToCConverter
+from mgen.backends.c.factory import CFactory
 
 
 class TestEnhancedCEmitter:
@@ -203,7 +27,7 @@ def add(x: int, y: int) -> int:
         c_code = self.emitter.emit_module(python_code)
 
         assert "int add(int x, int y)" in c_code
-        assert "#include \"mgen_error_handling.h\"" in c_code
+        assert '#include "mgen_error_handling.h"' in c_code
 
     def test_emit_module_fallback(self):
         """Test fallback to basic emission on py2c failure."""
@@ -267,14 +91,14 @@ class TestCContainerSystemEnhanced:
         assert "#define STC_ENABLED" in declarations
         assert "vec_int" in declarations
         assert "set_double" in declarations
-        assert "#include \"stc/vec.h\"" in declarations
+        assert '#include "stc/vec.h"' in declarations
 
     def test_required_imports_stc(self):
         """Test required imports for STC."""
         imports = self.container_system.get_required_imports()
 
-        assert "#include \"mgen_stc_bridge.h\"" in imports
-        assert "#include \"mgen_error_handling.h\"" in imports
+        assert '#include "mgen_stc_bridge.h"' in imports
+        assert '#include "mgen_error_handling.h"' in imports
 
     def test_type_name_sanitization(self):
         """Test type name sanitization for STC."""
@@ -293,8 +117,8 @@ class TestCBuilderEnhanced:
     def test_runtime_detection(self):
         """Test runtime directory detection."""
         # Runtime should be detected
-        assert hasattr(self.builder, 'use_runtime')
-        assert hasattr(self.builder, 'runtime_dir')
+        assert hasattr(self.builder, "use_runtime")
+        assert hasattr(self.builder, "runtime_dir")
 
     def test_makefile_generation_with_runtime(self):
         """Test Makefile generation with runtime sources."""
@@ -472,7 +296,7 @@ def test_enhanced_c_backend_comprehensive(sample_python_functions):
     """Comprehensive test of enhanced C backend."""
     emitter = CEmitter()
 
-    for name, code in sample_python_functions.items():
+    for _name, code in sample_python_functions.items():
         c_code = emitter.emit_module(code)
 
         # Basic sanity checks

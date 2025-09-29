@@ -97,8 +97,12 @@ release: clean $(TARGET)
 
             # Add MGen runtime support if available
             if self.use_runtime:
-                # Add include path
+                # Add include path for runtime
                 cmd.append(f"-I{self.runtime_dir}")
+                # Add include path for STC headers
+                stc_include_dir = Path(__file__).parent / "ext" / "stc" / "include"
+                if stc_include_dir.exists():
+                    cmd.append(f"-I{stc_include_dir}")
 
                 # Add runtime sources
                 cmd.extend(self.get_runtime_sources())
@@ -127,8 +131,12 @@ release: clean $(TARGET)
         flags = ["-Wall", "-Wextra", "-std=c99", "-O2"]
 
         if self.use_runtime:
-            # Add include path
+            # Add include path for runtime
             flags.append(f"-I{self.runtime_dir}")
+            # Add include path for STC headers
+            stc_include_dir = Path(__file__).parent / "ext" / "stc" / "include"
+            if stc_include_dir.exists():
+                flags.append(f"-I{stc_include_dir}")
 
         return flags
 

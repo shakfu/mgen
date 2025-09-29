@@ -16,7 +16,7 @@
 // STC types and headers are included by the generated code
 // This bridge only provides function declarations and implementations
 #ifdef STC_ENABLED
-    #include "stc/types.h"  // Only include core types, not template headers
+    #include "ext/stc/include/stc/types.h"  // Include from MGen's STC directory
 #endif
 
 #ifdef __cplusplus

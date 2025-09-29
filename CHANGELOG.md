@@ -27,19 +27,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Support for complex expressions within comprehensions (arithmetic, function calls, etc.)
   - Conditional filtering with `if` clauses for selective element inclusion
   - Range-based iteration with start, stop, and step parameters
-- **Enhanced STC Integration**: Smart Template Container operations for comprehensions
+- **Complete STC Library Integration**: Full Smart Template Container (STC) library support
+  - Integrated 864KB STC library from CGen into `src/mgen/backends/c/ext/stc/`
+  - Complete STC headers and Python integration modules for high-performance C containers
+  - Automatic STC include path configuration in build system and compiler flags
+  - Updated MGen runtime bridge to use proper STC include paths
+- **Enhanced STC Container Operations**: Smart Template Container operations for comprehensions
   - Automatic vector initialization and push operations for list comprehensions
   - HashMap insert operations for dictionary comprehensions with proper key-value handling
   - HashSet insert operations for set comprehensions with duplicate elimination
   - Type inference for container element types and proper C type mapping
-  - Memory-safe container operations with bounds checking and error handling
+  - Memory-safe container operations with STC's optimized implementations
 
 ### Technical Achievements
 - **Sophisticated AST Conversion**: Complete `ast.ListComp`, `ast.DictComp`, and `ast.SetComp` support
 - **Advanced Code Generation**: Multi-line C code blocks with proper loop and condition generation
+- **Complete STC Integration**: Full Smart Template Container library with 864KB of optimized C code
+- **Build System Enhancement**: Automatic STC include path detection and configuration
 - **Type Safety**: Automatic type inference for comprehension elements and container specialization
-- **Test Coverage**: 29 new comprehensive tests ensuring robust comprehensions functionality (204 total tests passing)
-- **Performance**: Efficient C loops with minimal overhead compared to Python equivalents
+- **Test Organization**: Professional test suite reorganization with focused, single-responsibility files
+- **Enhanced Test Coverage**: 191 total tests passing (29 new comprehensions + reorganized existing tests)
+- **Performance**: Efficient C loops with STC's high-performance container implementations
 
 ### Example Conversion
 **Python Input:**
@@ -81,6 +89,19 @@ dict process_numbers(int n) {
     return squares;
 }
 ```
+
+### Test Suite Reorganization
+- **Eliminated Duplication**: Removed 20+ duplicate tests from overlapping files
+- **Professional Structure**: Reorganized C backend tests into focused, single-responsibility files
+  - `test_backend_c_basics.py` (39 tests): Core Python-to-C conversion functionality
+  - `test_backend_c_controlflow.py` (6 tests): Control structures (if/while/for loops)
+  - `test_backend_c_builtins.py` (3 tests): Built-in function support (abs, bool, len, etc.)
+  - `test_backend_c_inference.py` (4 tests): Type inference and automatic type mapping
+  - `test_backend_c_oop.py` (19 tests): Object-oriented programming features
+  - `test_backend_c_comprehensions.py` (29 tests): List/dict/set comprehensions
+  - `test_backend_c_integration.py` (23 tests): Multi-component integration testing
+- **Improved Maintainability**: Clear separation of concerns with easy test discovery
+- **Enhanced Coverage**: 191 total tests ensuring comprehensive C backend validation
 
 ## [0.1.6]
 

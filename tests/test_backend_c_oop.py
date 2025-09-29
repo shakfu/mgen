@@ -2,11 +2,7 @@
 
 import pytest
 
-from mgen.backends.c.emitter import (
-    MGenPythonToCConverter,
-    UnsupportedFeatureError,
-    TypeMappingError
-)
+from mgen.backends.c.emitter import MGenPythonToCConverter, UnsupportedFeatureError
 
 
 class TestPy2COOPBasics:

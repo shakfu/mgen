@@ -71,12 +71,15 @@ class MGenPythonToCConverter:
         """Convert a Python module to C code."""
         parts = []
 
+        # Check for comprehensions to enable STC support
+        self.uses_comprehensions = self._uses_comprehensions(node)
+
         # Add includes
         parts.extend(self._generate_includes())
         parts.append("")
 
         # Add STC container declarations if needed
-        if self._uses_containers(node):
+        if self._uses_containers(node) or self.uses_comprehensions:
             parts.extend(self._generate_container_declarations())
             parts.append("")
 
@@ -113,6 +116,15 @@ class MGenPythonToCConverter:
             if self.container_variables or self._needs_containers():
                 includes.append("#include \"mgen_stc_bridge.h\"")
 
+        # Add STC includes for comprehensions
+        if hasattr(self, 'uses_comprehensions') and self.uses_comprehensions:
+            includes.extend([
+                "#define STC_ENABLED",
+                "#include \"ext/stc/include/stc/vec.h\"",
+                "#include \"ext/stc/include/stc/hmap.h\"",
+                "#include \"ext/stc/include/stc/hset.h\"",
+            ])
+
         return includes
 
     def _generate_container_declarations(self) -> List[str]:
@@ -122,40 +134,52 @@ class MGenPythonToCConverter:
         declarations.append("#define STC_ENABLED")
         declarations.append("")
 
-        # Analyze container types needed
+        # Analyze container types needed from existing variables
         container_types = set()
         for var_info in self.container_variables.values():
             if "element_type" in var_info:
                 container_types.add(var_info["element_type"])
 
+        # Add types for comprehensions (basic integer support for now)
+        if hasattr(self, 'uses_comprehensions') and self.uses_comprehensions:
+            container_types.add("int")  # Most common case for comprehensions
+
         # Generate declarations for each type
         for element_type in container_types:
             sanitized = self._sanitize_type_name(element_type)
 
-            # Vector declaration
+            # Vector declaration for list comprehensions
             declarations.extend([
                 f"#define i_type vec_{sanitized}",
                 f"#define i_val {element_type}",
-                "#include \"stc/vec.h\"",
+                "#include \"ext/stc/include/stc/vec.h\"",
+                "#undef i_type",
+                "#undef i_val",
                 ""
             ])
 
-            # Map declaration (string keys)
+            # Map declaration for dict comprehensions (int -> int)
             declarations.extend([
-                f"#define i_type map_str_{sanitized}",
-                "#define i_key_str",
+                f"#define i_type map_{sanitized}_{sanitized}",
+                f"#define i_key {element_type}",
                 f"#define i_val {element_type}",
-                "#include \"stc/map.h\"",
+                "#include \"ext/stc/include/stc/hmap.h\"",
+                "#undef i_type",
+                "#undef i_key",
+                "#undef i_val",
                 ""
             ])
 
-            # Set declaration
+            # Set declaration for set comprehensions
             declarations.extend([
                 f"#define i_type set_{sanitized}",
                 f"#define i_key {element_type}",
-                "#include \"stc/set.h\"",
+                "#include \"ext/stc/include/stc/hset.h\"",
+                "#undef i_type",
+                "#undef i_key",
                 ""
             ])
+
 
         return declarations
 
@@ -516,6 +540,13 @@ class MGenPythonToCConverter:
     def _needs_containers(self) -> bool:
         """Check if container support is needed."""
         return len(self.container_variables) > 0
+
+    def _uses_comprehensions(self, node: ast.AST) -> bool:
+        """Check if the AST contains comprehensions."""
+        for child in ast.walk(node):
+            if isinstance(child, (ast.ListComp, ast.DictComp, ast.SetComp)):
+                return True
+        return False
 
     def _sanitize_type_name(self, type_name: str) -> str:
         """Sanitize type name for use in STC containers."""
