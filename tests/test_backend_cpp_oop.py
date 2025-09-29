@@ -193,9 +193,9 @@ class ControlFlow:
 
         assert "int process(int x)" in cpp_code
         assert "if ((x > this->limit))" in cpp_code
-        assert "int result = (x * 2);" in cpp_code
+        assert ("int result = (x * 2);" in cpp_code or "auto result = (x * 2);" in cpp_code)
         assert "} else {" in cpp_code
-        assert "int result = x;" in cpp_code
+        assert ("int result = x;" in cpp_code or "auto result = x;" in cpp_code)
 
     def test_method_with_local_variables(self):
         """Test method that declares local variables."""

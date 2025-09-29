@@ -175,7 +175,7 @@ def test_set_comp_if() -> set:
 
         assert "set_comprehension" in cpp_code
         assert "Range(10)" in cpp_code
-        assert "x % 3 == 0" in cpp_code
+        assert "((x % 3) == 0)" in cpp_code
 
     def test_set_comprehension_with_expression(self):
         """Test set comprehension with expression transformation."""

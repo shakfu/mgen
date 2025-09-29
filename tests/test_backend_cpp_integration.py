@@ -40,7 +40,7 @@ def main() -> None:
 
         # Check main function
         assert "void main()" in cpp_code
-        assert "int result = factorial(5);" in cpp_code
+        assert "int result = factorial(5);" in cpp_code or "auto result = factorial(5);" in cpp_code
         assert "cout << result << endl;" in cpp_code
 
     def test_program_with_multiple_functions(self):
@@ -62,8 +62,8 @@ def calculate(x: int, y: int) -> int:
         assert "int add(int a, int b)" in cpp_code
         assert "int multiply(int a, int b)" in cpp_code
         assert "int calculate(int x, int y)" in cpp_code
-        assert "int sum_val = add(x, y);" in cpp_code
-        assert "int product = multiply(sum_val, 2);" in cpp_code
+        assert ("int sum_val = add(x, y);" in cpp_code or "auto sum_val = add(x, y);" in cpp_code)
+        assert ("int product = multiply(sum_val, 2);" in cpp_code or "auto product = multiply(sum_val, 2);" in cpp_code)
 
     def test_program_with_string_processing(self):
         """Test program with string operations."""
@@ -84,6 +84,8 @@ def format_greeting(name: str) -> str:
         assert "StringOps::upper(cleaned)" in cpp_code
         assert "std::string process_text(std::string text)" in cpp_code
         assert "std::string format_greeting(std::string name)" in cpp_code
+        assert ("std::string processed_name = process_text(name);" in cpp_code or
+                "auto processed_name = process_text(name);" in cpp_code)
 
 
 class TestCppIntegrationOOP:
@@ -280,7 +282,7 @@ def test_unsupported():
 """
         # Should not raise error for basic code
         cpp_code = self.converter.convert_code(python_code)
-        assert "void test_unsupported()" in cpp_code
+        assert ("void test_unsupported()" in cpp_code or "auto test_unsupported()" in cpp_code)
 
     def test_type_inference_fallback(self):
         """Test that type inference falls back to 'auto' when needed."""

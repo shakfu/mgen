@@ -180,7 +180,7 @@ def test_ops(a: int, b: int) -> int:
 """
         cpp_code = self.converter.convert_code(python_code)
 
-        assert "return (((a + b) - (a * b)) / a);" in cpp_code
+        assert "return ((a + b) - ((a * b) / a));" in cpp_code
 
     def test_comparison_operations(self):
         """Test comparison operations."""

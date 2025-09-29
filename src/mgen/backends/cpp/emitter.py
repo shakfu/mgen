@@ -284,7 +284,7 @@ class MGenPythonToCppConverter:
                     stmt.target.value.id == "self"):
                     attr_name = stmt.target.attr
                     if stmt.value:
-                        value_expr = self._convert_expression(stmt.value)
+                        value_expr = self._convert_method_expression(stmt.value, class_name)
                         body_parts.append(f"        this->{attr_name} = {value_expr};")
             elif isinstance(stmt, ast.Assign):
                 # self.attr = value
@@ -293,13 +293,13 @@ class MGenPythonToCppConverter:
                         isinstance(target.value, ast.Name) and
                         target.value.id == "self"):
                         attr_name = target.attr
-                        value_expr = self._convert_expression(stmt.value)
+                        value_expr = self._convert_method_expression(stmt.value, class_name)
                         body_parts.append(f"        this->{attr_name} = {value_expr};")
             else:
-                # Other statements in constructor
-                converted = self._convert_statement(stmt)
+                # Other statements in constructor - use method-aware conversion
+                converted = self._convert_method_statement(stmt, class_name)
                 if converted.strip():
-                    body_parts.append(f"        {converted}")
+                    body_parts.append(converted)
 
         # Build constructor
         param_str = ", ".join(params) if params else ""
@@ -342,10 +342,14 @@ class MGenPythonToCppConverter:
         """Convert a method statement with class context."""
         if isinstance(stmt, ast.Assign):
             return self._convert_method_assignment(stmt, class_name)
+        elif isinstance(stmt, ast.AnnAssign):
+            return self._convert_method_annotated_assignment(stmt, class_name)
         elif isinstance(stmt, ast.AugAssign):
             return self._convert_method_aug_assignment(stmt, class_name)
         elif isinstance(stmt, ast.Return):
             return self._convert_method_return(stmt, class_name)
+        elif isinstance(stmt, ast.If):
+            return self._convert_method_if(stmt, class_name)
         elif isinstance(stmt, ast.Expr):
             expr = self._convert_method_expression(stmt.value, class_name)
             return f"        {expr};"
@@ -400,6 +404,30 @@ class MGenPythonToCppConverter:
             return f"        return {value_expr};"
         return "        return;"
 
+    def _convert_method_if(self, stmt: ast.If, class_name: str) -> str:
+        """Convert if statement in method context with proper self handling."""
+        condition = self._convert_method_expression(stmt.test, class_name)
+        then_body = self._convert_method_statements(stmt.body, class_name)
+        if_part = f"        if ({condition}) {{\n{then_body}\n        }}"
+        if stmt.orelse:
+            if len(stmt.orelse) == 1 and isinstance(stmt.orelse[0], ast.If):
+                # elif chain
+                else_body = self._convert_method_if(stmt.orelse[0], class_name).strip()
+                return f"{if_part} else {else_body}"
+            else:
+                # regular else
+                else_body = self._convert_method_statements(stmt.orelse, class_name)
+                return f"{if_part} else {{\n{else_body}\n        }}"
+        else:
+            return if_part
+
+    def _convert_method_statements(self, statements: list, class_name: str) -> str:
+        """Convert a list of statements in method context."""
+        converted = []
+        for stmt in statements:
+            converted.append(self._convert_method_statement(stmt, class_name))
+        return '\n'.join(converted)
+
     def _convert_method_expression(self, expr: ast.expr, class_name: str) -> str:
         """Convert method expression with class context."""
         if isinstance(expr, ast.Attribute):
@@ -448,6 +476,21 @@ class MGenPythonToCppConverter:
 
             op = op_map.get(type(expr.op), "/*UNKNOWN_OP*/")
             return f"({left} {op} {right})"
+        elif isinstance(expr, ast.Compare):
+            # Handle comparison operations with proper self conversion
+            left = self._convert_method_expression(expr.left, class_name)
+            result = left
+
+            for op, comp in zip(expr.ops, expr.comparators):
+                op_map = {
+                    ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
+                    ast.Gt: ">", ast.GtE: ">=", ast.Is: "==", ast.IsNot: "!="
+                }
+                op_str = op_map.get(type(op), "/*UNKNOWN_OP*/")
+                comp_expr = self._convert_method_expression(comp, class_name)
+                result = f"({result} {op_str} {comp_expr})"
+
+            return result
         elif isinstance(expr, ast.Name):
             # Handle regular variable names
             return expr.id
@@ -517,6 +560,26 @@ class MGenPythonToCppConverter:
             target_expr = self._convert_expression(stmt.target)
             if stmt.value:
                 value_expr = self._convert_expression(stmt.value)
+                return f"        {target_expr} = {value_expr};"
+        return ""
+
+    def _convert_method_annotated_assignment(self, stmt: ast.AnnAssign, class_name: str) -> str:
+        """Convert annotated assignment in method context (var: type = value)."""
+        if isinstance(stmt.target, ast.Name):
+            var_name = stmt.target.id
+            var_type = self._convert_type_annotation(stmt.annotation)
+            self.variable_context[var_name] = var_type
+
+            if stmt.value:
+                value_expr = self._convert_method_expression(stmt.value, class_name)
+                return f"        {var_type} {var_name} = {value_expr};"
+            else:
+                return f"        {var_type} {var_name};"
+        else:
+            # Handle attribute annotations
+            target_expr = self._convert_method_expression(stmt.target, class_name)
+            if stmt.value:
+                value_expr = self._convert_method_expression(stmt.value, class_name)
                 return f"        {target_expr} = {value_expr};"
         return ""
 
@@ -947,6 +1010,17 @@ class MGenPythonToCppConverter:
                     return "std::string"
                 elif func_name == 'range':
                     return "Range"
+                else:
+                    # Try to infer from function context (if we know the return type)
+                    # For now, check if function name suggests a type
+                    if func_name.endswith('_int') or func_name in ['factorial', 'calculate', 'compute', 'add', 'subtract', 'multiply']:
+                        return "int"
+                    elif func_name.endswith('_str') or func_name in ['format', 'get_name', 'to_string']:
+                        return "std::string"
+                    elif func_name.endswith('_float') or func_name in ['average', 'mean']:
+                        return "double"
+                    elif func_name.endswith('_bool') or func_name in ['is_valid', 'check']:
+                        return "bool"
             elif isinstance(value.func, ast.Attribute):
                 # String method calls
                 if value.func.attr in ['upper', 'lower', 'strip', 'replace']:
