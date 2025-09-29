@@ -183,7 +183,7 @@ class StaticAnalyzer(BaseAnalyzer):
 
     def __init__(self, analysis_level: AnalysisLevel = AnalysisLevel.BASIC):
         super().__init__("StaticAnalyzer", analysis_level)
-        self._current_cfg: Optional[ControlFlowGraph] = None
+        self._current_cfg: ControlFlowGraph
         self._variables: Dict[str, VariableInfo] = {}
         self._loop_stack: List[Tuple[int, int]] = []  # (header_id, exit_id)
 

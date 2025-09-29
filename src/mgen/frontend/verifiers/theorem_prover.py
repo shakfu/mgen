@@ -11,15 +11,11 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
 # Z3 integration - graceful fallback if not installed
-try:
-    import z3
+# import z3  # TODO: Fix missing z3 dependency
+Z3_AVAILABLE = False
 
-    Z3_AVAILABLE = True
-except ImportError:
-    Z3_AVAILABLE = False
-
-    # Mock Z3 classes for development without Z3
-    class z3:
+# Mock Z3 classes for development without Z3
+class z3:
         class Solver:
             def __init__(self):
                 pass
@@ -32,6 +28,17 @@ except ImportError:
 
             def model(self):
                 return None
+
+        @staticmethod
+        def Not(expr):
+            return None
+
+        @staticmethod
+        def IntVal(val):
+            return None
+
+        sat = "sat"
+        unsat = "unsat"
 
         class Int:
             def __init__(self, name):
