@@ -64,6 +64,9 @@ class MGenPythonToCConverter:
         try:
             tree = ast.parse(source_code)
             return self._convert_module(tree)
+        except (UnsupportedFeatureError, TypeMappingError):
+            # Re-raise our specific exceptions without wrapping
+            raise
         except Exception as e:
             raise UnsupportedFeatureError(f"Failed to convert Python code: {e}")
 
@@ -73,6 +76,9 @@ class MGenPythonToCConverter:
 
         # Check for comprehensions to enable STC support
         self.uses_comprehensions = self._uses_comprehensions(node)
+
+        # First pass: check for string methods to populate includes_needed
+        self._detect_string_methods(node)
 
         # Add includes
         parts.extend(self._generate_includes())
@@ -97,6 +103,18 @@ class MGenPythonToCConverter:
             parts.append(self._generate_main_function())
 
         return "\n".join(parts)
+
+    def _detect_string_methods(self, node: ast.AST) -> None:
+        """Pre-scan AST to detect string method usage for include generation."""
+        for child in ast.walk(node):
+            if isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute):
+                method_name = child.func.attr
+
+                # Check if this looks like a string method call
+                if method_name in ["upper", "lower", "strip", "find", "replace", "split"]:
+                    # For pre-scan, we're more liberal - assume any call to these methods is a string method
+                    self.includes_needed.add('#include "mgen_string_ops.h"')
+                    break  # Only need to add it once
 
     def _generate_includes(self) -> List[str]:
         """Generate C includes with MGen runtime support."""
@@ -124,6 +142,9 @@ class MGenPythonToCConverter:
                 "#include \"ext/stc/include/stc/hmap.h\"",
                 "#include \"ext/stc/include/stc/hset.h\"",
             ])
+
+        # Add dynamically needed includes
+        includes.extend(sorted(self.includes_needed))
 
         return includes
 
@@ -226,6 +247,8 @@ class MGenPythonToCConverter:
             return self._convert_assignment(stmt)
         elif isinstance(stmt, ast.AnnAssign):
             return self._convert_annotated_assignment(stmt)
+        elif isinstance(stmt, ast.AugAssign):
+            return self._convert_augmented_assignment(stmt)
         elif isinstance(stmt, ast.If):
             return self._convert_if(stmt)
         elif isinstance(stmt, ast.While):
@@ -320,6 +343,71 @@ class MGenPythonToCConverter:
 
         else:
             raise UnsupportedFeatureError("Only simple variable and attribute annotation supported")
+
+    def _convert_augmented_assignment(self, stmt: ast.AugAssign) -> str:
+        """Convert augmented assignment (+=, -=, etc.) to C syntax."""
+        # Check if target is a simple variable
+        if isinstance(stmt.target, ast.Name):
+            var_name = stmt.target.id
+            if var_name not in self.variable_context:
+                raise TypeMappingError(f"Variable '{var_name}' must be declared before augmented assignment")
+
+            value_expr = self._convert_expression(stmt.value)
+
+            # Map Python augmented assignment operators to C
+            op_map = {
+                ast.Add: "+=",
+                ast.Sub: "-=",
+                ast.Mult: "*=",
+                ast.Div: "/=",
+                ast.FloorDiv: "/=",  # Floor division maps to regular division in C
+                ast.Mod: "%=",
+                ast.BitOr: "|=",
+                ast.BitXor: "^=",
+                ast.BitAnd: "&=",
+                ast.LShift: "<<=",
+                ast.RShift: ">>=",
+            }
+
+            if type(stmt.op) in op_map:
+                op_str = op_map[type(stmt.op)]
+                return f"{var_name} {op_str} {value_expr};"
+            else:
+                raise UnsupportedFeatureError(f"Unsupported augmented assignment operator: {type(stmt.op).__name__}")
+
+        # Check if target is an attribute (e.g., self.attr += value or obj.attr += value)
+        elif isinstance(stmt.target, ast.Attribute):
+            obj = self._convert_expression(stmt.target.value)
+            attr_name = stmt.target.attr
+            value_expr = self._convert_expression(stmt.value)
+
+            # Map operators for attribute access
+            op_map = {
+                ast.Add: "+=",
+                ast.Sub: "-=",
+                ast.Mult: "*=",
+                ast.Div: "/=",
+                ast.FloorDiv: "/=",
+                ast.Mod: "%=",
+                ast.BitOr: "|=",
+                ast.BitXor: "^=",
+                ast.BitAnd: "&=",
+                ast.LShift: "<<=",
+                ast.RShift: ">>=",
+            }
+
+            if type(stmt.op) in op_map:
+                op_str = op_map[type(stmt.op)]
+                # Determine correct access operator (-> for pointers, . for structs)
+                if obj == "self":
+                    return f"self->{attr_name} {op_str} {value_expr};"
+                else:
+                    return f"{obj}.{attr_name} {op_str} {value_expr};"
+            else:
+                raise UnsupportedFeatureError(f"Unsupported augmented assignment operator: {type(stmt.op).__name__}")
+
+        else:
+            raise UnsupportedFeatureError("Only simple variable and attribute augmented assignments supported")
 
     def _convert_expression(self, expr: ast.expr) -> str:
         """Convert Python expression to C expression."""
@@ -478,6 +566,10 @@ class MGenPythonToCConverter:
         obj = self._convert_expression(obj_expr)
         args = [self._convert_expression(arg) for arg in expr.args]
 
+        # Check if this is a string method call
+        if self._is_string_type(obj_expr):
+            return self._convert_string_method(obj, method_name, args)
+
         # Try to determine the class type from the object
         # For now, we'll use a simple heuristic - look for known class names
         class_name = None
@@ -497,6 +589,89 @@ class MGenPythonToCConverter:
             # Fallback - assume it's a simple method call
             args_str = ", ".join(args)
             return f"{obj}_{method_name}({args_str})"
+
+    def _is_string_type(self, expr: ast.expr) -> bool:
+        """Check if expression represents a string type."""
+        # Check if it's a string literal
+        if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
+            return True
+
+        # Check if it's a variable with string type
+        if isinstance(expr, ast.Name):
+            var_name = expr.id
+            if var_name in self.variable_context:
+                var_type = self.variable_context[var_name]
+                return var_type in ["str", "char*"]
+
+        # Check if it's an attribute access (e.g., self.text, obj.attr)
+        if isinstance(expr, ast.Attribute):
+            # For attribute access, look up the attribute in class definitions
+            if isinstance(expr.value, ast.Name) and expr.value.id == "self":
+                # This is self.attribute - check if we know this attribute is a string
+                attr_name = expr.attr
+                # Look through defined structs to find this attribute's type
+                for class_name, class_info in self.defined_structs.items():
+                    if attr_name in class_info.get("attributes", {}):
+                        attr_type = class_info["attributes"][attr_name]
+                        return attr_type in ["str", "char*"]
+            else:
+                # For obj.attr, try to determine the object type
+                obj_expr = expr.value
+                if isinstance(obj_expr, ast.Name):
+                    obj_name = obj_expr.id
+                    if obj_name in self.variable_context:
+                        obj_type = self.variable_context[obj_name]
+                        if obj_type in self.defined_structs:
+                            attr_name = expr.attr
+                            class_info = self.defined_structs[obj_type]
+                            if attr_name in class_info.get("attributes", {}):
+                                attr_type = class_info["attributes"][attr_name]
+                                return attr_type in ["str", "char*"]
+
+        return False
+
+    def _convert_string_method(self, obj: str, method_name: str, args: List[str]) -> str:
+        """Convert string method calls to appropriate C code."""
+        self.includes_needed.add('#include "mgen_string_ops.h"')
+
+        if method_name == "upper":
+            if args:
+                raise UnsupportedFeatureError("str.upper() takes no arguments")
+            return f"mgen_str_upper({obj})"
+
+        elif method_name == "lower":
+            if args:
+                raise UnsupportedFeatureError("str.lower() takes no arguments")
+            return f"mgen_str_lower({obj})"
+
+        elif method_name == "strip":
+            if len(args) == 0:
+                return f"mgen_str_strip({obj})"
+            elif len(args) == 1:
+                return f"mgen_str_strip_chars({obj}, {args[0]})"
+            else:
+                raise UnsupportedFeatureError("str.strip() takes at most one argument")
+
+        elif method_name == "find":
+            if len(args) != 1:
+                raise UnsupportedFeatureError("str.find() requires exactly one argument")
+            return f"mgen_str_find({obj}, {args[0]})"
+
+        elif method_name == "replace":
+            if len(args) != 2:
+                raise UnsupportedFeatureError("str.replace() requires exactly two arguments")
+            return f"mgen_str_replace({obj}, {args[0]}, {args[1]})"
+
+        elif method_name == "split":
+            if len(args) == 0:
+                return f"mgen_str_split({obj}, NULL)"
+            elif len(args) == 1:
+                return f"mgen_str_split({obj}, {args[0]})"
+            else:
+                raise UnsupportedFeatureError("str.split() takes at most one argument")
+
+        else:
+            raise UnsupportedFeatureError(f"Unsupported string method: {method_name}")
 
     def _get_type_annotation(self, annotation: ast.expr) -> str:
         """Extract type from annotation."""
@@ -696,6 +871,7 @@ class MGenPythonToCConverter:
         # Store struct info for later use
         self.defined_structs[class_name] = {
             'instance_vars': instance_vars,
+            'attributes': instance_vars,  # For compatibility with string method detection
             'methods': [m.name for m in methods]
         }
 

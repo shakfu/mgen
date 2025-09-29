@@ -17,6 +17,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.8]
+
+### Added
+- **Advanced Assignment Operators**: Complete augmented assignment support with comprehensive operator mapping
+  - All Python augmented assignment operators: `+=`, `-=`, `*=`, `/=`, `//=`, `%=`, `|=`, `^=`, `&=`, `<<=`, `>>=`
+  - Support for simple variables (`x += 5`) and object attributes (`self.count *= 2`, `obj.value += amount`)
+  - Automatic type safety with variable declaration checking before augmented assignment
+  - Comprehensive error handling for undeclared variables and unsupported operators
+  - Enhanced exception handling to properly propagate `TypeMappingError` and `UnsupportedFeatureError`
+- **Complete String Methods Support**: Python string operations with robust C runtime implementation
+  - Core string methods: `str.upper()`, `str.lower()`, `str.strip()`, `str.find()`, `str.replace()`, `str.split()`
+  - Intelligent AST pre-scanning for automatic include detection (`#include "mgen_string_ops.h"`)
+  - Enhanced type detection system supporting attribute access patterns (`self.text.strip()`, `obj.name.upper()`)
+  - MGen string operations runtime library with memory-safe implementations
+  - Advanced class integration: string methods work seamlessly on instance variables and object attributes
+  - Support for string literals (`"hello".upper()`) and variables with proper type inference
+
+### Technical Achievements
+- **Augmented Assignment Engine**: Complete AST.AugAssign handling with operator mapping and type validation
+- **String Operations Runtime**: Lightweight C library (`mgen_string_ops.h/.c`) with proper memory management
+- **Enhanced Type System**: Advanced `_is_string_type()` method supporting complex attribute access patterns
+- **Smart Include Generation**: Pre-scan detection with `_detect_string_methods()` for optimal header inclusion
+- **Class Attribute Tracking**: Enhanced struct information storage for string method detection on class attributes
+- **Comprehensive Test Coverage**: 64 new tests (34 augmented assignment + 30 string methods) with 255 total tests passing
+- **Production-Ready Code Generation**: Clean, efficient C code with proper error handling and type safety
+
+### Example Conversion
+**Python Input:**
+```python
+class Calculator:
+    def __init__(self, initial: int):
+        self.value: int = initial
+        self.name: str = "calc"
+
+    def process(self, amount: int) -> str:
+        self.value += amount * 2
+        self.value //= 3
+        return self.name.upper()
+
+def test_operations() -> str:
+    calc: Calculator = Calculator(10)
+    result: str = calc.process(5)
+    return result.strip()
+```
+
+**Generated C Output:**
+```c
+#include "mgen_string_ops.h"
+
+typedef struct Calculator {
+    int value;
+    char* name;
+} Calculator;
+
+void Calculator_process(Calculator* self, int amount) {
+    self->value += (amount * 2);
+    self->value /= 3;
+    return mgen_str_upper(self->name);
+}
+
+char* test_operations(void) {
+    Calculator calc = Calculator_new(10, "calc");
+    char* result = Calculator_process(&calc, 5);
+    return mgen_str_strip(result);
+}
+```
+
 ## [0.1.7]
 
 ### Added
