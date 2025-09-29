@@ -1,21 +1,25 @@
-"""C code emitter for MGen with integrated runtime libraries."""
+"""C code emitter for MGen with integrated runtime libraries and sophisticated py2c conversion."""
 
 import ast
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from ..base import AbstractEmitter
+from .py2c_converter import MGenPythonToCConverter, UnsupportedFeatureError
 
 
 class CEmitter(AbstractEmitter):
     """C code emitter with integrated runtime libraries."""
 
     def __init__(self):
-        """Initialize C emitter with runtime support."""
+        """Initialize C emitter with sophisticated py2c conversion and runtime support."""
         self.runtime_dir = Path(__file__).parent / "runtime"
         self.use_runtime = self.runtime_dir.exists()
 
-        # Type mapping for C code generation
+        # Initialize sophisticated py2c converter
+        self.py2c_converter = MGenPythonToCConverter()
+
+        # Enhanced type mapping for C code generation
         self.type_map = {
             "int": "int",
             "float": "double",
@@ -36,8 +40,16 @@ class CEmitter(AbstractEmitter):
         return self._emit_function_basic(func_node, type_context)
 
     def emit_module(self, source_code: str, analysis_result: Optional[Any] = None) -> str:
-        """Generate complete C module with MGen runtime support."""
-        return self._emit_module_with_runtime(source_code)
+        """Generate complete C module using sophisticated py2c conversion."""
+        try:
+            # Try sophisticated py2c conversion first
+            return self.py2c_converter.convert_code(source_code)
+        except UnsupportedFeatureError as e:
+            # Fall back to basic conversion with warning
+            return f"/* Py2C conversion failed: {e} */\n" + self._emit_module_with_runtime(source_code)
+        except Exception as e:
+            # Fall back to basic conversion with error comment
+            return f"/* Py2C conversion error: {e} */\n" + self._emit_module_with_runtime(source_code)
 
     def can_use_simple_emission(self, analysis_result: Any) -> bool:
         """Check if simple emission can be used for this code."""
