@@ -8,7 +8,7 @@ MGen translates Python code to multiple target languages while preserving semant
 
 - **Advanced Python Support**: Object-oriented programming, comprehensions, string methods, augmented assignment
 
-- **STL & Modern Libraries**: C++ STL containers, Rust collections, Go standard library integration
+- **Modern Libraries**: C++ STL containers, Rust collections, Go standard library integration
 
 - **Clean Architecture**: Extensible backend system for adding new languages
 
