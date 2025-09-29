@@ -491,11 +491,119 @@ class MGenPythonToCppConverter:
                 result = f"({result} {op_str} {comp_expr})"
 
             return result
+        elif isinstance(expr, ast.ListComp):
+            return self._convert_method_list_comprehension(expr, class_name)
+        elif isinstance(expr, ast.DictComp):
+            return self._convert_method_dict_comprehension(expr, class_name)
+        elif isinstance(expr, ast.SetComp):
+            return self._convert_method_set_comprehension(expr, class_name)
         elif isinstance(expr, ast.Name):
             # Handle regular variable names
             return expr.id
         else:
             return self._convert_expression(expr)
+
+    def _convert_method_list_comprehension(self, expr: ast.ListComp, class_name: str) -> str:
+        """Convert list comprehensions in method context using STL and runtime helpers."""
+        # Extract comprehension components
+        element_expr = expr.elt
+        target = expr.generators[0].target
+        iter_expr = expr.generators[0].iter
+        conditions = expr.generators[0].ifs
+
+        if isinstance(iter_expr, ast.Call) and isinstance(iter_expr.func, ast.Name) and iter_expr.func.id == "range":
+            # Range-based comprehension
+            range_args = [self._convert_method_expression(arg, class_name) for arg in iter_expr.args]
+            range_call = f"Range({', '.join(range_args)})"
+            # Create lambda for transformation
+            target_name = target.id if isinstance(target, ast.Name) else "x"
+            transform_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(element_expr, class_name)}; }}"
+
+            if conditions:
+                # Comprehension with condition
+                condition_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                return f"list_comprehension({range_call}, {transform_lambda}, {condition_lambda})"
+            else:
+                # Simple comprehension
+                return f"list_comprehension({range_call}, {transform_lambda})"
+        else:
+            # Iteration over container (like words)
+            container_expr = self._convert_method_expression(iter_expr, class_name)
+            target_name = target.id if isinstance(target, ast.Name) else "x"
+            transform_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(element_expr, class_name)}; }}"
+
+            if conditions:
+                condition_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                return f"list_comprehension({container_expr}, {transform_lambda}, {condition_lambda})"
+            else:
+                return f"list_comprehension({container_expr}, {transform_lambda})"
+
+    def _convert_method_dict_comprehension(self, expr: ast.DictComp, class_name: str) -> str:
+        """Convert dict comprehensions in method context."""
+        # Extract comprehension components
+        key_expr = expr.key
+        value_expr = expr.value
+        target = expr.generators[0].target
+        iter_expr = expr.generators[0].iter
+        conditions = expr.generators[0].ifs
+
+        if isinstance(iter_expr, ast.Call) and isinstance(iter_expr.func, ast.Name) and iter_expr.func.id == "range":
+            range_args = [self._convert_method_expression(arg, class_name) for arg in iter_expr.args]
+            range_call = f"Range({', '.join(range_args)})"
+            target_name = target.id if isinstance(target, ast.Name) else "x"
+
+            # Use make_pair for key-value pairs
+            key_transform = self._convert_method_expression(key_expr, class_name)
+            value_transform = self._convert_method_expression(value_expr, class_name)
+            transform_lambda = f"[]({target_name}) {{ return make_pair({key_transform}, {value_transform}); }}"
+
+            if conditions:
+                condition_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                return f"dict_comprehension({range_call}, {transform_lambda}, {condition_lambda})"
+            else:
+                return f"dict_comprehension({range_call}, {transform_lambda})"
+        else:
+            container_expr = self._convert_method_expression(iter_expr, class_name)
+            target_name = target.id if isinstance(target, ast.Name) else "x"
+            key_transform = self._convert_method_expression(key_expr, class_name)
+            value_transform = self._convert_method_expression(value_expr, class_name)
+            transform_lambda = f"[]({target_name}) {{ return make_pair({key_transform}, {value_transform}); }}"
+
+            if conditions:
+                condition_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                return f"dict_comprehension({container_expr}, {transform_lambda}, {condition_lambda})"
+            else:
+                return f"dict_comprehension({container_expr}, {transform_lambda})"
+
+    def _convert_method_set_comprehension(self, expr: ast.SetComp, class_name: str) -> str:
+        """Convert set comprehensions in method context."""
+        # Extract comprehension components
+        element_expr = expr.elt
+        target = expr.generators[0].target
+        iter_expr = expr.generators[0].iter
+        conditions = expr.generators[0].ifs
+
+        if isinstance(iter_expr, ast.Call) and isinstance(iter_expr.func, ast.Name) and iter_expr.func.id == "range":
+            range_args = [self._convert_method_expression(arg, class_name) for arg in iter_expr.args]
+            range_call = f"Range({', '.join(range_args)})"
+            target_name = target.id if isinstance(target, ast.Name) else "x"
+            transform_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(element_expr, class_name)}; }}"
+
+            if conditions:
+                condition_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                return f"set_comprehension({range_call}, {transform_lambda}, {condition_lambda})"
+            else:
+                return f"set_comprehension({range_call}, {transform_lambda})"
+        else:
+            container_expr = self._convert_method_expression(iter_expr, class_name)
+            target_name = target.id if isinstance(target, ast.Name) else "x"
+            transform_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(element_expr, class_name)}; }}"
+
+            if conditions:
+                condition_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                return f"set_comprehension({container_expr}, {transform_lambda}, {condition_lambda})"
+            else:
+                return f"set_comprehension({container_expr}, {transform_lambda})"
 
     def _convert_statement(self, stmt: ast.stmt) -> str:
         """Convert a Python statement to C++."""
@@ -862,9 +970,16 @@ class MGenPythonToCppConverter:
                 # No condition
                 return f"list_comprehension({range_call}, {transform_lambda})"
         else:
-            # Container iteration (simplified)
+            # Container iteration (like iterating over a vector)
             container_expr = self._convert_expression(iter_expr)
-            return f"/* List comprehension over {container_expr} */"
+            target_name = target.id if isinstance(target, ast.Name) else "x"
+            transform_lambda = f"[]({target_name}) {{ return {self._convert_expression(element_expr)}; }}"
+
+            if conditions:
+                condition_lambda = f"[]({target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
+                return f"list_comprehension({container_expr}, {transform_lambda}, {condition_lambda})"
+            else:
+                return f"list_comprehension({container_expr}, {transform_lambda})"
 
     def _convert_dict_comprehension(self, expr: ast.DictComp) -> str:
         """Convert dictionary comprehensions using STL and runtime helpers."""
@@ -892,7 +1007,16 @@ class MGenPythonToCppConverter:
                 # No condition
                 return f"dict_comprehension({range_call}, {key_val_lambda})"
         else:
-            return f"/* Dict comprehension over container */"
+            # Container iteration (like iterating over a vector)
+            container_expr = self._convert_expression(iter_expr)
+            target_name = target.id if isinstance(target, ast.Name) else "x"
+            key_val_lambda = f"[]({target_name}) {{ return std::make_pair({self._convert_expression(key_expr)}, {self._convert_expression(value_expr)}); }}"
+
+            if conditions:
+                condition_lambda = f"[]({target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
+                return f"dict_comprehension({container_expr}, {key_val_lambda}, {condition_lambda})"
+            else:
+                return f"dict_comprehension({container_expr}, {key_val_lambda})"
 
     def _convert_set_comprehension(self, expr: ast.SetComp) -> str:
         """Convert set comprehensions using STL and runtime helpers."""
@@ -919,7 +1043,16 @@ class MGenPythonToCppConverter:
                 # No condition
                 return f"set_comprehension({range_call}, {transform_lambda})"
         else:
-            return f"/* Set comprehension over container */"
+            # Container iteration (like iterating over a vector)
+            container_expr = self._convert_expression(iter_expr)
+            target_name = target.id if isinstance(target, ast.Name) else "x"
+            transform_lambda = f"[]({target_name}) {{ return {self._convert_expression(element_expr)}; }}"
+
+            if conditions:
+                condition_lambda = f"[]({target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
+                return f"set_comprehension({container_expr}, {transform_lambda}, {condition_lambda})"
+            else:
+                return f"set_comprehension({container_expr}, {transform_lambda})"
 
     def _convert_statements(self, statements: List[ast.stmt]) -> str:
         """Convert multiple statements."""
