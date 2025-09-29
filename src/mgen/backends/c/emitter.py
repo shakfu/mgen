@@ -54,7 +54,7 @@ class MGenPythonToCConverter:
         self.current_function: Optional[str] = None
         self.container_variables: Dict[str, Dict[str, Any]] = {}
         self.variable_context: Dict[str, str] = {}  # var_name -> c_type
-        self.defined_structs: Dict[str, str] = {}
+        self.defined_structs: Dict[str, Dict[str, Any]] = {}
         self.iterator_variables: Dict[str, str] = {}
         self.includes_needed = set()
         self.use_runtime = True
@@ -917,7 +917,7 @@ class MGenPythonToCConverter:
                                 var_type = self._get_type_annotation(body_stmt.annotation)
                                 var_type = self.type_mapping.get(var_type, var_type)
                             else:
-                                var_type = self._infer_expression_type(body_stmt.value)
+                                var_type = self._infer_expression_type(body_stmt.value) if body_stmt.value is not None else "void*"
                             instance_vars[var_name] = var_type
 
         return instance_vars
@@ -1367,7 +1367,7 @@ class CEmitter(AbstractEmitter):
             # Fall back to basic conversion with error comment
             return f"/* Py2C conversion error: {e} */\n" + self._emit_module_with_runtime(source_code)
 
-    def can_use_simple_emission(self, analysis_result: Any) -> bool:
+    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> bool:
         """Check if simple emission can be used for this code."""
         # With runtime support, we can handle more complex cases
         return not self.use_runtime
@@ -1468,7 +1468,7 @@ class CEmitter(AbstractEmitter):
                 elif isinstance(stmt.value, ast.Constant):
                     body_lines.append(f"    return {stmt.value.value};")
                 else:
-                    expr = self._emit_expression_enhanced(stmt.value)
+                    expr = self._emit_expression_enhanced(stmt.value) if stmt.value is not None else "NULL"
                     body_lines.append(f"    return {expr};")
             else:
                 # Handle other statement types

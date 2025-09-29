@@ -482,7 +482,7 @@ class MGenPythonToCppConverter:
             result = left
 
             for op, comp in zip(expr.ops, expr.comparators):
-                op_map = {
+                op_map: Dict[Any, str] = {
                     ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
                     ast.Gt: ">", ast.GtE: ">=", ast.Is: "==", ast.IsNot: "!="
                 }
@@ -1223,15 +1223,15 @@ class CppEmitter(AbstractEmitter):
         """Map Python type to C++ type."""
         return self.converter.type_mapping.get(python_type, "auto")
 
-    def can_use_simple_emission(self, analysis_result: Any) -> bool:
+    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> bool:
         """Check if simple emission can be used for this code."""
         # Always use full sophisticated conversion
         return False
 
-    def emit_function(self, node: ast.FunctionDef) -> str:
+    def emit_function(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
         """Emit a C++ function from a Python function definition."""
         # Delegate to converter for comprehensive function handling
-        return self.converter._convert_function(node)
+        return self.converter._convert_function(func_node)
 
     def emit_class(self, node: ast.ClassDef) -> str:
         """Emit a C++ class from a Python class definition."""

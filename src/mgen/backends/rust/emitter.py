@@ -851,8 +851,8 @@ class MGenPythonToRustConverter:
         # Convert key-value pairs
         pairs = []
         for key, value in zip(expr.keys, expr.values):
-            key_expr = self._convert_expression(key)
-            value_expr = self._convert_expression(value)
+            key_expr = self._convert_expression(key) if key is not None else "None"
+            value_expr = self._convert_expression(value) if value is not None else "None"
             pairs.append(f"({key_expr}, {value_expr})")
 
         # Create HashMap using collect()

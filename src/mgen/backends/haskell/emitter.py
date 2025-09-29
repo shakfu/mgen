@@ -715,8 +715,8 @@ main = printValue "Generated Haskell code executed successfully"'''
         """Convert Python dict literal to Haskell Map."""
         pairs = []
         for key, value in zip(node.keys, node.values):
-            key_expr = self._convert_expression(key)
-            value_expr = self._convert_expression(value)
+            key_expr = self._convert_expression(key) if key is not None else "undefined"
+            value_expr = self._convert_expression(value) if value is not None else "undefined"
             pairs.append(f"({key_expr}, {value_expr})")
 
         return f"Map.fromList [{', '.join(pairs)}]"

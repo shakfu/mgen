@@ -665,8 +665,12 @@ class IRBuilder:
             if node.value:
                 value_expr = self._build_expression(node.value)
                 return IRAssignment(var, value_expr, self._get_location(node))
+            else:
+                # Create assignment with None value for declaration only
+                return IRAssignment(var, None, self._get_location(node))
 
-        return None
+        # Fallback for complex targets
+        return IRAssignment(None, None, self._get_location(node))
 
     def _build_assignment(self, node: ast.Assign) -> Optional[IRStatement]:
         """Build regular assignment."""

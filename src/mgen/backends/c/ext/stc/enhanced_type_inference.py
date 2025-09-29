@@ -233,7 +233,10 @@ class EnhancedTypeInferenceEngine:
 
                 elif isinstance(value_node, ast.Dict):
                     # Infer key and value types from dict contents
-                    key_type, value_type = self._infer_dict_types(value_node.keys, value_node.values)
+                    # Filter out None values which can occur in dict literal keys/values
+                    filtered_keys = [k for k in value_node.keys if k is not None]
+                    filtered_values = [v for v in value_node.values if v is not None]
+                    key_type, value_type = self._infer_dict_types(filtered_keys, filtered_values)
                     python_type = f"Dict[{key_type}, {value_type}]" if key_type != "unknown" else "dict"
                     return InferredType(
                         python_type=python_type,

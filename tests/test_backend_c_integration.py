@@ -46,7 +46,9 @@ def complex_unsupported():
     def test_can_use_simple_emission(self):
         """Test simple emission detection."""
         # With runtime support, should prefer sophisticated conversion
-        result = self.emitter.can_use_simple_emission(None)
+        import ast
+        func_node = ast.FunctionDef(name="test", args=ast.arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[], decorator_list=[])
+        result = self.emitter.can_use_simple_emission(func_node, {})
         assert isinstance(result, bool)
 
     def test_py2c_converter_initialization(self):
