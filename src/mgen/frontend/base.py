@@ -39,7 +39,7 @@ class AnalysisContext:
     analysis_level: AnalysisLevel = AnalysisLevel.BASIC
     optimization_level: OptimizationLevel = OptimizationLevel.BASIC
     target_architecture: str = "x86_64"
-    metadata: Dict[str, Any] = None
+    metadata: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.metadata is None:
@@ -240,7 +240,7 @@ class IntelligencePipeline:
         Returns:
             Dictionary containing all analysis, optimization, and verification results
         """
-        results = {
+        results: Dict[str, Any] = {
             "analysis_reports": [],
             "optimization_results": [],
             "verification_results": [],

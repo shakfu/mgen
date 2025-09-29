@@ -299,15 +299,16 @@ class IRExpression(IRNode):
 class IRAssignment(IRStatement):
     """IR representation of an assignment statement."""
 
-    def __init__(self, target: IRVariable, value: IRExpression, location: Optional[IRLocation] = None):
+    def __init__(self, target: IRVariable, value: Optional[IRExpression], location: Optional[IRLocation] = None):
         super().__init__(location)
         self.target = target
         self.value = value
         self.add_child(target)
-        self.add_child(value)
+        if value is not None:
+            self.add_child(value)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"type": "assignment", "target": self.target.to_dict(), "value": self.value.to_dict()}
+        return {"type": "assignment", "target": self.target.to_dict(), "value": self.value.to_dict() if self.value else None}
 
     def accept(self, visitor: "IRVisitor") -> Any:
         return visitor.visit_assignment(self)
@@ -669,8 +670,13 @@ class IRBuilder:
                 # Create assignment with None value for declaration only
                 return IRAssignment(var, None, self._get_location(node))
 
-        # Fallback for complex targets
-        return IRAssignment(None, None, self._get_location(node))
+        # Fallback for complex targets - create a dummy assignment with placeholder
+        # This should be handled properly by the caller
+        from warnings import warn
+        warn(f"Complex annotated assignment target not supported: {type(node.target)}")
+        # Return a dummy assignment to satisfy type checker
+        dummy_var = IRVariable("_unknown", IRType(IRDataType.VOID), self._get_location(node))
+        return IRAssignment(dummy_var, None, self._get_location(node))
 
     def _build_assignment(self, node: ast.Assign) -> Optional[IRStatement]:
         """Build regular assignment."""
@@ -760,21 +766,21 @@ class IRBuilder:
     def _build_if(self, node: ast.If) -> IRIf:
         """Build if statement."""
         condition = self._build_expression(node.test)
-        then_body = [self._build_statement(stmt) for stmt in node.body]
-        then_body = [stmt for stmt in then_body if stmt]  # Filter None
+        then_body_raw = [self._build_statement(stmt) for stmt in node.body]
+        then_body: List[IRStatement] = [stmt for stmt in then_body_raw if stmt is not None]
 
-        else_body = []
+        else_body: List[IRStatement] = []
         if node.orelse:
-            else_body = [self._build_statement(stmt) for stmt in node.orelse]
-            else_body = [stmt for stmt in else_body if stmt]  # Filter None
+            else_body_raw = [self._build_statement(stmt) for stmt in node.orelse]
+            else_body = [stmt for stmt in else_body_raw if stmt is not None]
 
         return IRIf(condition, then_body, else_body, self._get_location(node))
 
     def _build_while(self, node: ast.While) -> IRWhile:
         """Build while loop."""
         condition = self._build_expression(node.test)
-        body = [self._build_statement(stmt) for stmt in node.body]
-        body = [stmt for stmt in body if stmt]  # Filter None
+        body_raw = [self._build_statement(stmt) for stmt in node.body]
+        body: List[IRStatement] = [stmt for stmt in body_raw if stmt is not None]
 
         return IRWhile(condition, body, self._get_location(node))
 
@@ -784,6 +790,10 @@ class IRBuilder:
             if node.iter.func.id == "range":
                 # Extract range parameters
                 args = node.iter.args
+                start: IRExpression
+                end: IRExpression
+                step: IRExpression
+
                 if len(args) == 1:
                     start = IRLiteral(0, IRType(IRDataType.INT))
                     end = self._build_expression(args[0])
@@ -805,8 +815,8 @@ class IRBuilder:
                     loop_var = IRVariable(var_name, IRType(IRDataType.INT), self._get_location(node.target))
                     self.symbol_table[var_name] = loop_var
 
-                    body = [self._build_statement(stmt) for stmt in node.body]
-                    body = [stmt for stmt in body if stmt]  # Filter None
+                    body_raw = [self._build_statement(stmt) for stmt in node.body]
+                    body: List[IRStatement] = [stmt for stmt in body_raw if stmt is not None]
 
                     return IRFor(loop_var, start, end, step, body, self._get_location(node))
 
@@ -835,7 +845,7 @@ class IRBuilder:
     def _get_location(self, node: ast.AST) -> IRLocation:
         """Extract location information from AST node."""
         return IRLocation(
-            line=node.lineno,
+            line=getattr(node, "lineno", 0),
             column=getattr(node, "col_offset", 0),
             end_line=getattr(node, "end_lineno", None),
             end_column=getattr(node, "end_col_offset", None),

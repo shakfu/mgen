@@ -273,7 +273,7 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
     def analyze_memory_safety(self, tree: ast.AST) -> Dict[str, Any]:
         """Comprehensive memory safety analysis."""
         # Run standard STC memory analysis
-        standard_errors = []
+        standard_errors: List[Dict[str, Any]] = []
 
         # Run enhanced memory analysis
         enhanced_errors = self.enhanced_memory_manager.detect_memory_issues()

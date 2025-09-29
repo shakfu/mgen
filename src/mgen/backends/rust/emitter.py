@@ -106,7 +106,7 @@ class MGenPythonToRustConverter:
 
     def _collect_required_imports(self, node: ast.Module) -> List[str]:
         """Collect required imports based on code features."""
-        imports = []
+        imports: List[str] = []
 
         # Check for collections usage
         for n in ast.walk(node):
@@ -1156,7 +1156,7 @@ class MGenPythonToRustConverter:
             if isinstance(stmt, (ast.Assign, ast.AnnAssign)):
                 if isinstance(stmt.target if hasattr(stmt, 'target') else stmt.targets[0], ast.Attribute):
                     target = stmt.target if hasattr(stmt, 'target') else stmt.targets[0]
-                    if isinstance(target.value, ast.Name) and target.value.id == "self":
+                    if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
                         fields.append(target.attr)
         return fields
 

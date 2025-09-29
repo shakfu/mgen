@@ -199,7 +199,7 @@ install(TARGETS {target_name} DESTINATION bin)
 
     def _detect_runtime_sources(self, source_files: List[str]) -> List[str]:
         """Detect if runtime sources are needed based on generated code analysis."""
-        runtime_sources = []
+        runtime_sources: List[str] = []
 
         # Check if any source files use MGen runtime features
         for source_file in source_files:

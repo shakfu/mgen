@@ -35,10 +35,10 @@ class MGenPythonToHaskellConverter:
             "None": "()",
             "NoneType": "()",
         }
-        self.data_types = {}  # Track data type definitions for classes
-        self.current_function = None  # Track current function context
-        self.declared_vars = set()  # Track declared variables in current function
-        self.needed_imports = set()  # Track which imports are needed
+        self.data_types: Dict[str, str] = {}  # Track data type definitions for classes
+        self.current_function: Optional[str] = None  # Track current function context
+        self.declared_vars: Set[str] = set()  # Track declared variables in current function
+        self.needed_imports: Set[str] = set()  # Track which imports are needed
 
     def _to_camel_case(self, snake_str: str) -> str:
         """Convert snake_case to CamelCase."""

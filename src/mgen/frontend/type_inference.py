@@ -8,7 +8,7 @@ and static analysis.
 import ast
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from ..common import log
 from .ast_analyzer import TypeInfo
@@ -58,7 +58,7 @@ class TypeInferenceEngine:
         self.enable_flow_sensitive = enable_flow_sensitive
 
         # Lazy import to avoid circular dependency
-        self._flow_sensitive_inferencer = None
+        self._flow_sensitive_inferencer: Optional["FlowSensitiveInferencer"] = None
         self.binary_op_result_types = {
             # (left_type, operator, right_type) -> result_type
             ("int", ast.Add, "int"): "int",
@@ -178,7 +178,9 @@ class TypeInferenceEngine:
 
         # Look up result type in our mapping
         op_type = type(node.op)
-        key = (left_result.type_info.c_equivalent, op_type, right_result.type_info.c_equivalent)
+        left_c = left_result.type_info.c_equivalent if left_result.type_info.c_equivalent else "unknown"
+        right_c = right_result.type_info.c_equivalent if right_result.type_info.c_equivalent else "unknown"
+        key = (left_c, op_type, right_c)
 
         if key in self.binary_op_result_types:
             result_c_type = self.binary_op_result_types[key]
@@ -316,7 +318,8 @@ class TypeInferenceEngine:
 
         for elem in node.elts:
             elem_result = self.infer_expression_type(elem, context)
-            element_types.append(elem_result.type_info.c_equivalent)
+            c_equiv = elem_result.type_info.c_equivalent if elem_result.type_info.c_equivalent else "unknown"
+            element_types.append(c_equiv)
             min_confidence = min(min_confidence, elem_result.confidence)
 
         return InferenceResult(

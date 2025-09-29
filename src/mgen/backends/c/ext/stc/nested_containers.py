@@ -7,7 +7,7 @@ and generating proper instantiation order.
 
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 
 @dataclass
@@ -337,7 +337,7 @@ class NestedContainerManager:
             and any(container in type_str for container in ["List[", "Dict[", "Set[", "list[", "dict[", "set["])
         )
 
-    def get_statistics(self) -> Dict[str, any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """Get statistics about nested container usage."""
         total_types = len(self.type_registry)
         nested_types = len([t for t in self.type_registry.values() if t.depth > 1])

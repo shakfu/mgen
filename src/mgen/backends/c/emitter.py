@@ -847,8 +847,9 @@ class MGenPythonToCConverter:
     def _convert_subscript(self, expr: ast.Subscript) -> str:
         """Convert subscript access."""
         obj = self._convert_expression(expr.value)
-        if isinstance(expr.slice, ast.Index):  # Python < 3.9
-            index = self._convert_expression(expr.slice.value)
+        # Handle both Python 3.8 (with ast.Index) and Python 3.9+ (without ast.Index)
+        if hasattr(ast, 'Index') and isinstance(expr.slice, ast.Index):  # Python < 3.9
+            index = self._convert_expression(expr.slice.value)  # type: ignore
         else:  # Python >= 3.9
             index = self._convert_expression(expr.slice)
         return f"{obj}[{index}]"
@@ -1466,7 +1467,11 @@ class CEmitter(AbstractEmitter):
                 elif isinstance(stmt.value, ast.Name):
                     body_lines.append(f"    return {stmt.value.id};")
                 elif isinstance(stmt.value, ast.Constant):
-                    body_lines.append(f"    return {stmt.value.value};")
+                    val = stmt.value.value
+                    if isinstance(val, bytes):
+                        body_lines.append(f"    return {val!r};")
+                    else:
+                        body_lines.append(f"    return {val};")
                 else:
                     expr = self._emit_expression_enhanced(stmt.value) if stmt.value is not None else "NULL"
                     body_lines.append(f"    return {expr};")
@@ -1580,7 +1585,11 @@ class CEmitter(AbstractEmitter):
             elif isinstance(return_node.value, ast.Name):
                 return f"    return {return_node.value.id};"
             elif isinstance(return_node.value, ast.Constant):
-                return f"    return {return_node.value.value};"
+                val = return_node.value.value
+                if isinstance(val, bytes):
+                    return f"    return {val!r};"
+                else:
+                    return f"    return {val};"
 
         return "    /* TODO: Implement complex function body */"
 

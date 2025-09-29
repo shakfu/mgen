@@ -17,8 +17,8 @@ from ...common import log
 # Add the ext.stc module to the path for STC integration
 try:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-    from cgen.ext.stc.containers import STCCodeGenerator, get_stc_container_for_python_type
-    from cgen.ext.stc.translator import STCPythonToCTranslator
+    from mgen.backends.c.ext.stc.containers import STCCodeGenerator, get_stc_container_for_python_type
+    from mgen.backends.c.ext.stc.translator import STCPythonToCTranslator
 
     STC_AVAILABLE = True
 except ImportError:
@@ -402,7 +402,7 @@ class SimplePythonToCTranslator:
             and isinstance(for_node.iter.func, ast.Name)
             and for_node.iter.func.id == "range"
         ):
-            loop_var = for_node.target.id
+            loop_var = for_node.target.id if isinstance(for_node.target, ast.Name) else str(for_node.target)
             range_args = for_node.iter.args
 
             if len(range_args) == 1:
@@ -453,8 +453,10 @@ class SimplePythonToCTranslator:
 
                 if method == "items" and isinstance(target, ast.Tuple) and len(target.elts) == 2:
                     # for key, value in dict.items()
-                    key_var = target.elts[0].id
-                    value_var = target.elts[1].id
+                    key_elt = target.elts[0]
+                    value_elt = target.elts[1]
+                    key_var = key_elt.id if isinstance(key_elt, ast.Name) else str(key_elt)
+                    value_var = value_elt.id if isinstance(value_elt, ast.Name) else str(value_elt)
                     lines.append(self._indent(f"/* {obj_name}.items() iteration */"))
                     lines.append(self._indent(f"/* for ({key_var}, {value_var}) in {obj_name} - not implemented */"))
                 else:

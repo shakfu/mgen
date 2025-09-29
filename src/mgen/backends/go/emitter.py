@@ -579,10 +579,12 @@ class MGenPythonToGoConverter:
 
         if stmt.value:
             value_expr = self._convert_expression(stmt.value)
-            return f"    var {stmt.target.id} {var_type} = {value_expr}"
+            target_id = stmt.target.id if isinstance(stmt.target, ast.Name) else str(stmt.target)
+            return f"    var {target_id} {var_type} = {value_expr}"
         else:
             default_value = self._get_default_value(var_type)
-            return f"    var {stmt.target.id} {var_type} = {default_value}"
+            target_id = stmt.target.id if isinstance(stmt.target, ast.Name) else str(stmt.target)
+            return f"    var {target_id} {var_type} = {default_value}"
 
     def _convert_aug_assignment(self, stmt: ast.AugAssign) -> str:
         """Convert augmented assignment."""
@@ -980,7 +982,7 @@ class MGenPythonToGoConverter:
             if isinstance(stmt, (ast.Assign, ast.AnnAssign)):
                 if isinstance(stmt.target if hasattr(stmt, 'target') else stmt.targets[0], ast.Attribute):
                     target = stmt.target if hasattr(stmt, 'target') else stmt.targets[0]
-                    if isinstance(target.value, ast.Name) and target.value.id == "self":
+                    if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
                         fields.append(target.attr)
         return fields
 

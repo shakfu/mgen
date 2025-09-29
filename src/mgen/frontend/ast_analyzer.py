@@ -301,16 +301,16 @@ class ASTAnalyzer(ast.NodeVisitor):
 
     def _calculate_function_complexity(self, node: ast.FunctionDef) -> StaticComplexity:
         """Calculate the complexity level of a function."""
-        complexity_score = 0
+        complexity_score: float = 0.0
 
         # Count control flow structures
         for child in ast.walk(node):
             if isinstance(child, (ast.If, ast.While, ast.For)):
-                complexity_score += 1
+                complexity_score += 1.0
             elif isinstance(child, ast.Call):
                 complexity_score += 0.5
             elif isinstance(child, (ast.ListComp, ast.DictComp, ast.GeneratorExp)):
-                complexity_score += 2  # Comprehensions are complex
+                complexity_score += 2.0  # Comprehensions are complex
 
         # Map score to complexity level
         if complexity_score <= 1:

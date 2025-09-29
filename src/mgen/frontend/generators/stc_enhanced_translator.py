@@ -445,7 +445,8 @@ class STCEnhancedTranslator:
 
             # Handle builtin functions
             if func_name in self.builtin_functions:
-                return self.builtin_functions[func_name](call)
+                handler = self.builtin_functions[func_name]
+                return handler(call)
 
             # Regular function call
             args = [self._translate_expression(arg) for arg in call.args]

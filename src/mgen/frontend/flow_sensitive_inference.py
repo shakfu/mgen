@@ -95,7 +95,7 @@ class TypeUnifier:
         return FlowType(
             name="union",
             is_union=True,
-            union_options=frozenset(options)
+            union_options=set(options)
         )
 
 

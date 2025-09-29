@@ -464,7 +464,7 @@ class MGenPythonToCppConverter:
             left = self._convert_method_expression(expr.left, class_name)
             right = self._convert_method_expression(expr.right, class_name)
 
-            op_map = {
+            binop_map = {
                 ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
                 ast.FloorDiv: "/", ast.Mod: "%",
                 ast.LShift: "<<", ast.RShift: ">>",
@@ -474,19 +474,20 @@ class MGenPythonToCppConverter:
             if isinstance(expr.op, ast.Pow):
                 return f"pow({left}, {right})"
 
-            op = op_map.get(type(expr.op), "/*UNKNOWN_OP*/")
+            op = binop_map.get(type(expr.op), "/*UNKNOWN_OP*/")
             return f"({left} {op} {right})"
         elif isinstance(expr, ast.Compare):
             # Handle comparison operations with proper self conversion
             left = self._convert_method_expression(expr.left, class_name)
             result = left
 
+            cmpop_map: Dict[type, str] = {
+                ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
+                ast.Gt: ">", ast.GtE: ">=", ast.Is: "==", ast.IsNot: "!="
+            }
+
             for op, comp in zip(expr.ops, expr.comparators):
-                op_map: Dict[Any, str] = {
-                    ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
-                    ast.Gt: ">", ast.GtE: ">=", ast.Is: "==", ast.IsNot: "!="
-                }
-                op_str = op_map.get(type(op), "/*UNKNOWN_OP*/")
+                op_str = cmpop_map.get(type(op), "/*UNKNOWN_OP*/")
                 comp_expr = self._convert_method_expression(comp, class_name)
                 result = f"({result} {op_str} {comp_expr})"
 

@@ -6,7 +6,7 @@ container operations in generated C code.
 """
 
 import ast
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .containers import STCCodeGenerator, get_stc_container_for_python_type
 from .enhanced_type_inference import EnhancedTypeInferenceEngine
@@ -87,7 +87,7 @@ class STCPythonToCTranslator:
         analyzer.visit(node)
         return type_info
 
-    def get_type_inference_statistics(self) -> Dict[str, any]:
+    def get_type_inference_statistics(self) -> Dict[str, Any]:
         """Get statistics about type inference accuracy."""
         return self.type_inference_engine.get_inference_statistics()
 

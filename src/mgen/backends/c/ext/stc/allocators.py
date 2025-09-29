@@ -336,7 +336,7 @@ class MemoryAllocatorManager:
             instance = self.allocators[allocator_name]
             stats = self.allocation_stats[allocator_name]
 
-            allocator_analysis = {
+            allocator_analysis: Dict[str, Any] = {
                 "type": instance.allocator_type.value,
                 "allocation_count": len(allocations),
                 "total_size": stats["total_size"],
@@ -347,7 +347,8 @@ class MemoryAllocatorManager:
 
             analysis["allocators"][allocator_name] = allocator_analysis
             analysis["total_allocations"] += len(allocations)
-            analysis["total_memory"] += stats["total_size"]
+            total_size: int = stats["total_size"]
+            analysis["total_memory"] += total_size
 
         # Generate recommendations
         analysis["recommendations"] = self._generate_optimization_recommendations(analysis)
