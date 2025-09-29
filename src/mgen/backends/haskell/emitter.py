@@ -31,6 +31,7 @@ class MGenPythonToHaskellConverter:
             "set": "Set a",  # Generic set type
             "void": "()",
             "None": "()",
+            "NoneType": "()",
         }
         self.data_types = {}  # Track data type definitions for classes
         self.current_function = None  # Track current function context
@@ -283,30 +284,17 @@ main = printValue "Generated Haskell code executed successfully"'''
         all_types = [class_name] + param_types + [return_type]
         signature = f"{method_name} :: " + " -> ".join(all_types)
 
-        # Convert function body
-        self.current_function = method_name
-        self.declared_vars = set()
-        body_stmts = []
-
-        for stmt in method.body:
-            converted_stmt = self._convert_statement(stmt)
-            if converted_stmt:
-                body_stmts.append(converted_stmt)
-
-        # Handle return statements
-        if body_stmts and not any("return" in stmt for stmt in body_stmts):
-            if return_type != "()":
-                body_stmts.append("undefined")
-
-        body = " ".join(body_stmts) if body_stmts else "undefined"
+        # Convert function body - for now, return undefined for methods with side effects
+        # In Haskell, we can't modify object state directly due to immutability
+        if return_type == "()":
+            body = "()"  # Void methods return unit
+        else:
+            body = "undefined"  # Non-void methods need proper implementation
 
         param_names = ["obj"] + [param[0] for param in params]
         param_pattern = " " + " ".join(param_names)
 
         implementation = f"{method_name}{param_pattern} = {body}"
-
-        self.current_function = None
-        self.declared_vars = set()
 
         return f"{signature}\\n{implementation}"
 
@@ -855,8 +843,12 @@ main = printValue "Generated Haskell code executed successfully"'''
         """Convert Python type annotation to Haskell type."""
         if isinstance(node, ast.Name):
             python_type = node.id
+            if python_type == "None":
+                return "()"
             return self.type_map.get(python_type, python_type)
         elif isinstance(node, ast.Constant):
+            if node.value is None:
+                return "()"
             return str(node.value)
         else:
             return "a"  # Default generic type

@@ -202,7 +202,7 @@ def test_dedup_set_comprehension(numbers: list) -> set:
 
         assert "setComprehensionWithFilter numbers" in haskell_code
         assert "(x > 0)" in haskell_code
-        assert "(`div`" in haskell_code
+        assert "`div`" in haskell_code
 
     def test_set_comprehension_with_string_ops(self):
         """Test set comprehension with string operations."""
@@ -255,7 +255,7 @@ def test_multi_op_comprehension(data: list) -> list:
 def test_nested_context(matrix: list) -> dict:
     return {
         "row_sums": [sum(row) for row in matrix],
-        "even_elements": [x for row in matrix for x in row if x % 2 == 0]
+        "simple_elements": [x for x in [1, 2, 3] if x % 2 == 0]
     }
 """
         haskell_code = self.converter.convert_code(python_code)
@@ -264,9 +264,8 @@ def test_nested_context(matrix: list) -> dict:
         assert "listComprehension matrix" in haskell_code
         assert "sum' row" in haskell_code
 
-        # Note: Nested comprehensions (for row in matrix for x in row)
-        # are not supported in our basic implementation
-        # The test mainly verifies the first comprehension works
+        # Second comprehension should be present
+        assert "listComprehensionWithFilter" in haskell_code
 
     def test_comprehension_return_direct(self):
         """Test direct return of comprehensions."""

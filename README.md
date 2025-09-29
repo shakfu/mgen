@@ -16,7 +16,7 @@ MGen translates Python code to multiple target languages while preserving semant
 
 - **CLI Interface**: Simple command-line tool for conversion and building
 
-- **Comprehensive Testing**: Full test suite with 566 passing tests (100% success rate) ensuring translation accuracy
+- **Comprehensive Testing**: Full test suite with 659 passing tests (100% success rate) ensuring translation accuracy
 
 ## Supported Languages
 
@@ -470,19 +470,19 @@ The C, C++, and Go backends support sophisticated Python language features:
 
 ### Test Coverage
 
-- **650 passing tests** across all backends (98% success rate)
+- **659 passing tests** across all backends (100% success rate)
 - **104 C++ backend tests** (104 passing, 100% success rate)
 - **191 C backend tests** with comprehensive advanced features
 - **95 Go backend tests** (95 passing, 100% success rate)
 - **176 Rust backend tests** with comprehensive OOP, string methods, and comprehensions support
-- **84 Haskell backend tests** with functional programming patterns and type safety
+- **93 Haskell backend tests** with functional programming patterns and type safety (100% success rate)
 - Specialized test suites for OOP, string methods, comprehensions, and more
 
 ## Roadmap
 
 - [x] **C++ Backend Enhancement** - STL-based runtime with feature parity to C backend
 - [x] **Advanced Python Features** - OOP, comprehensions, string methods, augmented assignment
-- [x] **Comprehensive Testing** - 566 tests with 100% success rate ensuring translation accuracy
+- [x] **Comprehensive Testing** - 659 tests with 100% success rate ensuring translation accuracy
 - [x] **Production-Ready C++ Backend** - Complete feature parity with advanced comprehension support
 - [x] **Go Backend Enhancement** - Complete feature parity with C/C++ backends using Go standard library
 - [x] **Rust Backend Enhancement** - Complete feature parity with C/C++/Go backends using Rust standard library
