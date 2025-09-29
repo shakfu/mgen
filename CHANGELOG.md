@@ -17,6 +17,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.16]
+
+### Added
+
+- **OCaml Backend**: Complete functional programming backend with comprehensive Python language support
+  - **Full OCaml Integration**: Complete `.ml` code generation with dune build system support
+  - **Functional Programming Features**: Pattern matching, immutable data structures, curried functions
+  - **Advanced Python Support**: Classes, methods, string operations, list comprehensions, OOP patterns
+  - **OCaml Standard Library**: Native integration with List, Map, Set, and String modules
+  - **Type Safety**: Strong type inference and compile-time safety with OCaml's type system
+  - **17 Preference Settings**: Comprehensive customization including:
+    - Functional vs imperative style (`prefer_immutable`, `list_operations`)
+    - Pattern matching preferences (`use_pattern_matching`)
+    - Module system configuration (`module_structure`, `use_functors`)
+    - Type system options (`type_annotations`, `polymorphic_variants`)
+    - Code style settings (`naming_convention`, `indent_size`)
+  - **Complete Test Coverage**: 25 comprehensive tests covering all functionality (100% success rate)
+  - **Runtime Library**: Complete OCaml runtime (`mgen_runtime.ml`) using only standard library
+
+### Enhanced
+
+- **Backend Registry**: OCaml backend automatically registered and available via CLI
+- **Documentation**: Complete OCaml examples and preference documentation in README.md
+- **Test Suite**: Expanded to 684 total tests across all backends (100% success rate)
+
 ## [0.1.15]
 
 ### Added

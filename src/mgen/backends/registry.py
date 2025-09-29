@@ -75,6 +75,13 @@ class BackendRegistry:
         except ImportError:
             pass  # Haskell backend not yet implemented
 
+        # Try to register OCaml backend
+        try:
+            from .ocaml.backend import OCamlBackend
+            self.register_backend("ocaml", OCamlBackend)
+        except ImportError:
+            pass  # OCaml backend not yet implemented
+
 
 # Global registry instance
 registry = BackendRegistry()

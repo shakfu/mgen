@@ -198,6 +198,51 @@ class GoPreferences(BackendPreferences):
         })
 
 
+@dataclass
+class OCamlPreferences(BackendPreferences):
+    """OCaml-specific backend preferences."""
+
+    def __post_init__(self):
+        """Initialize OCaml-specific default preferences."""
+        self.language_specific.update({
+            # Language version preferences
+            'ocaml_version': '4.14',             # OCaml version targeting
+            'use_modern_syntax': True,           # Modern OCaml syntax features
+
+            # Functional programming preferences
+            'prefer_immutable': True,            # Immutable data structures
+            'use_pattern_matching': True,        # Pattern matching over conditionals
+            'tail_recursion_opt': True,          # Tail recursion optimization
+            'curried_functions': True,           # Use curried function style
+
+            # Module system preferences
+            'module_structure': 'nested',        # nested, flat, hierarchical
+            'use_functors': False,               # Higher-order modules
+            'signature_files': False,            # Generate .mli files
+
+            # Type system preferences
+            'type_annotations': True,            # Explicit type annotations
+            'polymorphic_variants': False,       # Use polymorphic variants
+            'gadts': False,                      # Generalized ADTs (if supported)
+            'objects': False,                    # OCaml object system vs records
+
+            # Standard library preferences
+            'list_operations': 'functional',     # functional, imperative, mixed
+            'string_handling': 'stdlib',         # stdlib, bytes, custom
+            'hashtables': 'stdlib',              # Use Hashtbl module
+
+            # Code style preferences
+            'naming_convention': 'snake_case',   # snake_case, camelCase
+            'indent_size': 2,                    # Indentation size
+            'match_style': 'aligned',            # aligned, compact
+
+            # Performance preferences
+            'lazy_evaluation': False,            # Use lazy values
+            'mutable_optimization': False,       # Mutable optimizations where safe
+            'inline_hints': False,               # Compiler inline hints
+        })
+
+
 class PreferencesRegistry:
     """Registry for backend preference classes."""
 
@@ -207,6 +252,7 @@ class PreferencesRegistry:
         'cpp': CppPreferences,
         'rust': RustPreferences,
         'go': GoPreferences,
+        'ocaml': OCamlPreferences,
     }
 
     @classmethod
