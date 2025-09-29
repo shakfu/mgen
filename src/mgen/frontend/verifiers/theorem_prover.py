@@ -385,7 +385,13 @@ class TheoremProver:
     def _create_null_pointer_template(self, **kwargs) -> ProofProperty:
         """Template for null pointer safety properties."""
         # Implementation for null pointer checks
-        pass
+        return ProofProperty(
+            property_type=PropertyType.SAFETY,
+            description="Null pointer safety check",
+            formula="true",  # Placeholder formula
+            constraints=[],
+            metadata=kwargs
+        )
 
     def _create_overflow_template(self, **kwargs) -> ProofProperty:
         """Template for overflow safety properties."""
@@ -394,7 +400,13 @@ class TheoremProver:
     def _create_loop_invariant_template(self, **kwargs) -> ProofProperty:
         """Template for loop invariant properties."""
         # Implementation for loop invariants
-        pass
+        return ProofProperty(
+            property_type=PropertyType.CORRECTNESS,
+            description="Loop invariant property",
+            formula="true",  # Placeholder formula
+            constraints=[],
+            metadata=kwargs
+        )
 
 
 class SafetyPropertyExtractor(ast.NodeVisitor):

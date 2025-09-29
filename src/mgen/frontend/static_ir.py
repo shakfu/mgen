@@ -741,6 +741,12 @@ class IRBuilder:
             return_type = IRType(IRDataType.VOID)  # Would need better inference
 
             return IRFunctionCall(func_name, arguments, return_type, self._get_location(node))
+        else:
+            # Handle complex function calls (attribute access, etc.)
+            func_name = "complex_call"  # Placeholder for complex calls
+            arguments = [self._build_expression(arg) for arg in node.args]
+            return_type = IRType(IRDataType.VOID)
+            return IRFunctionCall(func_name, arguments, return_type, self._get_location(node))
 
     def _build_return(self, node: ast.Return) -> IRReturn:
         """Build return statement."""

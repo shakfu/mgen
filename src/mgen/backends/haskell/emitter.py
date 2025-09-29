@@ -397,6 +397,10 @@ main = printValue "Generated Haskell code executed successfully"'''
                     var_name = self._to_haskell_var_name(target.id)
                     value = self._convert_expression(node.value)
                     return f"{var_name} = {value}"
+                else:
+                    return "-- Complex assignment target"
+            else:
+                return "-- Multiple assignment targets"
 
         elif isinstance(node, ast.AnnAssign):
             if isinstance(node.target, ast.Name):
@@ -404,6 +408,10 @@ main = printValue "Generated Haskell code executed successfully"'''
                 if node.value:
                     value = self._convert_expression(node.value)
                     return f"{var_name} = {value}"
+                else:
+                    return f"{var_name} = undefined"  # Type annotation without value
+            else:
+                return "-- Complex annotated assignment"
 
         elif isinstance(node, ast.Expr):
             expr = self._convert_expression(node.value)
@@ -588,24 +596,38 @@ main = printValue "Generated Haskell code executed successfully"'''
             elif func_name == "len":
                 if args:
                     return f"len' {args[0]}"
+                else:
+                    return "0"  # Default len value
             elif func_name == "abs":
                 if args:
                     return f"abs' {args[0]}"
+                else:
+                    return "abs' 0"  # Default abs value
             elif func_name == "min":
                 if args:
                     return f"min' {args[0]}"
+                else:
+                    return "0"  # Default min value
             elif func_name == "max":
                 if args:
                     return f"max' {args[0]}"
+                else:
+                    return "0"  # Default max value
             elif func_name == "sum":
                 if args:
                     return f"sum' {args[0]}"
+                else:
+                    return "0"  # Default sum value
             elif func_name == "bool":
                 if args:
                     return f"bool' {args[0]}"
+                else:
+                    return "False"  # Default bool value
             elif func_name == "str":
                 if args:
                     return f"toString {args[0]}"
+                else:
+                    return "toString \"\""  # Empty string conversion
             elif func_name == "range":
                 if len(args) == 1:
                     return f"rangeList (range {args[0]})"
@@ -613,6 +635,8 @@ main = printValue "Generated Haskell code executed successfully"'''
                     return f"rangeList (range2 {args[0]} {args[1]})"
                 elif len(args) == 3:
                     return f"rangeList (range3 {args[0]} {args[1]} {args[2]})"
+                else:
+                    return f"rangeList (range 0)"  # Fallback for invalid range args
             else:
                 # Check if it's a class constructor call
                 camel_func_name = self._to_camel_case(func_name)

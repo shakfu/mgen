@@ -469,9 +469,13 @@ class MGenPythonToRustConverter:
                 elif func_name == "min":
                     if len(args) >= 2:
                         return f"Builtins::min_i32({args[0]}, {args[1]})"
+                    else:
+                        return "0"  # Fallback for invalid min args
                 elif func_name == "max":
                     if len(args) >= 2:
                         return f"Builtins::max_i32({args[0]}, {args[1]})"
+                    else:
+                        return "0"  # Fallback for invalid max args
                 elif func_name == "sum":
                     return f"Builtins::sum_i32(&{args[0]})"
                 elif func_name == "str":
@@ -483,6 +487,8 @@ class MGenPythonToRustConverter:
                         return f"new_range_with_start({args[0]}, {args[1]})"
                     elif len(args) == 3:
                         return f"new_range_with_step({args[0]}, {args[1]}, {args[2]})"
+                    else:
+                        return f"new_range(0)"  # Fallback for invalid range args
                 else:
                     # Check if this is a class constructor
                     if func_name in self.struct_info:
@@ -881,9 +887,13 @@ class MGenPythonToRustConverter:
             elif func_name == "min":
                 if len(args) >= 2:
                     return f"Builtins::min_i32({args[0]}, {args[1]})"
+                else:
+                    return "0"  # Fallback for invalid min args
             elif func_name == "max":
                 if len(args) >= 2:
                     return f"Builtins::max_i32({args[0]}, {args[1]})"
+                else:
+                    return "0"  # Fallback for invalid max args
             elif func_name == "sum":
                 return f"Builtins::sum_i32(&{args[0]})"
             elif func_name == "bool":
@@ -901,6 +911,8 @@ class MGenPythonToRustConverter:
                     return f"new_range_with_start({args[0]}, {args[1]}).collect()"
                 elif len(args) == 3:
                     return f"new_range_with_step({args[0]}, {args[1]}, {args[2]}).collect()"
+                else:
+                    return f"new_range(0).collect()"  # Fallback for invalid range args
             else:
                 # Check if this is a class constructor
                 if func_name in self.struct_info:

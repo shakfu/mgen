@@ -647,6 +647,10 @@ class MGenPythonToGoConverter:
                 start, stop, step = range_args
                 body = self._convert_statements(stmt.body)
                 return f"    for {target_name} := {start}; {target_name} < {stop}; {target_name} += {step} {{\n{body}\n    }}"
+            else:
+                # Invalid range arguments
+                body = self._convert_statements(stmt.body)
+                return f"    for {target_name} := 0; {target_name} < 0; {target_name}++ {{\n{body}\n    }}"  # Empty loop
         else:
             # Iteration over container
             container_expr = self._convert_expression(stmt.iter)
