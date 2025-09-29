@@ -300,10 +300,10 @@ class VectorizationDetector(BaseOptimizer):
 
             elif isinstance(index.op, ast.Mult):
                 if isinstance(index.left, ast.Name) and index.left.id == loop_var:
-                    if isinstance(index.right, ast.Constant):
+                    if isinstance(index.right, ast.Constant) and isinstance(index.right.value, int):
                         return "strided", index.right.value
                 elif isinstance(index.right, ast.Name) and index.right.id == loop_var:
-                    if isinstance(index.left, ast.Constant):
+                    if isinstance(index.left, ast.Constant) and isinstance(index.left.value, int):
                         return "strided", index.left.value
 
         return "irregular", None

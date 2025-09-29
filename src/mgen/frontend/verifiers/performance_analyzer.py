@@ -23,6 +23,10 @@ class z3:
         def __init__(self, name):
             self.name = name
 
+    @staticmethod
+    def IntVal(val):
+        return None
+
 from ..base import AnalysisContext
 from .theorem_prover import ProofProperty, ProofResult, PropertyType, TheoremProver
 

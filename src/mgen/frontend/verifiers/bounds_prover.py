@@ -25,6 +25,9 @@ class z3:
     @staticmethod
     def And(*args):
         return None
+    @staticmethod
+    def IntVal(val):
+        return None
 
 from ..base import AnalysisContext
 from .theorem_prover import ProofProperty, ProofResult, ProofStatus, PropertyType, TheoremProver

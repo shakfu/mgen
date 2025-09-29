@@ -317,7 +317,7 @@ class LoopAnalyzer(BaseOptimizer):
                     # range(n)
                     bounds.start = 0
                     bounds.step = 1
-                    if isinstance(args[0], ast.Constant):
+                    if isinstance(args[0], ast.Constant) and isinstance(args[0].value, int):
                         bounds.end = args[0].value
                         bounds.is_constant = True
                         bounds.total_iterations = bounds.end

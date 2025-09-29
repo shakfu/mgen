@@ -374,7 +374,7 @@ class SimplePythonToCTranslator:
         ):
             container_name = for_node.iter.id
             container_type = self.stc_container_vars[container_name]
-            target_var = for_node.target.id
+            target_var = for_node.target.id if isinstance(for_node.target, ast.Name) else "iter_var"
 
             # Generate STC iteration
             lines.append(self._indent(f"for (c_each(it, {container_type}, {container_name})) {{"))
@@ -463,7 +463,7 @@ class SimplePythonToCTranslator:
             elif isinstance(for_node.iter.func, ast.Attribute) and for_node.iter.func.attr == "split":
                 # Handle content.split()
                 obj_name = self._translate_expression(for_node.iter.func.value)
-                target_var = for_node.target.id
+                target_var = for_node.target.id if isinstance(for_node.target, ast.Name) else "iter_var"
                 lines.append(self._indent(f"/* for {target_var} in {obj_name}.split() - simplified */"))
                 lines.append(self._indent(f"char* {target_var};"))
                 lines.append(self._indent("/* split iteration not implemented */"))
@@ -473,7 +473,7 @@ class SimplePythonToCTranslator:
         # Handle simple name iteration (e.g., for item in list_var)
         elif isinstance(for_node.iter, ast.Name):
             iterable_name = for_node.iter.id
-            target_var = for_node.target.id
+            target_var = for_node.target.id if isinstance(for_node.target, ast.Name) else "iter_var"
 
             # Generate C-style array iteration
             lines.append(self._indent(f"int {target_var}_index = 0;"))

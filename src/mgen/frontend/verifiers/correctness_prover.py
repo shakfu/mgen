@@ -25,6 +25,9 @@ class z3:
     class Real:
         def __init__(self, name):
             self.name = name
+    class Bool:
+        def __init__(self, name):
+            self.name = name
     @staticmethod
     def And(*args):
         return None

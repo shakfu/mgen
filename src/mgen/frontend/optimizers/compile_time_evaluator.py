@@ -162,7 +162,7 @@ class CompileTimeEvaluator(BaseOptimizer):
     def _optimize_ast(self, node: ast.AST, report: CompileTimeReport) -> ast.AST:
         """Optimize the AST by performing compile-time evaluation."""
         # Create a copy to avoid modifying the original
-        optimized = ast.copy_location(ast.parse(ast.unparse(node)), node)
+        optimized: ast.AST = ast.copy_location(ast.parse(ast.unparse(node)), node)
 
         # First pass: collect constants
         self._collect_constants(optimized, report)
@@ -266,8 +266,8 @@ class CompileTimeEvaluator(BaseOptimizer):
             return simplified
 
         # Return with optimized operands
-        node.left = left
-        node.right = right
+        node.left = left if isinstance(left, ast.expr) else node.left  # type: ignore
+        node.right = right if isinstance(right, ast.expr) else node.right  # type: ignore
         return node
 
     def _optimize_unary_operation(self, node: ast.UnaryOp, report: CompileTimeReport) -> ast.AST:
