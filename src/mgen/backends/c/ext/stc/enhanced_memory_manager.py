@@ -12,7 +12,7 @@ Features:
 - RAII semantics
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -46,11 +46,7 @@ class ResourceAllocation:
     is_return_value: bool = False
     is_moved: bool = False
     reference_count: int = 1
-    dependencies: Set[str] = None  # Resources this depends on
-
-    def __post_init__(self):
-        if self.dependencies is None:
-            self.dependencies = set()
+    dependencies: Set[str] = field(default_factory=set)  # Resources this depends on
 
 
 class EnhancedMemoryManager:
@@ -66,7 +62,7 @@ class EnhancedMemoryManager:
     - Performance optimization
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Component managers
         self.stc_manager = STCMemoryManager()
         self.smart_pointer_manager = SmartPointerManager()
@@ -176,7 +172,7 @@ class EnhancedMemoryManager:
             name, allocator_type, block_size, pool_size, alignment, thread_safe, line_number
         )
 
-    def track_resource_dependency(self, dependent: str, dependency: str):
+    def track_resource_dependency(self, dependent: str, dependency: str) -> None:
         """Track dependency between resources."""
         if dependent in self.resources and dependency in self.resources:
             self.resources[dependent].dependencies.add(dependency)
@@ -353,13 +349,17 @@ class EnhancedMemoryManager:
             )
 
         # Add allocator-specific recommendations
-        recommendations.extend(analysis["allocator_analysis"]["recommendations"])
+        allocator_analysis = analysis.get("allocator_analysis", {})
+        if isinstance(allocator_analysis, dict):
+            allocator_recommendations = allocator_analysis.get("recommendations", [])
+            if isinstance(allocator_recommendations, list):
+                recommendations.extend(allocator_recommendations)
 
         analysis["optimization_recommendations"] = recommendations
 
         return analysis
 
-    def enter_scope(self, scope_type: MemoryScope = MemoryScope.BLOCK):
+    def enter_scope(self, scope_type: MemoryScope = MemoryScope.BLOCK) -> None:
         """Enter a new scope."""
         self.scope_stack.append({})
         self.stc_manager.enter_scope(scope_type)
@@ -371,7 +371,7 @@ class EnhancedMemoryManager:
             self.scope_stack.pop()
         return cleanup_code
 
-    def _add_to_current_scope(self, resource: ResourceAllocation):
+    def _add_to_current_scope(self, resource: ResourceAllocation) -> None:
         """Add resource to current scope."""
         if self.scope_stack:
             self.scope_stack[-1][resource.name] = resource
@@ -438,7 +438,7 @@ class EnhancedMemoryManager:
         risks = []
 
         # Check for resources with multiple cleanup paths
-        cleanup_counts = {}
+        cleanup_counts: Dict[str, int] = {}
         for name, resource in self.resources.items():
             if resource.requires_cleanup:
                 cleanup_counts[name] = cleanup_counts.get(name, 0) + 1
@@ -455,12 +455,13 @@ class EnhancedMemoryManager:
         visited = set()
         result = []
 
-        def dfs(node: str):
+        def dfs(node: str) -> None:
             if node in visited or node not in resource_names:
                 return
             visited.add(node)
 
-            for dependency in self.resources.get(node, ResourceAllocation("", ResourceType.CONTAINER, "")).dependencies:
+            resource = self.resources.get(node, ResourceAllocation("", ResourceType.CONTAINER, ""))
+            for dependency in resource.dependencies:
                 dfs(dependency)
 
             result.append(node)
@@ -494,14 +495,22 @@ class EnhancedMemoryManager:
 
         for resource in smart_pointer_resources:
             pointer_type = resource.data_type.split("<")[0]
-            analysis["by_type"][pointer_type] = analysis["by_type"].get(pointer_type, 0) + 1
+            by_type_dict = analysis["by_type"]
+            if isinstance(by_type_dict, dict):
+                by_type_dict[pointer_type] = by_type_dict.get(pointer_type, 0) + 1
 
-            if "shared_ptr" in pointer_type:
-                analysis["shared_ptr_usage"] += 1
-            elif "unique_ptr" in pointer_type:
-                analysis["unique_ptr_usage"] += 1
-            elif "weak_ptr" in pointer_type:
-                analysis["weak_ptr_usage"] += 1
+            if "shared_ptr" in pointer_type and "shared_ptr_usage" in analysis:
+                shared_ptr_count = analysis["shared_ptr_usage"]
+                if isinstance(shared_ptr_count, int):
+                    analysis["shared_ptr_usage"] = shared_ptr_count + 1
+            elif "unique_ptr" in pointer_type and "unique_ptr_usage" in analysis:
+                unique_ptr_count = analysis["unique_ptr_usage"]
+                if isinstance(unique_ptr_count, int):
+                    analysis["unique_ptr_usage"] = unique_ptr_count + 1
+            elif "weak_ptr" in pointer_type and "weak_ptr_usage" in analysis:
+                weak_ptr_count = analysis["weak_ptr_usage"]
+                if isinstance(weak_ptr_count, int):
+                    analysis["weak_ptr_usage"] = weak_ptr_count + 1
 
         return analysis
 
@@ -517,7 +526,7 @@ class EnhancedMemoryManager:
             return data_type.split("<")[0]
         return data_type
 
-    def _add_error(self, error_type: str, message: str, line_number: int, severity: str):
+    def _add_error(self, error_type: str, message: str, line_number: int, severity: str) -> None:
         """Add a memory safety error."""
         self.safety_errors.append(
             MemoryError(error_type=error_type, message=message, line_number=line_number, severity=severity)
