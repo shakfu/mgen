@@ -4,6 +4,10 @@ import ast
 from typing import Any, Optional, Union
 
 from ..base import AbstractEmitter
+from ..converter_utils import (
+    get_standard_binary_operator,
+    get_standard_comparison_operator,
+)
 from ..preferences import BackendPreferences
 
 
@@ -382,29 +386,31 @@ class MGenPythonToOCamlConverter:
         left = self._convert_expression(node.left)
         right = self._convert_expression(node.right)
 
-        op_map = {
-            ast.Add: "+",
-            ast.Sub: "-",
-            ast.Mult: "*",
-            ast.Div: "/",
-            ast.FloorDiv: "/",  # OCaml doesn't have floor division
-            ast.Mod: "mod",
-            ast.Pow: "**",
-            ast.BitOr: "lor",
-            ast.BitXor: "lxor",
-            ast.BitAnd: "land",
-            ast.LShift: "lsl",
-            ast.RShift: "lsr",
-        }
-
-        if type(node.op) in op_map:
-            op = op_map[type(node.op)]
-            if op == "mod":
-                return f"({left} {op} {right})"
-            else:
-                return f"({left} {op} {right})"
+        # Handle OCaml-specific operators
+        if isinstance(node.op, ast.FloorDiv):
+            op = "/"  # OCaml doesn't have floor division
+        elif isinstance(node.op, ast.Mod):
+            op = "mod"
+        elif isinstance(node.op, ast.Pow):
+            op = "**"
+        elif isinstance(node.op, ast.BitOr):
+            op = "lor"
+        elif isinstance(node.op, ast.BitXor):
+            op = "lxor"
+        elif isinstance(node.op, ast.BitAnd):
+            op = "land"
+        elif isinstance(node.op, ast.LShift):
+            op = "lsl"
+        elif isinstance(node.op, ast.RShift):
+            op = "lsr"
         else:
-            raise UnsupportedFeatureError(f"Unsupported binary operator: {type(node.op).__name__}")
+            # Use standard operator mapping from converter_utils for common operators
+            op_result = get_standard_binary_operator(node.op)
+            if op_result is None:
+                raise UnsupportedFeatureError(f"Unsupported binary operator: {type(node.op).__name__}")
+            op = op_result
+
+        return f"({left} {op} {right})"
 
     def _convert_unary_operation(self, node: ast.UnaryOp) -> str:
         """Convert Python unary operation to OCaml."""
@@ -430,20 +436,18 @@ class MGenPythonToOCamlConverter:
         right = self._convert_expression(node.comparators[0])
         op = node.ops[0]
 
-        op_map = {
-            ast.Eq: "=",
-            ast.NotEq: "<>",
-            ast.Lt: "<",
-            ast.LtE: "<=",
-            ast.Gt: ">",
-            ast.GtE: ">=",
-        }
-
-        if type(op) in op_map:
-            ocaml_op = op_map[type(op)]
-            return f"({left} {ocaml_op} {right})"
+        # Handle OCaml-specific comparison operators
+        if isinstance(op, ast.NotEq):
+            ocaml_op = "<>"  # OCaml uses <> instead of !=
         else:
-            raise UnsupportedFeatureError(f"Unsupported comparison operator: {type(op).__name__}")
+            # Use standard operator mapping from converter_utils for common operators
+            op_result = get_standard_comparison_operator(op)
+            if op_result is None:
+                raise UnsupportedFeatureError(f"Unsupported comparison operator: {type(op).__name__}")
+            # OCaml uses = for equality (same as standard)
+            ocaml_op = op_result
+
+        return f"({left} {ocaml_op} {right})"
 
     def _convert_function_call(self, node: ast.Call) -> str:
         """Convert Python function call to OCaml."""
@@ -668,26 +672,32 @@ class MGenPythonToOCamlConverter:
         target = self._convert_expression(node.target)
         value = self._convert_expression(node.value)
 
-        op_map = {
-            ast.Add: "+",
-            ast.Sub: "-",
-            ast.Mult: "*",
-            ast.Div: "/",
-            ast.FloorDiv: "/",
-            ast.Mod: "mod",
-            ast.Pow: "**",
-            ast.BitOr: "lor",
-            ast.BitXor: "lxor",
-            ast.BitAnd: "land",
-            ast.LShift: "lsl",
-            ast.RShift: "lsr",
-        }
-
-        if type(node.op) in op_map:
-            op = op_map[type(node.op)]
-            return f"let {target} = {target} {op} {value} in"
+        # Handle OCaml-specific operators
+        op: str
+        if isinstance(node.op, ast.FloorDiv):
+            op = "/"  # OCaml doesn't have floor division
+        elif isinstance(node.op, ast.Mod):
+            op = "mod"
+        elif isinstance(node.op, ast.Pow):
+            op = "**"
+        elif isinstance(node.op, ast.BitOr):
+            op = "lor"
+        elif isinstance(node.op, ast.BitXor):
+            op = "lxor"
+        elif isinstance(node.op, ast.BitAnd):
+            op = "land"
+        elif isinstance(node.op, ast.LShift):
+            op = "lsl"
+        elif isinstance(node.op, ast.RShift):
+            op = "lsr"
         else:
-            raise UnsupportedFeatureError(f"Unsupported augmented assignment operator: {type(node.op).__name__}")
+            # Use standard operator mapping from converter_utils for common operators
+            op_result = get_standard_binary_operator(node.op)
+            if op_result is None:
+                raise UnsupportedFeatureError(f"Unsupported augmented assignment operator: {type(node.op).__name__}")
+            op = op_result
+
+        return f"let {target} = {target} {op} {value} in"
 
     def _convert_expression_statement(self, node: ast.Expr) -> str:
         """Convert expression statement."""

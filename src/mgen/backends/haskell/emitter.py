@@ -4,6 +4,10 @@ import ast
 from typing import Any, Optional
 
 from ..base import AbstractEmitter
+from ..converter_utils import (
+    get_standard_binary_operator,
+    get_standard_comparison_operator,
+)
 from ..preferences import BackendPreferences
 
 
@@ -509,23 +513,27 @@ main = printValue "Generated Haskell code executed successfully"'''
         left = self._convert_expression(node.left)
         right = self._convert_expression(node.right)
 
-        op_map = {
-            ast.Add: "+",
-            ast.Sub: "-",
-            ast.Mult: "*",
-            ast.Div: "/",
-            ast.FloorDiv: "`div`",
-            ast.Mod: "`mod`",
-            ast.Pow: "**",
-            ast.BitOr: ".|.",
-            ast.BitXor: "`xor`",
-            ast.BitAnd: ".&.",
-            ast.LShift: "`shiftL`",
-            ast.RShift: "`shiftR`",
-        }
+        # Handle Haskell-specific operators
+        if isinstance(node.op, ast.FloorDiv):
+            return f"({left} `div` {right})"
+        elif isinstance(node.op, ast.Mod):
+            return f"({left} `mod` {right})"
+        elif isinstance(node.op, ast.Pow):
+            return f"({left} ** {right})"
+        elif isinstance(node.op, ast.BitOr):
+            return f"({left} .|. {right})"
+        elif isinstance(node.op, ast.BitXor):
+            return f"({left} `xor` {right})"
+        elif isinstance(node.op, ast.BitAnd):
+            return f"({left} .&. {right})"
+        elif isinstance(node.op, ast.LShift):
+            return f"({left} `shiftL` {right})"
+        elif isinstance(node.op, ast.RShift):
+            return f"({left} `shiftR` {right})"
 
-        if type(node.op) in op_map:
-            op = op_map[type(node.op)]
+        # Use standard operator mapping from converter_utils for common operators
+        op = get_standard_binary_operator(node.op)
+        if op is not None:
             return f"({left} {op} {right})"
         else:
             raise UnsupportedFeatureError(f"Unsupported binary operator: {type(node.op).__name__}")
@@ -553,17 +561,14 @@ main = printValue "Generated Haskell code executed successfully"'''
             op = node.ops[0]
             right = self._convert_expression(node.comparators[0])
 
-            op_map = {
-                ast.Eq: "==",
-                ast.NotEq: "/=",
-                ast.Lt: "<",
-                ast.LtE: "<=",
-                ast.Gt: ">",
-                ast.GtE: ">=",
-            }
+            # Handle Haskell-specific operators
+            if isinstance(op, ast.NotEq):
+                # Haskell uses /= for inequality
+                return f"({left} /= {right})"
 
-            if type(op) in op_map:
-                haskell_op = op_map[type(op)]
+            # Use standard comparison operator mapping from converter_utils
+            haskell_op = get_standard_comparison_operator(op)
+            if haskell_op is not None:
                 return f"({left} {haskell_op} {right})"
             else:
                 raise UnsupportedFeatureError(f"Unsupported comparison operator: {type(op).__name__}")
@@ -838,26 +843,32 @@ main = printValue "Generated Haskell code executed successfully"'''
         target = self._convert_expression(node.target)
         value = self._convert_expression(node.value)
 
-        op_map = {
-            ast.Add: "+",
-            ast.Sub: "-",
-            ast.Mult: "*",
-            ast.Div: "/",
-            ast.FloorDiv: "`div`",
-            ast.Mod: "`mod`",
-            ast.Pow: "**",
-            ast.BitOr: ".|.",
-            ast.BitXor: "`xor`",
-            ast.BitAnd: ".&.",
-            ast.LShift: "`shiftL`",
-            ast.RShift: "`shiftR`",
-        }
-
-        if type(node.op) in op_map:
-            op = op_map[type(node.op)]
-            return f"{target} = ({target} {op} {value})"
+        # Handle Haskell-specific operators
+        op: str
+        if isinstance(node.op, ast.FloorDiv):
+            op = "`div`"
+        elif isinstance(node.op, ast.Mod):
+            op = "`mod`"
+        elif isinstance(node.op, ast.Pow):
+            op = "**"
+        elif isinstance(node.op, ast.BitOr):
+            op = ".|."
+        elif isinstance(node.op, ast.BitXor):
+            op = "`xor`"
+        elif isinstance(node.op, ast.BitAnd):
+            op = ".&."
+        elif isinstance(node.op, ast.LShift):
+            op = "`shiftL`"
+        elif isinstance(node.op, ast.RShift):
+            op = "`shiftR`"
         else:
-            raise UnsupportedFeatureError(f"Unsupported augmented assignment operator: {type(node.op).__name__}")
+            # Use standard operator mapping from converter_utils for common operators
+            op_result = get_standard_binary_operator(node.op)
+            if op_result is None:
+                raise UnsupportedFeatureError(f"Unsupported augmented assignment operator: {type(node.op).__name__}")
+            op = op_result
+
+        return f"{target} = ({target} {op} {value})"
 
     def _convert_if_statement(self, node: ast.If) -> str:
         """Convert Python if statement to Haskell."""

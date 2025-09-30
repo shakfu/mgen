@@ -22,6 +22,12 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ..base import AbstractEmitter
+from ..converter_utils import (
+    get_augmented_assignment_operator,
+    get_standard_binary_operator,
+    get_standard_comparison_operator,
+    get_standard_unary_operator,
+)
 from ..preferences import BackendPreferences
 from .containers import CContainerSystem
 
@@ -347,6 +353,17 @@ class MGenPythonToCConverter:
 
     def _convert_augmented_assignment(self, stmt: ast.AugAssign) -> str:
         """Convert augmented assignment (+=, -=, etc.) to C syntax."""
+        # Handle C-specific operators
+        op_str: str
+        if isinstance(stmt.op, ast.FloorDiv):
+            op_str = "/="  # Floor division maps to regular division in C
+        else:
+            # Use standard augmented assignment operator mapping from converter_utils
+            op_result = get_augmented_assignment_operator(stmt.op)
+            if op_result is None:
+                raise UnsupportedFeatureError(f"Unsupported augmented assignment operator: {type(stmt.op).__name__}")
+            op_str = op_result
+
         # Check if target is a simple variable
         if isinstance(stmt.target, ast.Name):
             var_name = stmt.target.id
@@ -354,27 +371,7 @@ class MGenPythonToCConverter:
                 raise TypeMappingError(f"Variable '{var_name}' must be declared before augmented assignment")
 
             value_expr = self._convert_expression(stmt.value)
-
-            # Map Python augmented assignment operators to C
-            op_map = {
-                ast.Add: "+=",
-                ast.Sub: "-=",
-                ast.Mult: "*=",
-                ast.Div: "/=",
-                ast.FloorDiv: "/=",  # Floor division maps to regular division in C
-                ast.Mod: "%=",
-                ast.BitOr: "|=",
-                ast.BitXor: "^=",
-                ast.BitAnd: "&=",
-                ast.LShift: "<<=",
-                ast.RShift: ">>=",
-            }
-
-            if type(stmt.op) in op_map:
-                op_str = op_map[type(stmt.op)]
-                return f"{var_name} {op_str} {value_expr};"
-            else:
-                raise UnsupportedFeatureError(f"Unsupported augmented assignment operator: {type(stmt.op).__name__}")
+            return f"{var_name} {op_str} {value_expr};"
 
         # Check if target is an attribute (e.g., self.attr += value or obj.attr += value)
         elif isinstance(stmt.target, ast.Attribute):
@@ -382,30 +379,11 @@ class MGenPythonToCConverter:
             attr_name = stmt.target.attr
             value_expr = self._convert_expression(stmt.value)
 
-            # Map operators for attribute access
-            op_map = {
-                ast.Add: "+=",
-                ast.Sub: "-=",
-                ast.Mult: "*=",
-                ast.Div: "/=",
-                ast.FloorDiv: "/=",
-                ast.Mod: "%=",
-                ast.BitOr: "|=",
-                ast.BitXor: "^=",
-                ast.BitAnd: "&=",
-                ast.LShift: "<<=",
-                ast.RShift: ">>=",
-            }
-
-            if type(stmt.op) in op_map:
-                op_str = op_map[type(stmt.op)]
-                # Determine correct access operator (-> for pointers, . for structs)
-                if obj == "self":
-                    return f"self->{attr_name} {op_str} {value_expr};"
-                else:
-                    return f"{obj}.{attr_name} {op_str} {value_expr};"
+            # Determine correct access operator (-> for pointers, . for structs)
+            if obj == "self":
+                return f"self->{attr_name} {op_str} {value_expr};"
             else:
-                raise UnsupportedFeatureError(f"Unsupported augmented assignment operator: {type(stmt.op).__name__}")
+                return f"{obj}.{attr_name} {op_str} {value_expr};"
 
         else:
             raise UnsupportedFeatureError("Only simple variable and attribute augmented assignments supported")
@@ -451,47 +429,30 @@ class MGenPythonToCConverter:
         left = self._convert_expression(expr.left)
         right = self._convert_expression(expr.right)
 
-        op_map = {
-            ast.Add: "+",
-            ast.Sub: "-",
-            ast.Mult: "*",
-            ast.Div: "/",
-            ast.Mod: "%",
-            ast.FloorDiv: "/",  # Note: not exact for negative numbers
-            ast.Pow: "pow",     # Requires math.h
-            ast.BitOr: "|",
-            ast.BitXor: "^",
-            ast.BitAnd: "&",
-            ast.LShift: "<<",
-            ast.RShift: ">>",
-        }
-
-        if type(expr.op) in op_map:
-            op = op_map[type(expr.op)]
-            if op == "pow":
-                self.includes_needed.add("#include <math.h>")
-                return f"pow({left}, {right})"
-            else:
-                return f"({left} {op} {right})"
+        # Handle C-specific operators
+        if isinstance(expr.op, ast.Pow):
+            # Pow requires math.h
+            self.includes_needed.add("#include <math.h>")
+            return f"pow({left}, {right})"
+        elif isinstance(expr.op, ast.FloorDiv):
+            # FloorDiv maps to regular division in C (not exact for negative numbers)
+            return f"({left} / {right})"
         else:
-            raise UnsupportedFeatureError(f"Unsupported binary operator: {type(expr.op)}")
+            # Use standard operator mapping from converter_utils for common operators
+            op = get_standard_binary_operator(expr.op)
+            if op is None:
+                raise UnsupportedFeatureError(f"Unsupported binary operator: {type(expr.op)}")
+            return f"({left} {op} {right})"
 
     def _convert_unary_op(self, expr: ast.UnaryOp) -> str:
         """Convert unary operations."""
         operand = self._convert_expression(expr.operand)
 
-        op_map = {
-            ast.UAdd: "+",
-            ast.USub: "-",
-            ast.Not: "!",
-            ast.Invert: "~",
-        }
-
-        if type(expr.op) in op_map:
-            op = op_map[type(expr.op)]
-            return f"({op}{operand})"
-        else:
+        # Use standard operator mapping from converter_utils
+        op = get_standard_unary_operator(expr.op)
+        if op is None:
             raise UnsupportedFeatureError(f"Unsupported unary operator: {type(expr.op)}")
+        return f"({op}{operand})"
 
     def _convert_compare(self, expr: ast.Compare) -> str:
         """Convert comparison operations."""
@@ -501,20 +462,11 @@ class MGenPythonToCConverter:
         left = self._convert_expression(expr.left)
         right = self._convert_expression(expr.comparators[0])
 
-        op_map = {
-            ast.Eq: "==",
-            ast.NotEq: "!=",
-            ast.Lt: "<",
-            ast.LtE: "<=",
-            ast.Gt: ">",
-            ast.GtE: ">=",
-        }
-
-        if type(expr.ops[0]) in op_map:
-            op = op_map[type(expr.ops[0])]
-            return f"({left} {op} {right})"
-        else:
+        # Use standard operator mapping from converter_utils
+        op = get_standard_comparison_operator(expr.ops[0])
+        if op is None:
             raise UnsupportedFeatureError(f"Unsupported comparison: {type(expr.ops[0])}")
+        return f"({left} {op} {right})"
 
     def _convert_call(self, expr: ast.Call) -> str:
         """Convert function calls."""
