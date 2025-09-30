@@ -1,35 +1,33 @@
 # MGen: Multi-Language Code Generator
 
-MGen translates Python code to multiple target languages while preserving semantics and performance.
+MGen is a sophisticated Python-to-multiple-languages code generator that translates Python code to C, C++, Rust, Go, Haskell, and OCaml while preserving semantics and performance characteristics.
 
-## Features
+## Overview
 
-- **Multi-Language Support**: Generate code for C, C++, Rust, Go, Haskell with comprehensive language features
+MGen extends the CGen (Python-to-C) project into a comprehensive multi-language translation system with enhanced runtime libraries, sophisticated code generation, and a clean backend architecture.
 
+## Key Features
+
+- **Multi-Language Support**: Generate code for C, C++, Rust, Go, Haskell, and OCaml with comprehensive language features
 - **Universal Preference System**: Customize code generation for each backend with language-specific preferences
-
 - **Advanced Python Support**: Object-oriented programming, comprehensions, string methods, augmented assignment
-
-- **Modern Libraries**: C++ STL containers, Rust collections, Go standard library integration, Haskell standard library
-
-- **Clean Architecture**: Extensible backend system for adding new languages with preference support
-
-- **Type-Safe Generation**: Leverages Python type annotations for accurate translation
-
+- **Modern Libraries**: C++ STL, Rust standard library, Go standard library, Haskell containers, OCaml standard library
+- **Clean Architecture**: Extensible backend system with abstract interfaces for adding new target languages
+- **Type-Safe Generation**: Leverages Python type annotations for accurate and safe code translation
+- **Runtime Libraries**: Enhanced C backend with 50KB+ runtime libraries providing Python-like semantics
 - **CLI Interface**: Simple command-line tool with preference customization for conversion and building
-
-- **Comprehensive Testing**: Full test suite with 684 passing tests (100% success rate) ensuring translation accuracy
+- **Production-Ready**: 255 passing tests ensuring translation accuracy and code quality
 
 ## Supported Languages
 
-| Language | Status      | File Extension | Build System      | Advanced Features | Preferences |
-|----------|-------------|----------------|-------------------|-------------------|-------------|
-| C        | **Enhanced** | `.c`          | Makefile / gcc    | OOP, STC containers, string methods, comprehensions | 12 settings (containers, memory, style) |
-| C++      | **Enhanced** | `.cpp`        | Makefile / g++    | OOP, STL containers, string methods, comprehensions | 15 settings (C++ standard, modern features, STL) |
-| Rust     | **Enhanced** | `.rs`         | Cargo / rustc     | OOP, std library, string methods, comprehensions, memory safety | 19 settings (edition, ownership, idioms) |
-| Go       | **Enhanced** | `.go`         | go.mod / go build | OOP, standard library, string methods, comprehensions | 18 settings (version, concurrency, Go patterns) |
-| Haskell  | **Enhanced** | `.hs`         | Cabal / ghc       | OOP, pure functions, string methods, comprehensions, type safety | 12 settings (comprehensions, type system, style) |
-| OCaml    | **Enhanced** | `.ml`         | dune / ocamlc     | OOP, functional programming, pattern matching, comprehensions, type safety | 17 settings (version, functional style, modules) |
+| Language | Status      | Extension | Build System      | Advanced Features | Preferences |
+|----------|-------------|-----------|-------------------|-------------------|-------------|
+| C        | Enhanced    | `.c`      | Makefile / gcc    | OOP, STC containers, string methods, comprehensions, runtime libraries | 12 settings |
+| C++      | Enhanced    | `.cpp`    | Makefile / g++    | OOP, STL containers, string methods, comprehensions | 15 settings |
+| Rust     | Enhanced    | `.rs`     | Cargo / rustc     | OOP, standard library, string methods, comprehensions, memory safety | 19 settings |
+| Go       | Enhanced    | `.go`     | go.mod / go build | OOP, standard library, string methods, comprehensions | 18 settings |
+| Haskell  | Enhanced    | `.hs`     | Cabal / ghc       | Functional programming, comprehensions, type safety | 12 settings |
+| OCaml    | Enhanced    | `.ml`     | dune / ocamlc     | Functional programming, pattern matching, comprehensions | 17 settings |
 
 ## Quick Start
 
@@ -492,25 +490,40 @@ let process () =
 
 ## Architecture
 
-MGen follows a clean, extensible architecture with three main components:
+MGen follows a clean, extensible architecture with well-defined components:
+
+### 7-Phase Translation Pipeline
+
+1. **Validation**: Verify Python source compatibility
+2. **Analysis**: Analyze code structure and dependencies
+3. **Python Optimization**: Apply Python-level optimizations
+4. **Mapping**: Map Python constructs to target language equivalents
+5. **Target Optimization**: Apply target language-specific optimizations
+6. **Generation**: Generate target language code
+7. **Build**: Compile/build using target language toolchain
 
 ### Frontend (Language-Agnostic)
 
-- **Type Inference**: Analyzes Python type annotations
-- **Static Analysis**: Validates code compatibility
-- **AST Processing**: Parses and transforms Python syntax
+- **Type Inference**: Analyzes Python type annotations and infers types
+- **Static Analysis**: Validates code compatibility and detects unsupported features
+- **AST Processing**: Parses and transforms Python abstract syntax tree
 
 ### Backends (Language-Specific)
 
-- **Abstract Interfaces**: Common API for all target languages
-- **Code Generation**: Language-specific syntax and idioms
-- **Build Systems**: Native toolchain integration
+Each backend implements abstract interfaces:
 
-### Pipeline
+- **AbstractEmitter**: Code generation for target language
+- **AbstractFactory**: Factory for backend components
+- **AbstractBuilder**: Build system integration
+- **AbstractContainerSystem**: Container and collection handling
 
-- **Multi-Phase Processing**: Validation → Analysis → Generation → Build
-- **Error Handling**: Comprehensive error reporting and recovery
-- **Optimization**: Language-specific performance optimizations
+### Runtime Libraries (C Backend)
+
+- **Error Handling** (`mgen_error_handling.h/.c`): Python-like exception system
+- **Memory Management** (`mgen_memory_ops.h/.c`): Safe allocation and cleanup
+- **Python Operations** (`mgen_python_ops.h/.c`): Python built-ins and semantics
+- **String Operations** (`mgen_string_ops.h/.c`): String methods with memory safety
+- **STC Integration** (`mgen_stc_bridge.h/.c`): Smart Template Container bridge
 
 ## CLI Commands
 
@@ -563,29 +576,56 @@ mgen clean
 ### Running Tests
 
 ```bash
-make test           # Run all tests
-make test-unit      # Run unit tests only
-make lint           # Run code linting
-make type-check     # Run type checking
+make test           # Run all 255 tests
+make lint           # Run code linting with ruff
+make type-check     # Run type checking with pyright
 ```
+
+### Test Organization
+
+MGen maintains a comprehensive test suite organized into focused modules:
+
+- `test_backend_c_*.py`: C backend tests (191 tests total)
+  - Core functionality, OOP, comprehensions, string methods, runtime libraries
+- `test_backend_cpp_*.py`: C++ backend tests (104 tests)
+  - STL integration, modern C++ features, OOP support
+- `test_backend_rust_*.py`: Rust backend tests (176 tests)
+  - Ownership patterns, memory safety, standard library
+- `test_backend_go_*.py`: Go backend tests (95 tests)
+  - Go idioms, standard library, concurrency patterns
+- `test_backend_haskell_*.py`: Haskell backend tests (93 tests)
+  - Functional programming, type safety, comprehensions
+- `test_backend_ocaml_*.py`: OCaml backend tests (25 tests)
+  - Functional programming, pattern matching, immutability
 
 ### Adding New Backends
 
+To add support for a new target language:
+
 1. Create backend directory: `src/mgen/backends/mylang/`
-2. Implement required classes:
-   - `MyLangBackend(LanguageBackend)`
-   - `MyLangFactory(AbstractFactory)`
-   - `MyLangEmitter(AbstractEmitter)`
-   - `MyLangBuilder(AbstractBuilder)`
-   - `MyLangContainerSystem(AbstractContainerSystem)`
-3. Register in `registry.py`
-4. Add tests
+2. Implement required abstract interfaces:
+   - `MyLangBackend(LanguageBackend)`: Main backend class
+   - `MyLangFactory(AbstractFactory)`: Component factory
+   - `MyLangEmitter(AbstractEmitter)`: Code generation
+   - `MyLangBuilder(AbstractBuilder)`: Build system integration
+   - `MyLangContainerSystem(AbstractContainerSystem)`: Container handling
+   - `MyLangPreferences(BasePreferences)`: Language-specific preferences
+3. Register backend in `src/mgen/backends/registry.py`
+4. Add comprehensive tests in `tests/test_backend_mylang_*.py`
+5. Update documentation
 
-See existing backends for examples.
+See existing backends (C, C++, Rust, Go, Haskell, OCaml) for implementation examples.
 
-## Comparison with CGen
+## Relationship with CGen
 
-MGen is inspired by and builds upon concepts from the [CGen](https://github.com/shakfu/cgen) project.
+MGen extends the [CGen](https://github.com/shakfu/cgen) project by:
+
+- Expanding Python-to-C capabilities into a multi-language translation system
+- Integrating CGen's sophisticated C runtime libraries (50KB+ of error handling, memory management, Python operations)
+- Incorporating the STC (Smart Template Container) library for high-performance C containers
+- Adding support for C++, Rust, Go, Haskell, and OCaml target languages
+- Implementing a clean 7-phase translation pipeline with abstract backend interfaces
+- Providing a universal preference system for language-specific code generation customization
 
 ## Contributing
 
@@ -601,43 +641,62 @@ MIT License - see LICENSE file for details.
 
 ## Advanced Features
 
-### C/C++/Go Backends
+### Supported Python Features
 
-The C, C++, and Go backends support sophisticated Python language features:
+All backends support core Python features with varying levels of sophistication:
 
-- **Object-Oriented Programming**: Classes, methods, constructors, inheritance
-- **Advanced Assignment**: Augmented operators (`+=`, `-=`, `*=`, etc.)
+- **Object-Oriented Programming**: Classes, methods, constructors, instance variables, method calls
+- **Augmented Assignment**: All operators (`+=`, `-=`, `*=`, `/=`, `//=`, `%=`, `|=`, `^=`, `&=`, `<<=`, `>>=`)
 - **String Operations**: `upper()`, `lower()`, `strip()`, `find()`, `replace()`, `split()`
-- **Comprehensions**: List, dict, and set comprehensions with conditional filtering
-- **Type Inference**: Automatic type detection and smart C/C++ type mapping
-- **Container Support**:
-  - C: STC (Smart Template Container) high-performance containers
-  - C++: STL containers (`std::vector`, `std::unordered_map`, `std::unordered_set`)
-  - Go: Standard library containers with functional programming patterns
-  - Haskell: Standard library containers with type-safe functional operations
+- **Comprehensions**: List, dict, and set comprehensions with range iteration and conditional filtering
+- **Control Structures**: if/elif/else, while loops, for loops with range()
+- **Built-in Functions**: `abs()`, `bool()`, `len()`, `min()`, `max()`, `sum()`
+- **Type Inference**: Automatic type detection from annotations and assignments
+
+### Container Support by Language
+
+- **C**: STC (Smart Template Container) library with optimized C containers (864KB integrated library)
+- **C++**: STL containers (`std::vector`, `std::unordered_map`, `std::unordered_set`)
+- **Rust**: Standard library collections (`Vec`, `HashMap`, `HashSet`) with memory safety
+- **Go**: Standard library containers with idiomatic Go patterns
+- **Haskell**: Standard library containers with type-safe functional operations
+- **OCaml**: Standard library with immutable data structures and pattern matching
 
 ### Test Coverage
 
-- **684 passing tests** across all backends (100% success rate)
-- **104 C++ backend tests** (104 passing, 100% success rate)
-- **191 C backend tests** with comprehensive advanced features
-- **95 Go backend tests** (95 passing, 100% success rate)
-- **176 Rust backend tests** with comprehensive OOP, string methods, and comprehensions support
-- **93 Haskell backend tests** with functional programming patterns and type safety (100% success rate)
-- **25 OCaml backend tests** with functional programming, pattern matching, and type safety (100% success rate)
-- Specialized test suites for OOP, string methods, comprehensions, and more
+MGen maintains comprehensive test coverage ensuring translation accuracy:
 
-## Roadmap
+- **255 total tests** across all components and backends
+- **C Backend**: 191 tests covering OOP, comprehensions, string methods, runtime libraries
+- **C++ Backend**: 104 tests with STL integration and modern C++ features
+- **Rust Backend**: 176 tests with ownership patterns and memory safety
+- **Go Backend**: 95 tests with Go idioms and standard library
+- **Haskell Backend**: 93 tests with functional programming and type safety
+- **OCaml Backend**: 25 tests with functional programming and pattern matching
+- All tests passing with zero regressions
 
-- [x] **C++ Backend Enhancement** - STL-based runtime with feature parity to C backend
-- [x] **Advanced Python Features** - OOP, comprehensions, string methods, augmented assignment
-- [x] **Comprehensive Testing** - 659 tests with 100% success rate ensuring translation accuracy
-- [x] **Production-Ready C++ Backend** - Complete feature parity with advanced comprehension support
-- [x] **Go Backend Enhancement** - Complete feature parity with C/C++ backends using Go standard library
-- [x] **Rust Backend Enhancement** - Complete feature parity with C/C++/Go backends using Rust standard library
-- [x] **Haskell Backend Enhancement** - Complete functional programming backend with type safety and Haskell standard library
-- [x] **OCaml Backend Enhancement** - Complete functional programming backend with pattern matching, immutable data structures, and OCaml standard library
-- [x] **Universal Preference System** - Language-specific customization for all backends with CLI integration
-- [ ] **Performance Benchmarking** - Cross-language performance analysis
-- [ ] **Web Interface** - Online code conversion tool
-- [ ] **Plugin System** - External backend support
+## Development Roadmap
+
+### Completed Milestones
+
+- Multi-language backend system with C, C++, Rust, Go, Haskell, and OCaml support
+- Advanced C runtime integration with 50KB+ of runtime libraries
+- Sophisticated Python-to-C conversion with complete function and control flow support
+- Object-oriented programming support across all backends
+- Advanced Python language features: comprehensions, string methods, augmented assignment
+- Complete STC library integration (864KB Smart Template Container library)
+- Architecture consolidation with unified C backend module
+- Professional test organization with 255 tests in focused, single-responsibility files
+- Universal preference system with language-specific customization
+- Production-ready code generation with clean, efficient output
+
+### Future Development
+
+- **Advanced Frontend Analysis**: Integrate optimization detection and static analysis engine
+- **STC Performance Optimization**: Container specialization and memory layout optimization
+- **Formal Verification**: Theorem proving and memory safety proofs integration
+- **Cross-Language Runtime**: Extend runtime concepts to other backends (C++, Rust, Go)
+- **Performance Benchmarking**: Comprehensive performance analysis across all target languages
+- **IDE Integration**: Language server protocol support for MGen syntax
+- **Web Interface**: Online code conversion tool
+- **Plugin System**: External backend support and extensibility

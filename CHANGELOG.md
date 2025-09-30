@@ -17,6 +17,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.19]
+
+### Changed
+
+- Updated README.md with most recent changes.
+
+### Fixed
+
+- Applied `ruff check --fix` to all `.py` files.
+
 ## [0.1.18]
 
 ### Fixed
