@@ -739,6 +739,8 @@ class MGenPythonToRustConverter:
             return self._convert_list_literal(expr)
         elif isinstance(expr, ast.Dict):
             return self._convert_dict_literal(expr)
+        elif isinstance(expr, ast.Set):
+            return self._convert_set_literal(expr)
         elif isinstance(expr, ast.Subscript):
             return self._convert_subscript(expr)
         elif isinstance(expr, ast.GeneratorExp):
@@ -858,6 +860,18 @@ class MGenPythonToRustConverter:
 
         # Create HashMap using collect()
         return f"[{', '.join(pairs)}].iter().cloned().collect::<std::collections::HashMap<_, _>>()"
+
+    def _convert_set_literal(self, expr: ast.Set) -> str:
+        """Convert set literals."""
+        if not expr.elts:
+            # Empty set
+            return "std::collections::HashSet::new()"
+
+        # Convert elements
+        elements = [self._convert_expression(elt) for elt in expr.elts]
+
+        # Create HashSet using collect()
+        return f"[{', '.join(elements)}].iter().cloned().collect::<std::collections::HashSet<_>>()"
 
     def _convert_subscript(self, expr: ast.Subscript) -> str:
         """Convert subscript operations (indexing)."""
@@ -1102,6 +1116,30 @@ class MGenPythonToRustConverter:
         """Map Python type annotation to Rust type."""
         if isinstance(annotation, ast.Name):
             return self.type_map.get(annotation.id, "i32")
+        elif isinstance(annotation, ast.Subscript):
+            # Handle subscripted types like list[int], dict[str, int], set[int]
+            if isinstance(annotation.value, ast.Name):
+                container_type = annotation.value.id
+                if container_type == "list":
+                    # list[int] -> Vec<i32>
+                    if isinstance(annotation.slice, ast.Name):
+                        element_type = self.type_map.get(annotation.slice.id, annotation.slice.id)
+                        return f"Vec<{element_type}>"
+                    return "Vec<i32>"  # Default to Vec<i32>
+                elif container_type == "dict":
+                    # dict[str, int] -> HashMap<String, i32>
+                    if isinstance(annotation.slice, ast.Tuple) and len(annotation.slice.elts) == 2:
+                        key_type = self._map_type_annotation(annotation.slice.elts[0])
+                        value_type = self._map_type_annotation(annotation.slice.elts[1])
+                        return f"std::collections::HashMap<{key_type}, {value_type}>"
+                    return "std::collections::HashMap<String, i32>"  # Default
+                elif container_type == "set":
+                    # set[int] -> HashSet<i32>
+                    if isinstance(annotation.slice, ast.Name):
+                        element_type = self.type_map.get(annotation.slice.id, annotation.slice.id)
+                        return f"std::collections::HashSet<{element_type}>"
+                    return "std::collections::HashSet<i32>"  # Default
+            return "i32"
         elif isinstance(annotation, ast.Constant):
             if annotation.value is None:
                 return "()"  # None type should be unit type
@@ -1120,11 +1158,103 @@ class MGenPythonToRustConverter:
                 return "f64"
             elif isinstance(value.value, str):
                 return "String"
-        elif isinstance(value, ast.Call) and isinstance(value.func, ast.Name):
-            if value.func.id in self.struct_info:
-                return value.func.id
+        elif isinstance(value, ast.List):
+            # Infer type from list literal elements
+            if value.elts:
+                element_types = [self._infer_type_from_value(elt) for elt in value.elts]
+                # If all elements have the same type, use it
+                if element_types and all(t == element_types[0] for t in element_types):
+                    return f"Vec<{element_types[0]}>"
+            return "Vec<i32>"  # Default
+        elif isinstance(value, ast.Dict):
+            # Infer type from dict literal keys and values
+            if value.keys and value.values:
+                key_types = [self._infer_type_from_value(key) for key in value.keys if key]
+                value_types = [self._infer_type_from_value(val) for val in value.values if val]
+                if (key_types and all(t == key_types[0] for t in key_types) and
+                    value_types and all(t == value_types[0] for t in value_types)):
+                    return f"std::collections::HashMap<{key_types[0]}, {value_types[0]}>"
+            return "std::collections::HashMap<String, i32>"  # Default
+        elif isinstance(value, ast.Set):
+            # Infer type from set literal elements
+            if value.elts:
+                element_types = [self._infer_type_from_value(elt) for elt in value.elts]
+                if element_types and all(t == element_types[0] for t in element_types):
+                    return f"std::collections::HashSet<{element_types[0]}>"
+            return "std::collections::HashSet<i32>"  # Default
+        elif isinstance(value, ast.ListComp):
+            # Infer type from list comprehension element
+            element_type = self._infer_comprehension_element_type(value.elt)
+            return f"Vec<{element_type}>"
+        elif isinstance(value, ast.DictComp):
+            # Infer type from dict comprehension key and value
+            key_type = self._infer_comprehension_element_type(value.key)
+            value_type = self._infer_comprehension_element_type(value.value)
+            return f"std::collections::HashMap<{key_type}, {value_type}>"
+        elif isinstance(value, ast.SetComp):
+            # Infer type from set comprehension element
+            element_type = self._infer_comprehension_element_type(value.elt)
+            return f"std::collections::HashSet<{element_type}>"
+        elif isinstance(value, ast.Call):
+            if isinstance(value.func, ast.Name):
+                func_name = value.func.id
+                if func_name in self.struct_info:
+                    return func_name
+                elif func_name == "sum":
+                    return "i32"  # sum() returns integer
+                elif func_name == "len":
+                    return "usize"  # len() returns usize in Rust
+                elif func_name == "abs":
+                    return "i32"  # Default for abs
+                elif func_name == "min" or func_name == "max":
+                    return "i32"  # Default for min/max
+            elif isinstance(value.func, ast.Attribute):
+                # Method call - try to infer from method name
+                method_name = value.func.attr
+                if method_name in ["upper", "lower", "strip", "replace"]:
+                    return "String"
+                elif method_name == "find":
+                    return "i32"  # Returns index
 
         return "i32"
+
+    def _infer_comprehension_element_type(self, expr: ast.expr) -> str:
+        """Infer the type of elements produced by a comprehension expression."""
+        if isinstance(expr, ast.Constant):
+            if isinstance(expr.value, bool):
+                return "bool"
+            elif isinstance(expr.value, int):
+                return "i32"
+            elif isinstance(expr.value, float):
+                return "f64"
+            elif isinstance(expr.value, str):
+                return "String"
+        elif isinstance(expr, ast.Name):
+            # Variable reference - default to i32
+            return "i32"
+        elif isinstance(expr, ast.BinOp):
+            # For binary operations, try to infer from operands
+            left_type = self._infer_comprehension_element_type(expr.left)
+            right_type = self._infer_comprehension_element_type(expr.right)
+            if left_type == right_type:
+                return left_type
+            # If mixed int/float, return float
+            if {left_type, right_type} == {"i32", "f64"}:
+                return "f64"
+            return "i32"
+        elif isinstance(expr, ast.Call):
+            if isinstance(expr.func, ast.Name):
+                func_name = expr.func.id
+                if func_name == "str":
+                    return "String"
+                elif func_name in ["abs", "sum", "len", "min", "max"]:
+                    return "i32"
+            elif isinstance(expr.func, ast.Attribute):
+                method_name = expr.func.attr
+                if method_name in ["upper", "lower", "strip", "replace"]:
+                    return "String"
+
+        return "i32"  # Default to i32
 
     def _infer_type_from_assignment(self, stmt: ast.Assign) -> str:
         """Infer type from assignment statement."""
@@ -1165,14 +1295,35 @@ class MGenPythonToRustConverter:
         """Get default value for Rust type."""
         defaults = {
             "i32": "0",
+            "i64": "0",
+            "u32": "0",
+            "u64": "0",
+            "usize": "0",
+            "f32": "0.0",
             "f64": "0.0",
             "bool": "false",
             "String": '"".to_string()',
-            "Vec<i32>": "Vec::new()",
-            "HashMap<String, i32>": "HashMap::new()",
-            "HashSet<i32>": "HashSet::new()",
+            "()": "()",
         }
-        return defaults.get(rust_type, "Default::default()")
+
+        # Handle specific defaults
+        if rust_type in defaults:
+            return defaults[rust_type]
+
+        # Handle Vec<T> types
+        if rust_type.startswith("Vec<"):
+            return "Vec::new()"
+
+        # Handle HashMap<K, V> types
+        if rust_type.startswith("std::collections::HashMap<"):
+            return "std::collections::HashMap::new()"
+
+        # Handle HashSet<T> types
+        if rust_type.startswith("std::collections::HashSet<"):
+            return "std::collections::HashSet::new()"
+
+        # Default fallback
+        return "Default::default()"
 
 
 class RustEmitter(AbstractEmitter):

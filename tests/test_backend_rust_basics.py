@@ -356,6 +356,73 @@ def mystery_function(x, y):
         assert "fn mystery_function(x: i32, y: i32) -> i32" in rust_code
         assert "let mut result = (x + y);" in rust_code
 
+    def test_subscripted_list_type(self):
+        """Test subscripted list type annotation (Python 3.9+)."""
+        python_code = """
+def process_numbers(numbers: list[int]) -> int:
+    total: int = 0
+    for n in numbers:
+        total += n
+    return total
+"""
+        rust_code = self.converter.convert_code(python_code)
+
+        assert "fn process_numbers(numbers: Vec<i32>) -> i32" in rust_code
+        assert "let mut total: i32 = 0;" in rust_code
+
+    def test_subscripted_dict_type(self):
+        """Test subscripted dict type annotation (Python 3.9+)."""
+        python_code = """
+def lookup_score(scores: dict[str, int], name: str) -> int:
+    return scores.get(name, 0)
+"""
+        rust_code = self.converter.convert_code(python_code)
+
+        assert "fn lookup_score(scores: std::collections::HashMap<String, i32>, name: String) -> i32" in rust_code
+
+    def test_subscripted_set_type(self):
+        """Test subscripted set type annotation (Python 3.9+)."""
+        python_code = """
+def has_duplicates(unique_values: set[int]) -> bool:
+    return len(unique_values) > 0
+"""
+        rust_code = self.converter.convert_code(python_code)
+
+        assert "fn has_duplicates(unique_values: std::collections::HashSet<i32>) -> bool" in rust_code
+
+    def test_list_literal_with_annotation(self):
+        """Test list literal type inference with annotation."""
+        python_code = """
+def create_list() -> list[int]:
+    values: list[int] = [10, 20, 30]
+    return values
+"""
+        rust_code = self.converter.convert_code(python_code)
+
+        assert "let mut values: Vec<i32> = vec![10, 20, 30];" in rust_code
+
+    def test_dict_literal_with_annotation(self):
+        """Test dict literal type inference with annotation."""
+        python_code = """
+def create_dict() -> dict[str, int]:
+    mapping: dict[str, int] = {"key1": 1, "key2": 2}
+    return mapping
+"""
+        rust_code = self.converter.convert_code(python_code)
+
+        assert "let mut mapping: std::collections::HashMap<String, i32>" in rust_code
+
+    def test_set_literal_with_annotation(self):
+        """Test set literal type inference with annotation."""
+        python_code = """
+def create_set() -> set[int]:
+    unique: set[int] = {1, 2, 3}
+    return unique
+"""
+        rust_code = self.converter.convert_code(python_code)
+
+        assert "let mut unique: std::collections::HashSet<i32>" in rust_code
+
 
 class TestRustAdvancedExpressions:
     """Test advanced expression handling."""

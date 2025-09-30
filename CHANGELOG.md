@@ -17,6 +17,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.26]
+
+### Enhanced
+
+- **Rust Emitter Type Inference Improvements**: Significant improvements to generate specific types instead of `Box<dyn std::any::Any>`
+  - **Subscripted Type Annotations**: Added support for `list[int]`, `dict[str, int]`, `set[int]` → generates `Vec<i32>`, `HashMap<String, i32>`, `HashSet<i32>`
+  - **List Literal Type Inference**: Homogeneous list literals now generate typed vectors (e.g., `[1, 2, 3]` → `vec![1, 2, 3]` with inferred `Vec<i32>`)
+  - **Dict Literal Type Inference**: Homogeneous dict literals now generate typed HashMaps
+  - **Set Literal Support**: Added conversion for set literals to Rust HashSets with type inference
+  - **Comprehension Type Inference**: Improved type inference for list/dict/set comprehensions based on element expressions
+  - **Enhanced Default Values**: Improved default value generation for specific Vec/HashMap/HashSet types
+
+### Fixed
+
+- **Set Literal Generation**: Fixed missing conversion for `ast.Set` nodes (previously unsupported)
+- **Type Annotation Mapping**: Fixed `_map_type_annotation` to handle subscripted types instead of defaulting to `i32`
+- **Default Value Generation**: Enhanced `_get_default_value` to handle specific container types (Vec<T>, HashMap<K,V>, HashSet<T>)
+
+### Technical Details
+
+- **Type Inference Chain**: Added `_infer_comprehension_element_type()` method for analyzing comprehension element types
+- **Literal Type Detection**: Literals now detect homogeneous element types and generate appropriately typed Rust code
+- **Reduced Type Over-Generalization**: Eliminated unnecessary use of `Box<dyn std::any::Any>` in favor of specific types
+
+### Testing
+
+- **Added 6 New Tests**: Comprehensive tests for subscripted type annotations (list[int], dict[str, int], set[int])
+  - `test_subscripted_list_type`: Verifies `list[int]` → `Vec<i32>` conversion
+  - `test_subscripted_dict_type`: Verifies `dict[str, int]` → `HashMap<String, i32>` conversion
+  - `test_subscripted_set_type`: Verifies `set[int]` → `HashSet<i32>` conversion
+  - `test_list_literal_with_annotation`: Tests list literal type inference
+  - `test_dict_literal_with_annotation`: Tests dict literal type inference
+  - `test_set_literal_with_annotation`: Tests set literal type inference
+- **All 118 Rust Backend Tests Pass**: Zero regressions, full backward compatibility maintained
+- **Total Test Count**: 739 tests passing across all backends (increased from 733)
+
+### Impact
+
+- **Better Type Safety**: Generated Rust code uses specific types, improving compile-time type checking
+- **Reduced Runtime Overhead**: Eliminates boxing overhead from generic `Box<dyn Any>` types
+- **More Idiomatic Rust**: Generated code follows Rust best practices with proper type specialization
+- **Python 3.9+ Compatibility**: Full support for modern subscripted type annotations
+
 ## [0.1.25]
 
 ### Added
