@@ -1,6 +1,5 @@
 """Haskell container system for MGen."""
 
-from typing import List
 
 from ..base import AbstractContainerSystem
 
@@ -20,7 +19,7 @@ class HaskellContainerSystem(AbstractContainerSystem):
         """Get Haskell Set type for set storage."""
         return f"Set {element_type}"
 
-    def generate_container_operations(self, container_type: str, operations: List[str]) -> str:
+    def generate_container_operations(self, container_type: str, operations: list[str]) -> str:
         """Generate Haskell container operations."""
         operations_code = []
 
@@ -36,7 +35,7 @@ class HaskellContainerSystem(AbstractContainerSystem):
 
         return "\n".join(operations_code)
 
-    def get_required_imports(self) -> List[str]:
+    def get_required_imports(self) -> list[str]:
         """Get Haskell import statements required for container operations."""
         return [
             "import qualified Data.Map as Map",

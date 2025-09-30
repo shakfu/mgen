@@ -1,4 +1,4 @@
-"""STC Memory Management System
+"""STC Memory Management System.
 
 This module provides comprehensive memory management for STC containers,
 including automatic cleanup, error handling, and memory safety guarantees.
@@ -7,7 +7,7 @@ including automatic cleanup, error handling, and memory safety guarantees.
 import ast
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 
 class MemoryScope(Enum):
@@ -57,27 +57,27 @@ class STCMemoryManager:
 
     def __init__(self) -> None:
         # Track all container allocations
-        self.allocations: Dict[str, ContainerAllocation] = {}
+        self.allocations: dict[str, ContainerAllocation] = {}
 
         # Scope stack for tracking variable lifetimes
-        self.scope_stack: List[Dict[str, ContainerAllocation]] = [{}]
+        self.scope_stack: list[dict[str, ContainerAllocation]] = [{}]
 
         # Track moved/transferred containers
-        self.moved_containers: Set[str] = set()
+        self.moved_containers: set[str] = set()
 
         # Memory errors and warnings
-        self.memory_errors: List[MemoryError] = []
+        self.memory_errors: list[MemoryError] = []
 
         # Function-specific tracking
         self.current_function: Optional[str] = None
-        self.function_parameters: Dict[str, Set[str]] = {}
-        self.function_returns: Dict[str, Set[str]] = {}
+        self.function_parameters: dict[str, set[str]] = {}
+        self.function_returns: dict[str, set[str]] = {}
 
     def enter_scope(self, scope_type: MemoryScope = MemoryScope.BLOCK) -> None:
         """Enter a new scope (function, block, loop, etc.)."""
         self.scope_stack.append({})
 
-    def exit_scope(self) -> List[str]:
+    def exit_scope(self) -> list[str]:
         """Exit current scope and generate cleanup code.
 
         Returns:
@@ -89,7 +89,7 @@ class STCMemoryManager:
         scope_containers = self.scope_stack.pop()
         cleanup_code = []
 
-        for name, allocation in scope_containers.items():
+        for _name, allocation in scope_containers.items():
             if self._needs_cleanup(allocation):
                 cleanup_stmt = self._generate_cleanup_statement(allocation)
                 cleanup_code.append(cleanup_stmt)
@@ -155,7 +155,7 @@ class STCMemoryManager:
         self.current_function = function_name
         self.enter_scope(MemoryScope.FUNCTION)
 
-    def exit_function(self) -> Tuple[List[str], List[str]]:
+    def exit_function(self) -> tuple[list[str], list[str]]:
         """Exit function scope.
 
         Returns:
@@ -167,7 +167,7 @@ class STCMemoryManager:
         self.current_function = None
         return cleanup_code, error_handling
 
-    def generate_exception_safe_wrapper(self, operation_code: str, container_name: str) -> List[str]:
+    def generate_exception_safe_wrapper(self, operation_code: str, container_name: str) -> list[str]:
         """Generate exception-safe wrapper for potentially failing operations.
 
         Args:
@@ -187,7 +187,7 @@ class STCMemoryManager:
 
             # Generate cleanup for all containers in current scope
             for scope_containers in reversed(self.scope_stack):
-                for name, allocation in scope_containers.items():
+                for _name, allocation in scope_containers.items():
                     if self._needs_cleanup(allocation):
                         cleanup = self._generate_cleanup_statement(allocation)
                         code.append(f"        {cleanup}")
@@ -200,7 +200,7 @@ class STCMemoryManager:
 
         return code
 
-    def analyze_memory_safety(self, ast_node: ast.AST) -> List[MemoryError]:
+    def analyze_memory_safety(self, ast_node: ast.AST) -> list[MemoryError]:
         """Analyze AST for potential memory safety issues.
 
         Returns:
@@ -250,14 +250,12 @@ class STCMemoryManager:
 
             def _check_function_cleanup(self, node: ast.FunctionDef) -> None:
                 # Check if function properly cleans up local containers
-                has_cleanup = False
                 for stmt in ast.walk(node):
                     if (
                         isinstance(stmt, ast.Call)
                         and isinstance(stmt.func, ast.Attribute)
                         and stmt.func.attr in ["drop", "clear", "free"]
                     ):
-                        has_cleanup = True
                         break
 
         analyzer = MemoryAnalyzer(self)
@@ -265,7 +263,7 @@ class STCMemoryManager:
 
         return self.memory_errors
 
-    def generate_memory_safe_initialization(self, name: str, container_type: str) -> List[str]:
+    def generate_memory_safe_initialization(self, name: str, container_type: str) -> list[str]:
         """Generate memory-safe container initialization."""
         code = []
 
@@ -281,7 +279,7 @@ class STCMemoryManager:
 
         return code
 
-    def generate_function_cleanup_wrapper(self, function_code: List[str], function_name: str) -> List[str]:
+    def generate_function_cleanup_wrapper(self, function_code: list[str], function_name: str) -> list[str]:
         """Wrap function with automatic cleanup."""
         wrapped_code = []
 
@@ -322,12 +320,12 @@ class STCMemoryManager:
         """Generate cleanup statement for allocation."""
         return f"{allocation.container_type}_drop(&{allocation.name});"
 
-    def _generate_error_handling(self) -> List[str]:
+    def _generate_error_handling(self) -> list[str]:
         """Generate error handling code for current scope."""
         error_code = []
 
         # Check for common error patterns
-        current_containers: List[str] = []
+        current_containers: list[str] = []
         for scope_containers in self.scope_stack:
             current_containers.extend(scope_containers.keys())
 
@@ -362,7 +360,7 @@ class STCMemoryManager:
             MemoryError(error_type=error_type, message=message, line_number=line_number, severity="info")
         )
 
-    def generate_cleanup_summary(self) -> Dict[str, Any]:
+    def generate_cleanup_summary(self) -> dict[str, Any]:
         """Generate summary of memory management."""
         return {
             "total_allocations": len(self.allocations),
@@ -374,9 +372,9 @@ class STCMemoryManager:
             "allocations_by_type": self._get_allocations_by_type(),
         }
 
-    def _get_allocations_by_type(self) -> Dict[str, int]:
+    def _get_allocations_by_type(self) -> dict[str, int]:
         """Get allocation counts by container type."""
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for allocation in self.allocations.values():
             container_type = allocation.container_type
             counts[container_type] = counts.get(container_type, 0) + 1

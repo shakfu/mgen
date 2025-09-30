@@ -7,7 +7,7 @@ versions of functions based on usage patterns, type information, and call contex
 import ast
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from ..base import AnalysisContext, BaseOptimizer, OptimizationLevel, OptimizationResult
 
@@ -44,10 +44,10 @@ class ParameterInfo:
 
     name: str
     type_hint: Optional[str] = None
-    common_values: List[Any] = field(default_factory=list)
+    common_values: list[Any] = field(default_factory=list)
     is_constant_across_calls: bool = False
-    value_distribution: Dict[Any, int] = field(default_factory=dict)
-    range_info: Optional[Tuple[Any, Any]] = None
+    value_distribution: dict[Any, int] = field(default_factory=dict)
+    range_info: Optional[tuple[Any, Any]] = None
     nullable: bool = False
     used_in_conditions: bool = False
     used_in_loops: bool = False
@@ -60,8 +60,8 @@ class CallSiteInfo:
     function_name: str
     caller_name: str
     line_number: int
-    argument_values: List[Any] = field(default_factory=list)
-    argument_types: List[str] = field(default_factory=list)
+    argument_values: list[Any] = field(default_factory=list)
+    argument_types: list[str] = field(default_factory=list)
     is_constant_call: bool = False
     call_frequency: int = 1
     context: str = "normal"  # normal, loop, conditional, hot_path
@@ -72,8 +72,8 @@ class FunctionProfile:
     """Profile information about a function for specialization."""
 
     name: str
-    parameters: List[ParameterInfo] = field(default_factory=list)
-    call_sites: List[CallSiteInfo] = field(default_factory=list)
+    parameters: list[ParameterInfo] = field(default_factory=list)
+    call_sites: list[CallSiteInfo] = field(default_factory=list)
     call_pattern: CallPattern = CallPattern.SINGLE_USE
     is_pure: bool = False
     is_recursive: bool = False
@@ -93,13 +93,13 @@ class SpecializationCandidate:
     base_function: str
     specialization_type: SpecializationType
     specialized_name: str
-    parameter_bindings: Dict[str, Any] = field(default_factory=dict)
-    type_constraints: Dict[str, str] = field(default_factory=dict)
+    parameter_bindings: dict[str, Any] = field(default_factory=dict)
+    type_constraints: dict[str, str] = field(default_factory=dict)
     estimated_speedup: float = 1.0
     confidence: float = 1.0
     call_site_coverage: float = 0.0  # Fraction of calls this specialization covers
     code_size_impact: int = 0  # Estimated code size change
-    specialization_conditions: List[str] = field(default_factory=list)
+    specialization_conditions: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -109,8 +109,8 @@ class SpecializationResult:
     specialized_function: str
     original_function: str
     specialization_ast: Optional[ast.AST] = None
-    parameter_substitutions: Dict[str, Any] = field(default_factory=dict)
-    optimizations_applied: List[str] = field(default_factory=list)
+    parameter_substitutions: dict[str, Any] = field(default_factory=dict)
+    optimizations_applied: list[str] = field(default_factory=list)
     performance_gain: float = 1.0
     safety_verified: bool = True
 
@@ -119,15 +119,15 @@ class SpecializationResult:
 class SpecializationReport:
     """Report from function specialization analysis."""
 
-    function_profiles: Dict[str, FunctionProfile] = field(default_factory=dict)
-    specialization_candidates: List[SpecializationCandidate] = field(default_factory=list)
-    specialization_results: List[SpecializationResult] = field(default_factory=list)
+    function_profiles: dict[str, FunctionProfile] = field(default_factory=dict)
+    specialization_candidates: list[SpecializationCandidate] = field(default_factory=list)
+    specialization_results: list[SpecializationResult] = field(default_factory=list)
     total_functions: int = 0
     specialized_functions: int = 0
     estimated_code_size_change: int = 0
     estimated_performance_gain: float = 1.0
-    inlining_opportunities: List[str] = field(default_factory=list)
-    memoization_candidates: List[str] = field(default_factory=list)
+    inlining_opportunities: list[str] = field(default_factory=list)
+    memoization_candidates: list[str] = field(default_factory=list)
 
 
 class FunctionSpecializer(BaseOptimizer):
@@ -135,8 +135,8 @@ class FunctionSpecializer(BaseOptimizer):
 
     def __init__(self, optimization_level: OptimizationLevel = OptimizationLevel.BASIC):
         super().__init__("FunctionSpecializer", optimization_level)
-        self._function_definitions: Dict[str, ast.FunctionDef] = {}
-        self._call_sites: List[CallSiteInfo] = []
+        self._function_definitions: dict[str, ast.FunctionDef] = {}
+        self._call_sites: list[CallSiteInfo] = []
         self._current_function: Optional[str] = None
 
     def optimize(self, context: AnalysisContext) -> OptimizationResult:
@@ -274,7 +274,7 @@ class FunctionSpecializer(BaseOptimizer):
 
         self._call_sites.append(call_info)
 
-    def _analyze_argument(self, arg: ast.AST) -> Tuple[Any, str]:
+    def _analyze_argument(self, arg: ast.AST) -> tuple[Any, str]:
         """Analyze a function call argument."""
         if isinstance(arg, ast.Constant):
             return arg.value, type(arg.value).__name__
@@ -304,7 +304,7 @@ class FunctionSpecializer(BaseOptimizer):
                     profile.constant_calls += 1
 
                 # Update parameter info
-                for i, (param, arg_value, arg_type) in enumerate(
+                for i, (param, arg_value, _arg_type) in enumerate(
                     zip(profile.parameters, call_site.argument_values, call_site.argument_types)
                 ):
                     if i < len(profile.parameters):
@@ -397,12 +397,12 @@ class FunctionSpecializer(BaseOptimizer):
             and any(len(param.value_distribution) < profile.total_calls for param in profile.parameters)
         )
 
-    def _create_type_specialization_candidates(self, profile: FunctionProfile) -> List[SpecializationCandidate]:
+    def _create_type_specialization_candidates(self, profile: FunctionProfile) -> list[SpecializationCandidate]:
         """Create type specialization candidates."""
         candidates = []
 
         # Group call sites by argument types
-        type_groups: Dict[Tuple[str, ...], List[CallSiteInfo]] = {}
+        type_groups: dict[tuple[str, ...], list[CallSiteInfo]] = {}
         for call_site in profile.call_sites:
             type_signature = tuple(call_site.argument_types)
             if type_signature not in type_groups:
@@ -426,12 +426,12 @@ class FunctionSpecializer(BaseOptimizer):
 
         return candidates
 
-    def _create_constant_specialization_candidates(self, profile: FunctionProfile) -> List[SpecializationCandidate]:
+    def _create_constant_specialization_candidates(self, profile: FunctionProfile) -> list[SpecializationCandidate]:
         """Create constant specialization candidates."""
         candidates = []
 
         # Find parameters that are frequently constant
-        for i, param in enumerate(profile.parameters):
+        for _i, param in enumerate(profile.parameters):
             if not param.value_distribution:
                 continue
 
@@ -551,14 +551,14 @@ class FunctionSpecializer(BaseOptimizer):
         )
         return new_func
 
-    def _apply_constant_folding(self, func_ast: ast.FunctionDef, bindings: Dict[str, Any]) -> None:
+    def _apply_constant_folding(self, func_ast: ast.FunctionDef, bindings: dict[str, Any]) -> None:
         """Apply constant folding to a specialized function."""
         # Note: Proper constant folding should use ast.NodeTransformer
         # This is a simplified placeholder implementation
         # In production, use ast.NodeTransformer to properly replace Name nodes with Constant nodes
         pass  # TODO: Implement proper constant folding with ast.NodeTransformer
 
-    def _apply_type_specialization(self, func_ast: ast.FunctionDef, type_constraints: Dict[str, str]) -> None:
+    def _apply_type_specialization(self, func_ast: ast.FunctionDef, type_constraints: dict[str, str]) -> None:
         """Apply type-specific optimizations to a function."""
         # Add type-specific optimizations based on constraints
         # This is a simplified implementation
@@ -639,14 +639,14 @@ class FunctionSpecializer(BaseOptimizer):
         # Cap maximum gain
         return min(total_gain, 10.0)
 
-    def _generate_transformations(self, report: SpecializationReport) -> List[str]:
+    def _generate_transformations(self, report: SpecializationReport) -> list[str]:
         """Generate list of transformations applied."""
         transformations = []
 
         transformations.append(f"Analyzed {report.total_functions} functions")
         transformations.append(f"Created {report.specialized_functions} specialized versions")
 
-        specialization_counts: Dict[str, int] = {}
+        specialization_counts: dict[str, int] = {}
         for candidate in report.specialization_candidates:
             spec_type = candidate.specialization_type.value
             specialization_counts[spec_type] = specialization_counts.get(spec_type, 0) + 1
@@ -660,7 +660,7 @@ class FunctionSpecializer(BaseOptimizer):
 
         return transformations
 
-    def _analyze_safety(self, report: SpecializationReport) -> Dict[str, bool]:
+    def _analyze_safety(self, report: SpecializationReport) -> dict[str, bool]:
         """Analyze safety of function specializations."""
         safety_analysis = {
             "type_specialization": True,

@@ -1,6 +1,5 @@
 """Go container system for MGen."""
 
-from typing import List
 
 from ..base import AbstractContainerSystem
 
@@ -20,7 +19,7 @@ class GoContainerSystem(AbstractContainerSystem):
         """Get Go map type for set storage (using map[T]bool pattern)."""
         return f"map[{element_type}]bool"
 
-    def generate_container_operations(self, container_type: str, operations: List[str]) -> str:
+    def generate_container_operations(self, container_type: str, operations: list[str]) -> str:
         """Generate Go container operations."""
         operations_code = []
 
@@ -34,6 +33,6 @@ class GoContainerSystem(AbstractContainerSystem):
 
         return "\n".join(operations_code)
 
-    def get_required_imports(self) -> List[str]:
+    def get_required_imports(self) -> list[str]:
         """Get Go imports required for container operations."""
         return []  # Go's built-in containers don't require imports

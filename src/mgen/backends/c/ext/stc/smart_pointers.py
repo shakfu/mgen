@@ -1,4 +1,4 @@
-"""Smart Pointer System for STC Integration
+"""Smart Pointer System for STC Integration.
 
 This module provides C++ style smart pointers implemented using STC containers,
 offering memory safety, RAII semantics, and automatic resource management.
@@ -13,7 +13,7 @@ Features:
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 
 class SmartPointerType(Enum):
@@ -105,19 +105,19 @@ class SmartPointerManager:
 
     def __init__(self) -> None:
         # Track all smart pointer allocations
-        self.allocations: Dict[str, SmartPointerAllocation] = {}
+        self.allocations: dict[str, SmartPointerAllocation] = {}
 
         # Track reference relationships for cycle detection
-        self.reference_graph: Dict[str, Set[str]] = {}
+        self.reference_graph: dict[str, set[str]] = {}
 
         # Track shared_ptr reference counts
-        self.shared_references: Dict[str, int] = {}
+        self.shared_references: dict[str, int] = {}
 
         # Track weak_ptr relationships
-        self.weak_references: Dict[str, Set[str]] = {}
+        self.weak_references: dict[str, set[str]] = {}
 
         # Generated type definitions
-        self.generated_types: Set[str] = set()
+        self.generated_types: set[str] = set()
 
     def register_smart_pointer(
         self,
@@ -150,7 +150,7 @@ class SmartPointerManager:
 
         return allocation
 
-    def generate_smart_pointer_type_def(self, allocation: SmartPointerAllocation) -> Tuple[str, str]:
+    def generate_smart_pointer_type_def(self, allocation: SmartPointerAllocation) -> tuple[str, str]:
         """Generate STC smart pointer type definition."""
         spec = SMART_POINTER_SPECS[allocation.pointer_type]
 
@@ -177,7 +177,7 @@ class SmartPointerManager:
         return type_def, include
 
     def generate_smart_pointer_operation(
-        self, operation: str, pointer_name: str, args: Optional[List[str]] = None
+        self, operation: str, pointer_name: str, args: Optional[list[str]] = None
     ) -> Optional[str]:
         """Generate smart pointer operation code."""
         if pointer_name not in self.allocations:
@@ -215,7 +215,7 @@ class SmartPointerManager:
             return f"{type_name}_{stc_operation}(&{pointer_name})"
 
     def generate_make_smart_pointer(
-        self, pointer_type: SmartPointerType, element_type: str, args: Optional[List[str]] = None
+        self, pointer_type: SmartPointerType, element_type: str, args: Optional[list[str]] = None
     ) -> str:
         """Generate make_unique, make_shared, etc. calls."""
         args = args or []
@@ -248,13 +248,13 @@ class SmartPointerManager:
                         self.weak_references[source] = set()
                     self.weak_references[source].add(target)
 
-    def detect_reference_cycles(self) -> List[List[str]]:
+    def detect_reference_cycles(self) -> list[list[str]]:
         """Detect reference cycles in smart pointer graph."""
         cycles = []
         visited = set()
         rec_stack = set()
 
-        def dfs(node: str, path: List[str]) -> bool:
+        def dfs(node: str, path: list[str]) -> bool:
             if node in rec_stack:
                 # Found cycle
                 cycle_start = path.index(node)
@@ -282,7 +282,7 @@ class SmartPointerManager:
 
         return cycles
 
-    def generate_cleanup_code(self, pointer_name: str) -> List[str]:
+    def generate_cleanup_code(self, pointer_name: str) -> list[str]:
         """Generate cleanup code for smart pointer."""
         if pointer_name not in self.allocations:
             return []
@@ -304,7 +304,7 @@ class SmartPointerManager:
 
         return cleanup_code
 
-    def generate_move_semantics(self, source: str, target: str) -> List[str]:
+    def generate_move_semantics(self, source: str, target: str) -> list[str]:
         """Generate move semantics for smart pointers."""
         if source not in self.allocations or target not in self.allocations:
             return []
@@ -314,7 +314,7 @@ class SmartPointerManager:
 
         # Only unique_ptr supports move semantics
         if source_alloc.pointer_type == SmartPointerType.UNIQUE:
-            source_type = self._generate_type_name(source_alloc)
+            self._generate_type_name(source_alloc)
             target_type = self._generate_type_name(target_alloc)
 
             return [f"{target_type}_move(&{target}, &{source});", f"// {source} is now empty after move"]

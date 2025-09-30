@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from ..base import AbstractBuilder
 from ..preferences import BackendPreferences, OCamlPreferences
@@ -30,8 +30,7 @@ class OCamlBuilder(AbstractBuilder):
                 return self._generate_dune_project(output_file)
             else:
                 return self._compile_direct(output_file)
-        except Exception as e:
-            print(f"Build failed: {e}")
+        except Exception:
             return False
 
     def _compile_direct(self, output_file: str) -> bool:
@@ -55,10 +54,8 @@ class OCamlBuilder(AbstractBuilder):
         result = subprocess.run(cmd, capture_output=True, text=True)
 
         if result.returncode == 0:
-            print(f"Successfully compiled {output_file} to {executable}")
             return True
         else:
-            print(f"Compilation failed: {result.stderr}")
             return False
 
     def _generate_dune_project(self, output_file: str) -> bool:
@@ -92,8 +89,6 @@ class OCamlBuilder(AbstractBuilder):
         with open(dune_file_path, "w") as f:
             f.write(dune_content)
 
-        print(f"Generated dune-project and dune files for {project_name}")
-        print(f"Run 'dune build' in {base_path} to compile")
         return True
 
     def _copy_runtime_files(self, target_dir: Path) -> None:
@@ -110,14 +105,13 @@ class OCamlBuilder(AbstractBuilder):
                 target_file = target_dir / runtime_file.name
                 if not target_file.exists():
                     shutil.copy2(runtime_file, target_file)
-                    print(f"Copied {runtime_file.name} to {target_dir}")
 
-    def get_build_command(self, output_file: str) -> List[str]:
+    def get_build_command(self, output_file: str) -> list[str]:
         """Get the command to build the OCaml file."""
         base_name = Path(output_file).stem
         return ["ocamlc", "-o", base_name, "mgen_runtime.ml", output_file]
 
-    def get_run_command(self, output_file: str) -> List[str]:
+    def get_run_command(self, output_file: str) -> list[str]:
         """Get the command to run the compiled OCaml executable."""
         executable = Path(output_file).stem
         return [f"./{executable}"]
@@ -153,10 +147,9 @@ class OCamlBuilder(AbstractBuilder):
             except Exception:
                 continue
 
-        print(f"Cleaned {removed_count} OCaml build artifacts")
         return True
 
-    def generate_build_file(self, source_files: List[str], target_name: str) -> str:
+    def generate_build_file(self, source_files: list[str], target_name: str) -> str:
         """Generate dune-project build configuration."""
         dune_project_content = f"""(lang dune 3.0)
 
@@ -181,6 +174,6 @@ class OCamlBuilder(AbstractBuilder):
         """Compile OCaml source directly using ocamlc."""
         return self._compile_direct(source_file)
 
-    def get_compile_flags(self) -> List[str]:
+    def get_compile_flags(self) -> list[str]:
         """Get compilation flags for OCaml."""
         return ["-o"]

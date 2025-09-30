@@ -7,7 +7,7 @@ that Python code can be safely and correctly converted to C code.
 import ast
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Optional
 
 from ..common import log
 from .ast_analyzer import TypeInfo
@@ -53,8 +53,8 @@ class ConstraintViolation:
 class ConstraintReport:
     """Complete constraint checking report."""
 
-    violations: List[ConstraintViolation] = field(default_factory=list)
-    passed_checks: List[str] = field(default_factory=list)
+    violations: list[ConstraintViolation] = field(default_factory=list)
+    passed_checks: list[str] = field(default_factory=list)
     conversion_safe: bool = True
     confidence_score: float = 1.0
 
@@ -64,11 +64,11 @@ class ConstraintReport:
         if violation.severity in [ConstraintSeverity.ERROR, ConstraintSeverity.CRITICAL]:
             self.conversion_safe = False
 
-    def get_violations_by_severity(self, severity: ConstraintSeverity) -> List[ConstraintViolation]:
+    def get_violations_by_severity(self, severity: ConstraintSeverity) -> list[ConstraintViolation]:
         """Get all violations of a specific severity."""
         return [v for v in self.violations if v.severity == severity]
 
-    def get_violations_by_category(self, category: ConstraintCategory) -> List[ConstraintViolation]:
+    def get_violations_by_category(self, category: ConstraintCategory) -> list[ConstraintViolation]:
         """Get all violations of a specific category."""
         return [v for v in self.violations if v.category == category]
 
@@ -81,7 +81,7 @@ class StaticConstraintChecker:
         self.report = ConstraintReport()
         self.type_engine = TypeInferenceEngine()
         self.current_function: Optional[str] = None
-        self.variable_scopes: Dict[str, Dict[str, TypeInfo]] = {}
+        self.variable_scopes: dict[str, dict[str, TypeInfo]] = {}
 
         # Constraint rules registry
         self.rules = {

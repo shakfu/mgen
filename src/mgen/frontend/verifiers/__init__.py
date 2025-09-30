@@ -1,4 +1,4 @@
-"""CGen Formal Verification Module
+"""CGen Formal Verification Module.
 
 This module provides formal verification capabilities using theorem provers
 and symbolic analysis to ensure correctness and safety of generated code.

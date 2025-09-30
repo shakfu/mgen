@@ -1,4 +1,4 @@
-"""Simple Python-to-C AST Translator
+"""Simple Python-to-C AST Translator.
 
 A simplified version that generates basic C code using direct string generation
 rather than complex CFactory methods that may not exist.
@@ -10,7 +10,6 @@ container operations when use_stc_containers=True.
 import ast
 import os
 import sys
-from typing import Dict, List, Set
 
 from ...common import log
 
@@ -30,17 +29,17 @@ class SimplePythonToCTranslator:
 
     def __init__(self, use_stc_containers: bool = True) -> None:
         self.log = log.config(self.__class__.__name__)
-        self.variables: Dict[str, str] = {}  # variable_name -> c_type
-        self.functions: Dict[str, str] = {}  # function_name -> return_type
+        self.variables: dict[str, str] = {}  # variable_name -> c_type
+        self.functions: dict[str, str] = {}  # function_name -> return_type
         self.indent_level = 0
 
         # STC integration
         self.use_stc_containers = use_stc_containers and STC_AVAILABLE
         self.stc_translator = STCPythonToCTranslator() if self.use_stc_containers else None
-        self.stc_includes: Set[str] = set()
-        self.stc_type_definitions: List[str] = []
-        self.stc_container_vars: Dict[str, str] = {}  # var_name -> STC container type
-        self.stc_type_include_pairs: List[tuple] = []  # (type_def, include) pairs to maintain proper order
+        self.stc_includes: set[str] = set()
+        self.stc_type_definitions: list[str] = []
+        self.stc_container_vars: dict[str, str] = {}  # var_name -> STC container type
+        self.stc_type_include_pairs: list[tuple] = []  # (type_def, include) pairs to maintain proper order
 
         self.builtin_functions = {
             "print": self._translate_print_call,
@@ -68,7 +67,6 @@ class SimplePythonToCTranslator:
             except Exception as e:
                 # Fall back to traditional translation if STC analysis fails
                 self.log.warning(f"STC analysis failed, falling back to traditional translation: {e}")
-                print(f"Warning: STC analysis failed, falling back to traditional translation: {e}")
 
         # Add header comment
         if self.use_stc_containers:
@@ -119,7 +117,7 @@ class SimplePythonToCTranslator:
 
         return "\n".join(lines)
 
-    def _translate_function(self, func_node: ast.FunctionDef) -> List[str]:
+    def _translate_function(self, func_node: ast.FunctionDef) -> list[str]:
         """Translate a Python function to C function."""
         lines = []
 
@@ -174,7 +172,7 @@ class SimplePythonToCTranslator:
 
         return lines
 
-    def _translate_statement(self, stmt: ast.stmt) -> List[str]:
+    def _translate_statement(self, stmt: ast.stmt) -> list[str]:
         """Translate a Python statement to C statement(s)."""
         if isinstance(stmt, ast.Return):
             return self._translate_return(stmt)
@@ -195,7 +193,7 @@ class SimplePythonToCTranslator:
         else:
             return [self._indent(f"/* Unsupported statement: {type(stmt).__name__} */")]
 
-    def _translate_return(self, return_node: ast.Return) -> List[str]:
+    def _translate_return(self, return_node: ast.Return) -> list[str]:
         """Translate return statement."""
         if return_node.value:
             expr = self._translate_expression(return_node.value)
@@ -203,7 +201,7 @@ class SimplePythonToCTranslator:
         else:
             return [self._indent("return;")]
 
-    def _translate_assignment(self, assign_node: ast.Assign) -> List[str]:
+    def _translate_assignment(self, assign_node: ast.Assign) -> list[str]:
         """Translate assignment statement with STC support."""
         lines = []
 
@@ -276,7 +274,7 @@ class SimplePythonToCTranslator:
 
         return lines
 
-    def _translate_ann_assignment(self, ann_assign_node: ast.AnnAssign) -> List[str]:
+    def _translate_ann_assignment(self, ann_assign_node: ast.AnnAssign) -> list[str]:
         """Translate annotated assignment (var: type = value)."""
         lines = []
 
@@ -294,7 +292,7 @@ class SimplePythonToCTranslator:
 
         return lines
 
-    def _translate_aug_assignment(self, aug_assign_node: ast.AugAssign) -> List[str]:
+    def _translate_aug_assignment(self, aug_assign_node: ast.AugAssign) -> list[str]:
         """Translate augmented assignment (+=, -=, etc.)."""
         target_expr = self._translate_expression(aug_assign_node.target)
         value_expr = self._translate_expression(aug_assign_node.value)
@@ -310,7 +308,7 @@ class SimplePythonToCTranslator:
         op = op_map.get(type(aug_assign_node.op), "+=")
         return [self._indent(f"{target_expr} {op} {value_expr};")]
 
-    def _translate_if(self, if_node: ast.If) -> List[str]:
+    def _translate_if(self, if_node: ast.If) -> list[str]:
         """Translate if statement."""
         lines = []
         condition = self._translate_expression(if_node.test)
@@ -342,7 +340,7 @@ class SimplePythonToCTranslator:
         lines.append(self._indent("}"))
         return lines
 
-    def _translate_while(self, while_node: ast.While) -> List[str]:
+    def _translate_while(self, while_node: ast.While) -> list[str]:
         """Translate while loop."""
         lines = []
         condition = self._translate_expression(while_node.test)
@@ -362,7 +360,7 @@ class SimplePythonToCTranslator:
         lines.append(self._indent("}"))
         return lines
 
-    def _translate_for(self, for_node: ast.For) -> List[str]:
+    def _translate_for(self, for_node: ast.For) -> list[str]:
         """Translate for loop with STC iterator support."""
         lines = []
 
@@ -503,7 +501,7 @@ class SimplePythonToCTranslator:
 
         return lines
 
-    def _translate_expression_statement(self, expr_stmt: ast.Expr) -> List[str]:
+    def _translate_expression_statement(self, expr_stmt: ast.Expr) -> list[str]:
         """Translate expression statement with STC support."""
         # Check for STC container operations first
         if self.use_stc_containers and self.stc_translator and isinstance(expr_stmt.value, ast.Call):
@@ -883,7 +881,7 @@ class SimplePythonToCTranslator:
         result = "".join(parts)
         return f'"{result}"'
 
-    def _translate_global_constant(self, assign_node: ast.Assign) -> List[str]:
+    def _translate_global_constant(self, assign_node: ast.Assign) -> list[str]:
         """Translate global constant assignment."""
         lines = []
 
@@ -915,7 +913,7 @@ class SimplePythonToCTranslator:
 
         return lines
 
-    def _translate_global_ann_constant(self, ann_assign_node: ast.AnnAssign) -> List[str]:
+    def _translate_global_ann_constant(self, ann_assign_node: ast.AnnAssign) -> list[str]:
         """Translate global annotated constant assignment."""
         lines = []
 
@@ -1009,7 +1007,7 @@ class SimplePythonToCTranslator:
 
         return "int"
 
-    def _generate_special_function_body(self, func_name: str, func_node: ast.FunctionDef) -> List[str]:
+    def _generate_special_function_body(self, func_name: str, func_node: ast.FunctionDef) -> list[str]:
         """Generate proper C implementation for special functions."""
         lines = []
         self.indent_level = 1

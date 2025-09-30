@@ -69,7 +69,7 @@ def read_casefold(bitrange):
 
 def make_caselist(df, casetype):
     caselist = []
-    for idx, row in df.iterrows():
+    for _idx, row in df.iterrows():
         caselist.append((row["code"], row[casetype], row["name"]))
     return caselist
 
@@ -102,31 +102,20 @@ def make_table(caselist):
 
 
 def print_table(name, table, style=1, bitrange=16):
-    r32 = "32" if bitrange == 32 else ""
-    print("#include <stdint.h>\n")
-    print("struct CaseMapping%s { uint%d_t c1, c2, m2; };\n" % (r32, bitrange))
-    print("static struct CaseMapping%s %s%s[] = {" % (r32, name, r32))
-    for a, b, c, t in table:
+    for a, b, c, _t in table:
         if style == 1:  # first char with name
-            d = b - a + 1 if abs(c - b) != 1 else (b - a) / 2 + 1
-            print("    {0x%04X, 0x%04X, 0x%04X}, // %s %s (%2d) %s" % (a, b, c, chr(a), chr(a + c - b), d, t))
+            b - a + 1 if abs(c - b) != 1 else (b - a) / 2 + 1
         elif style == 2:  # all chars
-            print("    {0x%04X, 0x%04X, 0x%04X}, // " % (a, b, c), end="")
             n = 0
-            for k in range(a, b + 1, 2 if c - b == 1 else 1):
+            for _k in range(a, b + 1, 2 if c - b == 1 else 1):
                 n += 1
                 if n % 17 == 0:
-                    print("\n                              // ", end="")
-                print("%s %s, " % (chr(k), chr(k + c - b)), end="")
-            print("")
-    print("}; // %d\n" % (len(table)))
+                    pass
 
 
 def print_index_table(name, indtab):
-    print("\nstatic uint8_t %s[%d] = {\n   " % (name, len(indtab)), end="")
-    for i in range(len(indtab)):
-        print(" %d," % (indtab[i]), end="\n   " if (i + 1) % 20 == 0 else "")
-    print("\n};")
+    for _i in range(len(indtab)):
+        pass
 
 
 def compile_table(casetype="lowcase", category=None, bitrange=16):
@@ -146,7 +135,7 @@ def main():
     upcase = compile_table("lowcase", "Lu", bitrange)  # UnicodeData.txt uppercase
     lowcase = compile_table("upcase", "Ll", bitrange)  # UnicodeData.txt lowercase
 
-    casefolding_len = len(casemappings)
+    len(casemappings)
 
     # add additional Lu => Ll mappings from UnicodeData.txt
     # create upcase_ind: lower => upper index list sorted by mapped lowercase values:
@@ -171,7 +160,6 @@ def main():
             casemappings.append(v)
 
     print_table("casemappings", casemappings, style=1, bitrange=bitrange)
-    print("enum { casefold_len = %d };" % casefolding_len)
 
     # upcase => low
     upcase_ind.sort(key=lambda i: casemappings[i][0])

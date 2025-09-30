@@ -8,7 +8,7 @@ import ast
 import operator as op
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Optional, cast
 
 from ..base import AnalysisContext, BaseOptimizer, OptimizationLevel, OptimizationResult
 
@@ -68,14 +68,14 @@ class OptimizationCandidate:
 class CompileTimeReport:
     """Report from compile-time evaluation and optimization."""
 
-    constants_found: Dict[str, ConstantValue] = field(default_factory=dict)
-    optimizations: List[OptimizationCandidate] = field(default_factory=list)
+    constants_found: dict[str, ConstantValue] = field(default_factory=dict)
+    optimizations: list[OptimizationCandidate] = field(default_factory=list)
     expressions_evaluated: int = 0
     expressions_optimized: int = 0
     total_estimated_speedup: float = 1.0
     memory_saved: int = 0
-    warnings: List[str] = field(default_factory=list)
-    limitations: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    limitations: list[str] = field(default_factory=list)
 
 
 class CompileTimeEvaluator(BaseOptimizer):
@@ -83,7 +83,7 @@ class CompileTimeEvaluator(BaseOptimizer):
 
     def __init__(self, optimization_level: OptimizationLevel = OptimizationLevel.BASIC):
         super().__init__("CompileTimeEvaluator", optimization_level)
-        self._constants: Dict[str, ConstantValue] = {}
+        self._constants: dict[str, ConstantValue] = {}
         self._safe_functions = {"abs", "min", "max", "len", "round", "int", "float", "bool", "str"}
         self._binary_operators = {
             ast.Add: op.add,
@@ -609,14 +609,14 @@ class CompileTimeEvaluator(BaseOptimizer):
         # Return original binary operation
         return ast.BinOp(left=cast(ast.expr, left), op=op_node, right=cast(ast.expr, right))
 
-    def _generate_transformations(self, report: CompileTimeReport) -> List[str]:
+    def _generate_transformations(self, report: CompileTimeReport) -> list[str]:
         """Generate list of transformations performed."""
         transformations = []
 
         transformations.append(f"Found {len(report.constants_found)} compile-time constants")
         transformations.append(f"Optimized {report.expressions_optimized} expressions")
 
-        optimization_types: Dict[str, int] = {}
+        optimization_types: dict[str, int] = {}
         for opt in report.optimizations:
             optimization_types[opt.optimization_type] = optimization_types.get(opt.optimization_type, 0) + 1
 
@@ -639,7 +639,7 @@ class CompileTimeEvaluator(BaseOptimizer):
         # Cap the maximum speedup to be realistic
         return min(total_speedup, 10.0)
 
-    def _analyze_safety(self, report: CompileTimeReport) -> Dict[str, bool]:
+    def _analyze_safety(self, report: CompileTimeReport) -> dict[str, bool]:
         """Analyze safety of performed optimizations."""
         safety_analysis = {
             "constant_folding": True,

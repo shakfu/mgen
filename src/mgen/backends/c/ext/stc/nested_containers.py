@@ -1,4 +1,4 @@
-"""Nested Container Support for STC
+"""Nested Container Support for STC.
 
 This module provides support for complex nested container types like
 List[List[int]], Dict[str, List[int]], etc. by managing template dependencies
@@ -7,7 +7,7 @@ and generating proper instantiation order.
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any
 
 
 @dataclass
@@ -16,18 +16,18 @@ class NestedTypeInfo:
 
     full_type: str  # e.g., "List[Dict[str, int]]"
     container_type: str  # e.g., "List"
-    inner_types: List[str]  # e.g., ["Dict[str, int]"]
+    inner_types: list[str]  # e.g., ["Dict[str, int]"]
     depth: int  # Nesting depth
-    dependencies: List[str]  # Types this depends on
+    dependencies: list[str]  # Types this depends on
 
 
 class NestedContainerManager:
     """Manages complex nested container type generation."""
 
     def __init__(self) -> None:
-        self.type_registry: Dict[str, NestedTypeInfo] = {}
-        self.dependency_graph: Dict[str, Set[str]] = {}
-        self.instantiation_order: List[str] = []
+        self.type_registry: dict[str, NestedTypeInfo] = {}
+        self.dependency_graph: dict[str, set[str]] = {}
+        self.instantiation_order: list[str] = []
 
     def parse_nested_type(self, type_str: str) -> NestedTypeInfo:
         """Parse a nested container type string into components.
@@ -59,7 +59,7 @@ class NestedContainerManager:
             dependencies=dependencies,
         )
 
-    def _parse_container_structure(self, type_str: str) -> Tuple[str, List[str], int]:
+    def _parse_container_structure(self, type_str: str) -> tuple[str, list[str], int]:
         """Parse the container structure recursively."""
         # Match pattern like "List[...]" or "Dict[..., ...]"
         match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\[(.*)\]$", type_str)
@@ -83,7 +83,7 @@ class NestedContainerManager:
 
         return container_type, inner_types, max_depth
 
-    def _split_balanced(self, content: str) -> List[str]:
+    def _split_balanced(self, content: str) -> list[str]:
         """Split content by commas while respecting bracket balance."""
         parts = []
         current = ""
@@ -106,7 +106,7 @@ class NestedContainerManager:
 
         return parts
 
-    def _extract_dependencies(self, inner_types: List[str]) -> List[str]:
+    def _extract_dependencies(self, inner_types: list[str]) -> list[str]:
         """Extract type dependencies from inner types."""
         dependencies = []
 
@@ -174,7 +174,7 @@ class NestedContainerManager:
             dep_canonical = self.register_nested_type(dep)
             self.dependency_graph[type_name].add(dep_canonical)
 
-    def get_instantiation_order(self) -> List[str]:
+    def get_instantiation_order(self) -> list[str]:
         """Get the correct instantiation order for all registered types.
 
         Returns:
@@ -209,7 +209,7 @@ class NestedContainerManager:
         self.instantiation_order = order
         return order
 
-    def generate_stc_template_definitions(self, template_manager: Any) -> List[str]:
+    def generate_stc_template_definitions(self, template_manager: Any) -> list[str]:
         """Generate STC template definitions for all nested types.
 
         Args:
@@ -233,7 +233,7 @@ class NestedContainerManager:
 
         return definitions
 
-    def _generate_template_definition(self, type_name: str, type_info: NestedTypeInfo, template_manager: Any) -> List[str]:
+    def _generate_template_definition(self, type_name: str, type_info: NestedTypeInfo, template_manager: Any) -> list[str]:
         """Generate template definition for a specific nested type."""
         definitions = []
 
@@ -337,7 +337,7 @@ class NestedContainerManager:
             and any(container in type_str for container in ["List[", "Dict[", "Set[", "list[", "dict[", "set["])
         )
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get statistics about nested container usage."""
         total_types = len(self.type_registry)
         nested_types = len([t for t in self.type_registry.values() if t.depth > 1])

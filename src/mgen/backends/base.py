@@ -2,7 +2,7 @@
 
 import ast
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from .preferences import BackendPreferences
 
@@ -47,7 +47,7 @@ class AbstractFactory(ABC):
         """Create variable declaration."""
 
     @abstractmethod
-    def create_function_signature(self, name: str, params: List[tuple], return_type: str) -> str:
+    def create_function_signature(self, name: str, params: list[tuple], return_type: str) -> str:
         """Create function signature."""
 
     @abstractmethod
@@ -67,7 +67,7 @@ class AbstractEmitter(ABC):
         self.preferences = preferences
 
     @abstractmethod
-    def emit_function(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+    def emit_function(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Generate complete function in target language."""
 
     @abstractmethod
@@ -79,7 +79,7 @@ class AbstractEmitter(ABC):
         """Map Python type to target language type."""
 
     @abstractmethod
-    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> bool:
+    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> bool:
         """Determine if function can use simple emission strategy."""
 
 
@@ -87,7 +87,7 @@ class AbstractBuilder(ABC):
     """Abstract builder for language-specific build systems."""
 
     @abstractmethod
-    def generate_build_file(self, source_files: List[str], target_name: str) -> str:
+    def generate_build_file(self, source_files: list[str], target_name: str) -> str:
         """Generate build configuration (Makefile, Cargo.toml, etc.)."""
 
     @abstractmethod
@@ -99,7 +99,7 @@ class AbstractBuilder(ABC):
         """Compile source directly using language tools."""
 
     @abstractmethod
-    def get_compile_flags(self) -> List[str]:
+    def get_compile_flags(self) -> list[str]:
         """Get compilation flags for the language."""
 
 
@@ -119,9 +119,9 @@ class AbstractContainerSystem(ABC):
         """Get set type for element type."""
 
     @abstractmethod
-    def generate_container_operations(self, container_type: str, operations: List[str]) -> str:
+    def generate_container_operations(self, container_type: str, operations: list[str]) -> str:
         """Generate container-specific operations code."""
 
     @abstractmethod
-    def get_required_imports(self) -> List[str]:
+    def get_required_imports(self) -> list[str]:
         """Get imports required for container operations."""

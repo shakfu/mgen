@@ -1,6 +1,6 @@
 """C code element factory for generating clean C code."""
 
-from typing import List, Optional
+from typing import Optional
 
 from ..base import AbstractFactory
 
@@ -18,7 +18,7 @@ class CFactory(AbstractFactory):
             return f"{type_name} {name} = {value};"
         return f"{type_name} {name};"
 
-    def create_function_signature(self, name: str, params: List[tuple], return_type: str) -> str:
+    def create_function_signature(self, name: str, params: list[tuple], return_type: str) -> str:
         """Create C function signature."""
         param_strs = []
         for param_name, param_type in params:
@@ -45,12 +45,12 @@ class CFactory(AbstractFactory):
             # Assume system header
             return f"#include <{library}>"
 
-    def create_function(self, name: str, params: List[str], return_type: str, body: str) -> str:
+    def create_function(self, name: str, params: list[str], return_type: str, body: str) -> str:
         """Create complete C function."""
         params_str = ", ".join(params) if params else "void"
         return f"{return_type} {name}({params_str}) {{\n{body}\n}}"
 
-    def create_struct(self, name: str, fields: List[tuple]) -> str:
+    def create_struct(self, name: str, fields: list[tuple]) -> str:
         """Create C struct definition."""
         field_strs = []
         for field_name, field_type in fields:

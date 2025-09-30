@@ -5,8 +5,7 @@ converters to reduce code duplication while maintaining language-specific flexib
 """
 
 import ast
-from typing import Any, Dict, List, Optional, Set
-
+from typing import Any, Optional
 
 # ============================================================================
 # Common AST Analysis Utilities
@@ -43,7 +42,7 @@ def uses_classes(node: ast.Module) -> bool:
     return False
 
 
-def uses_string_methods(node: ast.Module) -> Set[str]:
+def uses_string_methods(node: ast.Module) -> set[str]:
     """Detect which string methods are used in the module.
 
     Args:
@@ -61,7 +60,7 @@ def uses_string_methods(node: ast.Module) -> Set[str]:
     return methods
 
 
-def uses_builtin_functions(node: ast.Module) -> Set[str]:
+def uses_builtin_functions(node: ast.Module) -> set[str]:
     """Detect which built-in functions are used in the module.
 
     Args:
@@ -79,16 +78,16 @@ def uses_builtin_functions(node: ast.Module) -> Set[str]:
     return builtins
 
 
-def extract_instance_variables(class_node: ast.ClassDef) -> Dict[str, Optional[str]]:
+def extract_instance_variables(class_node: ast.ClassDef) -> dict[str, Optional[ast.expr]]:
     """Extract instance variables from a class __init__ method.
 
     Args:
         class_node: AST ClassDef node
 
     Returns:
-        Dictionary mapping variable names to their types (or None if not annotated)
+        Dictionary mapping variable names to their type annotations (or None if not annotated)
     """
-    variables = {}
+    variables: dict[str, Optional[ast.expr]] = {}
 
     # Find __init__ method
     for item in class_node.body:
@@ -115,7 +114,7 @@ def extract_instance_variables(class_node: ast.ClassDef) -> Dict[str, Optional[s
     return variables
 
 
-def extract_methods(class_node: ast.ClassDef) -> List[ast.FunctionDef]:
+def extract_methods(class_node: ast.ClassDef) -> list[ast.FunctionDef]:
     """Extract methods from a class (excluding __init__).
 
     Args:

@@ -7,7 +7,7 @@ CGen's existing type system.
 
 import ast
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Set
+from typing import Optional
 
 from ..common import log
 from .ast_analyzer import TypeInfo
@@ -22,7 +22,7 @@ class FlowType:
     c_equivalent: Optional[str] = None
     is_unknown: bool = False
     is_union: bool = False
-    union_options: Optional[Set["FlowType"]] = None
+    union_options: Optional[set["FlowType"]] = None
 
     def __str__(self) -> str:
         if self.is_union and self.union_options:
@@ -106,15 +106,15 @@ class FlowSensitiveInferencer:
         self.log = log.config(self.__class__.__name__)
         self.fallback_engine = fallback_engine
         self.unifier = TypeUnifier()
-        self.class_defs: Dict[str, Dict[str, FlowType]] = {}
+        self.class_defs: dict[str, dict[str, FlowType]] = {}
 
         # Per-function state
-        self.current_env: Dict[str, FlowType] = {}
-        self.return_types: List[FlowType] = []
-        self.var_order: List[str] = []
-        self.errors: List[str] = []
+        self.current_env: dict[str, FlowType] = {}
+        self.return_types: list[FlowType] = []
+        self.var_order: list[str] = []
+        self.errors: list[str] = []
 
-    def analyze_function_flow(self, func_node: ast.FunctionDef) -> Dict[str, InferenceResult]:
+    def analyze_function_flow(self, func_node: ast.FunctionDef) -> dict[str, InferenceResult]:
         """Analyze function with flow-sensitive type inference."""
         self.log.debug(f"Starting flow-sensitive analysis for function: {func_node.name}")
 
@@ -167,7 +167,7 @@ class FlowSensitiveInferencer:
         self.log.debug(f"Completed flow-sensitive analysis for function: {func_node.name}")
         return results
 
-    def _infer_block(self, stmts: List[ast.stmt], env: Dict[str, FlowType]) -> Dict[str, FlowType]:
+    def _infer_block(self, stmts: list[ast.stmt], env: dict[str, FlowType]) -> dict[str, FlowType]:
         """Infer types for a block of statements with flow sensitivity."""
         current_env = dict(env)
 
@@ -176,7 +176,7 @@ class FlowSensitiveInferencer:
 
         return current_env
 
-    def _infer_stmt(self, stmt: ast.stmt, env: Dict[str, FlowType]) -> Dict[str, FlowType]:
+    def _infer_stmt(self, stmt: ast.stmt, env: dict[str, FlowType]) -> dict[str, FlowType]:
         """Infer types for a single statement."""
         if isinstance(stmt, ast.Assign):
             return self._handle_assignment(stmt, env)
@@ -194,7 +194,7 @@ class FlowSensitiveInferencer:
             # Unknown statement type, return environment unchanged
             return env
 
-    def _handle_assignment(self, stmt: ast.Assign, env: Dict[str, FlowType]) -> Dict[str, FlowType]:
+    def _handle_assignment(self, stmt: ast.Assign, env: dict[str, FlowType]) -> dict[str, FlowType]:
         """Handle regular assignment statements."""
         if len(stmt.targets) != 1 or not isinstance(stmt.targets[0], ast.Name):
             return env
@@ -212,7 +212,7 @@ class FlowSensitiveInferencer:
 
         return new_env
 
-    def _handle_annotated_assignment(self, stmt: ast.AnnAssign, env: Dict[str, FlowType]) -> Dict[str, FlowType]:
+    def _handle_annotated_assignment(self, stmt: ast.AnnAssign, env: dict[str, FlowType]) -> dict[str, FlowType]:
         """Handle annotated assignment statements."""
         if not isinstance(stmt.target, ast.Name):
             return env
@@ -231,7 +231,7 @@ class FlowSensitiveInferencer:
 
         return new_env
 
-    def _handle_return(self, stmt: ast.Return, env: Dict[str, FlowType]) -> Dict[str, FlowType]:
+    def _handle_return(self, stmt: ast.Return, env: dict[str, FlowType]) -> dict[str, FlowType]:
         """Handle return statements."""
         if stmt.value:
             return_type = self._infer_expr(stmt.value, env)
@@ -239,7 +239,7 @@ class FlowSensitiveInferencer:
 
         return env
 
-    def _handle_if(self, stmt: ast.If, env: Dict[str, FlowType]) -> Dict[str, FlowType]:
+    def _handle_if(self, stmt: ast.If, env: dict[str, FlowType]) -> dict[str, FlowType]:
         """Handle if statements with flow-sensitive branching."""
         # Evaluate test condition (may refine types through comparisons)
         test_env = dict(env)
@@ -260,7 +260,7 @@ class FlowSensitiveInferencer:
 
         return merged_env
 
-    def _handle_while(self, stmt: ast.While, env: Dict[str, FlowType]) -> Dict[str, FlowType]:
+    def _handle_while(self, stmt: ast.While, env: dict[str, FlowType]) -> dict[str, FlowType]:
         """Handle while loops."""
         # Simple approach: analyze body once and join with entry
         self._infer_expr(stmt.test, env)
@@ -277,7 +277,7 @@ class FlowSensitiveInferencer:
 
         return merged_env
 
-    def _handle_for(self, stmt: ast.For, env: Dict[str, FlowType]) -> Dict[str, FlowType]:
+    def _handle_for(self, stmt: ast.For, env: dict[str, FlowType]) -> dict[str, FlowType]:
         """Handle for loops (currently only range-based)."""
         if (isinstance(stmt.target, ast.Name) and
             isinstance(stmt.iter, ast.Call) and
@@ -306,7 +306,7 @@ class FlowSensitiveInferencer:
         # Unsupported for loop pattern
         return env
 
-    def _infer_expr(self, expr: ast.expr, env: Dict[str, FlowType]) -> FlowType:
+    def _infer_expr(self, expr: ast.expr, env: dict[str, FlowType]) -> FlowType:
         """Infer type of expression with comparison-driven type propagation."""
         if isinstance(expr, ast.Name):
             return env.get(expr.id, FLOW_UNKNOWN)

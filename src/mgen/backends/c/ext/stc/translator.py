@@ -1,4 +1,4 @@
-"""STC-Enhanced Python-to-C Translator
+"""STC-Enhanced Python-to-C Translator.
 
 This module extends the SimplePythonToCTranslator with STC container support,
 enabling translation of Python container operations to high-performance STC
@@ -6,7 +6,7 @@ container operations in generated C code.
 """
 
 import ast
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 from .containers import STCCodeGenerator, get_stc_container_for_python_type
 from .enhanced_type_inference import EnhancedTypeInferenceEngine
@@ -17,12 +17,12 @@ class STCPythonToCTranslator:
 
     def __init__(self) -> None:
         self.stc_generator = STCCodeGenerator()
-        self.container_variables: Dict[str, str] = {}  # var_name -> container_type
-        self.required_includes: Set[str] = set()
-        self.type_definitions: List[str] = []
+        self.container_variables: dict[str, str] = {}  # var_name -> container_type
+        self.required_includes: set[str] = set()
+        self.type_definitions: list[str] = []
         self.type_inference_engine = EnhancedTypeInferenceEngine()
 
-    def analyze_variable_types(self, node: ast.AST) -> Dict[str, str]:
+    def analyze_variable_types(self, node: ast.AST) -> dict[str, str]:
         """Enhanced variable type analysis using advanced type inference.
 
         Returns:
@@ -44,13 +44,13 @@ class STCPythonToCTranslator:
 
         return type_info
 
-    def _basic_type_analysis(self, node: ast.AST) -> Dict[str, str]:
+    def _basic_type_analysis(self, node: ast.AST) -> dict[str, str]:
         """Fallback basic type analysis for compatibility."""
         type_info = {}
 
         class TypeAnalyzer(ast.NodeVisitor):
             def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
-                """Handle type-annotated assignments: var: List[int] = []"""
+                """Handle type-annotated assignments: var: List[int] = []."""
                 if isinstance(node.target, ast.Name):
                     var_name = node.target.id
                     if isinstance(node.annotation, ast.Name):
@@ -65,7 +65,7 @@ class STCPythonToCTranslator:
                                 type_info[var_name] = ast.unparse(node.annotation)
 
             def visit_Assign(self, node: ast.Assign) -> None:
-                """Handle regular assignments with type inference"""
+                """Handle regular assignments with type inference."""
                 for target in node.targets:
                     if isinstance(target, ast.Name):
                         var_name = target.id
@@ -89,11 +89,11 @@ class STCPythonToCTranslator:
         analyzer.visit(node)
         return type_info
 
-    def get_type_inference_statistics(self) -> Dict[str, Any]:
+    def get_type_inference_statistics(self) -> dict[str, Any]:
         """Get statistics about type inference accuracy."""
         return self.type_inference_engine.get_inference_statistics()
 
-    def generate_stc_includes_and_types(self, type_info: Dict[str, str]) -> Tuple[List[str], List[str]]:
+    def generate_stc_includes_and_types(self, type_info: dict[str, str]) -> tuple[list[str], list[str]]:
         """Generate STC include statements and type definitions.
 
         Args:
@@ -349,7 +349,7 @@ class STCPythonToCTranslator:
 
         return None
 
-    def generate_cleanup_code(self) -> List[str]:
+    def generate_cleanup_code(self) -> list[str]:
         """Generate cleanup code for all STC containers."""
         cleanup_lines = []
         for var_name, container_type in self.container_variables.items():
@@ -467,7 +467,7 @@ class STCPythonToCTranslator:
 
         return None
 
-    def translate_for_loop_iteration(self, for_node: ast.For) -> Optional[Tuple[str, str, str]]:
+    def translate_for_loop_iteration(self, for_node: ast.For) -> Optional[tuple[str, str, str]]:
         """Translate for loop iteration over STC containers.
 
         Args:

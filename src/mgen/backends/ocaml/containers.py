@@ -1,6 +1,6 @@
 """OCaml container system for MGen."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from ..base import AbstractContainerSystem
 from ..preferences import BackendPreferences, OCamlPreferences
@@ -35,7 +35,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
         ocaml_type = self._map_python_type_to_ocaml(element_type)
         return f"{ocaml_type} Set.Make(struct type t = {ocaml_type} let compare = compare end).t"
 
-    def get_list_operations(self) -> Dict[str, str]:
+    def get_list_operations(self) -> dict[str, str]:
         """Get OCaml list operation mappings."""
         if self.preferences.get("list_operations") == "functional":
             return {
@@ -63,7 +63,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
                 "tail": "List.tl"
             }
 
-    def get_dict_operations(self) -> Dict[str, str]:
+    def get_dict_operations(self) -> dict[str, str]:
         """Get OCaml dictionary operation mappings."""
         if self.preferences.get("hashtables") == "stdlib":
             return {
@@ -89,7 +89,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
                 "fold": "Map.fold"
             }
 
-    def get_set_operations(self) -> Dict[str, str]:
+    def get_set_operations(self) -> dict[str, str]:
         """Get OCaml set operation mappings."""
         return {
             "create": "Set.empty",
@@ -120,7 +120,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
 
         return f"[{'; '.join(ocaml_elements)}]"
 
-    def generate_dict_literal(self, items: Dict[Any, Any], key_type: str, value_type: str) -> str:
+    def generate_dict_literal(self, items: dict[Any, Any], key_type: str, value_type: str) -> str:
         """Generate OCaml dictionary literal."""
         if not items:
             if self.preferences.get("hashtables") == "stdlib":
@@ -205,7 +205,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
 
         return includes
 
-    def generate_container_operations(self, container_type: str, operations: List[str]) -> str:
+    def generate_container_operations(self, container_type: str, operations: list[str]) -> str:
         """Generate container-specific operations code."""
         if "list" in container_type.lower():
             ops = self.get_list_operations()
@@ -223,7 +223,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
 
         return "\n".join(code_lines)
 
-    def get_required_imports(self) -> List[str]:
+    def get_required_imports(self) -> list[str]:
         """Get imports required for container operations."""
         imports = []
 

@@ -27,7 +27,7 @@ import ast
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 from .backends.preferences import BackendPreferences
 from .backends.registry import registry
@@ -87,9 +87,9 @@ class PipelineConfig:
     output_dir: Optional[str] = None
     build_mode: BuildMode = BuildMode.NONE
     compiler: Optional[str] = None
-    compiler_flags: Optional[List[str]] = None
-    include_dirs: Optional[List[str]] = None
-    libraries: Optional[List[str]] = None
+    compiler_flags: Optional[list[str]] = None
+    include_dirs: Optional[list[str]] = None
+    libraries: Optional[list[str]] = None
     enable_advanced_analysis: bool = True
     enable_optimizations: bool = True
     backend_preferences: Optional[BackendPreferences] = None
@@ -118,15 +118,15 @@ class PipelineResult:
     """Result from pipeline execution."""
     success: bool
     input_file: str
-    output_files: Dict[str, str]  # file_type -> file_path
+    output_files: dict[str, str]  # file_type -> file_path
     target_language: str = "c"
     generated_code: Optional[str] = None
     build_file_content: Optional[str] = None
     executable_path: Optional[str] = None
-    phase_results: Dict[PipelinePhase, Any] = field(default_factory=dict)
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    generated_files: List[str] = field(default_factory=list)
+    phase_results: dict[PipelinePhase, Any] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    generated_files: list[str] = field(default_factory=list)
 
 
 
@@ -280,7 +280,7 @@ class MGenPipeline:
         """Phase 1: Validate static-python style and translatability."""
         try:
             # Parse AST for validation
-            tree = ast.parse(source_code)
+            ast.parse(source_code)
 
             if FRONTEND_AVAILABLE and self.config.enable_advanced_analysis:
                 # Validate Python subset compatibility

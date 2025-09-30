@@ -1,4 +1,4 @@
-"""Performance Bound Analysis and Verification
+"""Performance Bound Analysis and Verification.
 
 This module provides formal analysis of algorithm performance bounds,
 complexity verification, and resource usage guarantees.
@@ -8,7 +8,7 @@ import ast
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 try:
     # import z3  # TODO: Fix missing z3 dependency
@@ -67,8 +67,8 @@ class PerformanceBound:
     average_case: str
     worst_case: str
     input_size_variable: str = "n"
-    constants: Optional[Dict[str, float]] = None
-    conditions: Optional[List[str]] = None
+    constants: Optional[dict[str, float]] = None
+    conditions: Optional[list[str]] = None
 
     def __post_init__(self) -> None:
         if self.constants is None:
@@ -82,11 +82,11 @@ class PerformanceAnalysisResult:
     """Result of performance bound analysis."""
 
     function_name: str
-    proven_bounds: Dict[ResourceType, PerformanceBound]
-    complexity_proofs: List[ProofResult]
-    resource_usage: Dict[str, Any]
-    bottlenecks: List[str]
-    optimization_opportunities: List[str]
+    proven_bounds: dict[ResourceType, PerformanceBound]
+    complexity_proofs: list[ProofResult]
+    resource_usage: dict[str, Any]
+    bottlenecks: list[str]
+    optimization_opportunities: list[str]
     verification_time: float
     confidence: float
 
@@ -218,7 +218,7 @@ class PerformanceAnalyzer:
 
     def _analyze_time_complexity(
         self, function_name: str, structure: "AlgorithmStructureExtractor", complexity: "ComplexityPatternAnalyzer"
-    ) -> Tuple[Optional[PerformanceBound], List[ProofResult]]:
+    ) -> tuple[Optional[PerformanceBound], list[ProofResult]]:
         """Analyze time complexity."""
         proofs = []
 
@@ -267,7 +267,7 @@ class PerformanceAnalyzer:
 
     def _analyze_space_complexity(
         self, function_name: str, structure: "AlgorithmStructureExtractor", complexity: "ComplexityPatternAnalyzer"
-    ) -> Tuple[Optional[PerformanceBound], List[ProofResult]]:
+    ) -> tuple[Optional[PerformanceBound], list[ProofResult]]:
         """Analyze space complexity."""
         proofs = []
 
@@ -315,7 +315,7 @@ class PerformanceAnalyzer:
 
     def _analyze_memory_complexity(
         self, structure: "AlgorithmStructureExtractor", complexity: "ComplexityPatternAnalyzer"
-    ) -> Tuple[Optional[PerformanceBound], List[ProofResult]]:
+    ) -> tuple[Optional[PerformanceBound], list[ProofResult]]:
         """Analyze memory access complexity."""
         # Simplified memory analysis
         if complexity.array_accesses:
@@ -382,7 +382,7 @@ class PerformanceAnalyzer:
 
     def _analyze_resource_usage(
         self, structure: "AlgorithmStructureExtractor", complexity: "ComplexityPatternAnalyzer"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze detailed resource usage."""
         return {
             "loop_count": len(complexity.loops),
@@ -395,7 +395,7 @@ class PerformanceAnalyzer:
 
     def _identify_bottlenecks(
         self, structure: "AlgorithmStructureExtractor", complexity: "ComplexityPatternAnalyzer"
-    ) -> List[str]:
+    ) -> list[str]:
         """Identify performance bottlenecks."""
         bottlenecks = []
 
@@ -414,8 +414,8 @@ class PerformanceAnalyzer:
         self,
         structure: "AlgorithmStructureExtractor",
         complexity: "ComplexityPatternAnalyzer",
-        bounds: Dict[ResourceType, PerformanceBound],
-    ) -> List[str]:
+        bounds: dict[ResourceType, PerformanceBound],
+    ) -> list[str]:
         """Find optimization opportunities."""
         opportunities = []
 
@@ -481,7 +481,7 @@ class PerformanceAnalyzer:
             context={"resource_type": resource_type, "complexity_class": complexity_class},
         )
 
-    def _calculate_performance_confidence(self, proof_results: List[ProofResult]) -> float:
+    def _calculate_performance_confidence(self, proof_results: list[ProofResult]) -> float:
         """Calculate confidence in performance analysis."""
         if not proof_results:
             return 0.8  # Default confidence for pattern-based analysis
@@ -502,9 +502,9 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
     """Extract algorithm structure for performance analysis."""
 
     def __init__(self) -> None:
-        self.loops: List[Dict[str, Any]] = []
-        self.recursive_calls: List[Dict[str, Any]] = []
-        self.function_calls: List[Dict[str, Any]] = []
+        self.loops: list[dict[str, Any]] = []
+        self.recursive_calls: list[dict[str, Any]] = []
+        self.function_calls: list[dict[str, Any]] = []
         self.variables: set[str] = set()
         self.current_function: Optional[str] = None
 
@@ -541,10 +541,10 @@ class ComplexityPatternAnalyzer(ast.NodeVisitor):
     def __init__(self) -> None:
         self.loop_depth = 0
         self.max_loop_depth = 0
-        self.loops: List[Dict[str, Any]] = []
-        self.array_accesses: List[Dict[str, Any]] = []
-        self.array_allocations: List[Dict[str, Any]] = []
-        self.function_calls: List[Dict[str, Any]] = []
+        self.loops: list[dict[str, Any]] = []
+        self.array_accesses: list[dict[str, Any]] = []
+        self.array_allocations: list[dict[str, Any]] = []
+        self.function_calls: list[dict[str, Any]] = []
         self.current_depth = 0
 
     def visit_For(self, node: ast.For) -> None:

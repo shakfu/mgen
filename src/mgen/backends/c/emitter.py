@@ -19,7 +19,7 @@ Supported Features:
 
 import ast
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from ..base import AbstractEmitter
 from ..preferences import BackendPreferences
@@ -53,10 +53,10 @@ class MGenPythonToCConverter:
         }
         self.container_system = CContainerSystem()
         self.current_function: Optional[str] = None
-        self.container_variables: Dict[str, Dict[str, Any]] = {}
-        self.variable_context: Dict[str, str] = {}  # var_name -> c_type
-        self.defined_structs: Dict[str, Dict[str, Any]] = {}
-        self.iterator_variables: Dict[str, str] = {}
+        self.container_variables: dict[str, dict[str, Any]] = {}
+        self.variable_context: dict[str, str] = {}  # var_name -> c_type
+        self.defined_structs: dict[str, dict[str, Any]] = {}
+        self.iterator_variables: dict[str, str] = {}
         self.includes_needed: set[str] = set()
         self.use_runtime = True
 
@@ -117,7 +117,7 @@ class MGenPythonToCConverter:
                     self.includes_needed.add('#include "mgen_string_ops.h"')
                     break  # Only need to add it once
 
-    def _generate_includes(self) -> List[str]:
+    def _generate_includes(self) -> list[str]:
         """Generate C includes with MGen runtime support."""
         includes = [
             "#include <stdio.h>",
@@ -149,7 +149,7 @@ class MGenPythonToCConverter:
 
         return includes
 
-    def _generate_container_declarations(self) -> List[str]:
+    def _generate_container_declarations(self) -> list[str]:
         """Generate STC container template declarations."""
         declarations = []
         declarations.append("// STC container declarations")
@@ -542,7 +542,7 @@ class MGenPythonToCConverter:
         else:
             raise UnsupportedFeatureError("Only simple function calls and method calls supported")
 
-    def _convert_builtin_with_runtime(self, func_name: str, args: List[str]) -> str:
+    def _convert_builtin_with_runtime(self, func_name: str, args: list[str]) -> str:
         """Convert built-in functions using MGen runtime."""
         if func_name == "len":
             return f"mgen_len_safe({args[0]}, vec_int_size)"  # Simplified
@@ -611,7 +611,7 @@ class MGenPythonToCConverter:
                 # This is self.attribute - check if we know this attribute is a string
                 attr_name = expr.attr
                 # Look through defined structs to find this attribute's type
-                for class_name, class_info in self.defined_structs.items():
+                for _class_name, class_info in self.defined_structs.items():
                     if attr_name in class_info.get("attributes", {}):
                         attr_type = class_info["attributes"][attr_name]
                         return attr_type in ["str", "char*"]
@@ -631,7 +631,7 @@ class MGenPythonToCConverter:
 
         return False
 
-    def _convert_string_method(self, obj: str, method_name: str, args: List[str]) -> str:
+    def _convert_string_method(self, obj: str, method_name: str, args: list[str]) -> str:
         """Convert string method calls to appropriate C code."""
         self.includes_needed.add('#include "mgen_string_ops.h"')
 
@@ -891,7 +891,7 @@ class MGenPythonToCConverter:
 
         return "\n".join(parts)
 
-    def _extract_instance_variables(self, class_node: ast.ClassDef) -> Dict[str, str]:
+    def _extract_instance_variables(self, class_node: ast.ClassDef) -> dict[str, str]:
         """Extract instance variables from class definition."""
         instance_vars = {}
 
@@ -924,7 +924,7 @@ class MGenPythonToCConverter:
 
         return instance_vars
 
-    def _extract_methods(self, class_node: ast.ClassDef) -> List[ast.FunctionDef]:
+    def _extract_methods(self, class_node: ast.ClassDef) -> list[ast.FunctionDef]:
         """Extract method definitions from class."""
         methods = []
         for stmt in class_node.body:
@@ -932,7 +932,7 @@ class MGenPythonToCConverter:
                 methods.append(stmt)
         return methods
 
-    def _generate_struct_definition(self, class_name: str, instance_vars: Dict[str, str]) -> str:
+    def _generate_struct_definition(self, class_name: str, instance_vars: dict[str, str]) -> str:
         """Generate C struct definition for Python class."""
         lines = [f"typedef struct {class_name} {{"]
 
@@ -948,7 +948,7 @@ class MGenPythonToCConverter:
         return "\n".join(lines)
 
     def _generate_constructor(self, class_name: str, init_method: ast.FunctionDef,
-                            instance_vars: Dict[str, str]) -> str:
+                            instance_vars: dict[str, str]) -> str:
         """Generate constructor function for class."""
         # Build parameter list (skip 'self')
         params = []
@@ -1353,7 +1353,7 @@ class CEmitter(AbstractEmitter):
         """Map Python type to C type."""
         return self.type_map.get(python_type, "int")
 
-    def emit_function(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+    def emit_function(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Generate C function code."""
         return self._emit_function_basic(func_node, type_context)
 
@@ -1369,7 +1369,7 @@ class CEmitter(AbstractEmitter):
             # Fall back to basic conversion with error comment
             return f"/* Py2C conversion error: {e} */\n" + self._emit_module_with_runtime(source_code)
 
-    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> bool:
+    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> bool:
         """Check if simple emission can be used for this code."""
         # With runtime support, we can handle more complex cases
         return not self.use_runtime
@@ -1420,7 +1420,7 @@ class CEmitter(AbstractEmitter):
         parts = includes + [""] + functions
         return "\\n".join(parts)
 
-    def _emit_function_enhanced(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+    def _emit_function_enhanced(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Enhanced C function generation with runtime support."""
         func_name = func_node.name
 
@@ -1442,7 +1442,7 @@ class CEmitter(AbstractEmitter):
 
         return f"{signature} {{\\n{body}\\n}}"
 
-    def _emit_function_body_enhanced(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+    def _emit_function_body_enhanced(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Enhanced function body generation with runtime support."""
         body_lines = []
 
@@ -1548,7 +1548,7 @@ class CEmitter(AbstractEmitter):
         parts = includes + [""] + functions
         return "\n".join(parts)
 
-    def _emit_function_basic(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+    def _emit_function_basic(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Basic C function generation fallback."""
         func_name = func_node.name
 
@@ -1570,7 +1570,7 @@ class CEmitter(AbstractEmitter):
 
         return f"{signature} {{\n{body}\n}}"
 
-    def _emit_function_body_basic(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+    def _emit_function_body_basic(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Basic function body generation fallback."""
         if len(func_node.body) == 1 and isinstance(func_node.body[0], ast.Return):
             return_node = func_node.body[0]
@@ -1613,7 +1613,7 @@ class CEmitter(AbstractEmitter):
                 return f"({left} / {right})"
         return "0"
 
-    def _infer_simple_types(self, func_node: ast.FunctionDef) -> Dict[str, str]:
+    def _infer_simple_types(self, func_node: ast.FunctionDef) -> dict[str, str]:
         """Infer simple types from function annotations."""
         type_context = {}
 

@@ -1,7 +1,7 @@
 """Enhanced Haskell code emitter for MGen with comprehensive Python language support."""
 
 import ast
-from typing import Any, Dict, Optional, Set
+from typing import Any, Optional
 
 from ..base import AbstractEmitter
 from ..preferences import BackendPreferences
@@ -35,10 +35,10 @@ class MGenPythonToHaskellConverter:
             "None": "()",
             "NoneType": "()",
         }
-        self.data_types: Dict[str, Any] = {}  # Track data type definitions for classes
+        self.data_types: dict[str, Any] = {}  # Track data type definitions for classes
         self.current_function: Optional[str] = None  # Track current function context
-        self.declared_vars: Set[str] = set()  # Track declared variables in current function
-        self.needed_imports: Set[str] = set()  # Track which imports are needed
+        self.declared_vars: set[str] = set()  # Track declared variables in current function
+        self.needed_imports: set[str] = set()  # Track which imports are needed
 
     def _to_camel_case(self, snake_str: str) -> str:
         """Convert snake_case to CamelCase."""
@@ -961,7 +961,7 @@ class HaskellEmitter(AbstractEmitter):
         """Generate Haskell code from Python source."""
         return self.converter.convert_code(source_code)
 
-    def emit_function(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+    def emit_function(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Generate complete function in Haskell."""
         return self.converter._convert_function(func_node)
 
@@ -973,7 +973,7 @@ class HaskellEmitter(AbstractEmitter):
         """Map Python type to Haskell type."""
         return self.converter.type_map.get(python_type, python_type)
 
-    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> bool:
+    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> bool:
         """Determine if function can use simple emission strategy."""
         # For now, use complex emission for all functions to ensure full feature support
         return False

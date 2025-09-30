@@ -8,7 +8,7 @@ performance and correctness guarantees.
 import ast
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Optional
 
 from ..common import log
 
@@ -40,10 +40,10 @@ class FeatureRule:
     tier: SubsetTier
     status: FeatureStatus
     description: str
-    ast_nodes: List[type] = field(default_factory=list)
+    ast_nodes: list[type] = field(default_factory=list)
     validator: Optional[Callable] = None
-    constraints: List[str] = field(default_factory=list)
-    examples: Dict[str, str] = field(default_factory=dict)
+    constraints: list[str] = field(default_factory=list)
+    examples: dict[str, str] = field(default_factory=dict)
     c_mapping: Optional[str] = None
 
 
@@ -53,10 +53,10 @@ class ValidationResult:
 
     is_valid: bool
     tier: SubsetTier
-    violations: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    supported_features: List[str] = field(default_factory=list)
-    unsupported_features: List[str] = field(default_factory=list)
+    violations: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    supported_features: list[str] = field(default_factory=list)
+    unsupported_features: list[str] = field(default_factory=list)
     conversion_strategy: Optional[str] = None
 
 
@@ -66,7 +66,7 @@ class StaticPythonSubsetValidator:
     def __init__(self) -> None:
         self.log = log.config(self.__class__.__name__)
         self.feature_rules = self._initialize_feature_rules()
-        self.validation_cache: Dict[str, ValidationResult] = {}
+        self.validation_cache: dict[str, ValidationResult] = {}
 
     def validate_code(self, source_code: str) -> ValidationResult:
         """Validate that code conforms to the Static Python Subset."""
@@ -87,7 +87,7 @@ class StaticPythonSubsetValidator:
         """Get support information for a specific feature."""
         return self.feature_rules.get(feature_name)
 
-    def list_supported_features(self, tier: Optional[SubsetTier] = None) -> List[FeatureRule]:
+    def list_supported_features(self, tier: Optional[SubsetTier] = None) -> list[FeatureRule]:
         """List all supported features, optionally filtered by tier."""
         rules = list(self.feature_rules.values())
         if tier:
@@ -133,7 +133,7 @@ class StaticPythonSubsetValidator:
         result = ValidationResult(is_valid=True, tier=SubsetTier.TIER_1_FUNDAMENTAL)
 
         # Check against feature rules
-        for rule_name, rule in self.feature_rules.items():
+        for _rule_name, rule in self.feature_rules.items():
             if node_type in rule.ast_nodes:
                 # First run custom validator if present (for rules that need specific checking)
                 validator_passed = True
@@ -186,7 +186,7 @@ class StaticPythonSubsetValidator:
 
         return result
 
-    def _initialize_feature_rules(self) -> Dict[str, FeatureRule]:
+    def _initialize_feature_rules(self) -> dict[str, FeatureRule]:
         """Initialize the feature rules for the Static Python Subset."""
         rules = {}
 

@@ -13,7 +13,7 @@ import ast
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 from ..base import AnalysisContext, AnalysisLevel, AnalysisReport, BaseAnalyzer
 
@@ -42,11 +42,11 @@ class CFGNode:
     ast_node: Optional[ast.AST] = None
     line_number: int = 0
     code: str = ""
-    predecessors: Set[int] = field(default_factory=set)
-    successors: Set[int] = field(default_factory=set)
-    dominators: Set[int] = field(default_factory=set)
-    post_dominators: Set[int] = field(default_factory=set)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    predecessors: set[int] = field(default_factory=set)
+    successors: set[int] = field(default_factory=set)
+    dominators: set[int] = field(default_factory=set)
+    post_dominators: set[int] = field(default_factory=set)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def add_predecessor(self, node_id: int) -> None:
         """Add a predecessor node."""
@@ -69,10 +69,10 @@ class CFGNode:
 class ControlFlowGraph:
     """Control Flow Graph representation."""
 
-    nodes: Dict[int, CFGNode] = field(default_factory=dict)
+    nodes: dict[int, CFGNode] = field(default_factory=dict)
     entry_node: Optional[int] = None
-    exit_nodes: Set[int] = field(default_factory=set)
-    edges: Set[Tuple[int, int]] = field(default_factory=set)
+    exit_nodes: set[int] = field(default_factory=set)
+    edges: set[tuple[int, int]] = field(default_factory=set)
     next_id: int = 0
 
     def create_node(self, node_type: NodeType, ast_node: Optional[ast.AST] = None) -> CFGNode:
@@ -95,7 +95,7 @@ class ControlFlowGraph:
             self.nodes[to_id].add_predecessor(from_id)
             self.edges.add((from_id, to_id))
 
-    def get_reachable_nodes(self, start_id: int) -> Set[int]:
+    def get_reachable_nodes(self, start_id: int) -> set[int]:
         """Get all nodes reachable from the start node."""
         reachable = set()
         stack = [start_id]
@@ -108,7 +108,7 @@ class ControlFlowGraph:
 
         return reachable
 
-    def find_dead_code(self) -> Set[int]:
+    def find_dead_code(self) -> set[int]:
         """Find unreachable nodes (dead code)."""
         if self.entry_node is None:
             return set()
@@ -157,8 +157,8 @@ class VariableInfo:
     name: str
     first_definition: int  # Line number
     last_usage: int  # Line number
-    definition_points: Set[int] = field(default_factory=set)
-    usage_points: Set[int] = field(default_factory=set)
+    definition_points: set[int] = field(default_factory=set)
+    usage_points: set[int] = field(default_factory=set)
     is_parameter: bool = False
     is_global: bool = False
     inferred_type: Optional[str] = None
@@ -171,11 +171,11 @@ class StaticAnalysisReport(AnalysisReport):
     """Extended analysis report for static analysis."""
 
     cfg: ControlFlowGraph = field(default_factory=ControlFlowGraph)
-    variables: Dict[str, VariableInfo] = field(default_factory=dict)
-    dead_code_nodes: Set[int] = field(default_factory=set)
-    complexity_metrics: Dict[str, int] = field(default_factory=dict)
-    potential_issues: List[str] = field(default_factory=list)
-    performance_hints: List[str] = field(default_factory=list)
+    variables: dict[str, VariableInfo] = field(default_factory=dict)
+    dead_code_nodes: set[int] = field(default_factory=set)
+    complexity_metrics: dict[str, int] = field(default_factory=dict)
+    potential_issues: list[str] = field(default_factory=list)
+    performance_hints: list[str] = field(default_factory=list)
 
 
 class StaticAnalyzer(BaseAnalyzer):
@@ -184,8 +184,8 @@ class StaticAnalyzer(BaseAnalyzer):
     def __init__(self, analysis_level: AnalysisLevel = AnalysisLevel.BASIC):
         super().__init__("StaticAnalyzer", analysis_level)
         self._current_cfg: ControlFlowGraph
-        self._variables: Dict[str, VariableInfo] = {}
-        self._loop_stack: List[Tuple[int, int]] = []  # (header_id, exit_id)
+        self._variables: dict[str, VariableInfo] = {}
+        self._loop_stack: list[tuple[int, int]] = []  # (header_id, exit_id)
 
     def analyze(self, context: AnalysisContext) -> StaticAnalysisReport:
         """Perform static analysis on the given context."""
@@ -275,7 +275,7 @@ class StaticAnalyzer(BaseAnalyzer):
         """Analyze a module."""
         return self._analyze_statements(module_node.body)
 
-    def _analyze_statements(self, statements: List[ast.stmt]) -> int:
+    def _analyze_statements(self, statements: list[ast.stmt]) -> int:
         """Analyze a list of statements and return the last node ID."""
         current_node_id = self._current_cfg.entry_node
         if current_node_id is None:
@@ -496,7 +496,7 @@ class StaticAnalyzer(BaseAnalyzer):
                 self._analyze_expression(value)
         # Add more expression types as needed
 
-    def _calculate_complexity_metrics(self) -> Dict[str, int]:
+    def _calculate_complexity_metrics(self) -> dict[str, int]:
         """Calculate various complexity metrics."""
         metrics = {
             "cyclomatic_complexity": 1,  # Base complexity
@@ -520,7 +520,7 @@ class StaticAnalyzer(BaseAnalyzer):
 
         return metrics
 
-    def _analyze_patterns(self) -> Tuple[List[str], List[str]]:
+    def _analyze_patterns(self) -> tuple[list[str], list[str]]:
         """Analyze code patterns for issues and performance hints."""
         issues = []
         hints = []
@@ -548,7 +548,7 @@ class StaticAnalyzer(BaseAnalyzer):
 
         return issues, hints
 
-    def _generate_findings(self) -> List[str]:
+    def _generate_findings(self) -> list[str]:
         """Generate a list of analysis findings."""
         findings = []
 

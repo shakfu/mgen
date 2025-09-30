@@ -1,6 +1,5 @@
 """Rust container system for MGen."""
 
-from typing import List
 
 from ..base import AbstractContainerSystem
 
@@ -20,7 +19,7 @@ class RustContainerSystem(AbstractContainerSystem):
         """Get Rust HashSet type for set storage."""
         return f"HashSet<{element_type}>"
 
-    def generate_container_operations(self, container_type: str, operations: List[str]) -> str:
+    def generate_container_operations(self, container_type: str, operations: list[str]) -> str:
         """Generate Rust container operations."""
         operations_code = []
 
@@ -34,7 +33,7 @@ class RustContainerSystem(AbstractContainerSystem):
 
         return "\n".join(operations_code)
 
-    def get_required_imports(self) -> List[str]:
+    def get_required_imports(self) -> list[str]:
         """Get Rust use statements required for container operations."""
         return [
             "use std::collections::HashMap;",

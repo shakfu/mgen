@@ -9,7 +9,7 @@ from typing import Optional
 
 
 def getenv(key: str, default: bool = False) -> bool:
-    """Convert '0','1' env values to bool {True, False}"""
+    """Convert '0','1' env values to bool {True, False}."""
     return bool(int(os.getenv(key, default)))
 
 
@@ -25,7 +25,7 @@ COLOR = getenv("COLOR", default=True)
 
 
 class CustomFormatter(logging.Formatter):
-    """custom logging formatting class"""
+    """custom logging formatting class."""
 
     white = "\x1b[97;20m"
     grey = "\x1b[38;20m"
@@ -55,7 +55,7 @@ class CustomFormatter(logging.Formatter):
         self.use_color = use_color
 
     def format(self, record: logging.LogRecord) -> str:
-        """Custom logger formatting method"""
+        """Custom logger formatting method."""
         if not self.use_color:
             log_fmt: Optional[str] = self.fmt
         else:

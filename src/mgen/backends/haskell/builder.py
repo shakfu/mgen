@@ -2,7 +2,6 @@
 
 import subprocess
 from pathlib import Path
-from typing import List
 
 from ..base import AbstractBuilder
 
@@ -14,7 +13,7 @@ class HaskellBuilder(AbstractBuilder):
         """Return cabal project file name."""
         return "mgen-project.cabal"
 
-    def generate_build_file(self, source_files: List[str], target_name: str) -> str:
+    def generate_build_file(self, source_files: list[str], target_name: str) -> str:
         """Generate Cabal file for Haskell project."""
         cabal_content = f"""cabal-version: 2.4
 
@@ -88,7 +87,7 @@ executable {target_name}
         except Exception:
             return False
 
-    def get_compile_flags(self) -> List[str]:
+    def get_compile_flags(self) -> list[str]:
         """Get Haskell compilation flags."""
         return [
             "-O2",  # Optimization

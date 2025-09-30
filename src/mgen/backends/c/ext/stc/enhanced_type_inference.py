@@ -1,4 +1,4 @@
-"""Enhanced Type Inference for STC Containers
+"""Enhanced Type Inference for STC Containers.
 
 This module provides advanced type inference capabilities for STC container types,
 improving accuracy from ~70% to >90% by analyzing context, usage patterns, and data flow.
@@ -7,7 +7,7 @@ improving accuracy from ~70% to >90% by analyzing context, usage patterns, and d
 import ast
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 
 class TypeConfidence(Enum):
@@ -34,12 +34,12 @@ class EnhancedTypeInferenceEngine:
     """Advanced type inference engine for STC containers."""
 
     def __init__(self) -> None:
-        self.type_cache: Dict[str, InferredType] = {}
-        self.context_stack: List[str] = []
-        self.usage_patterns: Dict[str, List[str]] = {}
-        self.data_flow_graph: Dict[str, Set[str]] = {}
+        self.type_cache: dict[str, InferredType] = {}
+        self.context_stack: list[str] = []
+        self.usage_patterns: dict[str, list[str]] = {}
+        self.data_flow_graph: dict[str, set[str]] = {}
 
-    def analyze_module(self, module: ast.Module) -> Dict[str, InferredType]:
+    def analyze_module(self, module: ast.Module) -> dict[str, InferredType]:
         """Perform comprehensive type analysis on a module.
 
         Returns:
@@ -285,7 +285,7 @@ class EnhancedTypeInferenceEngine:
 
                 return None
 
-            def _infer_list_element_type(self, elements: List[ast.expr]) -> str:
+            def _infer_list_element_type(self, elements: list[ast.expr]) -> str:
                 """Infer the element type of a list from its contents."""
                 if not elements:
                     return "int"  # Default for empty lists
@@ -314,7 +314,7 @@ class EnhancedTypeInferenceEngine:
                 else:
                     return "int"  # Default
 
-            def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]) -> Tuple[str, str]:
+            def _infer_dict_types(self, keys: list[ast.expr], values: list[ast.expr]) -> tuple[str, str]:
                 """Infer key and value types of a dictionary."""
                 key_type = self._infer_list_element_type(keys) if keys else "str"
                 value_type = self._infer_list_element_type(values) if values else "int"
@@ -505,7 +505,7 @@ class EnhancedTypeInferenceEngine:
 
         return python_type  # Fallback
 
-    def get_inference_statistics(self) -> Dict[str, Any]:
+    def get_inference_statistics(self) -> dict[str, Any]:
         """Get statistics about type inference accuracy."""
         total_vars = len(self.type_cache)
         if total_vars == 0:

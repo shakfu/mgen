@@ -1,8 +1,7 @@
 """C container system for MGen with STC support."""
 
-import os
 from pathlib import Path
-from typing import List
+from typing import Optional
 
 from ..base import AbstractContainerSystem
 
@@ -13,7 +12,7 @@ class CContainerSystem(AbstractContainerSystem):
     def __init__(self) -> None:
         """Initialize container system with STC preference."""
         self.use_stc = True  # Default to STC, fallback available
-        self._stc_available = None  # Cache for STC availability check
+        self._stc_available: Optional[bool] = None  # Cache for STC availability check
 
     def check_stc_availability(self) -> bool:
         """Check if STC library is available in the runtime directory.
@@ -84,14 +83,14 @@ class CContainerSystem(AbstractContainerSystem):
             # Fallback to basic array
             return f"{element_type}*"
 
-    def generate_container_operations(self, container_type: str, operations: List[str]) -> str:
+    def generate_container_operations(self, container_type: str, operations: list[str]) -> str:
         """Generate C container operations using STC or fallback."""
         if self.use_stc:
             return self._generate_stc_operations(container_type, operations)
         else:
             return self._generate_basic_operations(container_type, operations)
 
-    def get_required_imports(self) -> List[str]:
+    def get_required_imports(self) -> list[str]:
         """Get C headers required for container operations."""
         imports = [
             "#include <stdlib.h>",
@@ -114,7 +113,7 @@ class CContainerSystem(AbstractContainerSystem):
 
         return imports
 
-    def generate_container_declarations(self, containers: List[tuple]) -> str:
+    def generate_container_declarations(self, containers: list[tuple]) -> str:
         """Generate STC container template declarations."""
         if not self.use_stc:
             return "// Basic array-based containers - no declarations needed"
@@ -126,7 +125,7 @@ class CContainerSystem(AbstractContainerSystem):
 
         # Generate STC template declarations for each container type
         seen_types = set()
-        for container_name, element_type in containers:
+        for _container_name, element_type in containers:
             if element_type not in seen_types:
                 sanitized_type = self._sanitize_type_name(element_type)
 
@@ -181,7 +180,7 @@ class CContainerSystem(AbstractContainerSystem):
         }
         return type_map.get(type_name, type_name.replace("*", "ptr").replace(" ", "_"))
 
-    def _generate_stc_operations(self, container_type: str, operations: List[str]) -> str:
+    def _generate_stc_operations(self, container_type: str, operations: list[str]) -> str:
         """Generate STC-based container operations."""
         operations_code = []
         operations_code.append(f"// STC operations for {container_type}")
@@ -211,7 +210,7 @@ class CContainerSystem(AbstractContainerSystem):
 
         return "\n".join(operations_code)
 
-    def _generate_basic_operations(self, container_type: str, operations: List[str]) -> str:
+    def _generate_basic_operations(self, container_type: str, operations: list[str]) -> str:
         """Generate basic fallback container operations using mgen_dyn_array."""
         operations_code = []
         operations_code.append(f"// Fallback operations for {container_type} using mgen_dyn_array")

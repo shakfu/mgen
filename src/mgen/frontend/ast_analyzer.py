@@ -7,7 +7,7 @@ focusing on static analysis of Python code that can be converted to C.
 import ast
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Optional
 
 from ..common import log
 
@@ -49,7 +49,7 @@ class TypeInfo:
     c_equivalent: Optional[str] = None
     is_mutable: bool = True
     is_nullable: bool = False
-    constraints: List[str] = field(default_factory=list)
+    constraints: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Set up C equivalent mappings."""
@@ -87,11 +87,11 @@ class FunctionInfo:
     """Information about a function in static analysis."""
 
     name: str
-    parameters: List[VariableInfo] = field(default_factory=list)
+    parameters: list[VariableInfo] = field(default_factory=list)
     return_type: Optional[TypeInfo] = None
-    local_variables: Dict[str, VariableInfo] = field(default_factory=dict)
+    local_variables: dict[str, VariableInfo] = field(default_factory=dict)
     complexity: StaticComplexity = StaticComplexity.SIMPLE
-    calls_made: List[str] = field(default_factory=list)
+    calls_made: list[str] = field(default_factory=list)
     line_count: int = 0
     has_side_effects: bool = False
 
@@ -100,12 +100,12 @@ class FunctionInfo:
 class AnalysisResult:
     """Result of AST analysis."""
 
-    functions: Dict[str, FunctionInfo] = field(default_factory=dict)
-    global_variables: Dict[str, VariableInfo] = field(default_factory=dict)
-    imports: List[str] = field(default_factory=list)
+    functions: dict[str, FunctionInfo] = field(default_factory=dict)
+    global_variables: dict[str, VariableInfo] = field(default_factory=dict)
+    imports: list[str] = field(default_factory=list)
     complexity: StaticComplexity = StaticComplexity.SIMPLE
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     convertible: bool = True
     conversion_confidence: float = 1.0
 
@@ -118,8 +118,8 @@ class ASTAnalyzer(ast.NodeVisitor):
         self.result = AnalysisResult()
         self.current_function: Optional[str] = None
         self.current_scope = "global"
-        self.type_hints: Dict[str, TypeInfo] = {}
-        self.node_types: Dict[ast.AST, NodeType] = {}
+        self.type_hints: dict[str, TypeInfo] = {}
+        self.node_types: dict[ast.AST, NodeType] = {}
 
     def analyze(self, source_code: str) -> AnalysisResult:
         """Analyze Python source code and return analysis results."""

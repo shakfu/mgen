@@ -9,7 +9,7 @@ import ast
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from ..base import AnalysisContext, AnalysisLevel, AnalysisReport, BaseAnalyzer
 
@@ -49,8 +49,8 @@ class MemoryRegion:
     is_initialized: bool = False
     allocation_line: int = 0
     last_access_line: int = 0
-    bounds: Tuple[int, int] = (0, 0)  # (min_index, max_index)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    bounds: tuple[int, int] = (0, 0)  # (min_index, max_index)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def is_bounded(self) -> bool:
         """Check if this region has known bounds."""
@@ -82,15 +82,15 @@ class BoundsViolation:
     severity: str = "error"  # error, warning, info
     confidence: float = 1.0  # 0.0 to 1.0
     suggested_fix: str = ""
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class BoundsCheckingReport(AnalysisReport):
     """Extended analysis report for bounds checking."""
 
-    memory_regions: Dict[str, MemoryRegion] = field(default_factory=dict)
-    violations: List[BoundsViolation] = field(default_factory=list)
+    memory_regions: dict[str, MemoryRegion] = field(default_factory=dict)
+    violations: list[BoundsViolation] = field(default_factory=list)
     safe_accesses: int = 0
     unsafe_accesses: int = 0
     unknown_accesses: int = 0
@@ -102,7 +102,7 @@ class BoundsChecker(BaseAnalyzer):
 
     def __init__(self, analysis_level: AnalysisLevel = AnalysisLevel.BASIC):
         super().__init__("BoundsChecker", analysis_level)
-        self._memory_regions: Dict[str, MemoryRegion] = {}
+        self._memory_regions: dict[str, MemoryRegion] = {}
         self._current_line = 0
 
     def analyze(self, context: AnalysisContext) -> BoundsCheckingReport:
@@ -115,7 +115,7 @@ class BoundsChecker(BaseAnalyzer):
             self._current_line = 0
 
             # Analyze the AST
-            violations: List[BoundsViolation] = []
+            violations: list[BoundsViolation] = []
 
             if isinstance(context.ast_node, ast.FunctionDef):
                 violations.extend(self._analyze_function(context.ast_node))
@@ -166,7 +166,7 @@ class BoundsChecker(BaseAnalyzer):
                 execution_time_ms=execution_time,
             )
 
-    def _analyze_function(self, func_node: ast.FunctionDef) -> List[BoundsViolation]:
+    def _analyze_function(self, func_node: ast.FunctionDef) -> list[BoundsViolation]:
         """Analyze a function definition for bounds violations."""
         violations = []
 
@@ -186,11 +186,11 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _analyze_module(self, module_node: ast.Module) -> List[BoundsViolation]:
+    def _analyze_module(self, module_node: ast.Module) -> list[BoundsViolation]:
         """Analyze a module for bounds violations."""
         return self._analyze_statements(module_node.body)
 
-    def _analyze_statements(self, statements: List[ast.stmt]) -> List[BoundsViolation]:
+    def _analyze_statements(self, statements: list[ast.stmt]) -> list[BoundsViolation]:
         """Analyze a list of statements for bounds violations."""
         violations = []
 
@@ -200,7 +200,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _analyze_statement(self, stmt: ast.stmt) -> List[BoundsViolation]:
+    def _analyze_statement(self, stmt: ast.stmt) -> list[BoundsViolation]:
         """Analyze a single statement for bounds violations."""
         violations = []
 
@@ -221,7 +221,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _analyze_assignment(self, assign_stmt: ast.Assign) -> List[BoundsViolation]:
+    def _analyze_assignment(self, assign_stmt: ast.Assign) -> list[BoundsViolation]:
         """Analyze an assignment statement."""
         violations = []
 
@@ -240,7 +240,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _analyze_aug_assignment(self, aug_assign_stmt: ast.AugAssign) -> List[BoundsViolation]:
+    def _analyze_aug_assignment(self, aug_assign_stmt: ast.AugAssign) -> list[BoundsViolation]:
         """Analyze an augmented assignment statement."""
         violations = []
 
@@ -253,7 +253,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _analyze_for_loop(self, for_stmt: ast.For) -> List[BoundsViolation]:
+    def _analyze_for_loop(self, for_stmt: ast.For) -> list[BoundsViolation]:
         """Analyze a for loop for bounds violations."""
         violations = []
 
@@ -278,7 +278,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _analyze_while_loop(self, while_stmt: ast.While) -> List[BoundsViolation]:
+    def _analyze_while_loop(self, while_stmt: ast.While) -> list[BoundsViolation]:
         """Analyze a while loop for bounds violations."""
         violations = []
 
@@ -294,7 +294,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _analyze_if_statement(self, if_stmt: ast.If) -> List[BoundsViolation]:
+    def _analyze_if_statement(self, if_stmt: ast.If) -> list[BoundsViolation]:
         """Analyze an if statement for bounds violations."""
         violations = []
 
@@ -310,17 +310,17 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _analyze_expression_statement(self, expr_stmt: ast.Expr) -> List[BoundsViolation]:
+    def _analyze_expression_statement(self, expr_stmt: ast.Expr) -> list[BoundsViolation]:
         """Analyze an expression statement."""
         return self._analyze_expression(expr_stmt.value)
 
-    def _analyze_return_statement(self, return_stmt: ast.Return) -> List[BoundsViolation]:
+    def _analyze_return_statement(self, return_stmt: ast.Return) -> list[BoundsViolation]:
         """Analyze a return statement."""
         if return_stmt.value:
             return self._analyze_expression(return_stmt.value)
         return []
 
-    def _analyze_expression(self, expr: ast.expr) -> List[BoundsViolation]:
+    def _analyze_expression(self, expr: ast.expr) -> list[BoundsViolation]:
         """Analyze an expression for memory accesses and bounds violations."""
         violations = []
 
@@ -348,7 +348,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _analyze_subscript_access(self, subscript: ast.Subscript) -> List[BoundsViolation]:
+    def _analyze_subscript_access(self, subscript: ast.Subscript) -> list[BoundsViolation]:
         """Analyze a subscript access for bounds violations."""
         violations = []
 
@@ -411,7 +411,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _analyze_subscript_assignment(self, target: ast.Subscript, value: ast.expr) -> List[BoundsViolation]:
+    def _analyze_subscript_assignment(self, target: ast.Subscript, value: ast.expr) -> list[BoundsViolation]:
         """Analyze a subscript assignment."""
         violations = []
 
@@ -423,7 +423,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _analyze_function_call(self, call: ast.Call) -> List[BoundsViolation]:
+    def _analyze_function_call(self, call: ast.Call) -> list[BoundsViolation]:
         """Analyze a function call for potential memory issues."""
         violations = []
 
@@ -464,7 +464,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _analyze_variable_access(self, name: ast.Name) -> List[BoundsViolation]:
+    def _analyze_variable_access(self, name: ast.Name) -> list[BoundsViolation]:
         """Analyze a variable access."""
         violations = []
 
@@ -499,9 +499,9 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _handle_variable_assignment(self, var_name: str, value_expr: ast.expr) -> List[BoundsViolation]:
+    def _handle_variable_assignment(self, var_name: str, value_expr: ast.expr) -> list[BoundsViolation]:
         """Handle assignment to a variable."""
-        violations: List[BoundsViolation] = []
+        violations: list[BoundsViolation] = []
 
         # Create or update memory region for the variable
         if isinstance(value_expr, ast.List):
@@ -537,7 +537,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _check_constant_index(self, var_name: str, index: int, region: MemoryRegion) -> List[BoundsViolation]:
+    def _check_constant_index(self, var_name: str, index: int, region: MemoryRegion) -> list[BoundsViolation]:
         """Check bounds for a constant index."""
         violations = []
 
@@ -569,7 +569,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _check_variable_index(self, var_name: str, index_var: str, region: MemoryRegion) -> List[BoundsViolation]:
+    def _check_variable_index(self, var_name: str, index_var: str, region: MemoryRegion) -> list[BoundsViolation]:
         """Check bounds for a variable index."""
         violations = []
 
@@ -617,7 +617,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return violations
 
-    def _check_slice_access(self, var_name: str, slice_obj: ast.Slice, region: MemoryRegion) -> List[BoundsViolation]:
+    def _check_slice_access(self, var_name: str, slice_obj: ast.Slice, region: MemoryRegion) -> list[BoundsViolation]:
         """Check bounds for slice access."""
         violations = []
 
@@ -649,7 +649,7 @@ class BoundsChecker(BaseAnalyzer):
 
         return total_bytes
 
-    def _generate_findings(self, violations: List[BoundsViolation]) -> List[str]:
+    def _generate_findings(self, violations: list[BoundsViolation]) -> list[str]:
         """Generate a list of analysis findings."""
         findings = []
 

@@ -1,4 +1,4 @@
-"""Memory Allocator System for STC Integration
+"""Memory Allocator System for STC Integration.
 
 This module provides advanced memory allocation strategies including arena allocators,
 pool allocators, and stack allocators for high-performance memory management.
@@ -13,7 +13,7 @@ Features:
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 
 class AllocatorType(Enum):
@@ -132,19 +132,19 @@ class MemoryAllocatorManager:
 
     def __init__(self) -> None:
         # Track allocator instances
-        self.allocators: Dict[str, AllocatorInstance] = {}
+        self.allocators: dict[str, AllocatorInstance] = {}
 
         # Track allocations per allocator
-        self.allocations: Dict[str, List[AllocationInfo]] = {}
+        self.allocations: dict[str, list[AllocationInfo]] = {}
 
         # Track container-allocator bindings
-        self.container_allocators: Dict[str, str] = {}
+        self.container_allocators: dict[str, str] = {}
 
         # Performance metrics
-        self.allocation_stats: Dict[str, Dict[str, int]] = {}
+        self.allocation_stats: dict[str, dict[str, int]] = {}
 
         # Generated type definitions
-        self.generated_types: Set[str] = set()
+        self.generated_types: set[str] = set()
 
     def register_allocator(
         self,
@@ -178,7 +178,7 @@ class MemoryAllocatorManager:
 
         return instance
 
-    def generate_allocator_setup(self, instance: AllocatorInstance) -> Tuple[str, str]:
+    def generate_allocator_setup(self, instance: AllocatorInstance) -> tuple[str, str]:
         """Generate allocator initialization code."""
         spec = ALLOCATOR_SPECS[instance.allocator_type]
         type_name = f"{spec.stc_name}_{instance.name}"
@@ -205,7 +205,7 @@ class MemoryAllocatorManager:
 
     def generate_container_with_allocator(
         self, container_name: str, container_type: str, element_type: str
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Generate container definition with custom allocator."""
         if container_name not in self.container_allocators:
             return "", ""
@@ -299,7 +299,7 @@ class MemoryAllocatorManager:
         else:  # SYSTEM
             return f"free({variable_name});"
 
-    def generate_allocator_cleanup(self, allocator_name: str) -> List[str]:
+    def generate_allocator_cleanup(self, allocator_name: str) -> list[str]:
         """Generate cleanup code for allocator."""
         if allocator_name not in self.allocators:
             return []
@@ -325,9 +325,9 @@ class MemoryAllocatorManager:
 
         return cleanup_code
 
-    def analyze_allocation_patterns(self) -> Dict[str, Any]:
+    def analyze_allocation_patterns(self) -> dict[str, Any]:
         """Analyze allocation patterns for optimization suggestions."""
-        analysis: Dict[str, Any] = {"allocators": {}, "recommendations": [], "total_allocations": 0, "total_memory": 0}
+        analysis: dict[str, Any] = {"allocators": {}, "recommendations": [], "total_allocations": 0, "total_memory": 0}
 
         for allocator_name, allocations in self.allocations.items():
             if not allocations:
@@ -336,7 +336,7 @@ class MemoryAllocatorManager:
             instance = self.allocators[allocator_name]
             stats = self.allocation_stats[allocator_name]
 
-            allocator_analysis: Dict[str, Any] = {
+            allocator_analysis: dict[str, Any] = {
                 "type": instance.allocator_type.value,
                 "allocation_count": len(allocations),
                 "total_size": stats["total_size"],
@@ -391,7 +391,7 @@ class MemoryAllocatorManager:
         params_str = ", ".join(init_params) if init_params else ""
         return f"{type_name} {instance.name} = {type_name}_init({params_str});"
 
-    def _analyze_size_distribution(self, allocations: List[AllocationInfo]) -> Dict[str, int]:
+    def _analyze_size_distribution(self, allocations: list[AllocationInfo]) -> dict[str, int]:
         """Analyze size distribution of allocations."""
         distribution = {
             "small": 0,  # < 64 bytes
@@ -412,7 +412,7 @@ class MemoryAllocatorManager:
 
         return distribution
 
-    def _assess_fragmentation_risk(self, allocations: List[AllocationInfo], instance: AllocatorInstance) -> str:
+    def _assess_fragmentation_risk(self, allocations: list[AllocationInfo], instance: AllocatorInstance) -> str:
         """Assess fragmentation risk for allocator."""
         if instance.allocator_type in [AllocatorType.ARENA, AllocatorType.STACK]:
             return "low"  # Linear allocators have low fragmentation
@@ -428,7 +428,7 @@ class MemoryAllocatorManager:
         else:
             return "low"
 
-    def _generate_optimization_recommendations(self, analysis: Dict[str, Any]) -> List[str]:
+    def _generate_optimization_recommendations(self, analysis: dict[str, Any]) -> list[str]:
         """Generate optimization recommendations based on analysis."""
         recommendations = []
 

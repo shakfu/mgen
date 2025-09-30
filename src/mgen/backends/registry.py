@@ -1,6 +1,6 @@
 """Backend registry system for MGen language backends."""
 
-from typing import Dict, List, Optional, Type
+from typing import Optional
 
 from .base import LanguageBackend
 from .preferences import BackendPreferences, PreferencesRegistry
@@ -11,10 +11,10 @@ class BackendRegistry:
 
     def __init__(self) -> None:
         """Initialize registry with empty backend collection."""
-        self._backends: Dict[str, Type[LanguageBackend]] = {}
+        self._backends: dict[str, type[LanguageBackend]] = {}
         self._register_built_in_backends()
 
-    def register_backend(self, name: str, backend_class: Type[LanguageBackend]) -> None:
+    def register_backend(self, name: str, backend_class: type[LanguageBackend]) -> None:
         """Register a new language backend."""
         self._backends[name] = backend_class
 
@@ -30,7 +30,7 @@ class BackendRegistry:
 
         return self._backends[name](preferences)
 
-    def list_backends(self) -> List[str]:
+    def list_backends(self) -> list[str]:
         """List all available backend names."""
         return list(self._backends.keys())
 

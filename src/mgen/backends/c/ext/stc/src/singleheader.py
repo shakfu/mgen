@@ -21,9 +21,13 @@ def find_file(included_name, current_file):
 
 def process_file(
     file_path,
-    out_lines=[],
-    processed_files=[],
+    out_lines=None,
+    processed_files=None,
 ):
+    if processed_files is None:
+        processed_files = []
+    if out_lines is None:
+        out_lines = []
     out_lines += "// ### BEGIN_FILE_INCLUDE: " + basename(file_path) + "\n"
     comment_block = False
     with open(file_path, encoding="utf-8") as f:

@@ -1,4 +1,4 @@
-"""STC-Enhanced Python-to-C AST Translator
+"""STC-Enhanced Python-to-C AST Translator.
 
 Extends the SimplePythonToCTranslator with STC (Smart Template Containers) support
 for high-performance, type-safe container operations in generated C code.
@@ -7,7 +7,7 @@ for high-performance, type-safe container operations in generated C code.
 import ast
 import os
 import sys
-from typing import Callable, Dict, List
+from typing import Callable
 
 # Add the ext.stc module to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -24,16 +24,16 @@ class STCEnhancedTranslator:
         self.stc_translator = None
 
         # Traditional translator capabilities
-        self.variables: Dict[str, str] = {}  # variable_name -> c_type
-        self.functions: Dict[str, str] = {}  # function_name -> return_type
+        self.variables: dict[str, str] = {}  # variable_name -> c_type
+        self.functions: dict[str, str] = {}  # function_name -> return_type
         self.indent_level: int = 0
 
         # STC-specific tracking
         self.stc_includes: set[str] = set()
-        self.stc_type_definitions: List[str] = []
-        self.stc_container_vars: Dict[str, str] = {}  # var_name -> STC container type
+        self.stc_type_definitions: list[str] = []
+        self.stc_container_vars: dict[str, str] = {}  # var_name -> STC container type
 
-        self.builtin_functions: Dict[str, Callable[[ast.Call], str]] = {
+        self.builtin_functions: dict[str, Callable[[ast.Call], str]] = {
             "print": self._translate_print_call,
             "len": self._translate_len,
             "abs": self._translate_abs,
@@ -98,7 +98,7 @@ class STCEnhancedTranslator:
 
         return "\n".join(lines)
 
-    def _translate_function(self, func_node: ast.FunctionDef) -> List[str]:
+    def _translate_function(self, func_node: ast.FunctionDef) -> list[str]:
         """Translate a Python function to C function with STC container support."""
         lines = []
         func_name = func_node.name
@@ -149,7 +149,7 @@ class STCEnhancedTranslator:
         lines.append("}")
         return lines
 
-    def _translate_stc_container_function(self, func_node: ast.FunctionDef) -> List[str]:
+    def _translate_stc_container_function(self, func_node: ast.FunctionDef) -> list[str]:
         """Translate functions that use STC containers."""
         lines = []
         func_name = func_node.name
@@ -181,7 +181,7 @@ class STCEnhancedTranslator:
 
         return []
 
-    def _translate_statement(self, stmt: ast.stmt) -> List[str]:
+    def _translate_statement(self, stmt: ast.stmt) -> list[str]:
         """Translate a Python statement to C with STC support."""
         if isinstance(stmt, ast.Assign):
             return self._translate_assignment(stmt)
@@ -200,7 +200,7 @@ class STCEnhancedTranslator:
         else:
             return [f"{self._indent()}/* Unsupported statement: {type(stmt).__name__} */"]
 
-    def _translate_assignment(self, assign: ast.Assign) -> List[str]:
+    def _translate_assignment(self, assign: ast.Assign) -> list[str]:
         """Translate assignment with STC container support."""
         lines = []
 
@@ -245,7 +245,7 @@ class STCEnhancedTranslator:
 
         return lines
 
-    def _translate_expression_statement(self, expr_stmt: ast.Expr) -> List[str]:
+    def _translate_expression_statement(self, expr_stmt: ast.Expr) -> list[str]:
         """Translate expression statement with STC support."""
         if isinstance(expr_stmt.value, ast.Call):
             # Check for STC container operations first
@@ -258,9 +258,9 @@ class STCEnhancedTranslator:
         expr_code = self._translate_expression(expr_stmt.value)
         return [f"{self._indent()}{expr_code};"]
 
-    def _translate_for_statement(self, for_stmt: ast.For) -> List[str]:
+    def _translate_for_statement(self, for_stmt: ast.For) -> list[str]:
         """Translate for loop with STC iterator support."""
-        lines: List[str] = []
+        lines: list[str] = []
 
         # Check for STC container iteration
         if (
@@ -298,7 +298,7 @@ class STCEnhancedTranslator:
         # Traditional for loop translation
         return self._translate_traditional_for_loop(for_stmt)
 
-    def _translate_traditional_for_loop(self, for_stmt: ast.For) -> List[str]:
+    def _translate_traditional_for_loop(self, for_stmt: ast.For) -> list[str]:
         """Traditional for loop translation."""
         lines = []
 
@@ -510,27 +510,27 @@ class STCEnhancedTranslator:
         return default_type
 
     # Add placeholder methods for missing translator functionality
-    def _translate_global_constant(self, assign: ast.Assign) -> List[str]:
+    def _translate_global_constant(self, assign: ast.Assign) -> list[str]:
         """Translate global constants."""
         return []
 
-    def _translate_global_ann_constant(self, assign: ast.AnnAssign) -> List[str]:
+    def _translate_global_ann_constant(self, assign: ast.AnnAssign) -> list[str]:
         """Translate global annotated constants."""
         return []
 
-    def _translate_annotated_assignment(self, assign: ast.AnnAssign) -> List[str]:
+    def _translate_annotated_assignment(self, assign: ast.AnnAssign) -> list[str]:
         """Translate annotated assignments."""
         return []
 
-    def _translate_if_statement(self, if_stmt: ast.If) -> List[str]:
+    def _translate_if_statement(self, if_stmt: ast.If) -> list[str]:
         """Translate if statements."""
         return []
 
-    def _translate_while_statement(self, while_stmt: ast.While) -> List[str]:
+    def _translate_while_statement(self, while_stmt: ast.While) -> list[str]:
         """Translate while statements."""
         return []
 
-    def _translate_return_statement(self, return_stmt: ast.Return) -> List[str]:
+    def _translate_return_statement(self, return_stmt: ast.Return) -> list[str]:
         """Translate return statements."""
         if return_stmt.value:
             value_code = self._translate_expression(return_stmt.value)
@@ -579,11 +579,11 @@ class STCEnhancedTranslator:
         """Translate float() cast function call."""
         return "(float)(/* arg */)"
 
-    def _translate_list_assignment(self, assign: ast.Assign) -> List[str]:
+    def _translate_list_assignment(self, assign: ast.Assign) -> list[str]:
         """Traditional list assignment."""
         return []
 
-    def _generate_special_function_body(self, func_name: str, func_node: ast.FunctionDef) -> List[str]:
+    def _generate_special_function_body(self, func_name: str, func_node: ast.FunctionDef) -> list[str]:
         """Generate special function implementations."""
         return []
 

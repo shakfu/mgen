@@ -1,7 +1,7 @@
 """Backend preference system for MGen language-specific optimizations."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Type
+from typing import Any
 
 
 @dataclass
@@ -14,7 +14,7 @@ class BackendPreferences:
     preserve_python_semantics: bool = True
 
     # Language-specific preferences (populated by subclasses)
-    language_specific: Dict[str, Any] = field(default_factory=dict)
+    language_specific: dict[str, Any] = field(default_factory=dict)
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get a preference value with fallback to default."""
@@ -245,7 +245,7 @@ class OCamlPreferences(BackendPreferences):
 class PreferencesRegistry:
     """Registry for backend preference classes."""
 
-    _preferences_map: Dict[str, Type[BackendPreferences]] = {
+    _preferences_map: dict[str, type[BackendPreferences]] = {
         "haskell": HaskellPreferences,
         "c": CPreferences,
         "cpp": CppPreferences,
@@ -255,7 +255,7 @@ class PreferencesRegistry:
     }
 
     @classmethod
-    def get_preferences_class(cls, backend_name: str) -> Type[BackendPreferences]:
+    def get_preferences_class(cls, backend_name: str) -> type[BackendPreferences]:
         """Get preference class for a backend."""
         return cls._preferences_map.get(backend_name, BackendPreferences)
 
@@ -266,6 +266,6 @@ class PreferencesRegistry:
         return prefs_class(**kwargs)
 
     @classmethod
-    def register_backend(cls, backend_name: str, preferences_class: Type[BackendPreferences]) -> None:
+    def register_backend(cls, backend_name: str, preferences_class: type[BackendPreferences]) -> None:
         """Register a new backend preference class."""
         cls._preferences_map[backend_name] = preferences_class

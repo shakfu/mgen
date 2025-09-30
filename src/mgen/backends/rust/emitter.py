@@ -1,7 +1,7 @@
 """Enhanced Rust code emitter for MGen with comprehensive Python language support."""
 
 import ast
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from ..base import AbstractEmitter
 from ..preferences import BackendPreferences
@@ -33,7 +33,7 @@ class MGenPythonToRustConverter:
             "void": "()",
             "None": "()",
         }
-        self.struct_info: Dict[str, Dict[str, Any]] = {}  # Track struct definitions for classes
+        self.struct_info: dict[str, dict[str, Any]] = {}  # Track struct definitions for classes
         self.current_function: Optional[str] = None  # Track current function context
         self.declared_vars: set[str] = set()  # Track declared variables in current function
 
@@ -105,9 +105,9 @@ class MGenPythonToRustConverter:
 
         return "\n".join(parts)
 
-    def _collect_required_imports(self, node: ast.Module) -> List[str]:
+    def _collect_required_imports(self, node: ast.Module) -> list[str]:
         """Collect required imports based on code features."""
-        imports: List[str] = []
+        imports: list[str] = []
 
         # Check for collections usage
         for n in ast.walk(node):
@@ -186,7 +186,7 @@ class MGenPythonToRustConverter:
         result_lines = struct_lines + [""] + impl_lines
         return "\n".join(result_lines)
 
-    def _convert_constructor(self, class_name: str, init_method: ast.FunctionDef) -> List[str]:
+    def _convert_constructor(self, class_name: str, init_method: ast.FunctionDef) -> list[str]:
         """Convert __init__ method to Rust constructor function."""
         lines = []
 
@@ -223,7 +223,7 @@ class MGenPythonToRustConverter:
 
         return lines
 
-    def _convert_method(self, class_name: str, method: ast.FunctionDef) -> List[str]:
+    def _convert_method(self, class_name: str, method: ast.FunctionDef) -> list[str]:
         """Convert Python method to Rust method."""
         lines = []
 
@@ -265,7 +265,7 @@ class MGenPythonToRustConverter:
 
         return lines
 
-    def _convert_method_statements(self, statements: List[ast.stmt], class_name: str) -> str:
+    def _convert_method_statements(self, statements: list[ast.stmt], class_name: str) -> str:
         """Convert method statements with class context."""
         converted = []
         for stmt in statements:
@@ -553,7 +553,7 @@ class MGenPythonToRustConverter:
 
         return f"{func_signature} {{\n{body}\n}}"
 
-    def _convert_statements(self, statements: List[ast.stmt]) -> str:
+    def _convert_statements(self, statements: list[ast.stmt]) -> str:
         """Convert a list of statements."""
         converted = []
         for stmt in statements:
@@ -1280,7 +1280,7 @@ class MGenPythonToRustConverter:
                 isinstance(value.func, ast.Name) and
                 value.func.id in self.struct_info)
 
-    def _extract_struct_fields(self, init_method: ast.FunctionDef) -> List[str]:
+    def _extract_struct_fields(self, init_method: ast.FunctionDef) -> list[str]:
         """Extract struct field names from __init__ method."""
         fields = []
         for stmt in init_method.body:
@@ -1338,7 +1338,7 @@ class RustEmitter(AbstractEmitter):
         """Map Python type to Rust type."""
         return self.converter.type_map.get(python_type, "i32")
 
-    def emit_function(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+    def emit_function(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Generate Rust function code using converter."""
         # Create a simple module with just this function
         module = ast.Module(body=[func_node], type_ignores=[])
@@ -1369,7 +1369,7 @@ class RustEmitter(AbstractEmitter):
         """Generate complete Rust module using converter."""
         return self.converter.convert_code(source_code)
 
-    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> bool:
+    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> bool:
         """Check if function can use simple emission strategy."""
         # Use the advanced converter for all functions
         return False

@@ -1,4 +1,4 @@
-"""Enhanced STC Translator with Smart Pointers and Allocators
+"""Enhanced STC Translator with Smart Pointers and Allocators.
 
 This module extends the STC translator to support smart pointers, custom allocators,
 and advanced memory management patterns in Python-to-C translation.
@@ -12,7 +12,7 @@ Features:
 """
 
 import ast
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from .allocators import AllocatorType
 from .enhanced_memory_manager import EnhancedMemoryManager, ResourceType
@@ -51,12 +51,12 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
         }
 
         # Track smart pointer variables
-        self.smart_pointer_variables: Dict[str, SmartPointerType] = {}
+        self.smart_pointer_variables: dict[str, SmartPointerType] = {}
 
         # Track allocator variables
-        self.allocator_variables: Dict[str, AllocatorType] = {}
+        self.allocator_variables: dict[str, AllocatorType] = {}
 
-    def analyze_variable_types(self, tree: ast.AST) -> Dict[str, str]:
+    def analyze_variable_types(self, tree: ast.AST) -> dict[str, str]:
         """Enhanced variable type analysis including smart pointers and allocators."""
         type_info = super().analyze_variable_types(tree)
 
@@ -88,9 +88,9 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
                     if func_name.startswith(("make_unique", "make_shared")):
                         # Extract return type and register
                         if func_name.startswith("make_unique"):
-                            pointer_type = SmartPointerType.UNIQUE
+                            pass
                         else:
-                            pointer_type = SmartPointerType.SHARED
+                            pass
 
                         # Try to determine variable name from context
                         # This would need to be enhanced based on specific patterns
@@ -117,7 +117,7 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
         if obj_name not in self.smart_pointer_variables:
             return None
 
-        pointer_type = self.smart_pointer_variables[obj_name]
+        self.smart_pointer_variables[obj_name]
 
         # Convert arguments
         args = [self._convert_arg_to_string(arg) for arg in node.args]
@@ -144,7 +144,7 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
         if obj_name not in self.allocator_variables:
             return None
 
-        allocator_type = self.allocator_variables[obj_name]
+        self.allocator_variables[obj_name]
         args = [self._convert_arg_to_string(arg) for arg in node.args]
 
         # Generate allocator operation based on method
@@ -205,7 +205,7 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
 
         return None
 
-    def generate_enhanced_type_definitions(self, type_info: Dict[str, str]) -> Tuple[List[str], List[str]]:
+    def generate_enhanced_type_definitions(self, type_info: dict[str, str]) -> tuple[list[str], list[str]]:
         """Generate enhanced type definitions including smart pointers and allocators."""
         includes, type_defs = [], []
 
@@ -216,7 +216,7 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
                 element_type = self._extract_element_type_from_annotation(type_str)
 
                 # Register smart pointer
-                resource = self.enhanced_memory_manager.register_smart_pointer(var_name, pointer_type, element_type)
+                self.enhanced_memory_manager.register_smart_pointer(var_name, pointer_type, element_type)
 
                 # Generate type definition
                 pointer_alloc = self.enhanced_memory_manager.smart_pointer_manager.allocations[var_name]
@@ -251,7 +251,7 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
                 element_type = self._extract_element_type_from_annotation(type_str)
 
                 # Register container
-                resource = self.enhanced_memory_manager.register_container_with_allocator(
+                self.enhanced_memory_manager.register_container_with_allocator(
                     var_name, container_type, element_type
                 )
 
@@ -275,14 +275,14 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
 
         return unique_includes, unique_type_defs
 
-    def generate_enhanced_cleanup_code(self) -> List[str]:
+    def generate_enhanced_cleanup_code(self) -> list[str]:
         """Generate enhanced cleanup code for all managed resources."""
         return self.enhanced_memory_manager.generate_cleanup_code()
 
-    def analyze_memory_safety(self, tree: ast.AST) -> Dict[str, Any]:
+    def analyze_memory_safety(self, tree: ast.AST) -> dict[str, Any]:
         """Comprehensive memory safety analysis."""
         # Run standard STC memory analysis
-        standard_errors: List[Dict[str, Any]] = []
+        standard_errors: list[dict[str, Any]] = []
 
         # Run enhanced memory analysis
         enhanced_errors = self.enhanced_memory_manager.detect_memory_issues()

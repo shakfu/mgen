@@ -1,4 +1,4 @@
-"""Algorithm Correctness Verification
+"""Algorithm Correctness Verification.
 
 This module provides formal verification of algorithm correctness using
 preconditions, postconditions, loop invariants, and functional specifications.
@@ -8,7 +8,7 @@ import ast
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 try:
     # import z3  # TODO: Fix missing z3 dependency
@@ -57,11 +57,11 @@ class FormalSpecification:
     """Formal specification of a function or algorithm."""
 
     name: str
-    preconditions: List[str]  # Conditions that must hold at function entry
-    postconditions: List[str]  # Conditions that must hold at function exit
-    loop_invariants: Dict[int, List[str]]  # Line number -> invariants
-    assertions: Dict[int, str]  # Line number -> assertion
-    termination_conditions: List[str]  # Conditions ensuring termination
+    preconditions: list[str]  # Conditions that must hold at function entry
+    postconditions: list[str]  # Conditions that must hold at function exit
+    loop_invariants: dict[int, list[str]]  # Line number -> invariants
+    assertions: dict[int, str]  # Line number -> assertion
+    termination_conditions: list[str]  # Conditions ensuring termination
     functional_spec: Optional[str] = None  # High-level functional specification
 
 
@@ -73,9 +73,9 @@ class AlgorithmProof:
     specification: FormalSpecification
     correctness_type: CorrectnessPropertyType
     is_correct: bool
-    proof_results: List[ProofResult]
-    failed_properties: List[str]
-    loop_analysis: Dict[int, Dict[str, Any]]
+    proof_results: list[ProofResult]
+    failed_properties: list[str]
+    loop_analysis: dict[int, dict[str, Any]]
     verification_time: float
     confidence: float
 
@@ -181,7 +181,7 @@ class CorrectnessProver:
             confidence=confidence,
         )
 
-    def _verify_preconditions(self, spec: FormalSpecification, context: AnalysisContext) -> List[ProofResult]:
+    def _verify_preconditions(self, spec: FormalSpecification, context: AnalysisContext) -> list[ProofResult]:
         """Verify that preconditions are satisfied."""
         results = []
 
@@ -192,7 +192,7 @@ class CorrectnessProver:
 
         return results
 
-    def _verify_postconditions(self, spec: FormalSpecification, context: AnalysisContext) -> List[ProofResult]:
+    def _verify_postconditions(self, spec: FormalSpecification, context: AnalysisContext) -> list[ProofResult]:
         """Verify that postconditions are satisfied."""
         results = []
 
@@ -205,7 +205,7 @@ class CorrectnessProver:
 
     def _verify_loop_invariants(
         self, spec: FormalSpecification, extractor: "AlgorithmStructureExtractor", context: AnalysisContext
-    ) -> Tuple[List[ProofResult], Dict[int, Dict[str, Any]]]:
+    ) -> tuple[list[ProofResult], dict[int, dict[str, Any]]]:
         """Verify loop invariants."""
         results = []
         loop_analysis = {}
@@ -234,7 +234,7 @@ class CorrectnessProver:
 
     def _verify_termination(
         self, spec: FormalSpecification, extractor: "AlgorithmStructureExtractor", context: AnalysisContext
-    ) -> List[ProofResult]:
+    ) -> list[ProofResult]:
         """Verify algorithm termination."""
         results = []
 
@@ -252,7 +252,7 @@ class CorrectnessProver:
 
         return results
 
-    def _verify_functional_correctness(self, spec: FormalSpecification, context: AnalysisContext) -> List[ProofResult]:
+    def _verify_functional_correctness(self, spec: FormalSpecification, context: AnalysisContext) -> list[ProofResult]:
         """Verify functional correctness specification."""
         func_spec = spec.functional_spec if spec.functional_spec is not None else ""
         prop = self._create_functional_correctness_property(spec.name, func_spec)
@@ -299,7 +299,7 @@ class CorrectnessProver:
         )
 
     def _create_loop_invariant_property(
-        self, name: str, invariant: str, phase: str, loop_info: Dict[str, Any]
+        self, name: str, invariant: str, phase: str, loop_info: dict[str, Any]
     ) -> ProofProperty:
         """Create a loop invariant verification property."""
         if not self.z3_available:
@@ -339,7 +339,7 @@ class CorrectnessProver:
             z3_formula=z3_formula,
         )
 
-    def _create_ranking_function_property(self, loop_info: Dict[str, Any]) -> ProofProperty:
+    def _create_ranking_function_property(self, loop_info: dict[str, Any]) -> ProofProperty:
         """Create a ranking function property for loop termination."""
         if not self.z3_available:
             return ProofProperty(
@@ -416,7 +416,7 @@ class CorrectnessProver:
             termination_conditions=["true"],
         )
 
-    def _calculate_correctness_confidence(self, proof_results: List[ProofResult]) -> float:
+    def _calculate_correctness_confidence(self, proof_results: list[ProofResult]) -> float:
         """Calculate confidence in correctness verification."""
         if not proof_results:
             return 0.0
@@ -495,9 +495,9 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
     """Extract algorithm structure for correctness verification."""
 
     def __init__(self) -> None:
-        self.loops: List[Dict[str, Any]] = []
-        self.recursive_calls: List[Dict[str, Any]] = []
-        self.assertions: List[Dict[str, Any]] = []
+        self.loops: list[dict[str, Any]] = []
+        self.recursive_calls: list[dict[str, Any]] = []
+        self.assertions: list[dict[str, Any]] = []
         self.variables: set[str] = set()
         self.current_function: Optional[str] = None
 
@@ -508,7 +508,7 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
 
     def visit_For(self, node: ast.For) -> None:
         """Extract for loop information."""
-        loop_info: Dict[str, Any] = {"type": "for", "line": node.lineno, "variable": None, "iterable": None, "body_lines": []}
+        loop_info: dict[str, Any] = {"type": "for", "line": node.lineno, "variable": None, "iterable": None, "body_lines": []}
 
         # Extract loop variable
         if isinstance(node.target, ast.Name):
@@ -529,7 +529,7 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
 
     def visit_While(self, node: ast.While) -> None:
         """Extract while loop information."""
-        loop_info: Dict[str, Any] = {
+        loop_info: dict[str, Any] = {
             "type": "while",
             "line": node.lineno,
             "condition": ast.unparse(node.test) if hasattr(ast, "unparse") else str(node.test),
@@ -554,7 +554,7 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
 
     def visit_Assert(self, node: ast.Assert) -> None:
         """Extract assertion statements."""
-        assertion_info: Dict[str, Any] = {
+        assertion_info: dict[str, Any] = {
             "line": node.lineno,
             "condition": ast.unparse(node.test) if hasattr(ast, "unparse") else str(node.test),
             "message": None,
@@ -571,7 +571,7 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
         self.variables.add(node.id)
         self.generic_visit(node)
 
-    def get_loop_info(self, line_no: int) -> Optional[Dict[str, Any]]:
+    def get_loop_info(self, line_no: int) -> Optional[dict[str, Any]]:
         """Get loop information for a specific line number."""
         for loop in self.loops:
             if loop["line"] == line_no:

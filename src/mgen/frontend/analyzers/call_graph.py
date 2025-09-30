@@ -7,7 +7,7 @@ Python code analysis, focusing on function relationships and call patterns.
 import ast
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Set
+from typing import Optional
 
 from ..base import AnalysisContext, AnalysisReport, BaseAnalyzer
 
@@ -58,11 +58,11 @@ class FunctionNode:
     is_leaf: bool = False  # No outgoing calls
     is_root: bool = False  # No incoming calls
     parameters_count: int = 0
-    local_calls: Set[str] = field(default_factory=set)
-    external_calls: Set[str] = field(default_factory=set)
-    call_sites: List[CallSite] = field(default_factory=list)
-    callers: Set[str] = field(default_factory=set)
-    callees: Set[str] = field(default_factory=set)
+    local_calls: set[str] = field(default_factory=set)
+    external_calls: set[str] = field(default_factory=set)
+    call_sites: list[CallSite] = field(default_factory=list)
+    callers: set[str] = field(default_factory=set)
+    callees: set[str] = field(default_factory=set)
     depth_from_root: int = 0
     max_call_depth: int = 0
 
@@ -71,10 +71,10 @@ class FunctionNode:
 class CallPath:
     """A path through the call graph."""
 
-    functions: List[str] = field(default_factory=list)
+    functions: list[str] = field(default_factory=list)
     total_depth: int = 0
     has_cycles: bool = False
-    cycle_functions: Set[str] = field(default_factory=set)
+    cycle_functions: set[str] = field(default_factory=set)
     estimated_complexity: int = 0
 
 
@@ -99,13 +99,13 @@ class CallGraphMetrics:
 class CallGraphReport(AnalysisReport):
     """Report from call graph analysis."""
 
-    call_graph: Dict[str, FunctionNode] = field(default_factory=dict)
-    call_sites: List[CallSite] = field(default_factory=list)
-    call_paths: List[CallPath] = field(default_factory=list)
+    call_graph: dict[str, FunctionNode] = field(default_factory=dict)
+    call_sites: list[CallSite] = field(default_factory=list)
+    call_paths: list[CallPath] = field(default_factory=list)
     metrics: CallGraphMetrics = field(default_factory=CallGraphMetrics)
-    cycles: List[List[str]] = field(default_factory=list)
-    critical_paths: List[CallPath] = field(default_factory=list)
-    optimization_opportunities: List[str] = field(default_factory=list)
+    cycles: list[list[str]] = field(default_factory=list)
+    critical_paths: list[CallPath] = field(default_factory=list)
+    optimization_opportunities: list[str] = field(default_factory=list)
 
 
 class CallGraphAnalyzer(BaseAnalyzer):
@@ -113,11 +113,11 @@ class CallGraphAnalyzer(BaseAnalyzer):
 
     def __init__(self) -> None:
         super().__init__("CallGraphAnalyzer")
-        self._defined_functions: Set[str] = set()
-        self._call_sites: List[CallSite] = []
+        self._defined_functions: set[str] = set()
+        self._call_sites: list[CallSite] = []
         self._current_function: Optional[str] = None
         self._current_context: CallContext = CallContext.UNCONDITIONAL
-        self._context_stack: List[CallContext] = []
+        self._context_stack: list[CallContext] = []
         self._builtin_functions = {
             "print",
             "len",
@@ -336,7 +336,7 @@ class CallGraphAnalyzer(BaseAnalyzer):
         else:
             return 0.5  # Complex call expressions
 
-    def _build_call_graph(self) -> Dict[str, FunctionNode]:
+    def _build_call_graph(self) -> dict[str, FunctionNode]:
         """Build the call graph from collected information."""
         call_graph = {}
 
@@ -372,7 +372,7 @@ class CallGraphAnalyzer(BaseAnalyzer):
 
         return call_graph
 
-    def _analyze_call_paths(self, call_graph: Dict[str, FunctionNode]) -> List[CallPath]:
+    def _analyze_call_paths(self, call_graph: dict[str, FunctionNode]) -> list[CallPath]:
         """Analyze possible call paths through the graph."""
         paths = []
 
@@ -387,8 +387,8 @@ class CallGraphAnalyzer(BaseAnalyzer):
         return paths
 
     def _generate_paths_from_function(
-        self, call_graph: Dict[str, FunctionNode], func_name: str, visited: Set[str], current_path: Optional[List[str]] = None
-    ) -> List[CallPath]:
+        self, call_graph: dict[str, FunctionNode], func_name: str, visited: set[str], current_path: Optional[list[str]] = None
+    ) -> list[CallPath]:
         """Generate all paths starting from a given function."""
         if current_path is None:
             current_path = []
@@ -449,13 +449,13 @@ class CallGraphAnalyzer(BaseAnalyzer):
             ]
         )
 
-    def _detect_cycles(self, call_graph: Dict[str, FunctionNode]) -> List[List[str]]:
+    def _detect_cycles(self, call_graph: dict[str, FunctionNode]) -> list[list[str]]:
         """Detect cycles in the call graph using DFS."""
         cycles = []
         visited = set()
         rec_stack = set()
 
-        def dfs(node_name: str, path: List[str]) -> None:
+        def dfs(node_name: str, path: list[str]) -> None:
             if node_name in rec_stack:
                 # Found a cycle
                 cycle_start = path.index(node_name)
@@ -483,7 +483,7 @@ class CallGraphAnalyzer(BaseAnalyzer):
 
         return cycles
 
-    def _calculate_metrics(self, call_graph: Dict[str, FunctionNode]) -> CallGraphMetrics:
+    def _calculate_metrics(self, call_graph: dict[str, FunctionNode]) -> CallGraphMetrics:
         """Calculate metrics from the call graph."""
         metrics = CallGraphMetrics()
 
@@ -513,11 +513,11 @@ class CallGraphAnalyzer(BaseAnalyzer):
 
         return metrics
 
-    def _calculate_max_depth(self, call_graph: Dict[str, FunctionNode]) -> int:
+    def _calculate_max_depth(self, call_graph: dict[str, FunctionNode]) -> int:
         """Calculate maximum call depth in the graph."""
         max_depth = 0
 
-        def dfs_depth(node_name: str, visited: Set[str]) -> int:
+        def dfs_depth(node_name: str, visited: set[str]) -> int:
             if node_name in visited:
                 return 0  # Avoid infinite recursion
 
@@ -540,8 +540,8 @@ class CallGraphAnalyzer(BaseAnalyzer):
         return max_depth
 
     def _find_optimization_opportunities(
-        self, call_graph: Dict[str, FunctionNode], cycles: List[List[str]]
-    ) -> List[str]:
+        self, call_graph: dict[str, FunctionNode], cycles: list[list[str]]
+    ) -> list[str]:
         """Find potential optimization opportunities."""
         opportunities = []
 
@@ -567,7 +567,7 @@ class CallGraphAnalyzer(BaseAnalyzer):
 
         return opportunities
 
-    def _find_critical_paths(self, call_paths: List[CallPath]) -> List[CallPath]:
+    def _find_critical_paths(self, call_paths: list[CallPath]) -> list[CallPath]:
         """Find critical paths that might affect performance."""
         # Sort by complexity and depth
         sorted_paths = sorted(call_paths, key=lambda p: (p.estimated_complexity, p.total_depth), reverse=True)
@@ -575,7 +575,7 @@ class CallGraphAnalyzer(BaseAnalyzer):
         # Return top 5 most complex paths
         return sorted_paths[:5]
 
-    def _calculate_confidence(self, call_graph: Dict[str, FunctionNode]) -> float:
+    def _calculate_confidence(self, call_graph: dict[str, FunctionNode]) -> float:
         """Calculate overall confidence in the analysis."""
         if not self._call_sites:
             return 1.0
@@ -584,8 +584,8 @@ class CallGraphAnalyzer(BaseAnalyzer):
         return total_confidence / len(self._call_sites)
 
     def _generate_findings(
-        self, call_graph: Dict[str, FunctionNode], cycles: List[List[str]], metrics: CallGraphMetrics
-    ) -> List[str]:
+        self, call_graph: dict[str, FunctionNode], cycles: list[list[str]], metrics: CallGraphMetrics
+    ) -> list[str]:
         """Generate analysis findings."""
         findings = [
             f"Analyzed {metrics.total_functions} functions with {metrics.total_call_sites} call sites",
@@ -603,7 +603,7 @@ class CallGraphAnalyzer(BaseAnalyzer):
 
         return findings
 
-    def _generate_warnings(self, call_graph: Dict[str, FunctionNode], cycles: List[List[str]]) -> List[str]:
+    def _generate_warnings(self, call_graph: dict[str, FunctionNode], cycles: list[list[str]]) -> list[str]:
         """Generate analysis warnings."""
         warnings = []
 

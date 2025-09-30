@@ -7,7 +7,7 @@ Python code, focusing on loop patterns that can be efficiently converted to C.
 import ast
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Set, Union
+from typing import Optional, Union
 
 from ..base import AnalysisContext, BaseOptimizer, OptimizationLevel, OptimizationResult
 
@@ -72,7 +72,7 @@ class LoopVariable:
     is_modified: bool = False
     is_accumulator: bool = False
     first_use_line: Optional[int] = None
-    dependency_chain: List[str] = field(default_factory=list)
+    dependency_chain: list[str] = field(default_factory=list)
     invariant: bool = False
 
 
@@ -83,16 +83,16 @@ class LoopInfo:
     loop_type: LoopType
     pattern: LoopPattern
     bounds: LoopBounds
-    variables: Dict[str, LoopVariable] = field(default_factory=dict)
+    variables: dict[str, LoopVariable] = field(default_factory=dict)
     body_complexity: int = 0
     nesting_level: int = 0
     line_number: int = 0
     has_break: bool = False
     has_continue: bool = False
     has_early_exit: bool = False
-    inner_loops: List["LoopInfo"] = field(default_factory=list)
-    dependencies: Set[str] = field(default_factory=set)
-    side_effects: List[str] = field(default_factory=list)
+    inner_loops: list["LoopInfo"] = field(default_factory=list)
+    dependencies: set[str] = field(default_factory=set)
+    side_effects: list[str] = field(default_factory=list)
     is_vectorizable: bool = False
     is_parallelizable: bool = False
     estimated_complexity: str = "O(n)"
@@ -107,9 +107,9 @@ class LoopOptimization:
     description: str
     estimated_speedup: float
     confidence: float
-    prerequisites: List[str] = field(default_factory=list)
+    prerequisites: list[str] = field(default_factory=list)
     transformed_code: Optional[str] = None
-    safety_checks: Dict[str, bool] = field(default_factory=dict)
+    safety_checks: dict[str, bool] = field(default_factory=dict)
     applicability_score: float = 1.0
 
 
@@ -117,16 +117,16 @@ class LoopOptimization:
 class LoopAnalysisReport:
     """Report from loop analysis and optimization."""
 
-    loops_found: List[LoopInfo] = field(default_factory=list)
-    optimizations: List[LoopOptimization] = field(default_factory=list)
+    loops_found: list[LoopInfo] = field(default_factory=list)
+    optimizations: list[LoopOptimization] = field(default_factory=list)
     total_loops: int = 0
     nested_loops: int = 0
     vectorizable_loops: int = 0
     parallelizable_loops: int = 0
     complex_loops: int = 0
-    optimization_opportunities: List[str] = field(default_factory=list)
-    performance_bottlenecks: List[str] = field(default_factory=list)
-    c_compatibility_issues: List[str] = field(default_factory=list)
+    optimization_opportunities: list[str] = field(default_factory=list)
+    performance_bottlenecks: list[str] = field(default_factory=list)
+    c_compatibility_issues: list[str] = field(default_factory=list)
 
 
 class LoopAnalyzer(BaseOptimizer):
@@ -135,8 +135,8 @@ class LoopAnalyzer(BaseOptimizer):
     def __init__(self, optimization_level: OptimizationLevel = OptimizationLevel.BASIC):
         super().__init__("LoopAnalyzer", optimization_level)
         self._current_nesting = 0
-        self._loop_stack: List[LoopInfo] = []
-        self._variables_in_scope: Dict[str, LoopVariable] = {}
+        self._loop_stack: list[LoopInfo] = []
+        self._variables_in_scope: dict[str, LoopVariable] = {}
 
     def optimize(self, context: AnalysisContext) -> OptimizationResult:
         """Perform loop analysis and optimization."""
@@ -410,7 +410,7 @@ class LoopAnalyzer(BaseOptimizer):
                             if isinstance(left, ast.Name) and left.id == var_name:
                                 var_info.is_accumulator = True
 
-    def _analyze_loop_body(self, body: List[ast.stmt], loop_info: LoopInfo, report: LoopAnalysisReport) -> None:
+    def _analyze_loop_body(self, body: list[ast.stmt], loop_info: LoopInfo, report: LoopAnalysisReport) -> None:
         """Analyze the body of a loop."""
         # Calculate complexity based on statement types
         complexity = 0.0
@@ -704,7 +704,7 @@ class LoopAnalyzer(BaseOptimizer):
         # Cap maximum gain
         return min(total_gain, 5.0)
 
-    def _generate_transformations(self, report: LoopAnalysisReport) -> List[str]:
+    def _generate_transformations(self, report: LoopAnalysisReport) -> list[str]:
         """Generate list of transformations applied."""
         transformations = []
 
@@ -716,7 +716,7 @@ class LoopAnalyzer(BaseOptimizer):
         if report.vectorizable_loops > 0:
             transformations.append(f"Identified {report.vectorizable_loops} vectorizable loops")
 
-        optimization_counts: Dict[str, int] = {}
+        optimization_counts: dict[str, int] = {}
         for opt in report.optimizations:
             opt_type = opt.optimization_type.value
             optimization_counts[opt_type] = optimization_counts.get(opt_type, 0) + 1
@@ -726,7 +726,7 @@ class LoopAnalyzer(BaseOptimizer):
 
         return transformations
 
-    def _analyze_safety(self, report: LoopAnalysisReport) -> Dict[str, bool]:
+    def _analyze_safety(self, report: LoopAnalysisReport) -> dict[str, bool]:
         """Analyze safety of loop optimizations."""
         safety_analysis = {
             "loop_unrolling": True,

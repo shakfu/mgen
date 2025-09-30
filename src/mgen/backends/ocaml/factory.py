@@ -1,6 +1,6 @@
 """OCaml backend factory for MGen."""
 
-from typing import List, Optional
+from typing import Optional
 
 from ..base import AbstractFactory
 from ..preferences import BackendPreferences, OCamlPreferences
@@ -21,7 +21,7 @@ class OCamlFactory(AbstractFactory):
         else:
             return f"let {name} : {ocaml_type}"
 
-    def create_function_signature(self, name: str, params: List[tuple], return_type: str) -> str:
+    def create_function_signature(self, name: str, params: list[tuple], return_type: str) -> str:
         """Create OCaml function signature."""
         ocaml_return_type = self._map_python_type_to_ocaml(return_type)
 
@@ -29,7 +29,7 @@ class OCamlFactory(AbstractFactory):
             return f"let {name} () : {ocaml_return_type}"
 
         param_types = []
-        for param_name, param_type in params:
+        for _param_name, param_type in params:
             ocaml_param_type = self._map_python_type_to_ocaml(param_type)
             param_types.append(ocaml_param_type)
 

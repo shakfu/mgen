@@ -1,6 +1,6 @@
 """C++ code element factory."""
 
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from ..base import AbstractFactory
 
@@ -8,7 +8,7 @@ from ..base import AbstractFactory
 class CppFactory(AbstractFactory):
     """Factory for creating C++ code elements."""
 
-    def create_function(self, name: str, params: List[str], return_type: str, body: str) -> str:
+    def create_function(self, name: str, params: list[str], return_type: str, body: str) -> str:
         """Create a C++ function."""
         param_str = ", ".join(params)
         return f"{return_type} {name}({param_str}) {{\n{body}\n}}"
@@ -31,7 +31,7 @@ class CppFactory(AbstractFactory):
         """Create a C++ binary operation."""
         return f"({left} {operator} {right})"
 
-    def create_function_call(self, name: str, args: List[str]) -> str:
+    def create_function_call(self, name: str, args: list[str]) -> str:
         """Create a C++ function call."""
         args_str = ", ".join(args)
         return f"{name}({args_str})"
@@ -74,7 +74,7 @@ class CppFactory(AbstractFactory):
             return f"/* {text} */"
         return f"// {text}"
 
-    def create_function_signature(self, name: str, params: List[tuple], return_type: str) -> str:
+    def create_function_signature(self, name: str, params: list[tuple], return_type: str) -> str:
         """Create a C++ function signature."""
         param_strings = []
         for param_name, param_type in params:
@@ -92,7 +92,7 @@ class CppFactory(AbstractFactory):
         """Create a C++ namespace."""
         return f"namespace {name} {{\n{body}\n}}"
 
-    def create_class(self, name: str, body: str, base_classes: Optional[List[str]] = None) -> str:
+    def create_class(self, name: str, body: str, base_classes: Optional[list[str]] = None) -> str:
         """Create a C++ class."""
         inheritance = ""
         if base_classes:

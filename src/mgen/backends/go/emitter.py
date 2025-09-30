@@ -1,7 +1,7 @@
 """Enhanced Go code emitter for MGen with comprehensive Python language support."""
 
 import ast
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 from ..base import AbstractEmitter
 from ..preferences import BackendPreferences
@@ -33,7 +33,7 @@ class MGenPythonToGoConverter:
             "void": "",
             "None": "",
         }
-        self.struct_info: Dict[str, Dict[str, Any]] = {}  # Track struct definitions for classes
+        self.struct_info: dict[str, dict[str, Any]] = {}  # Track struct definitions for classes
         self.current_function: Optional[str] = None  # Track current function context
         self.declared_vars: set[str] = set()  # Track declared variables in current function
 
@@ -97,7 +97,7 @@ class MGenPythonToGoConverter:
 
         return "\n".join(parts)
 
-    def _collect_required_imports(self, node: ast.Module) -> List[str]:
+    def _collect_required_imports(self, node: ast.Module) -> list[str]:
         """Collect required imports based on code features."""
         imports = ["mgen"]  # Always import our runtime
 
@@ -234,7 +234,7 @@ class MGenPythonToGoConverter:
 
         return func_signature + " {\n" + body + "\n}"
 
-    def _convert_method_statements(self, statements: List[ast.stmt], class_name: str) -> str:
+    def _convert_method_statements(self, statements: list[ast.stmt], class_name: str) -> str:
         """Convert method statements with class context."""
         converted = []
         for stmt in statements:
@@ -267,7 +267,7 @@ class MGenPythonToGoConverter:
         for target in stmt.targets:
             if isinstance(target, ast.Name):
                 # Local variable assignment
-                var_type = self._infer_type_from_value(stmt.value)
+                self._infer_type_from_value(stmt.value)
                 statements.append(f"    {target.id} := {value_expr}")
             elif isinstance(target, ast.Attribute):
                 if isinstance(target.value, ast.Name) and target.value.id == "self":
@@ -517,7 +517,7 @@ class MGenPythonToGoConverter:
 
         return func_signature + " {\n" + body + "\n}"
 
-    def _convert_statements(self, statements: List[ast.stmt]) -> str:
+    def _convert_statements(self, statements: list[ast.stmt]) -> str:
         """Convert a list of statements."""
         converted = []
         for stmt in statements:
@@ -864,8 +864,23 @@ class MGenPythonToGoConverter:
             # Empty dict
             return "make(map[interface{}]interface{})"
 
-        # Try to infer common types for keys and values
-        key_types = [self._infer_type_from_value(key) for key in expr.keys]
+        # Check for None keys (dictionary unpacking with **)
+        has_unpacking = any(key is None for key in expr.keys)
+
+        if has_unpacking:
+            # Dictionary unpacking present, use interface{} for safety
+            pairs = []
+            for key, value in zip(expr.keys, expr.values):
+                if key is not None:
+                    key_str = self._convert_expression(key)
+                    value_str = self._convert_expression(value)
+                    pairs.append(f"{key_str}: {value_str}")
+                # Note: actual unpacking (**dict) would need runtime handling
+            pairs_str = ", ".join(pairs)
+            return f"map[interface{{}}]interface{{}}{{{{{pairs_str}}}}}"
+
+        # Try to infer common types for keys and values (all keys are non-None)
+        key_types = [self._infer_type_from_value(key) for key in expr.keys if key is not None]
         value_types = [self._infer_type_from_value(value) for value in expr.values]
 
         if (key_types and all(t == key_types[0] and t != "interface{}" for t in key_types) and
@@ -875,18 +890,20 @@ class MGenPythonToGoConverter:
             value_type = value_types[0]
             pairs = []
             for key, value in zip(expr.keys, expr.values):
-                key_str = self._convert_expression(key)
-                value_str = self._convert_expression(value)
-                pairs.append(f"{key_str}: {value_str}")
+                if key is not None:
+                    key_str = self._convert_expression(key)
+                    value_str = self._convert_expression(value)
+                    pairs.append(f"{key_str}: {value_str}")
             pairs_str = ", ".join(pairs)
             return f"map[{key_type}]{value_type}{{{{{pairs_str}}}}}"
         else:
             # Mixed types or interface{}, use interface{}
             pairs = []
             for key, value in zip(expr.keys, expr.values):
-                key_str = self._convert_expression(key)
-                value_str = self._convert_expression(value)
-                pairs.append(f"{key_str}: {value_str}")
+                if key is not None:
+                    key_str = self._convert_expression(key)
+                    value_str = self._convert_expression(value)
+                    pairs.append(f"{key_str}: {value_str}")
             pairs_str = ", ".join(pairs)
             return f"map[interface{{}}]interface{{}}{{{{{pairs_str}}}}}"
 
@@ -1124,7 +1141,7 @@ class MGenPythonToGoConverter:
                 isinstance(value.func, ast.Name) and
                 value.func.id in self.struct_info)
 
-    def _extract_struct_fields(self, init_method: ast.FunctionDef) -> List[str]:
+    def _extract_struct_fields(self, init_method: ast.FunctionDef) -> list[str]:
         """Extract struct field names from __init__ method."""
         fields = []
         for stmt in init_method.body:
@@ -1167,7 +1184,7 @@ class GoEmitter(AbstractEmitter):
         """Map Python type to Go type."""
         return self.converter.type_map.get(python_type, "interface{}")
 
-    def emit_function(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+    def emit_function(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Generate Go function code using the advanced converter."""
         return self.converter._convert_function(func_node)
 
@@ -1175,7 +1192,7 @@ class GoEmitter(AbstractEmitter):
         """Generate complete Go module using the advanced converter."""
         return self.converter.convert_code(source_code)
 
-    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> bool:
+    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> bool:
         """Check if function can use simple emission strategy."""
         # Advanced converter handles all cases
         return True

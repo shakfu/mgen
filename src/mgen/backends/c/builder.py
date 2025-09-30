@@ -2,7 +2,6 @@
 
 import subprocess
 from pathlib import Path
-from typing import List
 
 from ..base import AbstractBuilder
 
@@ -19,7 +18,7 @@ class CBuilder(AbstractBuilder):
         """Return Makefile as the build file name."""
         return "Makefile"
 
-    def generate_build_file(self, source_files: List[str], target_name: str) -> str:
+    def generate_build_file(self, source_files: list[str], target_name: str) -> str:
         """Generate Makefile for C project with MGen runtime support."""
         # Get source file basenames
         source_basenames = [Path(f).name for f in source_files]
@@ -126,7 +125,7 @@ release: clean $(TARGET)
         except Exception:
             return False
 
-    def get_compile_flags(self) -> List[str]:
+    def get_compile_flags(self) -> list[str]:
         """Get C compilation flags including MGen runtime support."""
         flags = ["-Wall", "-Wextra", "-std=c99", "-O2"]
 
@@ -140,7 +139,7 @@ release: clean $(TARGET)
 
         return flags
 
-    def get_runtime_sources(self) -> List[str]:
+    def get_runtime_sources(self) -> list[str]:
         """Get MGen runtime source files for compilation."""
         if not self.use_runtime:
             return []
@@ -151,7 +150,7 @@ release: clean $(TARGET)
 
         return runtime_sources
 
-    def get_runtime_headers(self) -> List[str]:
+    def get_runtime_headers(self) -> list[str]:
         """Get MGen runtime header files for inclusion."""
         if not self.use_runtime:
             return []

@@ -17,7 +17,7 @@ import argparse
 import shutil
 import sys
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from ..backends.preferences import BackendPreferences, PreferencesRegistry
 from ..backends.registry import registry
@@ -156,7 +156,7 @@ Build Directory Structure:
         }
         return mapping.get(level_str, OptimizationLevel.MODERATE)
 
-    def parse_preferences(self, backend_name: str, preference_args: Optional[List[str]] = None) -> BackendPreferences:
+    def parse_preferences(self, backend_name: str, preference_args: Optional[list[str]] = None) -> BackendPreferences:
         """Parse preference arguments and create backend preferences."""
         # Create default preferences for the backend
         preferences = PreferencesRegistry.create_preferences(backend_name)
@@ -657,13 +657,13 @@ def main(argv: Optional[list] = None) -> int:
         try:
             cli.log.error("Interrupted")
         except:
-            print("Interrupted")
+            pass
         return 1
     except Exception as e:
         try:
             cli.log.error(f"Error: {e}")
         except:
-            print(f"Error: {e}")
+            pass
         return 1
 
 

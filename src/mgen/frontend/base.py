@@ -4,7 +4,7 @@ import ast
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from ..common import log
 from .ast_analyzer import AnalysisResult
@@ -39,7 +39,7 @@ class AnalysisContext:
     analysis_level: AnalysisLevel = AnalysisLevel.BASIC
     optimization_level: OptimizationLevel = OptimizationLevel.BASIC
     target_architecture: str = "x86_64"
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[dict[str, Any]] = None
 
     def __post_init__(self) -> None:
         if self.metadata is None:
@@ -53,10 +53,10 @@ class AnalysisReport:
     analyzer_name: str
     success: bool
     confidence: float  # 0.0 to 1.0
-    findings: List[str]
-    warnings: List[str]
-    errors: List[str]
-    metadata: Dict[str, Any]
+    findings: list[str]
+    warnings: list[str]
+    errors: list[str]
+    metadata: dict[str, Any]
     execution_time_ms: float = 0.0
 
     def has_issues(self) -> bool:
@@ -75,7 +75,7 @@ class BaseAnalyzer(ABC):
         self.log = log.config(self.__class__.__name__)
         self.name = name
         self.analysis_level = analysis_level
-        self._cache: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
 
     @abstractmethod
     def analyze(self, context: AnalysisContext) -> AnalysisReport:
@@ -159,10 +159,10 @@ class OptimizationResult:
     optimizer_name: str
     success: bool
     optimized_ast: Optional[ast.AST]
-    transformations: List[str]
+    transformations: list[str]
     performance_gain_estimate: float  # Estimated performance improvement factor
-    safety_analysis: Dict[str, bool]  # Safety checks passed
-    metadata: Dict[str, Any]
+    safety_analysis: dict[str, bool]  # Safety checks passed
+    metadata: dict[str, Any]
     execution_time_ms: float = 0.0
 
     def is_valid(self) -> bool:
@@ -203,7 +203,7 @@ class VerificationResult:
     is_correct: bool
     proof_generated: bool
     confidence: float  # 0.0 to 1.0
-    verification_details: Dict[str, Any]
+    verification_details: dict[str, Any]
     execution_time_ms: float = 0.0
 
     def is_verified(self) -> bool:
@@ -215,9 +215,9 @@ class IntelligencePipeline:
     """Main pipeline for coordinating analyzers, optimizers, and verifiers."""
 
     def __init__(self) -> None:
-        self.analyzers: List[BaseAnalyzer] = []
-        self.optimizers: List[BaseOptimizer] = []
-        self.verifiers: List[BaseVerifier] = []
+        self.analyzers: list[BaseAnalyzer] = []
+        self.optimizers: list[BaseOptimizer] = []
+        self.verifiers: list[BaseVerifier] = []
 
     def add_analyzer(self, analyzer: BaseAnalyzer) -> None:
         """Add an analyzer to the pipeline."""
@@ -231,7 +231,7 @@ class IntelligencePipeline:
         """Add a verifier to the pipeline."""
         self.verifiers.append(verifier)
 
-    def process(self, context: AnalysisContext) -> Dict[str, Any]:
+    def process(self, context: AnalysisContext) -> dict[str, Any]:
         """Process the context through the entire intelligence pipeline.
 
         Args:
@@ -240,7 +240,7 @@ class IntelligencePipeline:
         Returns:
             Dictionary containing all analysis, optimization, and verification results
         """
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "analysis_reports": [],
             "optimization_results": [],
             "verification_results": [],
@@ -270,7 +270,7 @@ class IntelligencePipeline:
 
         return results
 
-    def _evaluate_pipeline_success(self, results: Dict[str, Any]) -> bool:
+    def _evaluate_pipeline_success(self, results: dict[str, Any]) -> bool:
         """Evaluate if the pipeline execution was successful."""
         # Check if any critical errors occurred
         for report in results["analysis_reports"]:

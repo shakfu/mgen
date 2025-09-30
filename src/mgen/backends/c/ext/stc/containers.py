@@ -1,11 +1,11 @@
-"""STC Container Type Mappings and Code Generation
+"""STC Container Type Mappings and Code Generation.
 
 This module provides mappings between Python container types and STC containers,
 along with code generation utilities for translating Python operations to STC.
 """
 
 from dataclasses import dataclass
-from typing import List, Optional, Set, Tuple
+from typing import Optional
 
 
 @dataclass
@@ -119,7 +119,7 @@ class STCCodeGenerator:
     """Generates STC container code from Python type annotations."""
 
     def __init__(self) -> None:
-        self.generated_types: Set[str] = set()
+        self.generated_types: set[str] = set()
         from .template_manager import get_template_manager
 
         self.template_manager = get_template_manager()
@@ -128,7 +128,7 @@ class STCCodeGenerator:
         """Convert Python type to C type suitable for STC containers."""
         return PYTHON_TO_C_TYPES.get(python_type, python_type)
 
-    def generate_container_type_def(self, container_name: str, python_type_hint: str) -> Tuple[str, str]:
+    def generate_container_type_def(self, container_name: str, python_type_hint: str) -> tuple[str, str]:
         """Generate STC container type definition using template manager.
 
         Args:
@@ -210,7 +210,7 @@ class STCCodeGenerator:
             # Fallback for unsupported types
             return f"void /* Unsupported type: {python_type_hint} */", ""
 
-    def generate_operation_translation(self, operation: str, container_type: str, args: List[str]) -> str:
+    def generate_operation_translation(self, operation: str, container_type: str, args: list[str]) -> str:
         """Translate Python container operations to STC operations.
 
         Args:

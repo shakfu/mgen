@@ -1,4 +1,4 @@
-"""STC (Smart Template Containers) Integration
+"""STC (Smart Template Containers) Integration.
 
 This module provides integration with the STC C library for high-performance,
 type-safe container operations in generated C code.

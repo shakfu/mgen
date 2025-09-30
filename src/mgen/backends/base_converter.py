@@ -7,7 +7,7 @@ implements language-specific formatting via abstract methods.
 
 import ast
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 
 class UnsupportedFeatureError(Exception):
@@ -47,10 +47,10 @@ class BaseConverter(ABC):
 
     def __init__(self) -> None:
         """Initialize the base converter with common tracking structures."""
-        self.type_map: Dict[str, str] = {}  # Populated by subclasses
-        self.classes: Dict[str, Any] = {}  # Track class definitions
+        self.type_map: dict[str, str] = {}  # Populated by subclasses
+        self.classes: dict[str, Any] = {}  # Track class definitions
         self.current_class: Optional[str] = None  # Current class context
-        self.variable_types: Dict[str, str] = {}  # Track variable types
+        self.variable_types: dict[str, str] = {}  # Track variable types
 
     # ============================================================================
     # Main Entry Points (to be called by subclasses)
@@ -163,7 +163,7 @@ class BaseConverter(ABC):
     def _format_function_definition(
         self,
         name: str,
-        params: List[tuple[str, str]],
+        params: list[tuple[str, str]],
         return_type: str,
         body: str,
     ) -> str:
@@ -252,7 +252,7 @@ class BaseConverter(ABC):
         pass
 
     @abstractmethod
-    def _format_function_call(self, func_name: str, args: List[str]) -> str:
+    def _format_function_call(self, func_name: str, args: list[str]) -> str:
         """Format a function call.
 
         Args:
@@ -266,7 +266,7 @@ class BaseConverter(ABC):
 
     @abstractmethod
     def _format_method_call(
-        self, object_expr: str, method_name: str, args: List[str]
+        self, object_expr: str, method_name: str, args: list[str]
     ) -> str:
         """Format a method call.
 

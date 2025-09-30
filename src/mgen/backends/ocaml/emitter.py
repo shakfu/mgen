@@ -1,7 +1,7 @@
 """Enhanced OCaml code emitter for MGen with comprehensive Python language support."""
 
 import ast
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 from ..base import AbstractEmitter
 from ..preferences import BackendPreferences
@@ -37,8 +37,8 @@ class MGenPythonToOCamlConverter:
         }
 
         # Track class definitions and variables
-        self.classes: Dict[str, Any] = {}
-        self.variables: Dict[str, str] = {}
+        self.classes: dict[str, Any] = {}
+        self.variables: dict[str, str] = {}
         self.current_class: Optional[str] = None
 
     def convert_code(self, python_code: str) -> str:
@@ -73,7 +73,7 @@ class MGenPythonToOCamlConverter:
 
         return "\n".join(ocaml_code)
 
-    def _convert_statement(self, node: ast.AST) -> Union[str, List[str]]:
+    def _convert_statement(self, node: ast.AST) -> Union[str, list[str]]:
         """Convert a Python statement to OCaml."""
         if isinstance(node, ast.FunctionDef):
             return self._convert_function_def(node)
@@ -96,9 +96,9 @@ class MGenPythonToOCamlConverter:
         else:
             raise UnsupportedFeatureError(f"Unsupported statement: {type(node).__name__}")
 
-    def _convert_function_def(self, node: ast.FunctionDef) -> List[str]:
+    def _convert_function_def(self, node: ast.FunctionDef) -> list[str]:
         """Convert Python function definition to OCaml."""
-        func_name = self._to_ocaml_var_name(node.name)
+        self._to_ocaml_var_name(node.name)
 
         # Extract parameter information
         params = []
@@ -121,7 +121,7 @@ class MGenPythonToOCamlConverter:
             # This is a regular function
             return self._convert_regular_function(node, params, return_type)
 
-    def _convert_regular_function(self, node: ast.FunctionDef, params: List[tuple], return_type: str) -> List[str]:
+    def _convert_regular_function(self, node: ast.FunctionDef, params: list[tuple], return_type: str) -> list[str]:
         """Convert a regular function definition."""
         func_name = self._to_ocaml_var_name(node.name)
 
@@ -142,7 +142,7 @@ class MGenPythonToOCamlConverter:
         else:
             # Multiple statements - use let expressions
             body_lines = []
-            for i, stmt in enumerate(node.body):
+            for _i, stmt in enumerate(node.body):
                 if isinstance(stmt, ast.Return):
                     if stmt.value:
                         body_lines.append(f"  {self._convert_expression(stmt.value)}")
@@ -162,7 +162,7 @@ class MGenPythonToOCamlConverter:
 
         return lines
 
-    def _convert_class_def(self, node: ast.ClassDef) -> List[str]:
+    def _convert_class_def(self, node: ast.ClassDef) -> list[str]:
         """Convert Python class to OCaml record type and functions."""
         class_name = self._to_ocaml_type_name(node.name)
         self.current_class = class_name
@@ -209,7 +209,7 @@ class MGenPythonToOCamlConverter:
         self.current_class = None
         return lines
 
-    def _extract_class_fields(self, init_method: ast.FunctionDef) -> List[tuple]:
+    def _extract_class_fields(self, init_method: ast.FunctionDef) -> list[tuple]:
         """Extract field definitions from __init__ method."""
         fields = []
 
@@ -228,7 +228,7 @@ class MGenPythonToOCamlConverter:
 
         return fields
 
-    def _convert_constructor(self, node: ast.FunctionDef, params: List[tuple]) -> List[str]:
+    def _convert_constructor(self, node: ast.FunctionDef, params: list[tuple]) -> list[str]:
         """Convert __init__ method to constructor function."""
         if self.current_class is None:
             raise ValueError("Constructor called outside of class context")
@@ -279,7 +279,7 @@ class MGenPythonToOCamlConverter:
 
         return lines
 
-    def _convert_method(self, node: ast.FunctionDef, params: List[tuple], return_type: str) -> List[str]:
+    def _convert_method(self, node: ast.FunctionDef, params: list[tuple], return_type: str) -> list[str]:
         """Convert class method to OCaml function."""
         if self.current_class is None:
             raise ValueError("Method called outside of class context")
@@ -473,7 +473,7 @@ class MGenPythonToOCamlConverter:
         else:
             raise UnsupportedFeatureError(f"Unsupported function call: {type(node.func).__name__}")
 
-    def _convert_builtin_call(self, func_name: str, args: List[ast.expr]) -> str:
+    def _convert_builtin_call(self, func_name: str, args: list[ast.expr]) -> str:
         """Convert built-in function calls."""
         if not args:
             raise UnsupportedFeatureError(f"Function {func_name} requires arguments")
@@ -491,7 +491,7 @@ class MGenPythonToOCamlConverter:
 
         return builtin_map.get(func_name, f"{func_name}' {arg}")
 
-    def _convert_range_call(self, args: List[ast.expr]) -> str:
+    def _convert_range_call(self, args: list[ast.expr]) -> str:
         """Convert range() call to OCaml."""
         if len(args) == 1:
             stop = self._convert_expression(args[0])
@@ -527,7 +527,7 @@ class MGenPythonToOCamlConverter:
         else:
             raise UnsupportedFeatureError("Complex method calls not supported")
 
-    def _convert_string_method(self, obj_name: str, method_name: str, args: List[ast.expr]) -> str:
+    def _convert_string_method(self, obj_name: str, method_name: str, args: list[ast.expr]) -> str:
         """Convert string method calls."""
         if method_name == "upper":
             return f"upper {obj_name}"
@@ -825,7 +825,7 @@ class OCamlEmitter(AbstractEmitter):
         """Generate OCaml code from Python source."""
         return self.converter.convert_code(source_code)
 
-    def emit_function(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+    def emit_function(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Generate complete function in OCaml."""
         return "\n".join(self.converter._convert_function_def(func_node))
 
@@ -837,7 +837,7 @@ class OCamlEmitter(AbstractEmitter):
         """Map Python type to OCaml type."""
         return self.converter.type_map.get(python_type, "'a")
 
-    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> bool:
+    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> bool:
         """Determine if function can use simple emission strategy."""
         # For now, always use the full converter
         return False

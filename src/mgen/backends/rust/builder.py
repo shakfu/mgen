@@ -2,7 +2,6 @@
 
 import subprocess
 from pathlib import Path
-from typing import List
 
 from ..base import AbstractBuilder
 
@@ -14,7 +13,7 @@ class RustBuilder(AbstractBuilder):
         """Return Cargo.toml as the build file name."""
         return "Cargo.toml"
 
-    def generate_build_file(self, source_files: List[str], target_name: str) -> str:
+    def generate_build_file(self, source_files: list[str], target_name: str) -> str:
         """Generate Cargo.toml for Rust project."""
         cargo_content = f"""[package]
 name = "{target_name}"
@@ -53,6 +52,6 @@ edition = "2021"
         except Exception:
             return False
 
-    def get_compile_flags(self) -> List[str]:
+    def get_compile_flags(self) -> list[str]:
         """Get Rust compilation flags."""
         return ["--edition", "2021", "-O"]

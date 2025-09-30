@@ -7,7 +7,7 @@ optimization opportunities, particularly in loops and array operations.
 import ast
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 from ..base import AnalysisContext, BaseOptimizer, OptimizationResult
 
@@ -43,7 +43,7 @@ class MemoryAccess:
     """Represents a memory access pattern."""
 
     variable: str
-    indices: List[ast.expr]  # Changed from List[ast.AST] to List[ast.expr]
+    indices: list[ast.expr]  # Changed from List[ast.AST] to List[ast.expr]
     is_read: bool
     is_write: bool
     access_pattern: str  # "linear", "strided", "random", "irregular"
@@ -58,12 +58,12 @@ class VectorizationCandidate:
     loop_node: ast.AST
     vectorization_type: VectorizationType
     vector_length: int
-    memory_accesses: List[MemoryAccess]
-    constraints: Set[VectorizationConstraint]
+    memory_accesses: list[MemoryAccess]
+    constraints: set[VectorizationConstraint]
     estimated_speedup: float
     confidence: float
     transformation_complexity: str  # "trivial", "moderate", "complex"
-    required_intrinsics: List[str] = field(default_factory=list)
+    required_intrinsics: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate the candidate after initialization."""
@@ -77,13 +77,13 @@ class VectorizationCandidate:
 class VectorizationReport:
     """Report containing vectorization analysis results."""
 
-    candidates: List[VectorizationCandidate]
+    candidates: list[VectorizationCandidate]
     total_loops_analyzed: int
     vectorizable_loops: int
     potential_speedup: float
-    recommended_vector_widths: Dict[str, int]
-    architecture_recommendations: List[str]
-    analysis_summary: Dict[str, Any]
+    recommended_vector_widths: dict[str, int]
+    architecture_recommendations: list[str]
+    analysis_summary: dict[str, Any]
 
 
 class VectorizationDetector(BaseOptimizer):
@@ -101,7 +101,7 @@ class VectorizationDetector(BaseOptimizer):
         self.default_vector_width = vector_width
         self.arch_capabilities = self._get_arch_capabilities()
 
-    def _get_arch_capabilities(self) -> Dict[str, Any]:
+    def _get_arch_capabilities(self) -> dict[str, Any]:
         """Get architecture-specific vectorization capabilities."""
         capabilities = {
             "x86_64": {
@@ -242,7 +242,7 @@ class VectorizationDetector(BaseOptimizer):
 
         return False
 
-    def _analyze_memory_accesses(self, loop_node: ast.AST) -> List[MemoryAccess]:
+    def _analyze_memory_accesses(self, loop_node: ast.AST) -> list[MemoryAccess]:
         """Analyze memory access patterns in a loop."""
         accesses = []
 
@@ -278,7 +278,7 @@ class VectorizationDetector(BaseOptimizer):
             stride=stride,
         )
 
-    def _analyze_access_pattern(self, indices: List[ast.expr], loop_node: ast.AST) -> Tuple[str, Optional[int]]:
+    def _analyze_access_pattern(self, indices: list[ast.expr], loop_node: ast.AST) -> tuple[str, Optional[int]]:
         """Analyze the access pattern of array indices."""
         if len(indices) != 1:
             return "irregular", None
@@ -314,7 +314,7 @@ class VectorizationDetector(BaseOptimizer):
             return loop_node.target.id
         return None
 
-    def _filter_vectorizable_accesses(self, accesses: List[MemoryAccess]) -> List[MemoryAccess]:
+    def _filter_vectorizable_accesses(self, accesses: list[MemoryAccess]) -> list[MemoryAccess]:
         """Filter accesses to keep only vectorizable ones."""
         vectorizable = []
 
@@ -325,7 +325,7 @@ class VectorizationDetector(BaseOptimizer):
 
         return vectorizable
 
-    def _classify_vectorization_type(self, loop_node: ast.AST, accesses: List[MemoryAccess]) -> VectorizationType:
+    def _classify_vectorization_type(self, loop_node: ast.AST, accesses: list[MemoryAccess]) -> VectorizationType:
         """Classify the type of vectorization opportunity."""
         # Check dot product first since it's a specific type of reduction
         if self._is_dot_product_pattern(loop_node, accesses):
@@ -342,7 +342,7 @@ class VectorizationDetector(BaseOptimizer):
 
         return VectorizationType.SIMPLE_LOOP
 
-    def _is_reduction_pattern(self, loop_node: ast.AST, accesses: List[MemoryAccess]) -> bool:
+    def _is_reduction_pattern(self, loop_node: ast.AST, accesses: list[MemoryAccess]) -> bool:
         """Check if this is a reduction pattern."""
         for node in ast.walk(loop_node):
             if isinstance(node, ast.AugAssign):
@@ -350,7 +350,7 @@ class VectorizationDetector(BaseOptimizer):
                     return True
         return False
 
-    def _is_array_copy_pattern(self, accesses: List[MemoryAccess]) -> bool:
+    def _is_array_copy_pattern(self, accesses: list[MemoryAccess]) -> bool:
         """Check if this is an array copy pattern."""
         if len(accesses) == 2:
             read_access = next((a for a in accesses if a.is_read), None)
@@ -360,14 +360,14 @@ class VectorizationDetector(BaseOptimizer):
                 return read_access.access_pattern == "linear" and write_access.access_pattern == "linear"
         return False
 
-    def _is_element_wise_pattern(self, accesses: List[MemoryAccess]) -> bool:
+    def _is_element_wise_pattern(self, accesses: list[MemoryAccess]) -> bool:
         """Check if this is an element-wise operation pattern."""
         if len(accesses) >= 2:
             linear_accesses = [a for a in accesses if a.access_pattern == "linear"]
             return len(linear_accesses) == len(accesses)
         return False
 
-    def _is_dot_product_pattern(self, loop_node: ast.AST, accesses: List[MemoryAccess]) -> bool:
+    def _is_dot_product_pattern(self, loop_node: ast.AST, accesses: list[MemoryAccess]) -> bool:
         """Check if this is a dot product pattern."""
         if len(accesses) >= 2 and self._is_reduction_pattern(loop_node, accesses):
             # Check for pattern: result += a[i] * b[i]
@@ -380,7 +380,7 @@ class VectorizationDetector(BaseOptimizer):
                             return all(a.access_pattern == "linear" for a in read_accesses)
         return False
 
-    def _identify_constraints(self, loop_node: ast.AST, accesses: List[MemoryAccess]) -> Set[VectorizationConstraint]:
+    def _identify_constraints(self, loop_node: ast.AST, accesses: list[MemoryAccess]) -> set[VectorizationConstraint]:
         """Identify constraints that affect vectorization."""
         constraints = set()
 
@@ -447,12 +447,12 @@ class VectorizationDetector(BaseOptimizer):
                 return True
         return False
 
-    def _has_potential_aliasing(self, accesses: List[MemoryAccess]) -> bool:
+    def _has_potential_aliasing(self, accesses: list[MemoryAccess]) -> bool:
         """Check for potential memory aliasing issues."""
         variables = set(a.variable for a in accesses)
         return len(variables) < len(accesses)  # Simplified check
 
-    def _has_data_dependencies(self, loop_node: ast.AST, accesses: List[MemoryAccess]) -> bool:
+    def _has_data_dependencies(self, loop_node: ast.AST, accesses: list[MemoryAccess]) -> bool:
         """Check for data dependencies that prevent vectorization."""
         # Check for loop-carried dependencies and reduction patterns
         for node in ast.walk(loop_node):
@@ -477,7 +477,7 @@ class VectorizationDetector(BaseOptimizer):
         # Only flag as dependency if it's the same array (potential aliasing)
         return bool(write_vars.intersection(read_vars))
 
-    def _determine_vector_length(self, accesses: List[MemoryAccess], vec_type: VectorizationType) -> int:
+    def _determine_vector_length(self, accesses: list[MemoryAccess], vec_type: VectorizationType) -> int:
         """Determine optimal vector length for the operation."""
         base_width = self.default_vector_width
 
@@ -499,7 +499,7 @@ class VectorizationDetector(BaseOptimizer):
         return max(2, min(base_width, 16))
 
     def _estimate_speedup(
-        self, vec_type: VectorizationType, vector_length: int, constraints: Set[VectorizationConstraint]
+        self, vec_type: VectorizationType, vector_length: int, constraints: set[VectorizationConstraint]
     ) -> float:
         """Estimate potential speedup from vectorization."""
         base_speedup = vector_length * 0.8  # Account for overhead
@@ -532,7 +532,7 @@ class VectorizationDetector(BaseOptimizer):
 
         return max(1.1, speedup)
 
-    def _calculate_confidence(self, constraints: Set[VectorizationConstraint], accesses: List[MemoryAccess]) -> float:
+    def _calculate_confidence(self, constraints: set[VectorizationConstraint], accesses: list[MemoryAccess]) -> float:
         """Calculate confidence in the vectorization analysis."""
         base_confidence = 0.9
 
@@ -556,7 +556,7 @@ class VectorizationDetector(BaseOptimizer):
         return max(0.1, min(1.0, base_confidence))
 
     def _assess_transformation_complexity(
-        self, vec_type: VectorizationType, constraints: Set[VectorizationConstraint]
+        self, vec_type: VectorizationType, constraints: set[VectorizationConstraint]
     ) -> str:
         """Assess the complexity of the required transformation."""
         if len(constraints) == 0:
@@ -573,7 +573,7 @@ class VectorizationDetector(BaseOptimizer):
 
         return "moderate"
 
-    def _suggest_intrinsics(self, vec_type: VectorizationType, vector_length: int) -> List[str]:
+    def _suggest_intrinsics(self, vec_type: VectorizationType, vector_length: int) -> list[str]:
         """Suggest appropriate SIMD intrinsics for the vectorization."""
         intrinsics = []
 
@@ -589,7 +589,7 @@ class VectorizationDetector(BaseOptimizer):
 
         return intrinsics
 
-    def _recommend_vector_widths(self, candidates: List[VectorizationCandidate]) -> Dict[str, int]:
+    def _recommend_vector_widths(self, candidates: list[VectorizationCandidate]) -> dict[str, int]:
         """Recommend optimal vector widths for different data types."""
         recommendations = {}
 
@@ -603,7 +603,7 @@ class VectorizationDetector(BaseOptimizer):
 
         return recommendations
 
-    def _generate_arch_recommendations(self, candidates: List[VectorizationCandidate]) -> List[str]:
+    def _generate_arch_recommendations(self, candidates: list[VectorizationCandidate]) -> list[str]:
         """Generate architecture-specific recommendations."""
         recommendations = []
 
@@ -622,7 +622,7 @@ class VectorizationDetector(BaseOptimizer):
 
         return recommendations
 
-    def _analyze_complexity_distribution(self, candidates: List[VectorizationCandidate]) -> Dict[str, int]:
+    def _analyze_complexity_distribution(self, candidates: list[VectorizationCandidate]) -> dict[str, int]:
         """Analyze the distribution of transformation complexities."""
         distribution = {"trivial": 0, "moderate": 0, "complex": 0}
 
@@ -631,9 +631,9 @@ class VectorizationDetector(BaseOptimizer):
 
         return distribution
 
-    def _analyze_constraint_frequency(self, candidates: List[VectorizationCandidate]) -> Dict[str, int]:
+    def _analyze_constraint_frequency(self, candidates: list[VectorizationCandidate]) -> dict[str, int]:
         """Analyze frequency of different constraints."""
-        frequency: Dict[str, int] = {}
+        frequency: dict[str, int] = {}
 
         for candidate in candidates:
             for constraint in candidate.constraints:

@@ -1,4 +1,4 @@
-"""STC Template Manager
+"""STC Template Manager.
 
 This module manages STC template instantiation and avoids multiple macro redefinitions.
 It provides a centralized system for tracking and generating unique STC template definitions.
@@ -6,7 +6,7 @@ It provides a centralized system for tracking and generating unique STC template
 
 import hashlib
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 
 @dataclass
@@ -15,7 +15,7 @@ class STCTemplateInstance:
 
     template_name: str  # e.g., "vec_int"
     stc_type: str  # e.g., "vec"
-    element_types: List[str]  # e.g., ["int"] or ["cstr", "int"] for maps
+    element_types: list[str]  # e.g., ["int"] or ["cstr", "int"] for maps
     header_file: str  # e.g., "stc/vec.h"
     macro_definition: str  # The actual #define statement
     instance_name: str  # Unique instance name for this specific usage
@@ -26,17 +26,17 @@ class STCTemplateManager:
 
     def __init__(self) -> None:
         # Track generated template instances by signature
-        self.template_instances: Dict[str, STCTemplateInstance] = {}
+        self.template_instances: dict[str, STCTemplateInstance] = {}
         # Track which headers are needed
-        self.required_headers: Set[str] = set()
+        self.required_headers: set[str] = set()
         # Track variable to template instance mappings
-        self.variable_mappings: Dict[str, str] = {}
+        self.variable_mappings: dict[str, str] = {}
         # Counter for generating unique names
         self.instance_counter = 0
         # Nested container manager (lazy initialization to avoid circular imports)
         self._nested_container_manager: Optional[Any] = None
 
-    def _generate_signature(self, stc_type: str, element_types: List[str]) -> str:
+    def _generate_signature(self, stc_type: str, element_types: list[str]) -> str:
         """Generate a unique signature for a template instantiation."""
         combined = f"{stc_type}_{'_'.join(element_types)}"
         # Use hash for very long type names
@@ -72,7 +72,7 @@ class STCTemplateManager:
         return self._nested_container_manager
 
     def register_container_usage(
-        self, variable_name: str, stc_type: str, element_types: List[str], header_file: str
+        self, variable_name: str, stc_type: str, element_types: list[str], header_file: str
     ) -> str:
         """Register a container usage and get the template instance name.
         Enhanced to support nested containers.
@@ -163,7 +163,7 @@ class STCTemplateManager:
         """Get the STC container type name for a variable."""
         return self.variable_mappings.get(variable_name)
 
-    def generate_template_definitions(self) -> List[str]:
+    def generate_template_definitions(self) -> list[str]:
         """Generate all template definitions in dependency order."""
         definitions = []
 
@@ -184,11 +184,11 @@ class STCTemplateManager:
 
         return definitions
 
-    def generate_include_statements(self) -> List[str]:
+    def generate_include_statements(self) -> list[str]:
         """Generate unique include statements needed."""
         return [f"#include <{header}>" for header in sorted(self.required_headers)]
 
-    def generate_cleanup_statements(self, scope_variables: List[str]) -> List[str]:
+    def generate_cleanup_statements(self, scope_variables: list[str]) -> list[str]:
         """Generate cleanup statements for variables in the given scope."""
         cleanup_statements = []
 
@@ -213,7 +213,7 @@ class STCTemplateManager:
         self.variable_mappings.clear()
         self.instance_counter = 0
 
-    def get_statistics(self) -> Dict[str, int]:
+    def get_statistics(self) -> dict[str, int]:
         """Get statistics about template usage."""
         return {
             "total_instances": len(self.template_instances),

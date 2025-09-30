@@ -20,7 +20,7 @@ Supported Features:
 """
 
 import ast
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 from ..base import AbstractEmitter
 from ..preferences import BackendPreferences
@@ -53,10 +53,10 @@ class MGenPythonToCppConverter:
             "set": "std::unordered_set",   # Will be specialized
         }
         self.current_function: Optional[str] = None
-        self.container_variables: Dict[str, Dict[str, Any]] = {}
-        self.variable_context: Dict[str, str] = {}  # var_name -> cpp_type
-        self.defined_classes: Dict[str, Dict[str, Any]] = {}
-        self.iterator_variables: Dict[str, str] = {}
+        self.container_variables: dict[str, dict[str, Any]] = {}
+        self.variable_context: dict[str, str] = {}  # var_name -> cpp_type
+        self.defined_classes: dict[str, dict[str, Any]] = {}
+        self.iterator_variables: dict[str, str] = {}
         self.includes_needed: set[str] = set()
         self.use_runtime = True
 
@@ -105,7 +105,7 @@ class MGenPythonToCppConverter:
 
         return "\n".join(parts)
 
-    def _generate_includes(self) -> List[str]:
+    def _generate_includes(self) -> list[str]:
         """Generate necessary C++ includes based on code analysis."""
         includes = [
             "#include <iostream>",
@@ -228,7 +228,7 @@ class MGenPythonToCppConverter:
         parts.append("};")
         return "\n".join(parts)
 
-    def _extract_instance_variables(self, class_node: ast.ClassDef) -> Dict[str, str]:
+    def _extract_instance_variables(self, class_node: ast.ClassDef) -> dict[str, str]:
         """Extract instance variables from __init__ method."""
         instance_vars = {}
 
@@ -256,7 +256,7 @@ class MGenPythonToCppConverter:
 
         return instance_vars
 
-    def _extract_methods(self, class_node: ast.ClassDef) -> List[ast.FunctionDef]:
+    def _extract_methods(self, class_node: ast.ClassDef) -> list[ast.FunctionDef]:
         """Extract method definitions from class."""
         methods = []
         for stmt in class_node.body:
@@ -265,7 +265,7 @@ class MGenPythonToCppConverter:
         return methods
 
     def _generate_constructor(self, class_name: str, init_method: ast.FunctionDef,
-                            instance_vars: Dict[str, str]) -> str:
+                            instance_vars: dict[str, str]) -> str:
         """Generate C++ constructor from Python __init__."""
         # Get constructor parameters (skip 'self')
         params = []
@@ -444,7 +444,7 @@ class MGenPythonToCppConverter:
                 if isinstance(expr.func.value, ast.Name) and expr.func.value.id == "self":
                     # self.method() -> handle string methods and other method calls
                     method_name = expr.func.attr
-                    args = [self._convert_method_expression(arg, class_name) for arg in expr.args]
+                    [self._convert_method_expression(arg, class_name) for arg in expr.args]
 
                     # Handle string methods on self attributes
                     if method_name in ["upper", "lower", "strip", "find", "replace", "split"]:
@@ -481,7 +481,7 @@ class MGenPythonToCppConverter:
             left = self._convert_method_expression(expr.left, class_name)
             result = left
 
-            cmpop_map: Dict[type, str] = {
+            cmpop_map: dict[type, str] = {
                 ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
                 ast.Gt: ">", ast.GtE: ">=", ast.Is: "==", ast.IsNot: "!="
             }
@@ -1056,7 +1056,7 @@ class MGenPythonToCppConverter:
             else:
                 return f"set_comprehension({container_expr}, {transform_lambda})"
 
-    def _convert_statements(self, statements: List[ast.stmt]) -> str:
+    def _convert_statements(self, statements: list[ast.stmt]) -> str:
         """Convert multiple statements."""
         converted_statements = []
         for stmt in statements:
@@ -1225,12 +1225,12 @@ class CppEmitter(AbstractEmitter):
         """Map Python type to C++ type."""
         return self.converter.type_mapping.get(python_type, "auto")
 
-    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> bool:
+    def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> bool:
         """Check if simple emission can be used for this code."""
         # Always use full sophisticated conversion
         return False
 
-    def emit_function(self, func_node: ast.FunctionDef, type_context: Dict[str, str]) -> str:
+    def emit_function(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Emit a C++ function from a Python function definition."""
         # Delegate to converter for comprehensive function handling
         return self.converter._convert_function(func_node)

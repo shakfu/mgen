@@ -1,6 +1,6 @@
 """C++ container system implementation."""
 
-from typing import Dict, List, Optional
+from typing import Optional
 
 from ..base import AbstractContainerSystem
 
@@ -10,7 +10,7 @@ class CppContainerSystem(AbstractContainerSystem):
 
     def __init__(self) -> None:
         """Initialize the C++ container system."""
-        self.container_mappings: Dict[str, str] = {
+        self.container_mappings: dict[str, str] = {
             "list": "std::vector",
             "dict": "std::map",
             "set": "std::set",
@@ -23,7 +23,7 @@ class CppContainerSystem(AbstractContainerSystem):
             "unordered_set": "std::unordered_set",
         }
 
-        self.required_headers: Dict[str, str] = {
+        self.required_headers: dict[str, str] = {
             "std::vector": "vector",
             "std::map": "map",
             "std::set": "set",
@@ -37,7 +37,7 @@ class CppContainerSystem(AbstractContainerSystem):
             "std::string": "string",
         }
 
-    def get_container_type(self, python_container: str, element_types: Optional[List[str]] = None) -> str:
+    def get_container_type(self, python_container: str, element_types: Optional[list[str]] = None) -> str:
         """Get C++ container type for Python container."""
         base_type = self.container_mappings.get(python_container, python_container)
 
@@ -52,7 +52,7 @@ class CppContainerSystem(AbstractContainerSystem):
 
         return base_type
 
-    def create_container(self, container_type: str, elements: Optional[List[str]] = None) -> str:
+    def create_container(self, container_type: str, elements: Optional[list[str]] = None) -> str:
         """Create C++ container initialization."""
         if elements:
             elements_str = ", ".join(elements)
@@ -98,7 +98,7 @@ class CppContainerSystem(AbstractContainerSystem):
         else:
             return f"for (auto& item : {container_var})"
 
-    def get_required_headers(self) -> List[str]:
+    def get_required_headers(self) -> list[str]:
         """Get list of required headers for containers."""
         return list(set(self.required_headers.values()))
 
@@ -106,7 +106,7 @@ class CppContainerSystem(AbstractContainerSystem):
         """Get required header for specific container type."""
         return self.required_headers.get(container_type)
 
-    def generate_container_includes(self, used_containers: List[str]) -> List[str]:
+    def generate_container_includes(self, used_containers: list[str]) -> list[str]:
         """Generate include statements for used containers."""
         includes = []
         headers_needed = set()
@@ -121,7 +121,7 @@ class CppContainerSystem(AbstractContainerSystem):
 
         return includes
 
-    def create_list_operations(self) -> Dict[str, str]:
+    def create_list_operations(self) -> dict[str, str]:
         """Create C++ code patterns for common list operations."""
         return {
             "append": "vec.push_back(item);",
@@ -135,7 +135,7 @@ class CppContainerSystem(AbstractContainerSystem):
             "sort": "std::sort(vec.begin(), vec.end());",
         }
 
-    def create_dict_operations(self) -> Dict[str, str]:
+    def create_dict_operations(self) -> dict[str, str]:
         """Create C++ code patterns for common dict operations."""
         return {
             "insert": "map[key] = value;",
@@ -149,7 +149,7 @@ class CppContainerSystem(AbstractContainerSystem):
             "empty": "map.empty()",
         }
 
-    def create_set_operations(self) -> Dict[str, str]:
+    def create_set_operations(self) -> dict[str, str]:
         """Create C++ code patterns for common set operations."""
         return {
             "add": "set.insert(item);",
@@ -208,7 +208,7 @@ class CppContainerSystem(AbstractContainerSystem):
         """Get C++ set type for element type."""
         return f"std::set<{element_type}>"
 
-    def generate_container_operations(self, container_type: str, operations: List[str]) -> str:
+    def generate_container_operations(self, container_type: str, operations: list[str]) -> str:
         """Generate container-specific operations code."""
         code_parts = []
         for operation in operations:
@@ -226,7 +226,7 @@ class CppContainerSystem(AbstractContainerSystem):
                     code_parts.append(ops[operation])
         return "\n".join(code_parts)
 
-    def get_required_imports(self) -> List[str]:
+    def get_required_imports(self) -> list[str]:
         """Get imports required for container operations."""
         return [
             "#include <vector>",

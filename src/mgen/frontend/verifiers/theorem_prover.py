@@ -1,4 +1,4 @@
-"""Z3 Theorem Prover Integration for Formal Verification
+"""Z3 Theorem Prover Integration for Formal Verification.
 
 This module provides integration with the Z3 theorem prover for formal verification
 of code properties, memory safety, and algorithm correctness.
@@ -10,7 +10,7 @@ import ast
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 # Z3 integration - graceful fallback if not installed
 # import z3  # TODO: Fix missing z3 dependency
@@ -129,7 +129,7 @@ class ProofProperty:
     property_type: PropertyType
     description: str
     z3_formula: Any  # Z3 formula
-    context: Optional[Dict[str, Any]] = None
+    context: dict[str, Any] | None = None
 
 
 @dataclass
@@ -139,10 +139,10 @@ class ProofResult:
     proof_property: ProofProperty  # Renamed from 'property' to avoid conflict with @property decorator
     status: ProofStatus
     proof_time: float
-    counterexample: Optional[Dict[str, Any]] = None
-    error_message: Optional[str] = None
-    z3_model: Optional[Any] = None
-    verification_steps: Optional[List[str]] = None
+    counterexample: dict[str, Any] | None = None
+    error_message: str | None = None
+    z3_model: Any | None = None
+    verification_steps: list[str] | None = None
 
     def __post_init__(self) -> None:
         if self.verification_steps is None:
@@ -249,7 +249,7 @@ class TheoremProver:
                 proof_property=prop, status=ProofStatus.ERROR, proof_time=time.time() - start_time, error_message=str(e)
             )
 
-    def verify_multiple_properties(self, properties: List[ProofProperty]) -> List[ProofResult]:
+    def verify_multiple_properties(self, properties: list[ProofProperty]) -> list[ProofResult]:
         """Verify multiple properties efficiently.
 
         Args:
@@ -271,7 +271,7 @@ class TheoremProver:
         return results
 
     def create_bounds_check_property(
-        self, array_name: str, index_expr: str, array_size: Union[int, str], context: Optional[Dict[str, Any]] = None
+        self, array_name: str, index_expr: str, array_size: int | str, context: dict[str, Any] | None = None
     ) -> ProofProperty:
         """Create a bounds checking property.
 
@@ -309,7 +309,7 @@ class TheoremProver:
         )
 
     def create_overflow_safety_property(
-        self, operation: str, operands: List[str], result_type: str = "int", context: Optional[Dict[str, Any]] = None
+        self, operation: str, operands: list[str], result_type: str = "int", context: dict[str, Any] | None = None
     ) -> ProofProperty:
         """Create an overflow safety property.
 
@@ -363,7 +363,7 @@ class TheoremProver:
             context=context,
         )
 
-    def analyze_function_safety(self, context: AnalysisContext) -> List[ProofResult]:
+    def analyze_function_safety(self, context: AnalysisContext) -> list[ProofResult]:
         """Analyze a function for various safety properties.
 
         Args:
@@ -393,7 +393,7 @@ class TheoremProver:
         # Verify all properties
         return self.verify_multiple_properties(properties)
 
-    def _extract_counterexample(self, model: Any) -> Dict[str, Any]:
+    def _extract_counterexample(self, model: Any) -> dict[str, Any]:
         """Extract counterexample from Z3 model."""
         if not model:
             return {}
@@ -439,10 +439,10 @@ class SafetyPropertyExtractor(ast.NodeVisitor):
     """AST visitor to extract safety properties from Python code."""
 
     def __init__(self) -> None:
-        self.array_accesses: List[Dict[str, Any]] = []
-        self.arithmetic_ops: List[Dict[str, Any]] = []
-        self.function_calls: List[Dict[str, Any]] = []
-        self.loop_bounds: List[Dict[str, Any]] = []
+        self.array_accesses: list[dict[str, Any]] = []
+        self.arithmetic_ops: list[dict[str, Any]] = []
+        self.function_calls: list[dict[str, Any]] = []
+        self.loop_bounds: list[dict[str, Any]] = []
 
     def visit_Subscript(self, node: ast.Subscript) -> None:
         """Extract array access patterns."""

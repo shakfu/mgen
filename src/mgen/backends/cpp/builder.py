@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from ..base import AbstractBuilder
 
@@ -14,14 +14,14 @@ class CppBuilder(AbstractBuilder):
         """Initialize the C++ builder."""
         self.compiler = "g++"
         self.default_flags = ["-std=c++17", "-Wall", "-O2"]
-        self.runtime_sources: List[str] = []
+        self.runtime_sources: list[str] = []
         self.runtime_headers_dir: Optional[str] = None
 
     def get_build_filename(self) -> str:
         """Get the build file name (Makefile for C++)."""
         return "Makefile"
 
-    def generate_build_file(self, source_files: List[str], target_name: str) -> str:
+    def generate_build_file(self, source_files: list[str], target_name: str) -> str:
         """Generate a Makefile for the C++ project."""
         sources = " ".join(Path(f).name for f in source_files)
 
@@ -98,18 +98,16 @@ help:
             if result.returncode == 0:
                 return True
             else:
-                print(f"C++ compilation failed: {result.stderr}")
                 return False
 
-        except Exception as e:
-            print(f"C++ compilation error: {e}")
+        except Exception:
             return False
 
     def get_executable_name(self, source_file: str) -> str:
         """Get the executable name for a source file."""
         return Path(source_file).stem
 
-    def get_compiler_flags(self) -> List[str]:
+    def get_compiler_flags(self) -> list[str]:
         """Get default compiler flags."""
         return self.default_flags.copy()
 
@@ -159,7 +157,7 @@ help:
         """Add a library directory."""
         self.add_flag(f"-L{directory}")
 
-    def generate_cmake_file(self, source_files: List[str], target_name: str) -> str:
+    def generate_cmake_file(self, source_files: list[str], target_name: str) -> str:
         """Generate a CMakeLists.txt file as an alternative to Makefile."""
         sources = "\n    ".join(Path(f).name for f in source_files)
 
@@ -190,16 +188,16 @@ install(TARGETS {target_name} DESTINATION bin)
 """
         return cmake_content
 
-    def get_compile_flags(self) -> List[str]:
+    def get_compile_flags(self) -> list[str]:
         """Get default compilation flags with runtime includes."""
         flags = self.default_flags.copy()
         if self.runtime_headers_dir:
             flags.append(f"-I{self.runtime_headers_dir}")
         return flags
 
-    def _detect_runtime_sources(self, source_files: List[str]) -> List[str]:
+    def _detect_runtime_sources(self, source_files: list[str]) -> list[str]:
         """Detect if runtime sources are needed based on generated code analysis."""
-        runtime_sources: List[str] = []
+        runtime_sources: list[str] = []
 
         # Check if any source files use MGen runtime features
         for source_file in source_files:
@@ -250,11 +248,11 @@ install(TARGETS {target_name} DESTINATION bin)
         """Set the runtime headers directory."""
         self.runtime_headers_dir = runtime_dir
 
-    def get_runtime_sources(self) -> List[str]:
+    def get_runtime_sources(self) -> list[str]:
         """Get list of runtime source files (empty for header-only C++ runtime)."""
         return self.runtime_sources.copy()
 
-    def requires_runtime_library(self, source_files: List[str]) -> bool:
+    def requires_runtime_library(self, source_files: list[str]) -> bool:
         """Check if the project requires MGen C++ runtime library."""
         runtime_sources = self._detect_runtime_sources(source_files)
         return len(runtime_sources) > 0 or self.runtime_headers_dir is not None

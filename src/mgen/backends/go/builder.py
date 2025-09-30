@@ -2,7 +2,6 @@
 
 import subprocess
 from pathlib import Path
-from typing import List
 
 from ..base import AbstractBuilder
 
@@ -14,7 +13,7 @@ class GoBuilder(AbstractBuilder):
         """Return go.mod as the build file name."""
         return "go.mod"
 
-    def generate_build_file(self, source_files: List[str], target_name: str) -> str:
+    def generate_build_file(self, source_files: list[str], target_name: str) -> str:
         """Generate go.mod for Go project."""
         go_mod_content = f"""module {target_name}
 
@@ -50,6 +49,6 @@ go 1.21
         except Exception:
             return False
 
-    def get_compile_flags(self) -> List[str]:
+    def get_compile_flags(self) -> list[str]:
         """Get Go compilation flags."""
         return ["-ldflags", "-s -w"]  # Strip debug info for smaller binaries

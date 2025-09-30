@@ -1,4 +1,4 @@
-"""Memory Safety and Bounds Verification
+"""Memory Safety and Bounds Verification.
 
 This module provides formal verification of memory safety properties,
 including bounds checking, buffer overflow prevention, and pointer safety.
@@ -8,7 +8,7 @@ import ast
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 try:
     # import z3  # TODO: Fix missing z3 dependency
@@ -101,9 +101,9 @@ class MemorySafetyProof:
     function_name: str
     safety_type: MemorySafetyType
     is_safe: bool
-    proof_results: List[ProofResult]
-    unsafe_accesses: List[MemoryAccess]
-    recommendations: List[str]
+    proof_results: list[ProofResult]
+    unsafe_accesses: list[MemoryAccess]
+    recommendations: list[str]
     verification_time: float
     confidence: float  # 0.0 to 1.0
 
@@ -127,8 +127,8 @@ class BoundsProver:
         self.z3_available = Z3_AVAILABLE
 
         # Track memory regions and their properties
-        self.memory_regions: Dict[str, MemoryRegion] = {}
-        self.memory_accesses: List[MemoryAccess] = []
+        self.memory_regions: dict[str, MemoryRegion] = {}
+        self.memory_accesses: list[MemoryAccess] = []
 
     def verify_memory_safety(self, context: AnalysisContext) -> MemorySafetyProof:
         """Verify memory safety for a function.
@@ -195,7 +195,7 @@ class BoundsProver:
             confidence=confidence,
         )
 
-    def _verify_bounds_safety(self) -> List[ProofResult]:
+    def _verify_bounds_safety(self) -> list[ProofResult]:
         """Verify bounds checking for all memory accesses."""
         results = []
 
@@ -211,11 +211,11 @@ class BoundsProver:
 
         return results
 
-    def _verify_null_pointer_safety(self) -> List[ProofResult]:
+    def _verify_null_pointer_safety(self) -> list[ProofResult]:
         """Verify null pointer dereference safety."""
         results = []
 
-        for region_name, region in self.memory_regions.items():
+        for _region_name, region in self.memory_regions.items():
             if region.base_address == 0 or region.base_address == "null":
                 # Create null pointer safety property
                 prop = self._create_null_pointer_property(region)
@@ -224,12 +224,12 @@ class BoundsProver:
 
         return results
 
-    def _verify_buffer_overflow_safety(self) -> List[ProofResult]:
+    def _verify_buffer_overflow_safety(self) -> list[ProofResult]:
         """Verify buffer overflow prevention."""
         results = []
 
         # Group accesses by memory region
-        region_accesses: Dict[str, List[MemoryAccess]] = {}
+        region_accesses: dict[str, list[MemoryAccess]] = {}
         for access in self.memory_accesses:
             region_name = access.region.name
             if region_name not in region_accesses:
@@ -238,7 +238,7 @@ class BoundsProver:
 
         # Verify each region for buffer overflows
         for region_name, accesses in region_accesses.items():
-            region = self.memory_regions[region_name]
+            self.memory_regions[region_name]
 
             # Check for potential buffer overflows
             for access in accesses:
@@ -340,7 +340,7 @@ class BoundsProver:
             context={"access": access, "region": region},
         )
 
-    def _calculate_confidence(self, proof_results: List[ProofResult]) -> float:
+    def _calculate_confidence(self, proof_results: list[ProofResult]) -> float:
         """Calculate confidence based on proof results."""
         if not proof_results:
             return 0.0
@@ -354,8 +354,8 @@ class BoundsProver:
         return min(confidence, 1.0)
 
     def _generate_recommendations(
-        self, unsafe_accesses: List[MemoryAccess], proof_results: List[ProofResult]
-    ) -> List[str]:
+        self, unsafe_accesses: list[MemoryAccess], proof_results: list[ProofResult]
+    ) -> list[str]:
         """Generate recommendations for improving memory safety."""
         recommendations = []
 
@@ -382,8 +382,8 @@ class MemoryOperationExtractor(ast.NodeVisitor):
     """Extract memory operations and regions from Python AST."""
 
     def __init__(self) -> None:
-        self.memory_regions: Dict[str, MemoryRegion] = {}
-        self.memory_accesses: List[MemoryAccess] = []
+        self.memory_regions: dict[str, MemoryRegion] = {}
+        self.memory_accesses: list[MemoryAccess] = []
         self.current_function: Optional[str] = None
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
@@ -460,7 +460,7 @@ class MemoryOperationExtractor(ast.NodeVisitor):
 
         self.generic_visit(node)
 
-    def _infer_element_type(self, elements: List[ast.expr]) -> str:
+    def _infer_element_type(self, elements: list[ast.expr]) -> str:
         """Infer element type from list elements."""
         if not elements:
             return "unknown"

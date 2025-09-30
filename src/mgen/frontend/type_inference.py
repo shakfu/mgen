@@ -8,7 +8,7 @@ and static analysis.
 import ast
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from .flow_sensitive_inference import FlowSensitiveInferencer
@@ -36,8 +36,8 @@ class InferenceResult:
     type_info: TypeInfo
     confidence: float  # 0.0 to 1.0
     method: InferenceMethod
-    evidence: List[str] = field(default_factory=list)
-    alternatives: List[TypeInfo] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
+    alternatives: list[TypeInfo] = field(default_factory=list)
 
 
 @dataclass
@@ -56,8 +56,8 @@ class TypeInferenceEngine:
 
     def __init__(self, enable_flow_sensitive: bool = True):
         self.log = log.config(self.__class__.__name__)
-        self.inferred_types: Dict[str, InferenceResult] = {}
-        self.constraints: List[TypeConstraint] = []
+        self.inferred_types: dict[str, InferenceResult] = {}
+        self.constraints: list[TypeConstraint] = []
         self.enable_flow_sensitive = enable_flow_sensitive
 
         # Lazy import to avoid circular dependency
@@ -94,7 +94,7 @@ class TypeInferenceEngine:
             ("char*", ast.Eq, "char*"): "bool",
         }
 
-    def infer_expression_type(self, node: ast.expr, context: Dict[str, TypeInfo]) -> InferenceResult:
+    def infer_expression_type(self, node: ast.expr, context: dict[str, TypeInfo]) -> InferenceResult:
         """Infer the type of an expression."""
         if isinstance(node, ast.Constant):
             return self._infer_constant_type(node)
@@ -144,7 +144,7 @@ class TypeInferenceEngine:
             evidence=[f"Literal value: {repr(value)}"],
         )
 
-    def _infer_name_type(self, node: ast.Name, context: Dict[str, TypeInfo]) -> InferenceResult:
+    def _infer_name_type(self, node: ast.Name, context: dict[str, TypeInfo]) -> InferenceResult:
         """Infer type from variable name."""
         var_name = node.id
 
@@ -174,7 +174,7 @@ class TypeInferenceEngine:
             evidence=[f"Unknown variable: {var_name}"],
         )
 
-    def _infer_binop_type(self, node: ast.BinOp, context: Dict[str, TypeInfo]) -> InferenceResult:
+    def _infer_binop_type(self, node: ast.BinOp, context: dict[str, TypeInfo]) -> InferenceResult:
         """Infer type from binary operations."""
         left_result = self.infer_expression_type(node.left, context)
         right_result = self.infer_expression_type(node.right, context)
@@ -208,7 +208,7 @@ class TypeInferenceEngine:
             evidence=[f"Unknown binary operation: {op_type.__name__}"],
         )
 
-    def _infer_unaryop_type(self, node: ast.UnaryOp, context: Dict[str, TypeInfo]) -> InferenceResult:
+    def _infer_unaryop_type(self, node: ast.UnaryOp, context: dict[str, TypeInfo]) -> InferenceResult:
         """Infer type from unary operations."""
         operand_result = self.infer_expression_type(node.operand, context)
 
@@ -238,7 +238,7 @@ class TypeInferenceEngine:
             evidence=[f"Unknown unary operation: {type(node.op).__name__}"],
         )
 
-    def _infer_call_type(self, node: ast.Call, context: Dict[str, TypeInfo]) -> InferenceResult:
+    def _infer_call_type(self, node: ast.Call, context: dict[str, TypeInfo]) -> InferenceResult:
         """Infer type from function calls."""
         if isinstance(node.func, ast.Name):
             func_name = node.func.id
@@ -284,7 +284,7 @@ class TypeInferenceEngine:
             evidence=["Unknown function call"],
         )
 
-    def _infer_compare_type(self, node: ast.Compare, context: Dict[str, TypeInfo]) -> InferenceResult:
+    def _infer_compare_type(self, node: ast.Compare, context: dict[str, TypeInfo]) -> InferenceResult:
         """Infer type from comparison operations."""
         # All comparisons return bool
         return InferenceResult(
@@ -294,7 +294,7 @@ class TypeInferenceEngine:
             evidence=["Comparison operations always return bool"],
         )
 
-    def _infer_list_type(self, node: ast.List, context: Dict[str, TypeInfo]) -> InferenceResult:
+    def _infer_list_type(self, node: ast.List, context: dict[str, TypeInfo]) -> InferenceResult:
         """Infer type from list literals."""
         if not node.elts:
             # Empty list - can't infer element type
@@ -314,7 +314,7 @@ class TypeInferenceEngine:
             evidence=[f"List with {first_elem_result.type_info.c_equivalent} elements"],
         )
 
-    def _infer_tuple_type(self, node: ast.Tuple, context: Dict[str, TypeInfo]) -> InferenceResult:
+    def _infer_tuple_type(self, node: ast.Tuple, context: dict[str, TypeInfo]) -> InferenceResult:
         """Infer type from tuple literals."""
         element_types = []
         min_confidence = 1.0
@@ -332,7 +332,7 @@ class TypeInferenceEngine:
             evidence=[f"Tuple with elements: {', '.join(element_types)}"],
         )
 
-    def analyze_function_signature(self, func_node: ast.FunctionDef) -> Dict[str, InferenceResult]:
+    def analyze_function_signature(self, func_node: ast.FunctionDef) -> dict[str, InferenceResult]:
         """Analyze and infer types for a complete function signature."""
         results = {}
 
@@ -368,14 +368,14 @@ class TypeInferenceEngine:
 
         return results
 
-    def analyze_function_signature_enhanced(self, func_node: ast.FunctionDef) -> Dict[str, InferenceResult]:
+    def analyze_function_signature_enhanced(self, func_node: ast.FunctionDef) -> dict[str, InferenceResult]:
         """Enhanced function analysis with optional flow-sensitive inference."""
         if self.enable_flow_sensitive:
             return self._get_flow_sensitive_results(func_node)
         else:
             return self.analyze_function_signature(func_node)
 
-    def _get_flow_sensitive_results(self, func_node: ast.FunctionDef) -> Dict[str, InferenceResult]:
+    def _get_flow_sensitive_results(self, func_node: ast.FunctionDef) -> dict[str, InferenceResult]:
         """Get results from flow-sensitive analysis."""
         if self._flow_sensitive_inferencer is None:
             # Lazy import to avoid circular dependency
