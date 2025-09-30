@@ -14,13 +14,21 @@ if str(src_path) not in sys.path:
 HAS_PYTEST = True
 
 from mgen.frontend import (
+    AnalysisContext,
+    AnalysisLevel,
+    BoundsChecker,
+    CallGraphAnalyzer,
     ConstraintSeverity,
     InferenceMethod,
     IRDataType,
+    OptimizationLevel,
+    StaticAnalyzer,
     StaticConstraintChecker,
     StaticPythonSubsetValidator,
     SubsetTier,
+    SymbolicExecutor,
     TypeInferenceEngine,
+    VectorizationDetector,
     analyze_python_code,
     build_ir_from_code,
 )
@@ -442,3 +450,224 @@ if HAS_PYTEST:
     TestSubsetValidator = pytest.mark.frontend(pytest.mark.unit(TestSubsetValidator))
     TestStaticIR = pytest.mark.frontend(pytest.mark.unit(TestStaticIR))
     TestFrontendIntegration = pytest.mark.frontend(pytest.mark.integration(TestFrontendIntegration))
+
+
+class TestAdvancedAnalysis:
+    """Test advanced frontend analysis components."""
+
+    def test_static_analyzer_basic(self):
+        """Test StaticAnalyzer on simple code."""
+        code = """
+def add(x: int, y: int) -> int:
+    return x + y
+"""
+        analysis_result = analyze_python_code(code)
+        import ast
+        ast_root = ast.parse(code)
+
+        context = AnalysisContext(
+            source_code=code,
+            ast_node=ast_root,
+            analysis_result=analysis_result,
+            analysis_level=AnalysisLevel.INTERMEDIATE
+        )
+
+        static_analyzer = StaticAnalyzer()
+        report = static_analyzer.analyze(context)
+
+        assert report.analyzer_name == "StaticAnalyzer"
+        assert report.success
+        assert report.execution_time_ms > 0
+        # Should have control flow information
+        assert report.metadata is not None
+
+    def test_symbolic_executor_basic(self):
+        """Test SymbolicExecutor on simple code."""
+        code = """
+def max_value(x: int, y: int) -> int:
+    if x > y:
+        return x
+    return y
+"""
+        analysis_result = analyze_python_code(code)
+        import ast
+        ast_root = ast.parse(code)
+
+        context = AnalysisContext(
+            source_code=code,
+            ast_node=ast_root,
+            analysis_result=analysis_result,
+            analysis_level=AnalysisLevel.INTERMEDIATE
+        )
+
+        symbolic_executor = SymbolicExecutor()
+        report = symbolic_executor.analyze(context)
+
+        assert report.analyzer_name == "SymbolicExecutor"
+        assert report.success
+        assert report.execution_time_ms > 0
+        # Should have path analysis information
+        assert report.metadata is not None
+
+    def test_bounds_checker_basic(self):
+        """Test BoundsChecker on simple code."""
+        code = """
+def array_access(arr: list[int], index: int) -> int:
+    return arr[index]
+"""
+        analysis_result = analyze_python_code(code)
+        import ast
+        ast_root = ast.parse(code)
+
+        context = AnalysisContext(
+            source_code=code,
+            ast_node=ast_root,
+            analysis_result=analysis_result,
+            analysis_level=AnalysisLevel.INTERMEDIATE
+        )
+
+        bounds_checker = BoundsChecker()
+        report = bounds_checker.analyze(context)
+
+        assert report.analyzer_name == "BoundsChecker"
+        assert report.success
+        assert report.execution_time_ms > 0
+
+    def test_call_graph_analyzer_basic(self):
+        """Test CallGraphAnalyzer on simple code."""
+        code = """
+def helper(x: int) -> int:
+    return x * 2
+
+def main(value: int) -> int:
+    result = helper(value)
+    return result + 1
+"""
+        analysis_result = analyze_python_code(code)
+        import ast
+        ast_root = ast.parse(code)
+
+        context = AnalysisContext(
+            source_code=code,
+            ast_node=ast_root,
+            analysis_result=analysis_result,
+            analysis_level=AnalysisLevel.INTERMEDIATE
+        )
+
+        call_graph_analyzer = CallGraphAnalyzer()
+        report = call_graph_analyzer.analyze(context)
+
+        assert report.analyzer_name == "CallGraphAnalyzer"
+        assert report.success
+        assert report.execution_time_ms >= 0
+        # Should have detected function calls
+        assert report.metadata is not None
+
+    def test_vectorization_detector_basic(self):
+        """Test VectorizationDetector on loop code."""
+        code = """
+def sum_array(arr: list[int]) -> int:
+    total: int = 0
+    for i in range(len(arr)):
+        total += arr[i]
+    return total
+"""
+        analysis_result = analyze_python_code(code)
+        import ast
+        ast_root = ast.parse(code)
+
+        context = AnalysisContext(
+            source_code=code,
+            ast_node=ast_root,
+            analysis_result=analysis_result,
+            analysis_level=AnalysisLevel.INTERMEDIATE,
+            optimization_level=OptimizationLevel.MODERATE
+        )
+
+        vectorization_detector = VectorizationDetector()
+        report = vectorization_detector.optimize(context)
+
+        assert report.optimizer_name == "VectorizationDetector"
+        assert report.success
+        assert report.execution_time_ms >= 0
+
+    def test_flow_sensitive_type_inference(self):
+        """Test flow-sensitive type inference."""
+        code = """
+def conditional_type(flag: bool) -> int:
+    if flag:
+        x = 10
+    else:
+        x = 20
+    return x
+"""
+        import ast
+        ast_root = ast.parse(code)
+
+        type_engine = TypeInferenceEngine(enable_flow_sensitive=True)
+
+        # Get the function node
+        func_node = None
+        for node in ast.walk(ast_root):
+            if isinstance(node, ast.FunctionDef) and node.name == "conditional_type":
+                func_node = node
+                break
+
+        assert func_node is not None
+
+        # Run flow-sensitive analysis
+        results = type_engine.analyze_function_signature_enhanced(func_node)
+
+        # Should have inferred types for parameters and local variables
+        assert "flag" in results
+        assert results["flag"].type_info.name == "bool"
+
+        # Should have inferred type for x from assignments
+        assert "x" in results
+        # x is inferred as int from the literal assignments
+        assert results["x"].type_info.c_equivalent in ["int", "inferred"]
+
+    def test_flow_sensitive_vs_basic_inference(self):
+        """Test difference between flow-sensitive and basic inference."""
+        code = """
+def infer_from_usage(a, b):
+    c = a + b
+    return c
+"""
+        import ast
+        ast_root = ast.parse(code)
+
+        func_node = None
+        for node in ast.walk(ast_root):
+            if isinstance(node, ast.FunctionDef) and node.name == "infer_from_usage":
+                func_node = node
+                break
+
+        assert func_node is not None
+
+        # Test with flow-sensitive enabled
+        type_engine_flow = TypeInferenceEngine(enable_flow_sensitive=True)
+        results_flow = type_engine_flow.analyze_function_signature_enhanced(func_node)
+
+        # Test with flow-sensitive disabled
+        type_engine_basic = TypeInferenceEngine(enable_flow_sensitive=False)
+        results_basic = type_engine_basic.analyze_function_signature(func_node)
+
+        # Both should work, but flow-sensitive may provide better inference
+        assert "a" in results_flow
+        assert "b" in results_flow
+        assert "c" in results_flow
+
+        assert "a" in results_basic
+        assert "b" in results_basic
+
+
+if __name__ == "__main__":
+    # Apply markers when running directly
+    TestASTAnalyzer = pytest.mark.frontend(pytest.mark.unit(TestASTAnalyzer))
+    TestTypeInference = pytest.mark.frontend(pytest.mark.unit(TestTypeInference))
+    TestConstraintChecker = pytest.mark.frontend(pytest.mark.unit(TestConstraintChecker))
+    TestSubsetValidator = pytest.mark.frontend(pytest.mark.unit(TestSubsetValidator))
+    TestStaticIR = pytest.mark.frontend(pytest.mark.unit(TestStaticIR))
+    TestFrontendIntegration = pytest.mark.frontend(pytest.mark.integration(TestFrontendIntegration))
+    TestAdvancedAnalysis = pytest.mark.frontend(pytest.mark.integration(TestAdvancedAnalysis))

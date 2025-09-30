@@ -38,15 +38,20 @@ try:
     from .frontend import (
         AnalysisContext,
         ASTAnalyzer,
+        BoundsChecker,
+        CallGraphAnalyzer,
         CompileTimeEvaluator,
         FunctionSpecializer,
         LoopAnalyzer,
+        StaticAnalyzer,
         StaticConstraintChecker,
         StaticPythonSubsetValidator,
+        SymbolicExecutor,
+        TypeInferenceEngine,
         VectorizationDetector,
         analyze_python_code,
     )
-    from .frontend.base import OptimizationLevel as FrontendOptimizationLevel
+    from .frontend.base import AnalysisLevel, OptimizationLevel as FrontendOptimizationLevel
     FRONTEND_AVAILABLE = True
 except ImportError:
     # Fallback if frontend components not available
@@ -175,6 +180,15 @@ class MGenPipeline:
             self.subset_validator = StaticPythonSubsetValidator()
             self.constraint_checker = StaticConstraintChecker()
             self.ast_analyzer = ASTAnalyzer()
+
+            # Advanced static analysis components
+            self.static_analyzer = StaticAnalyzer()
+            self.symbolic_executor = SymbolicExecutor()
+            self.bounds_checker = BoundsChecker()
+            self.call_graph_analyzer = CallGraphAnalyzer()
+
+            # Flow-sensitive type inference
+            self.type_inference_engine = TypeInferenceEngine(enable_flow_sensitive=True)
 
             if self.config.enable_optimizations:
                 self.compile_time_evaluator = CompileTimeEvaluator()
@@ -325,18 +339,64 @@ class MGenPipeline:
             return False
 
     def _analysis_phase(self, source_code: str, result: PipelineResult) -> Optional[Any]:
-        """Phase 2: AST parsing and semantic element breakdown."""
+        """Phase 2: AST parsing and semantic element breakdown with advanced static analysis."""
         try:
             if FRONTEND_AVAILABLE and self.config.enable_advanced_analysis:
                 # Use comprehensive AST analysis
                 analysis_result = self.ast_analyzer.analyze(source_code)
-                result.phase_results[PipelinePhase.ANALYSIS] = analysis_result
+                result.phase_results[PipelinePhase.ANALYSIS] = {
+                    "ast_analysis": analysis_result
+                }
 
                 if not analysis_result.convertible:
                     result.success = False
                     result.errors.extend(analysis_result.errors)
                     result.warnings.extend(analysis_result.warnings)
                     return None
+
+                # Run advanced static analysis
+                advanced_analysis: dict[str, Any] = {}
+
+                # Parse AST for advanced analysis
+                ast_root = ast.parse(source_code)
+
+                # Create AnalysisContext for advanced analyzers
+                analysis_context = AnalysisContext(
+                    source_code=source_code,
+                    ast_node=ast_root,
+                    analysis_result=analysis_result,
+                    analysis_level=AnalysisLevel.INTERMEDIATE,
+                    optimization_level=FrontendOptimizationLevel.MODERATE
+                )
+
+                # Static analysis (control flow, data flow)
+                static_report = self.static_analyzer.analyze(analysis_context)
+                advanced_analysis["static_analysis"] = static_report
+
+                # Symbolic execution
+                symbolic_report = self.symbolic_executor.analyze(analysis_context)
+                advanced_analysis["symbolic_execution"] = symbolic_report
+
+                # Bounds checking
+                bounds_report = self.bounds_checker.analyze(analysis_context)
+                advanced_analysis["bounds_checking"] = bounds_report
+
+                # Call graph analysis
+                call_graph_report = self.call_graph_analyzer.analyze(analysis_context)
+                advanced_analysis["call_graph"] = call_graph_report
+
+                # Flow-sensitive type inference
+                type_inference_results: dict[str, dict[str, Any]] = {}
+                for node in ast.walk(ast_root):
+                    if isinstance(node, ast.FunctionDef):
+                        func_inference = self.type_inference_engine.analyze_function_signature_enhanced(node)
+                        type_inference_results[node.name] = func_inference
+                        self.log.debug(f"Type inference completed for function: {node.name}")
+
+                advanced_analysis["type_inference"] = type_inference_results
+
+                # Store advanced analysis results
+                result.phase_results[PipelinePhase.ANALYSIS]["advanced"] = advanced_analysis
 
                 # Store additional data for later phases
                 # Note: Additional data (source_code, ast_root) stored in phase_results
@@ -400,6 +460,10 @@ class MGenPipeline:
                 # Function specialization
                 specialization_result = self.function_specializer.optimize(context)
                 optimizations["specialization"] = specialization_result
+
+                # Vectorization detection
+                vectorization_result = self.vectorization_detector.optimize(context)
+                optimizations["vectorization"] = vectorization_result
 
                 result.phase_results[PipelinePhase.PYTHON_OPTIMIZATION] = optimizations
             else:
