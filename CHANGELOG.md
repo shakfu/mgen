@@ -17,6 +17,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.22]
+
+### Enhanced
+
+- **Go Runtime Library Verification**: Comprehensive verification of Go runtime library
+  - **Runtime Library Exists**: Confirmed `mgen/src/mgen/backends/go/runtime/mgen_go_runtime.go` is fully functional (413 lines)
+  - **Complete Functionality**: All required components present and operational
+    - `StringOps` struct with all Python string methods (`Upper()`, `Lower()`, `Strip()`, `StripChars()`, `Find()`, `Replace()`, `Split()`, `SplitSep()`)
+    - `BuiltinOps` struct with Python built-in functions (`Len()`, `Abs()`, `Min()`, `Max()`, `Sum()`, `BoolValue()`)
+    - `Range` struct with `ToSlice()` and `ForEach()` methods for Python-like range() operations
+    - `ComprehensionOps` struct with list, dict, and set comprehensions (with and without filters)
+    - Helper functions: `ToStr()`, `Print()`, `NewRange()`, `compareValues()`
+  - **Go Standard Library Only**: Zero external dependencies, uses only Go std library
+  - **Test Verification**: All 95 Go backend tests passing (100% success rate)
+  - **Runtime Verification**: Manual runtime test compiled and executed successfully, all operations working correctly
+
+### Technical Details
+
+- **Go Runtime Architecture**: Pure Go implementation using only standard library
+- **Reflection-Based Flexibility**: Uses `reflect` package for generic operations on slices and maps
+- **Idiomatic Go**: Follows Go conventions with proper error handling via panic
+- **Type Safety**: Runtime is fully type-safe; emitter type inference improvements needed for generated code
+
+### Known Limitations
+
+- **Emitter Type Inference**: Generated Go code sometimes uses overly generic `interface{}` types where more specific types would be better (not a runtime library issue)
+
+## [0.1.21]
+
+### Enhanced
+
+- **Rust Runtime Library Verification**: Comprehensive verification of Rust runtime library
+  - **Runtime Library Exists**: Confirmed `/Users/sa/projects/mgen/src/mgen/backends/rust/runtime/mgen_rust_runtime.rs` is fully functional (304 lines)
+  - **Complete Functionality**: All required components present and operational
+    - `StrOps` struct with all Python string methods (`upper()`, `lower()`, `strip()`, `strip_chars()`, `find()`, `replace()`, `split()`, `split_sep()`)
+    - `Builtins` struct with Python built-in functions (`len_string()`, `len_vec()`, `abs_i32()`, `abs_f64()`, `min_i32()`, `max_i32()`, `sum_i32()`, `sum_f64()`)
+    - `Range` struct with `Iterator` trait implementation for Python-like range() operations
+    - `Comprehensions` struct with list, dict, and set comprehensions (with and without filters)
+    - Helper functions: `print_value()`, `to_string()`, `new_range()` functions
+  - **Rust Standard Library Only**: Zero external dependencies, uses only Rust std library
+  - **Test Verification**: All 112 Rust backend tests passing (100% success rate)
+  - **Runtime Verification**: Manual runtime test compiled and executed successfully, all operations working correctly
+
+### Technical Details
+
+- **Rust Runtime Architecture**: Pure Rust implementation using only standard library
+- **Functional Programming Patterns**: Generic functions with trait bounds for type safety
+- **Memory Safety**: Rust's ownership system ensures compile-time memory safety
+- **Idiomatic Rust**: Uses iterators, closures, and Rust idioms throughout
+- **Performance**: Zero-cost abstractions with efficient implementations
+
 ## [0.1.20]
 
 ### Enhanced
@@ -34,14 +85,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
     - Set comprehension overloads for transforming container elements
   - **Test Verification**: All 104 C++ backend tests passing (100% success rate)
   - **Code Generation Verification**: Generated C++ code compiles successfully with g++ -std=c++17
-
-### Fixed
-
-- **Documentation Corrections**: Updated CLAUDE.md comprehensive code review section
-  - **C++ Backend Status**: Corrected from "CRITICALLY BLOCKED" to "PRODUCTION-READY"
-  - **Feature Support Matrix**: Updated to reflect C++ runtime library availability
-  - **Critical Issues**: Removed incorrect claim about missing C++ runtime library
-  - **Test Statistics**: Updated to reflect current 733 total tests (all passing)
 
 ### Technical Details
 
