@@ -1,5 +1,7 @@
 """C container system for MGen with STC support."""
 
+import os
+from pathlib import Path
 from typing import List
 
 from ..base import AbstractContainerSystem
@@ -11,6 +13,45 @@ class CContainerSystem(AbstractContainerSystem):
     def __init__(self) -> None:
         """Initialize container system with STC preference."""
         self.use_stc = True  # Default to STC, fallback available
+        self._stc_available = None  # Cache for STC availability check
+
+    def check_stc_availability(self) -> bool:
+        """Check if STC library is available in the runtime directory.
+
+        Returns:
+            True if STC is available, False otherwise
+        """
+        if self._stc_available is not None:
+            return self._stc_available
+
+        # Get the directory of this file
+        current_dir = Path(__file__).parent
+        stc_dir = current_dir / "ext" / "stc" / "include" / "stc"
+
+        # Check if STC directory exists and has header files
+        self._stc_available = stc_dir.exists() and stc_dir.is_dir()
+
+        if self._stc_available:
+            # Verify key STC headers exist
+            key_headers = ["vec.h", "map.h", "set.h"]
+            for header in key_headers:
+                if not (stc_dir / header).exists():
+                    self._stc_available = False
+                    break
+
+        return self._stc_available
+
+    def set_use_stc(self, use_stc: bool) -> None:
+        """Manually set whether to use STC or fallback containers.
+
+        Args:
+            use_stc: True to use STC, False to use fallback
+        """
+        self.use_stc = use_stc
+
+    def auto_detect_stc(self) -> None:
+        """Automatically detect STC availability and set use_stc accordingly."""
+        self.use_stc = self.check_stc_availability()
 
     def get_list_type(self, element_type: str) -> str:
         """Get C vector type for element type."""
@@ -68,6 +109,7 @@ class CContainerSystem(AbstractContainerSystem):
             imports.extend([
                 '#include "mgen_error_handling.h"',
                 '#include "mgen_memory_ops.h"',
+                '#include "mgen_containers_fallback.h"',
             ])
 
         return imports
@@ -170,27 +212,46 @@ class CContainerSystem(AbstractContainerSystem):
         return "\n".join(operations_code)
 
     def _generate_basic_operations(self, container_type: str, operations: List[str]) -> str:
-        """Generate basic fallback container operations."""
+        """Generate basic fallback container operations using mgen_dyn_array."""
         operations_code = []
-        operations_code.append(f"// Basic operations for {container_type}")
+        operations_code.append(f"// Fallback operations for {container_type} using mgen_dyn_array")
+        operations_code.append("// Include fallback container runtime:")
+        operations_code.append('// #include "mgen_containers_fallback.h"')
+        operations_code.append("")
 
         for op in operations:
             if op == "append":
-                operations_code.append("/* TODO: Implement append with realloc */")
+                operations_code.append("// Append operation:")
+                operations_code.append("// mgen_dyn_array_append(array, &element);")
             elif op == "insert":
-                operations_code.append("/* TODO: Implement insert with memmove */")
+                operations_code.append("// Insert operation:")
+                operations_code.append("// mgen_dyn_array_insert(array, index, &element);")
             elif op == "remove":
-                operations_code.append("/* TODO: Implement remove with memmove */")
+                operations_code.append("// Remove operation:")
+                operations_code.append("// mgen_dyn_array_remove(array, index);")
             elif op == "get":
-                operations_code.append("/* TODO: Implement bounds-checked get */")
+                operations_code.append("// Get operation (bounds-checked):")
+                operations_code.append("// element = *(type*)mgen_dyn_array_get(array, index);")
             elif op == "set":
-                operations_code.append("/* TODO: Implement bounds-checked set */")
+                operations_code.append("// Set operation (bounds-checked):")
+                operations_code.append("// mgen_dyn_array_set(array, index, &element);")
             elif op == "size":
-                operations_code.append("/* TODO: Track array size separately */")
+                operations_code.append("// Size operation:")
+                operations_code.append("// size = mgen_dyn_array_size(array);")
             elif op == "clear":
-                operations_code.append("/* TODO: Free array and reset size */")
+                operations_code.append("// Clear operation:")
+                operations_code.append("// mgen_dyn_array_clear(array);")
             elif op == "contains":
-                operations_code.append("/* TODO: Linear search implementation */")
+                operations_code.append("// Contains operation (linear search):")
+                operations_code.append("// found = mgen_dyn_array_contains(array, &element);")
+
+        operations_code.append("")
+        operations_code.append("// Example: Creating a typed dynamic array")
+        operations_code.append("// mgen_dyn_array_t* int_array = mgen_dyn_array_new(sizeof(int), 0);")
+        operations_code.append("// int value = 42;")
+        operations_code.append("// mgen_dyn_array_append(int_array, &value);")
+        operations_code.append("// int* retrieved = (int*)mgen_dyn_array_get(int_array, 0);")
+        operations_code.append("// mgen_dyn_array_free(int_array);")
 
         return "\n".join(operations_code)
 
@@ -209,4 +270,5 @@ class CContainerSystem(AbstractContainerSystem):
             return """// MGen runtime includes (basic fallback)
 #include "mgen_error_handling.h"
 #include "mgen_memory_ops.h"
+#include "mgen_containers_fallback.h"
 """
