@@ -4,6 +4,11 @@ import ast
 from typing import Any, Optional
 
 from ..base import AbstractEmitter
+from ..converter_utils import (
+    get_augmented_assignment_operator,
+    get_standard_binary_operator,
+    get_standard_comparison_operator,
+)
 from ..preferences import BackendPreferences
 
 
@@ -336,14 +341,14 @@ class MGenPythonToRustConverter:
         """Convert method augmented assignment with proper self handling."""
         value_expr = self._convert_method_expression(stmt.value, class_name)
 
-        # Map augmented assignment operators
-        op_map = {
-            ast.Add: "+=", ast.Sub: "-=", ast.Mult: "*=", ast.Div: "/=",
-            ast.FloorDiv: "/=", ast.Mod: "%=", ast.BitOr: "|=",
-            ast.BitXor: "^=", ast.BitAnd: "&=", ast.LShift: "<<=", ast.RShift: ">>="
-        }
-
-        op = op_map.get(type(stmt.op), "/*UNKNOWN_OP*/")
+        # Get augmented assignment operator from converter_utils
+        op = get_augmented_assignment_operator(stmt.op)
+        if op is None:
+            # Handle Rust-specific operators
+            if isinstance(stmt.op, ast.FloorDiv):
+                op = "/="  # Rust integer division is already floor division
+            else:
+                op = "/*UNKNOWN_OP*/"
 
         if isinstance(stmt.target, ast.Name):
             return f"        {stmt.target.id} {op} {value_expr};"
@@ -397,14 +402,15 @@ class MGenPythonToRustConverter:
             left = self._convert_method_expression(expr.left, class_name)
             right = self._convert_method_expression(expr.right, class_name)
 
-            op_map = {
-                ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
-                ast.FloorDiv: "/", ast.Mod: "%",
-                ast.LShift: "<<", ast.RShift: ">>",
-                ast.BitOr: "|", ast.BitXor: "^", ast.BitAnd: "&"
-            }
+            # Handle Rust-specific operators
+            if isinstance(expr.op, ast.FloorDiv):
+                # Rust integer division is already floor division
+                return f"({left} / {right})"
 
-            op = op_map.get(type(expr.op), "/*UNKNOWN_OP*/")
+            # Use standard operator mapping from converter_utils
+            op = get_standard_binary_operator(expr.op)
+            if op is None:
+                op = "/*UNKNOWN_OP*/"
             return f"({left} {op} {right})"
         elif isinstance(expr, ast.Compare):
             return self._convert_method_compare(expr, class_name)
@@ -507,11 +513,18 @@ class MGenPythonToRustConverter:
         result = left
 
         for op, comp in zip(expr.ops, expr.comparators):
-            op_map = {
-                ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
-                ast.Gt: ">", ast.GtE: ">=", ast.Is: "==", ast.IsNot: "!="
-            }
-            op_str = op_map.get(type(op), "/*UNKNOWN_OP*/")
+            # Use standard comparison operator mapping from converter_utils
+            op_str = get_standard_comparison_operator(op)
+
+            # Handle Rust-specific operators
+            if op_str is None:
+                if isinstance(op, ast.Is):
+                    op_str = "=="
+                elif isinstance(op, ast.IsNot):
+                    op_str = "!="
+                else:
+                    op_str = "/*UNKNOWN_OP*/"
+
             comp_expr = self._convert_method_expression(comp, class_name)
             result = f"({result} {op_str} {comp_expr})"
 
@@ -635,13 +648,14 @@ class MGenPythonToRustConverter:
         """Convert augmented assignment."""
         value_expr = self._convert_expression(stmt.value)
 
-        op_map = {
-            ast.Add: "+=", ast.Sub: "-=", ast.Mult: "*=", ast.Div: "/=",
-            ast.FloorDiv: "/=", ast.Mod: "%=", ast.BitOr: "|=",
-            ast.BitXor: "^=", ast.BitAnd: "&=", ast.LShift: "<<=", ast.RShift: ">>="
-        }
-
-        op = op_map.get(type(stmt.op), "/*UNKNOWN_OP*/")
+        # Get augmented assignment operator from converter_utils
+        op = get_augmented_assignment_operator(stmt.op)
+        if op is None:
+            # Handle Rust-specific operators
+            if isinstance(stmt.op, ast.FloorDiv):
+                op = "/="  # Rust integer division is already floor division
+            else:
+                op = "/*UNKNOWN_OP*/"
 
         if isinstance(stmt.target, ast.Name):
             return f"    {stmt.target.id} {op} {value_expr};"
@@ -769,17 +783,17 @@ class MGenPythonToRustConverter:
         left = self._convert_expression(expr.left)
         right = self._convert_expression(expr.right)
 
-        op_map = {
-            ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
-            ast.FloorDiv: "/", ast.Mod: "%",
-            ast.LShift: "<<", ast.RShift: ">>",
-            ast.BitOr: "|", ast.BitXor: "^", ast.BitAnd: "&"
-        }
-
+        # Handle Rust-specific operators
         if isinstance(expr.op, ast.Pow):
             return f"{left}.pow({right} as u32)"
+        elif isinstance(expr.op, ast.FloorDiv):
+            # Rust integer division is already floor division
+            return f"({left} / {right})"
 
-        op = op_map.get(type(expr.op), "/*UNKNOWN_OP*/")
+        # Use standard operator mapping from converter_utils
+        op = get_standard_binary_operator(expr.op)
+        if op is None:
+            op = "/*UNKNOWN_OP*/"
         return f"({left} {op} {right})"
 
     def _convert_unaryop(self, expr: ast.UnaryOp) -> str:
@@ -804,11 +818,18 @@ class MGenPythonToRustConverter:
         result = left
 
         for op, comp in zip(expr.ops, expr.comparators):
-            op_map = {
-                ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
-                ast.Gt: ">", ast.GtE: ">=", ast.Is: "==", ast.IsNot: "!="
-            }
-            op_str = op_map.get(type(op), "/*UNKNOWN_OP*/")
+            # Use standard comparison operator mapping from converter_utils
+            op_str = get_standard_comparison_operator(op)
+
+            # Handle Rust-specific operators
+            if op_str is None:
+                if isinstance(op, ast.Is):
+                    op_str = "=="
+                elif isinstance(op, ast.IsNot):
+                    op_str = "!="
+                else:
+                    op_str = "/*UNKNOWN_OP*/"
+
             comp_expr = self._convert_expression(comp)
             result = f"({result} {op_str} {comp_expr})"
 

@@ -23,6 +23,17 @@ import ast
 from typing import Any, Optional, Union
 
 from ..base import AbstractEmitter
+from ..converter_utils import (
+    AUGMENTED_ASSIGNMENT_OPERATORS,
+    STANDARD_BINARY_OPERATORS,
+    STANDARD_COMPARISON_OPERATORS,
+    STANDARD_UNARY_OPERATORS,
+    escape_string_for_c_family,
+    get_augmented_assignment_operator,
+    get_standard_binary_operator,
+    get_standard_comparison_operator,
+    get_standard_unary_operator,
+)
 from ..preferences import BackendPreferences
 from .factory import CppFactory
 
@@ -464,31 +475,35 @@ class MGenPythonToCppConverter:
             left = self._convert_method_expression(expr.left, class_name)
             right = self._convert_method_expression(expr.right, class_name)
 
-            binop_map = {
-                ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
-                ast.FloorDiv: "/", ast.Mod: "%",
-                ast.LShift: "<<", ast.RShift: ">>",
-                ast.BitOr: "|", ast.BitXor: "^", ast.BitAnd: "&"
-            }
-
             if isinstance(expr.op, ast.Pow):
                 return f"pow({left}, {right})"
+            elif isinstance(expr.op, ast.FloorDiv):
+                # C++ integer division is already floor division
+                return f"({left} / {right})"
 
-            op = binop_map.get(type(expr.op), "/*UNKNOWN_OP*/")
+            # Use standard operator mapping from converter_utils
+            op = get_standard_binary_operator(expr.op)
+            if op is None:
+                op = "/*UNKNOWN_OP*/"
             return f"({left} {op} {right})"
         elif isinstance(expr, ast.Compare):
             # Handle comparison operations with proper self conversion
             left = self._convert_method_expression(expr.left, class_name)
             result = left
 
-            cmpop_map: dict[type, str] = {
-                ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
-                ast.Gt: ">", ast.GtE: ">=", ast.Is: "==", ast.IsNot: "!="
-            }
-
             for op_node, comp in zip(expr.ops, expr.comparators):
-                op_type = type(op_node)
-                op_str_val = cmpop_map.get(op_type, "/*UNKNOWN_OP*/")
+                # Use standard comparison operator mapping from converter_utils
+                op_str_val = get_standard_comparison_operator(op_node)
+
+                # Handle C++-specific operators
+                if op_str_val is None:
+                    if isinstance(op_node, ast.Is):
+                        op_str_val = "=="
+                    elif isinstance(op_node, ast.IsNot):
+                        op_str_val = "!="
+                    else:
+                        op_str_val = "/*UNKNOWN_OP*/"
+
                 comp_expr = self._convert_method_expression(comp, class_name)
                 result = f"({result} {op_str_val} {comp_expr})"
 
@@ -815,28 +830,26 @@ class MGenPythonToCppConverter:
         left = self._convert_expression(expr.left)
         right = self._convert_expression(expr.right)
 
-        op_map = {
-            ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
-            ast.FloorDiv: "/", ast.Mod: "%",
-            ast.LShift: "<<", ast.RShift: ">>",
-            ast.BitOr: "|", ast.BitXor: "^", ast.BitAnd: "&"
-        }
-
         if isinstance(expr.op, ast.Pow):
             return f"pow({left}, {right})"
+        elif isinstance(expr.op, ast.FloorDiv):
+            # C++ integer division is already floor division
+            return f"({left} / {right})"
 
-        op = op_map.get(type(expr.op), "/*UNKNOWN_OP*/")
+        # Use standard operator mapping from converter_utils
+        op = get_standard_binary_operator(expr.op)
+        if op is None:
+            op = "/*UNKNOWN_OP*/"
         return f"({left} {op} {right})"
 
     def _convert_unary_op(self, expr: ast.UnaryOp) -> str:
         """Convert unary operations."""
         operand = self._convert_expression(expr.operand)
 
-        op_map = {
-            ast.UAdd: "+", ast.USub: "-", ast.Not: "!", ast.Invert: "~"
-        }
-
-        op = op_map.get(type(expr.op), "/*UNKNOWN_UNARY*/")
+        # Use standard unary operator mapping from converter_utils
+        op = get_standard_unary_operator(expr.op)
+        if op is None:
+            op = "/*UNKNOWN_UNARY*/"
         return f"({op}{operand})"
 
     def _convert_bool_op(self, expr: ast.BoolOp) -> str:
@@ -850,15 +863,25 @@ class MGenPythonToCppConverter:
         left = self._convert_expression(expr.left)
         result = left
 
-        op_map = {
-            ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
-            ast.Gt: ">", ast.GtE: ">=", ast.Is: "==", ast.IsNot: "!=",
-            ast.In: "/* IN */", ast.NotIn: "/* NOT IN */"
-        }
-
         for op, comparator in zip(expr.ops, expr.comparators):
             right = self._convert_expression(comparator)
-            cpp_op = op_map.get(type(op), "/*UNKNOWN_CMP*/")
+
+            # Use standard comparison operator mapping from converter_utils
+            cpp_op = get_standard_comparison_operator(op)
+
+            # Handle C++-specific operators
+            if cpp_op is None:
+                if isinstance(op, ast.Is):
+                    cpp_op = "=="
+                elif isinstance(op, ast.IsNot):
+                    cpp_op = "!="
+                elif isinstance(op, ast.In):
+                    cpp_op = "/* IN */"
+                elif isinstance(op, ast.NotIn):
+                    cpp_op = "/* NOT IN */"
+                else:
+                    cpp_op = "/*UNKNOWN_CMP*/"
+
             result = f"({result} {cpp_op} {right})"
 
         return result
@@ -1185,14 +1208,17 @@ class MGenPythonToCppConverter:
         return "auto"
 
     def _get_aug_op(self, op: ast.operator) -> str:
-        """Get augmented assignment operator."""
-        op_map = {
-            ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
-            ast.FloorDiv: "/", ast.Mod: "%",
-            ast.LShift: "<<", ast.RShift: ">>",
-            ast.BitOr: "|", ast.BitXor: "^", ast.BitAnd: "&"
-        }
-        return op_map.get(type(op), "/*UNKNOWN_OP*/")
+        """Get augmented assignment operator (just the operator part, without =)."""
+        # Handle FloorDiv specially for C++
+        if isinstance(op, ast.FloorDiv):
+            return "/"
+
+        # Use standard binary operator mapping from converter_utils
+        # (augmented assignment operators are the same as binary operators)
+        op_str = get_standard_binary_operator(op)
+        if op_str is None:
+            return "/*UNKNOWN_OP*/"
+        return op_str
 
 
 class CppEmitter(AbstractEmitter):

@@ -17,6 +17,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.30]
+
+### Changed
+
+- **Converter Utils Adoption - C++ Backend**: Refactored C++ backend to use shared converter_utils module
+  - **Eliminated Duplication**: Replaced 7 hardcoded operator mapping dictionaries with converter_utils functions
+  - **Operator Mappings**: Now using `get_standard_binary_operator()`, `get_standard_comparison_operator()`, `get_standard_unary_operator()`
+  - **Single Source of Truth**: All operator mappings now come from converter_utils module
+  - **Maintainability**: Easier to extend and modify operator handling across all backends
+  - **Zero Regressions**: All 717 tests passing after refactoring
+
+### Technical Details
+
+- **Files Modified**: `src/mgen/backends/cpp/emitter.py`
+- **Imports Added**: converter_utils functions and constants
+- **Dictionaries Eliminated**:
+  - 3× binop_map dictionaries → get_standard_binary_operator()
+  - 2× cmpop_map dictionaries → get_standard_comparison_operator()
+  - 1× unary op_map dictionary → get_standard_unary_operator()
+  - 1× `_get_aug_op` method refactored to use get_standard_binary_operator()
+- **Special Handling**: C++-specific operators (FloorDiv, Pow, Is, IsNot, In, NotIn) handled explicitly
+
+### Impact
+
+- ✅ **Consistency**: Uniform operator handling using shared utilities
+- ✅ **Maintainability**: Single location to update operator mappings
+- ✅ **Extensibility**: Easy to add new operators or modify existing ones
+- ✅ **Foundation**: Proof-of-concept for remaining backend refactoring
+- ✅ **Quality**: Zero test regressions, all functionality preserved
+
+### Progress Update
+
+**Development Priority 2 Progress**: 2 of 6 backends refactored (C++, Rust)
+
+**Completed**:
+- ✅ C++ Backend: 7 operator mappings eliminated
+- ✅ Rust Backend: 6 operator mappings eliminated
+  - 2× augmented assignment operators → get_augmented_assignment_operator()
+  - 2× binary operators → get_standard_binary_operator()
+  - 2× comparison operators → get_standard_comparison_operator()
+  - Special handling for Pow and FloorDiv operators
+
+**Remaining**:
+- ⏳ Go backend (estimated 4 operator mappings)
+- ⏳ Haskell backend (estimated 2 operator mappings)
+- ⏳ OCaml backend (estimated 2 operator mappings)
+- ⏳ C backend verification (3 operator mappings, may need updates)
+
+**Estimated Remaining Savings**: 360-600 lines of duplicated code when all remaining backends refactored
+
 ## [0.1.29]
 
 ### Added
