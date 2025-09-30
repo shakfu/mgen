@@ -17,14 +17,14 @@ import argparse
 import shutil
 import sys
 from pathlib import Path
-from typing import Optional, List, Union, Any
+from typing import List, Optional, Union
 
+from ..backends.preferences import BackendPreferences, PreferencesRegistry
+from ..backends.registry import registry
 from ..common import log
 
 # Import the pipeline and backends
 from ..pipeline import BuildMode, MGenPipeline, OptimizationLevel, PipelineConfig
-from ..backends.registry import registry
-from ..backends.preferences import PreferencesRegistry, BackendPreferences
 
 BUILD_DIR = "build"
 
@@ -260,7 +260,7 @@ Build Directory Structure:
         # Validate target language
         target = args.target
         if not registry.has_backend(target):
-            available = ', '.join(registry.list_backends())
+            available = ", ".join(registry.list_backends())
             self.log.error(f"Unsupported target language '{target}'. Available: {available}")
             return 1
 
@@ -313,7 +313,7 @@ Build Directory Structure:
         # Validate target language
         target = args.target
         if not registry.has_backend(target):
-            available = ', '.join(registry.list_backends())
+            available = ", ".join(registry.list_backends())
             self.log.error(f"Unsupported target language '{target}'. Available: {available}")
             return 1
 
@@ -420,7 +420,7 @@ Build Directory Structure:
         # Validate target language
         target = args.target
         if not registry.has_backend(target):
-            available = ', '.join(registry.list_backends())
+            available = ", ".join(registry.list_backends())
             self.log.error(f"Unsupported target language '{target}'. Available: {available}")
             return 1
 

@@ -1,6 +1,6 @@
 """Backend registry system for MGen language backends."""
 
-from typing import Dict, List, Type, Optional
+from typing import Dict, List, Optional, Type
 
 from .base import LanguageBackend
 from .preferences import BackendPreferences, PreferencesRegistry
@@ -21,7 +21,7 @@ class BackendRegistry:
     def get_backend(self, name: str, preferences: Optional[BackendPreferences] = None) -> LanguageBackend:
         """Get backend instance by name with optional preferences."""
         if name not in self._backends:
-            available = ', '.join(self.list_backends())
+            available = ", ".join(self.list_backends())
             raise ValueError(f"Unknown backend: {name}. Available: {available}")
 
         # Create preferences if not provided

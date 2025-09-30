@@ -2,12 +2,12 @@
 
 from typing import Optional
 
-from ..base import LanguageBackend, AbstractFactory, AbstractEmitter, AbstractBuilder, AbstractContainerSystem
+from ..base import AbstractBuilder, AbstractContainerSystem, AbstractEmitter, AbstractFactory, LanguageBackend
 from ..preferences import BackendPreferences, HaskellPreferences
-from .factory import HaskellFactory
-from .emitter import HaskellEmitter
 from .builder import HaskellBuilder
 from .containers import HaskellContainerSystem
+from .emitter import HaskellEmitter
+from .factory import HaskellFactory
 
 
 class HaskellBackend(LanguageBackend):

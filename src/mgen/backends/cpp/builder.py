@@ -204,16 +204,16 @@ install(TARGETS {target_name} DESTINATION bin)
         # Check if any source files use MGen runtime features
         for source_file in source_files:
             try:
-                with open(source_file, 'r') as f:
+                with open(source_file) as f:
                     content = f.read()
                     # Check for MGen runtime usage patterns
-                    if ('mgen_cpp_runtime.hpp' in content or
-                        'mgen::' in content or
-                        'StringOps::' in content or
-                        'Range(' in content or
-                        'list_comprehension' in content or
-                        'dict_comprehension' in content or
-                        'set_comprehension' in content):
+                    if ("mgen_cpp_runtime.hpp" in content or
+                        "mgen::" in content or
+                        "StringOps::" in content or
+                        "Range(" in content or
+                        "list_comprehension" in content or
+                        "dict_comprehension" in content or
+                        "set_comprehension" in content):
                         # Runtime is needed, but it's header-only for C++
                         # Just ensure the include path is set
                         source_dir = Path(source_file).parent

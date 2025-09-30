@@ -20,7 +20,6 @@ Supported Features:
 """
 
 import ast
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from ..base import AbstractEmitter
@@ -148,8 +147,8 @@ class MGenPythonToCppConverter:
         """Detect string method usage to add appropriate includes."""
         for n in ast.walk(node):
             if isinstance(n, ast.Attribute):
-                if n.attr in ['upper', 'lower', 'strip', 'find', 'replace', 'split']:
-                    self.includes_needed.add('string_ops')
+                if n.attr in ["upper", "lower", "strip", "find", "replace", "split"]:
+                    self.includes_needed.add("string_ops")
 
     def _convert_function(self, node: ast.FunctionDef) -> str:
         """Convert a Python function to C++."""
@@ -396,7 +395,7 @@ class MGenPythonToCppConverter:
             # Regular variable augmented assignment
             return f"        {stmt.target.id} {op}= {value_expr};"
 
-        return f"        /* Unknown augmented assignment target */"
+        return "        /* Unknown augmented assignment target */"
 
     def _convert_method_return(self, stmt: ast.Return, class_name: str) -> str:
         """Convert method return statement."""
@@ -427,7 +426,7 @@ class MGenPythonToCppConverter:
         converted = []
         for stmt in statements:
             converted.append(self._convert_method_statement(stmt, class_name))
-        return '\n'.join(converted)
+        return "\n".join(converted)
 
     def _convert_method_expression(self, expr: ast.expr, class_name: str) -> str:
         """Convert method expression with class context."""
@@ -448,7 +447,7 @@ class MGenPythonToCppConverter:
                     args = [self._convert_method_expression(arg, class_name) for arg in expr.args]
 
                     # Handle string methods on self attributes
-                    if method_name in ['upper', 'lower', 'strip', 'find', 'replace', 'split']:
+                    if method_name in ["upper", "lower", "strip", "find", "replace", "split"]:
                         obj_expr = f"this->{expr.func.attr}"  # This would be wrong for method calls
                         # Actually, this case shouldn't happen - string methods are called on attributes
                         pass
@@ -886,7 +885,7 @@ class MGenPythonToCppConverter:
                 mapped_name = builtin_map[func_name]
                 if func_name == "print":
                     if args:
-                        return f"cout << {' << \" \" << '.join(args)} << endl"
+                        return f"cout << {' << " " << '.join(args)} << endl"
                     else:
                         return "cout << endl"
                 elif func_name == "range":
@@ -915,21 +914,21 @@ class MGenPythonToCppConverter:
             args = [self._convert_expression(arg) for arg in expr.args]
 
             # Handle string methods
-            if method_name in ['upper', 'lower', 'strip', 'find', 'replace', 'split']:
-                if method_name == 'upper':
+            if method_name in ["upper", "lower", "strip", "find", "replace", "split"]:
+                if method_name == "upper":
                     return f"StringOps::upper({obj_expr})"
-                elif method_name == 'lower':
+                elif method_name == "lower":
                     return f"StringOps::lower({obj_expr})"
-                elif method_name == 'strip':
+                elif method_name == "strip":
                     if args:
                         return f"StringOps::strip({obj_expr}, {args[0]})"
                     else:
                         return f"StringOps::strip({obj_expr})"
-                elif method_name == 'find':
+                elif method_name == "find":
                     return f"StringOps::find({obj_expr}, {args[0]})"
-                elif method_name == 'replace':
+                elif method_name == "replace":
                     return f"StringOps::replace({obj_expr}, {args[0]}, {args[1]})"
-                elif method_name == 'split':
+                elif method_name == "split":
                     if args:
                         return f"StringOps::split({obj_expr}, {args[0]})"
                     else:
@@ -1070,14 +1069,14 @@ class MGenPythonToCppConverter:
         """Add indentation to a block of text."""
         if not text.strip():
             return text
-        lines = text.split('\n')
+        lines = text.split("\n")
         indented_lines = []
         for line in lines:
             if line.strip():  # Don't indent empty lines
                 indented_lines.append(f"    {line}")
             else:
                 indented_lines.append(line)
-        return '\n'.join(indented_lines)
+        return "\n".join(indented_lines)
 
     def _get_return_type(self, func_node: ast.FunctionDef) -> str:
         """Get return type from function annotation."""
@@ -1138,32 +1137,32 @@ class MGenPythonToCppConverter:
             # Infer type from function calls
             if isinstance(value.func, ast.Name):
                 func_name = value.func.id
-                if func_name in ['abs', 'len', 'sum', 'min', 'max']:
+                if func_name in ["abs", "len", "sum", "min", "max"]:
                     return "int"  # Most built-ins return int
-                elif func_name == 'bool':
+                elif func_name == "bool":
                     return "bool"
-                elif func_name in ['str', 'upper', 'lower', 'strip', 'replace']:
+                elif func_name in ["str", "upper", "lower", "strip", "replace"]:
                     return "std::string"
-                elif func_name == 'range':
+                elif func_name == "range":
                     return "Range"
                 else:
                     # Try to infer from function context (if we know the return type)
                     # For now, check if function name suggests a type
-                    if func_name.endswith('_int') or func_name in ['factorial', 'calculate', 'compute', 'add', 'subtract', 'multiply']:
+                    if func_name.endswith("_int") or func_name in ["factorial", "calculate", "compute", "add", "subtract", "multiply"]:
                         return "int"
-                    elif func_name.endswith('_str') or func_name in ['format', 'get_name', 'to_string']:
+                    elif func_name.endswith("_str") or func_name in ["format", "get_name", "to_string"]:
                         return "std::string"
-                    elif func_name.endswith('_float') or func_name in ['average', 'mean']:
+                    elif func_name.endswith("_float") or func_name in ["average", "mean"]:
                         return "double"
-                    elif func_name.endswith('_bool') or func_name in ['is_valid', 'check']:
+                    elif func_name.endswith("_bool") or func_name in ["is_valid", "check"]:
                         return "bool"
             elif isinstance(value.func, ast.Attribute):
                 # String method calls
-                if value.func.attr in ['upper', 'lower', 'strip', 'replace']:
+                if value.func.attr in ["upper", "lower", "strip", "replace"]:
                     return "std::string"
-                elif value.func.attr == 'find':
+                elif value.func.attr == "find":
                     return "int"
-                elif value.func.attr == 'split':
+                elif value.func.attr == "split":
                     return "std::vector<std::string>"
         elif isinstance(value, ast.BinOp):
             # Try to infer from binary operations
@@ -1206,7 +1205,7 @@ class CppEmitter(AbstractEmitter):
         self.converter = MGenPythonToCppConverter()
         self.indent_level = 0
         # Use preferences for indent size if available
-        self.indent_size = preferences.get('indent_size', 4) if preferences else 4
+        self.indent_size = preferences.get("indent_size", 4) if preferences else 4
 
     def emit_module(self, source_code: str, analysis_result: Optional[Any] = None) -> str:
         """Emit a complete C++ module from Python source."""

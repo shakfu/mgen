@@ -6,7 +6,7 @@ from ..base import LanguageBackend
 from ..preferences import BackendPreferences, CppPreferences
 
 if TYPE_CHECKING:
-    from ..base import AbstractBuilder, AbstractEmitter, AbstractFactory, AbstractContainerSystem
+    from ..base import AbstractBuilder, AbstractContainerSystem, AbstractEmitter, AbstractFactory
 
 
 class CppBackend(LanguageBackend):

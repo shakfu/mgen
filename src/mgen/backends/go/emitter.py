@@ -39,8 +39,8 @@ class MGenPythonToGoConverter:
 
     def _to_camel_case(self, snake_str: str) -> str:
         """Convert snake_case to CamelCase."""
-        components = snake_str.split('_')
-        return ''.join(word.capitalize() for word in components)
+        components = snake_str.split("_")
+        return "".join(word.capitalize() for word in components)
 
     def _to_go_method_name(self, method_name: str) -> str:
         """Convert Python method name to Go method name (proper CamelCase)."""
@@ -147,7 +147,7 @@ class MGenPythonToGoConverter:
 
         # Store struct info for method generation
         self.struct_info[class_name] = {
-            'fields': self._extract_struct_fields(init_method) if init_method else []
+            "fields": self._extract_struct_fields(init_method) if init_method else []
         }
 
         # Generate constructor
@@ -239,7 +239,7 @@ class MGenPythonToGoConverter:
         converted = []
         for stmt in statements:
             converted.append(self._convert_method_statement(stmt, class_name))
-        return '\n'.join(converted)
+        return "\n".join(converted)
 
     def _convert_method_statement(self, stmt: ast.stmt, class_name: str) -> str:
         """Convert a method statement with class context."""
@@ -279,7 +279,7 @@ class MGenPythonToGoConverter:
                     obj_expr = self._convert_method_expression(target.value, class_name)
                     statements.append(f"    {obj_expr}.{self._to_camel_case(target.attr)} = {value_expr}")
 
-        return '\n'.join(statements)
+        return "\n".join(statements)
 
     def _convert_method_annotated_assignment(self, stmt: ast.AnnAssign, class_name: str) -> str:
         """Convert method annotated assignment with proper obj handling."""
@@ -300,7 +300,7 @@ class MGenPythonToGoConverter:
                 field_name = self._to_camel_case(stmt.target.attr)
                 return f"    obj.{field_name} = {value_expr}"
 
-        return f"    // TODO: Complex annotated assignment"
+        return "    // TODO: Complex annotated assignment"
 
     def _convert_method_aug_assignment(self, stmt: ast.AugAssign, class_name: str) -> str:
         """Convert method augmented assignment with proper obj handling."""
@@ -322,7 +322,7 @@ class MGenPythonToGoConverter:
                 field_name = self._to_camel_case(stmt.target.attr)
                 return f"    obj.{field_name} {op} {value_expr}"
 
-        return f"    // TODO: Complex augmented assignment"
+        return "    // TODO: Complex augmented assignment"
 
     def _convert_method_return(self, stmt: ast.Return, class_name: str) -> str:
         """Convert method return statement."""
@@ -403,21 +403,21 @@ class MGenPythonToGoConverter:
                 args = [self._convert_method_expression(arg, class_name) for arg in expr.args]
 
                 # Handle string methods
-                if method_name in ['upper', 'lower', 'strip', 'find', 'replace', 'split']:
-                    if method_name == 'upper':
+                if method_name in ["upper", "lower", "strip", "find", "replace", "split"]:
+                    if method_name == "upper":
                         return f"mgen.StrOps.Upper({obj_expr})"
-                    elif method_name == 'lower':
+                    elif method_name == "lower":
                         return f"mgen.StrOps.Lower({obj_expr})"
-                    elif method_name == 'strip':
+                    elif method_name == "strip":
                         if args:
                             return f"mgen.StrOps.StripChars({obj_expr}, {args[0]})"
                         else:
                             return f"mgen.StrOps.Strip({obj_expr})"
-                    elif method_name == 'find':
+                    elif method_name == "find":
                         return f"mgen.StrOps.Find({obj_expr}, {args[0]})"
-                    elif method_name == 'replace':
+                    elif method_name == "replace":
                         return f"mgen.StrOps.Replace({obj_expr}, {args[0]}, {args[1]})"
-                    elif method_name == 'split':
+                    elif method_name == "split":
                         if args:
                             return f"mgen.StrOps.SplitSep({obj_expr}, {args[0]})"
                         else:
@@ -522,7 +522,7 @@ class MGenPythonToGoConverter:
         converted = []
         for stmt in statements:
             converted.append(self._convert_statement(stmt))
-        return '\n'.join(converted)
+        return "\n".join(converted)
 
     def _convert_statement(self, stmt: ast.stmt) -> str:
         """Convert a Python statement to Go."""
@@ -572,7 +572,7 @@ class MGenPythonToGoConverter:
                     else:
                         statements.append(f"    var {target.id} {var_type} = {value_expr}")
 
-        return '\n'.join(statements)
+        return "\n".join(statements)
 
     def _convert_annotated_assignment(self, stmt: ast.AnnAssign) -> str:
         """Convert annotated assignment."""
@@ -602,7 +602,7 @@ class MGenPythonToGoConverter:
         if isinstance(stmt.target, ast.Name):
             return f"    {stmt.target.id} {op} {value_expr}"
 
-        return f"    // TODO: Complex augmented assignment"
+        return "    // TODO: Complex augmented assignment"
 
     def _convert_if(self, stmt: ast.If) -> str:
         """Convert if statement."""
@@ -801,21 +801,21 @@ class MGenPythonToGoConverter:
             args = [self._convert_expression(arg) for arg in expr.args]
 
             # Handle string methods
-            if method_name in ['upper', 'lower', 'strip', 'find', 'replace', 'split']:
-                if method_name == 'upper':
+            if method_name in ["upper", "lower", "strip", "find", "replace", "split"]:
+                if method_name == "upper":
                     return f"mgen.StrOps.Upper({obj_expr})"
-                elif method_name == 'lower':
+                elif method_name == "lower":
                     return f"mgen.StrOps.Lower({obj_expr})"
-                elif method_name == 'strip':
+                elif method_name == "strip":
                     if args:
                         return f"mgen.StrOps.StripChars({obj_expr}, {args[0]})"
                     else:
                         return f"mgen.StrOps.Strip({obj_expr})"
-                elif method_name == 'find':
+                elif method_name == "find":
                     return f"mgen.StrOps.Find({obj_expr}, {args[0]})"
-                elif method_name == 'replace':
+                elif method_name == "replace":
                     return f"mgen.StrOps.Replace({obj_expr}, {args[0]}, {args[1]})"
-                elif method_name == 'split':
+                elif method_name == "split":
                     if args:
                         return f"mgen.StrOps.SplitSep({obj_expr}, {args[0]})"
                     else:
@@ -981,8 +981,8 @@ class MGenPythonToGoConverter:
         fields = []
         for stmt in init_method.body:
             if isinstance(stmt, (ast.Assign, ast.AnnAssign)):
-                if isinstance(stmt.target if hasattr(stmt, 'target') else stmt.targets[0], ast.Attribute):
-                    target = stmt.target if hasattr(stmt, 'target') else stmt.targets[0]
+                if isinstance(stmt.target if hasattr(stmt, "target") else stmt.targets[0], ast.Attribute):
+                    target = stmt.target if hasattr(stmt, "target") else stmt.targets[0]
                     if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
                         fields.append(target.attr)
         return fields

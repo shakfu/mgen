@@ -49,13 +49,13 @@ class z3:
             def __init__(self, name: str) -> None:
                 self.name = name
 
-            def __add__(self, other: Any) -> "z3.Int":
+            def __add__(self, other: Any) -> z3.Int:
                 return z3.Int(f"({self.name} + {other})")
 
-            def __sub__(self, other: Any) -> "z3.Int":
+            def __sub__(self, other: Any) -> z3.Int:
                 return z3.Int(f"({self.name} - {other})")
 
-            def __mul__(self, other: Any) -> "z3.Int":
+            def __mul__(self, other: Any) -> z3.Int:
                 return z3.Int(f"({self.name} * {other})")
 
             def __le__(self, other: Any) -> str:

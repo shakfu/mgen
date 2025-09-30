@@ -26,8 +26,8 @@ class HaskellFactory(AbstractFactory):
 
     def create_comment(self, text: str) -> str:
         """Create Haskell comment."""
-        if '\n' in text:
-            lines = text.split('\n')
+        if "\n" in text:
+            lines = text.split("\n")
             if len(lines) > 1:
                 # Multi-line comment
                 return "{-\n" + "\n".join(lines) + "\n-}"

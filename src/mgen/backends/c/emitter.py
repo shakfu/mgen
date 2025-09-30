@@ -19,7 +19,7 @@ Supported Features:
 
 import ast
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from ..base import AbstractEmitter
 from ..preferences import BackendPreferences
@@ -127,21 +127,21 @@ class MGenPythonToCConverter:
 
         if self.use_runtime:
             includes.extend([
-                "#include \"mgen_error_handling.h\"",
-                "#include \"mgen_python_ops.h\"",
-                "#include \"mgen_memory_ops.h\"",
+                '#include "mgen_error_handling.h"',
+                '#include "mgen_python_ops.h"',
+                '#include "mgen_memory_ops.h"',
             ])
 
             if self.container_variables or self._needs_containers():
-                includes.append("#include \"mgen_stc_bridge.h\"")
+                includes.append('#include "mgen_stc_bridge.h"')
 
         # Add STC includes for comprehensions
-        if hasattr(self, 'uses_comprehensions') and self.uses_comprehensions:
+        if hasattr(self, "uses_comprehensions") and self.uses_comprehensions:
             includes.extend([
                 "#define STC_ENABLED",
-                "#include \"ext/stc/include/stc/vec.h\"",
-                "#include \"ext/stc/include/stc/hmap.h\"",
-                "#include \"ext/stc/include/stc/hset.h\"",
+                '#include "ext/stc/include/stc/vec.h"',
+                '#include "ext/stc/include/stc/hmap.h"',
+                '#include "ext/stc/include/stc/hset.h"',
             ])
 
         # Add dynamically needed includes
@@ -163,7 +163,7 @@ class MGenPythonToCConverter:
                 container_types.add(var_info["element_type"])
 
         # Add types for comprehensions (basic integer support for now)
-        if hasattr(self, 'uses_comprehensions') and self.uses_comprehensions:
+        if hasattr(self, "uses_comprehensions") and self.uses_comprehensions:
             container_types.add("int")  # Most common case for comprehensions
 
         # Generate declarations for each type
@@ -174,7 +174,7 @@ class MGenPythonToCConverter:
             declarations.extend([
                 f"#define i_type vec_{sanitized}",
                 f"#define i_val {element_type}",
-                "#include \"ext/stc/include/stc/vec.h\"",
+                '#include "ext/stc/include/stc/vec.h"',
                 "#undef i_type",
                 "#undef i_val",
                 ""
@@ -185,7 +185,7 @@ class MGenPythonToCConverter:
                 f"#define i_type map_{sanitized}_{sanitized}",
                 f"#define i_key {element_type}",
                 f"#define i_val {element_type}",
-                "#include \"ext/stc/include/stc/hmap.h\"",
+                '#include "ext/stc/include/stc/hmap.h"',
                 "#undef i_type",
                 "#undef i_key",
                 "#undef i_val",
@@ -196,7 +196,7 @@ class MGenPythonToCConverter:
             declarations.extend([
                 f"#define i_type set_{sanitized}",
                 f"#define i_key {element_type}",
-                "#include \"ext/stc/include/stc/hset.h\"",
+                '#include "ext/stc/include/stc/hset.h"',
                 "#undef i_type",
                 "#undef i_key",
                 ""
@@ -232,7 +232,7 @@ class MGenPythonToCConverter:
         for stmt in node.body:
             converted = self._convert_statement(stmt)
             if converted:
-                body_lines.extend(converted.split('\n'))
+                body_lines.extend(converted.split("\n"))
 
         # Format function
         body = "\n".join(f"    {line}" if line.strip() else "" for line in body_lines)
@@ -749,7 +749,7 @@ class MGenPythonToCConverter:
         for s in stmt.body:
             converted = self._convert_statement(s)
             if converted:
-                body.extend(converted.split('\n'))
+                body.extend(converted.split("\n"))
 
         result = f"if ({condition}) {{\n"
         for line in body:
@@ -768,7 +768,7 @@ class MGenPythonToCConverter:
                 for s in stmt.orelse:
                     converted = self._convert_statement(s)
                     if converted:
-                        for line in converted.split('\n'):
+                        for line in converted.split("\n"):
                             result += f"    {line}\n"
                 result += "}"
 
@@ -781,7 +781,7 @@ class MGenPythonToCConverter:
         for s in stmt.body:
             converted = self._convert_statement(s)
             if converted:
-                body.extend(converted.split('\n'))
+                body.extend(converted.split("\n"))
 
         result = f"while ({condition}) {{\n"
         for line in body:
@@ -820,7 +820,7 @@ class MGenPythonToCConverter:
         for s in stmt.body:
             converted = self._convert_statement(s)
             if converted:
-                body.extend(converted.split('\n'))
+                body.extend(converted.split("\n"))
 
         result = f"for (int {var_name} = {start}; {var_name} < {stop}; {var_name} += {step}) {{\n"
         for line in body:
@@ -849,7 +849,7 @@ class MGenPythonToCConverter:
         """Convert subscript access."""
         obj = self._convert_expression(expr.value)
         # Handle both Python 3.8 (with ast.Index) and Python 3.9+ (without ast.Index)
-        if hasattr(ast, 'Index') and isinstance(expr.slice, ast.Index):  # Python < 3.9
+        if hasattr(ast, "Index") and isinstance(expr.slice, ast.Index):  # Python < 3.9
             index = self._convert_expression(expr.slice.value)  # type: ignore
         else:  # Python >= 3.9
             index = self._convert_expression(expr.slice)
@@ -872,9 +872,9 @@ class MGenPythonToCConverter:
 
         # Store struct info for later use
         self.defined_structs[class_name] = {
-            'instance_vars': instance_vars,
-            'attributes': instance_vars,  # For compatibility with string method detection
-            'methods': [m.name for m in methods]
+            "instance_vars": instance_vars,
+            "attributes": instance_vars,  # For compatibility with string method detection
+            "methods": [m.name for m in methods]
         }
 
         # Generate method declarations
@@ -1029,7 +1029,7 @@ class MGenPythonToCConverter:
         for stmt in method.body:
             converted = self._convert_method_statement(stmt, class_name)
             if converted:
-                body_lines.extend(converted.split('\n'))
+                body_lines.extend(converted.split("\n"))
 
         body = "\n".join(f"    {line}" if line.strip() else "" for line in body_lines)
 
@@ -1391,13 +1391,13 @@ class CEmitter(AbstractEmitter):
             "#include <stdio.h>",
             "#include <stdlib.h>",
             "#include <stdbool.h>",
-            "#include \"mgen_error_handling.h\"",
-            "#include \"mgen_python_ops.h\"",
-            "#include \"mgen_memory_ops.h\"",
+            '#include "mgen_error_handling.h"',
+            '#include "mgen_python_ops.h"',
+            '#include "mgen_memory_ops.h"',
         ]
 
         if self._uses_containers(tree):
-            includes.append("#include \"mgen_stc_bridge.h\"")
+            includes.append('#include "mgen_stc_bridge.h"')
             includes.append("// STC container declarations will be added here")
 
         # Generate functions with runtime support

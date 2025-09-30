@@ -24,13 +24,13 @@ Usage:
 """
 
 import ast
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
-from dataclasses import dataclass, field
 
-from .backends.registry import registry
 from .backends.preferences import BackendPreferences
+from .backends.registry import registry
 from .common import log
 
 # Import frontend analysis components
@@ -130,7 +130,7 @@ class PipelineResult:
 
 
 
-def _map_optimization_level(pipeline_level: OptimizationLevel) -> 'FrontendOptimizationLevel':
+def _map_optimization_level(pipeline_level: OptimizationLevel) -> "FrontendOptimizationLevel":
     """Map pipeline OptimizationLevel to frontend OptimizationLevel."""
     if not FRONTEND_AVAILABLE:
         return None  # type: ignore
@@ -354,18 +354,18 @@ class MGenPipeline:
                             self.ast_root = ast.parse(code)
                             self.analysis = analysis
                             self.convertible = analysis.convertible
-                            self.errors = analysis.errors if hasattr(analysis, 'errors') else []
-                            self.warnings = analysis.warnings if hasattr(analysis, 'warnings') else []
+                            self.errors = analysis.errors if hasattr(analysis, "errors") else []
+                            self.warnings = analysis.warnings if hasattr(analysis, "warnings") else []
 
                     return SimpleAnalysisResult(source_code, simple_analysis)
                 except:
                     # Fallback to basic analysis
-                    basic_result = type('BasicAnalysis', (), {
-                        'source_code': source_code,
-                        'ast_root': ast.parse(source_code),
-                        'convertible': True,
-                        'errors': [],
-                        'warnings': []
+                    basic_result = type("BasicAnalysis", (), {
+                        "source_code": source_code,
+                        "ast_root": ast.parse(source_code),
+                        "convertible": True,
+                        "errors": [],
+                        "warnings": []
                     })()
                     result.phase_results[PipelinePhase.ANALYSIS] = {"basic": True}
                     return basic_result
@@ -447,7 +447,7 @@ class MGenPipeline:
             }
 
             # Backend-specific optimizations could be added here
-            if hasattr(self.backend, 'optimize'):
+            if hasattr(self.backend, "optimize"):
                 target_opts["backend_optimizations"] = self.backend.optimize(analysis_result)
 
             result.phase_results[PipelinePhase.TARGET_OPTIMIZATION] = target_opts

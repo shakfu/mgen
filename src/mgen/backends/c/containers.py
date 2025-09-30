@@ -59,15 +59,15 @@ class CContainerSystem(AbstractContainerSystem):
 
         if self.use_stc:
             imports.extend([
-                "#include \"mgen_stc_bridge.h\"",
-                "#include \"mgen_error_handling.h\"",
-                "#include \"mgen_python_ops.h\"",
+                '#include "mgen_stc_bridge.h"',
+                '#include "mgen_error_handling.h"',
+                '#include "mgen_python_ops.h"',
                 "// STC template headers will be included as needed",
             ])
         else:
             imports.extend([
-                "#include \"mgen_error_handling.h\"",
-                "#include \"mgen_memory_ops.h\"",
+                '#include "mgen_error_handling.h"',
+                '#include "mgen_memory_ops.h"',
             ])
 
         return imports
@@ -91,20 +91,20 @@ class CContainerSystem(AbstractContainerSystem):
                 # Vector declaration
                 declarations.append(f"#define i_type vec_{sanitized_type}")
                 declarations.append(f"#define i_val {element_type}")
-                declarations.append("#include \"stc/vec.h\"")
+                declarations.append('#include "stc/vec.h"')
                 declarations.append("")
 
                 # Map declaration (for string keys)
                 declarations.append(f"#define i_type map_str_{sanitized_type}")
                 declarations.append("#define i_key_str")
                 declarations.append(f"#define i_val {element_type}")
-                declarations.append("#include \"stc/map.h\"")
+                declarations.append('#include "stc/map.h"')
                 declarations.append("")
 
                 # Set declaration
                 declarations.append(f"#define i_type set_{sanitized_type}")
                 declarations.append(f"#define i_key {element_type}")
-                declarations.append("#include \"stc/set.h\"")
+                declarations.append('#include "stc/set.h"')
                 declarations.append("")
 
                 seen_types.add(element_type)
@@ -114,7 +114,7 @@ class CContainerSystem(AbstractContainerSystem):
             declarations.append("// String containers")
             declarations.append("#define i_type vec_cstr")
             declarations.append("#define i_val_str")
-            declarations.append("#include \"stc/vec.h\"")
+            declarations.append('#include "stc/vec.h"')
             declarations.append("")
 
         # Include STC bridge implementation

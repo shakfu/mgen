@@ -168,11 +168,11 @@ class CppContainerSystem(AbstractContainerSystem):
         if "std::vector" in container_type:
             return "{1, 2, 3}"
         elif "std::map" in container_type:
-            return "{{\"key1\", \"value1\"}, {\"key2\", \"value2\"}}"
+            return '{{"key1", "value1"}, {"key2", "value2"}}'
         elif "std::set" in container_type:
             return "{1, 2, 3}"
         elif "std::tuple" in container_type:
-            return "{1, \"hello\", 3.14}"
+            return '{1, "hello", 3.14}'
         else:
             return "{}"
 

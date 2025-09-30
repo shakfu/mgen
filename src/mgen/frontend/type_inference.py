@@ -8,7 +8,7 @@ and static analysis.
 import ast
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     from .flow_sensitive_inference import FlowSensitiveInferencer
@@ -61,7 +61,7 @@ class TypeInferenceEngine:
         self.enable_flow_sensitive = enable_flow_sensitive
 
         # Lazy import to avoid circular dependency
-        self._flow_sensitive_inferencer: Optional["FlowSensitiveInferencer"] = None
+        self._flow_sensitive_inferencer: Optional[FlowSensitiveInferencer] = None
         self.binary_op_result_types = {
             # (left_type, operator, right_type) -> result_type
             ("int", ast.Add, "int"): "int",

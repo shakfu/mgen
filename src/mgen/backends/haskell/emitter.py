@@ -1,7 +1,7 @@
 """Enhanced Haskell code emitter for MGen with comprehensive Python language support."""
 
 import ast
-from typing import Any, Dict, List, Union, Set, Optional
+from typing import Any, Dict, Optional, Set
 
 from ..base import AbstractEmitter
 from ..preferences import BackendPreferences
@@ -45,17 +45,17 @@ class MGenPythonToHaskellConverter:
         # If it's already CamelCase, keep it as is
         if snake_str[0].isupper():
             return snake_str
-        components = snake_str.split('_')
-        return ''.join(word.capitalize() for word in components)
+        components = snake_str.split("_")
+        return "".join(word.capitalize() for word in components)
 
     def _to_haskell_function_name(self, function_name: str) -> str:
         """Convert Python function name to Haskell function name (camelCase)."""
         if function_name == "main":
             return "main"
-        components = function_name.split('_')
+        components = function_name.split("_")
         if len(components) == 1:
             return function_name
-        return components[0] + ''.join(word.capitalize() for word in components[1:])
+        return components[0] + "".join(word.capitalize() for word in components[1:])
 
     def _to_haskell_var_name(self, var_name: str) -> str:
         """Convert Python variable name to Haskell variable name (camelCase)."""
@@ -627,7 +627,7 @@ main = printValue "Generated Haskell code executed successfully"'''
                 if args:
                     return f"toString {args[0]}"
                 else:
-                    return "toString \"\""  # Empty string conversion
+                    return 'toString ""'  # Empty string conversion
             elif func_name == "range":
                 if len(args) == 1:
                     return f"rangeList (range {args[0]})"
@@ -636,7 +636,7 @@ main = printValue "Generated Haskell code executed successfully"'''
                 elif len(args) == 3:
                     return f"rangeList (range3 {args[0]} {args[1]} {args[2]})"
                 else:
-                    return f"rangeList (range 0)"  # Fallback for invalid range args
+                    return "rangeList (range 0)"  # Fallback for invalid range args
             else:
                 # Check if it's a class constructor call
                 camel_func_name = self._to_camel_case(func_name)
@@ -730,7 +730,7 @@ main = printValue "Generated Haskell code executed successfully"'''
         """Convert Python list comprehension to Haskell."""
         # Check preferences for comprehension style
         use_native = False
-        if self.preferences and self.preferences.get('use_native_comprehensions', False):
+        if self.preferences and self.preferences.get("use_native_comprehensions", False):
             use_native = True
 
         expr = self._convert_expression(node.elt)
@@ -763,7 +763,7 @@ main = printValue "Generated Haskell code executed successfully"'''
         """Convert Python dict comprehension to Haskell."""
         # Check preferences for comprehension style
         use_native = False
-        if self.preferences and self.preferences.get('use_native_comprehensions', False):
+        if self.preferences and self.preferences.get("use_native_comprehensions", False):
             use_native = True
 
         key_expr = self._convert_expression(node.key)
@@ -797,7 +797,7 @@ main = printValue "Generated Haskell code executed successfully"'''
         """Convert Python set comprehension to Haskell."""
         # Check preferences for comprehension style
         use_native = False
-        if self.preferences and self.preferences.get('use_native_comprehensions', False):
+        if self.preferences and self.preferences.get("use_native_comprehensions", False):
             use_native = True
 
         expr = self._convert_expression(node.elt)

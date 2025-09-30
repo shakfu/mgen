@@ -1,8 +1,7 @@
 """Backend preference system for MGen language-specific optimizations."""
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Type
 from dataclasses import dataclass, field
+from typing import Any, Dict, Type
 
 
 @dataclass
@@ -34,20 +33,20 @@ class HaskellPreferences(BackendPreferences):
         """Initialize Haskell-specific default preferences."""
         self.language_specific.update({
             # Comprehension generation preferences
-            'use_native_comprehensions': False,  # Default to runtime consistency
-            'prefer_idiomatic_syntax': False,    # Default to cross-language consistency
-            'enable_type_annotations': True,     # Always include type signatures
-            'use_strict_mode': False,            # Use lazy evaluation by default
+            "use_native_comprehensions": False,  # Default to runtime consistency
+            "prefer_idiomatic_syntax": False,    # Default to cross-language consistency
+            "enable_type_annotations": True,     # Always include type signatures
+            "use_strict_mode": False,            # Use lazy evaluation by default
 
             # Code style preferences
-            'camel_case_conversion': True,       # Convert snake_case to camelCase
-            'module_pragmas': ['OverloadedStrings'],  # Default language extensions
-            'import_qualified': True,            # Use qualified imports
+            "camel_case_conversion": True,       # Convert snake_case to camelCase
+            "module_pragmas": ["OverloadedStrings"],  # Default language extensions
+            "import_qualified": True,            # Use qualified imports
 
             # Performance preferences
-            'enable_fusion_rules': False,        # Enable list fusion optimizations
-            'strict_data_types': False,          # Use strict data fields
-            'unpack_pragmas': False,             # Add UNPACK pragmas
+            "enable_fusion_rules": False,        # Enable list fusion optimizations
+            "strict_data_types": False,          # Use strict data fields
+            "unpack_pragmas": False,             # Add UNPACK pragmas
         })
 
 
@@ -59,20 +58,20 @@ class CPreferences(BackendPreferences):
         """Initialize C-specific default preferences."""
         self.language_specific.update({
             # Code generation preferences
-            'use_stc_containers': True,         # Use Smart Template Containers
-            'inline_functions': False,          # Add inline keywords
-            'use_restrict_keywords': False,     # Use restrict pointers
-            'enable_compiler_optimizations': True,
+            "use_stc_containers": True,         # Use Smart Template Containers
+            "inline_functions": False,          # Add inline keywords
+            "use_restrict_keywords": False,     # Use restrict pointers
+            "enable_compiler_optimizations": True,
 
             # Memory management preferences
-            'explicit_memory_management': True, # Manual malloc/free
-            'bounds_checking': True,            # Array bounds checking
-            'null_pointer_checks': True,        # NULL pointer validation
+            "explicit_memory_management": True, # Manual malloc/free
+            "bounds_checking": True,            # Array bounds checking
+            "null_pointer_checks": True,        # NULL pointer validation
 
             # Style preferences
-            'brace_style': 'k&r',               # K&R, allman, gnu, etc.
-            'indent_size': 4,                   # Indentation size
-            'use_stdint_types': True,           # Use int32_t instead of int
+            "brace_style": "k&r",               # K&R, allman, gnu, etc.
+            "indent_size": 4,                   # Indentation size
+            "use_stdint_types": True,           # Use int32_t instead of int
         })
 
 
@@ -84,31 +83,31 @@ class CppPreferences(BackendPreferences):
         """Initialize C++-specific default preferences."""
         self.language_specific.update({
             # Language standard preferences
-            'cpp_standard': 'c++17',            # C++ standard version
-            'use_modern_cpp': True,             # Modern C++ features
-            'enable_concepts': False,           # C++20 concepts (if supported)
+            "cpp_standard": "c++17",            # C++ standard version
+            "use_modern_cpp": True,             # Modern C++ features
+            "enable_concepts": False,           # C++20 concepts (if supported)
 
             # STL and library preferences
-            'use_stl_containers': True,         # Use std::vector, std::map, etc.
-            'prefer_algorithms': False,         # Use <algorithm> functions
-            'use_smart_pointers': False,        # std::unique_ptr, std::shared_ptr
-            'enable_move_semantics': False,     # Move constructors/assignment
+            "use_stl_containers": True,         # Use std::vector, std::map, etc.
+            "prefer_algorithms": False,         # Use <algorithm> functions
+            "use_smart_pointers": False,        # std::unique_ptr, std::shared_ptr
+            "enable_move_semantics": False,     # Move constructors/assignment
 
             # Code generation preferences
-            'use_auto_keyword': False,          # Auto type deduction
-            'use_range_based_loops': False,     # for (auto& x : container)
-            'inline_functions': False,          # Add inline keywords
-            'use_constexpr': False,             # constexpr functions
+            "use_auto_keyword": False,          # Auto type deduction
+            "use_range_based_loops": False,     # for (auto& x : container)
+            "inline_functions": False,          # Add inline keywords
+            "use_constexpr": False,             # constexpr functions
 
             # Memory management preferences
-            'raii_style': True,                 # Resource Acquisition Is Initialization
-            'exception_safety': True,          # Exception-safe code generation
-            'bounds_checking': True,           # Array bounds validation
+            "raii_style": True,                 # Resource Acquisition Is Initialization
+            "exception_safety": True,          # Exception-safe code generation
+            "bounds_checking": True,           # Array bounds validation
 
             # Style preferences
-            'brace_style': 'k&r',              # K&R, allman, gnu, etc.
-            'indent_size': 4,                  # Indentation size
-            'namespace_style': 'nested',       # nested, compact
+            "brace_style": "k&r",              # K&R, allman, gnu, etc.
+            "indent_size": 4,                  # Indentation size
+            "namespace_style": "nested",       # nested, compact
         })
 
 
@@ -120,38 +119,38 @@ class RustPreferences(BackendPreferences):
         """Initialize Rust-specific default preferences."""
         self.language_specific.update({
             # Language edition preferences
-            'rust_edition': '2021',             # Rust edition (2018, 2021)
-            'use_modern_rust': True,            # Modern Rust idioms
+            "rust_edition": "2021",             # Rust edition (2018, 2021)
+            "use_modern_rust": True,            # Modern Rust idioms
 
             # Memory safety preferences
-            'prefer_borrowing': True,           # Use references over owned values
-            'explicit_lifetimes': False,        # Add explicit lifetime annotations
-            'use_box_for_recursion': True,      # Box<T> for recursive types
+            "prefer_borrowing": True,           # Use references over owned values
+            "explicit_lifetimes": False,        # Add explicit lifetime annotations
+            "use_box_for_recursion": True,      # Box<T> for recursive types
 
             # Ownership and borrowing
-            'clone_strategy': 'minimal',        # minimal, explicit, liberal
-            'use_cow': False,                   # Cow<'_, str> for string handling
-            'prefer_into_iter': True,           # .into_iter() over .iter()
+            "clone_strategy": "minimal",        # minimal, explicit, liberal
+            "use_cow": False,                   # Cow<'_, str> for string handling
+            "prefer_into_iter": True,           # .into_iter() over .iter()
 
             # Error handling preferences
-            'error_handling': 'result',         # result, panic, unwrap
-            'use_anyhow': False,                # anyhow crate for error handling
-            'explicit_error_types': True,      # Custom error types
+            "error_handling": "result",         # result, panic, unwrap
+            "use_anyhow": False,                # anyhow crate for error handling
+            "explicit_error_types": True,      # Custom error types
 
             # Collections and iterators
-            'use_iterators': True,              # Iterator chains over loops
-            'collect_strategy': 'smart',        # smart, explicit, minimal
-            'use_hashmap': True,                # HashMap over BTreeMap
+            "use_iterators": True,              # Iterator chains over loops
+            "collect_strategy": "smart",        # smart, explicit, minimal
+            "use_hashmap": True,                # HashMap over BTreeMap
 
             # Code style preferences
-            'snake_case_conversion': True,      # Keep Python snake_case
-            'use_derives': True,                # #[derive(...)] attributes
-            'explicit_returns': False,         # Explicit return statements
+            "snake_case_conversion": True,      # Keep Python snake_case
+            "use_derives": True,                # #[derive(...)] attributes
+            "explicit_returns": False,         # Explicit return statements
 
             # Performance preferences
-            'zero_cost_abstractions': True,    # Prefer zero-cost patterns
-            'inline_hints': False,             # #[inline] attributes
-            'simd_optimizations': False,       # SIMD where applicable
+            "zero_cost_abstractions": True,    # Prefer zero-cost patterns
+            "inline_hints": False,             # #[inline] attributes
+            "simd_optimizations": False,       # SIMD where applicable
         })
 
 
@@ -163,38 +162,38 @@ class GoPreferences(BackendPreferences):
         """Initialize Go-specific default preferences."""
         self.language_specific.update({
             # Language version preferences
-            'go_version': '1.21',               # Minimum Go version
-            'use_generics': True,               # Go 1.18+ generics
+            "go_version": "1.21",               # Minimum Go version
+            "use_generics": True,               # Go 1.18+ generics
 
             # Package and module preferences
-            'module_structure': 'single',       # single, multi-package
-            'package_naming': 'lowercase',      # lowercase, descriptive
-            'use_internal_packages': False,     # internal/ directory structure
+            "module_structure": "single",       # single, multi-package
+            "package_naming": "lowercase",      # lowercase, descriptive
+            "use_internal_packages": False,     # internal/ directory structure
 
             # Concurrency preferences
-            'use_goroutines': False,            # Concurrent processing
-            'channel_strategy': 'minimal',      # minimal, explicit, buffered
-            'context_usage': 'explicit',        # explicit, implicit, none
+            "use_goroutines": False,            # Concurrent processing
+            "channel_strategy": "minimal",      # minimal, explicit, buffered
+            "context_usage": "explicit",        # explicit, implicit, none
 
             # Error handling preferences
-            'error_handling': 'explicit',       # explicit, wrapped, panic
-            'use_errors_is': True,              # errors.Is/As for error checking
-            'custom_error_types': False,        # Custom error types
+            "error_handling": "explicit",       # explicit, wrapped, panic
+            "use_errors_is": True,              # errors.Is/As for error checking
+            "custom_error_types": False,        # Custom error types
 
             # Memory management preferences
-            'pointer_usage': 'minimal',         # minimal, explicit, performance
-            'slice_capacity': 'smart',          # smart, explicit, generous
-            'string_builder': True,             # strings.Builder for concatenation
+            "pointer_usage": "minimal",         # minimal, explicit, performance
+            "slice_capacity": "smart",          # smart, explicit, generous
+            "string_builder": True,             # strings.Builder for concatenation
 
             # Code style preferences
-            'naming_convention': 'go_style',    # go_style, camelCase, preserved
-            'use_short_names': True,            # Go-style short variable names
-            'explicit_interfaces': False,       # Explicit interface definitions
+            "naming_convention": "go_style",    # go_style, camelCase, preserved
+            "use_short_names": True,            # Go-style short variable names
+            "explicit_interfaces": False,       # Explicit interface definitions
 
             # Standard library preferences
-            'prefer_standard_lib': True,        # Use standard library over runtime
-            'use_fmt_package': True,            # fmt package for output
-            'json_tags': False,                 # Add json struct tags
+            "prefer_standard_lib": True,        # Use standard library over runtime
+            "use_fmt_package": True,            # fmt package for output
+            "json_tags": False,                 # Add json struct tags
         })
 
 
@@ -206,40 +205,40 @@ class OCamlPreferences(BackendPreferences):
         """Initialize OCaml-specific default preferences."""
         self.language_specific.update({
             # Language version preferences
-            'ocaml_version': '4.14',             # OCaml version targeting
-            'use_modern_syntax': True,           # Modern OCaml syntax features
+            "ocaml_version": "4.14",             # OCaml version targeting
+            "use_modern_syntax": True,           # Modern OCaml syntax features
 
             # Functional programming preferences
-            'prefer_immutable': True,            # Immutable data structures
-            'use_pattern_matching': True,        # Pattern matching over conditionals
-            'tail_recursion_opt': True,          # Tail recursion optimization
-            'curried_functions': True,           # Use curried function style
+            "prefer_immutable": True,            # Immutable data structures
+            "use_pattern_matching": True,        # Pattern matching over conditionals
+            "tail_recursion_opt": True,          # Tail recursion optimization
+            "curried_functions": True,           # Use curried function style
 
             # Module system preferences
-            'module_structure': 'nested',        # nested, flat, hierarchical
-            'use_functors': False,               # Higher-order modules
-            'signature_files': False,            # Generate .mli files
+            "module_structure": "nested",        # nested, flat, hierarchical
+            "use_functors": False,               # Higher-order modules
+            "signature_files": False,            # Generate .mli files
 
             # Type system preferences
-            'type_annotations': True,            # Explicit type annotations
-            'polymorphic_variants': False,       # Use polymorphic variants
-            'gadts': False,                      # Generalized ADTs (if supported)
-            'objects': False,                    # OCaml object system vs records
+            "type_annotations": True,            # Explicit type annotations
+            "polymorphic_variants": False,       # Use polymorphic variants
+            "gadts": False,                      # Generalized ADTs (if supported)
+            "objects": False,                    # OCaml object system vs records
 
             # Standard library preferences
-            'list_operations': 'functional',     # functional, imperative, mixed
-            'string_handling': 'stdlib',         # stdlib, bytes, custom
-            'hashtables': 'stdlib',              # Use Hashtbl module
+            "list_operations": "functional",     # functional, imperative, mixed
+            "string_handling": "stdlib",         # stdlib, bytes, custom
+            "hashtables": "stdlib",              # Use Hashtbl module
 
             # Code style preferences
-            'naming_convention': 'snake_case',   # snake_case, camelCase
-            'indent_size': 2,                    # Indentation size
-            'match_style': 'aligned',            # aligned, compact
+            "naming_convention": "snake_case",   # snake_case, camelCase
+            "indent_size": 2,                    # Indentation size
+            "match_style": "aligned",            # aligned, compact
 
             # Performance preferences
-            'lazy_evaluation': False,            # Use lazy values
-            'mutable_optimization': False,       # Mutable optimizations where safe
-            'inline_hints': False,               # Compiler inline hints
+            "lazy_evaluation": False,            # Use lazy values
+            "mutable_optimization": False,       # Mutable optimizations where safe
+            "inline_hints": False,               # Compiler inline hints
         })
 
 
@@ -247,12 +246,12 @@ class PreferencesRegistry:
     """Registry for backend preference classes."""
 
     _preferences_map: Dict[str, Type[BackendPreferences]] = {
-        'haskell': HaskellPreferences,
-        'c': CPreferences,
-        'cpp': CppPreferences,
-        'rust': RustPreferences,
-        'go': GoPreferences,
-        'ocaml': OCamlPreferences,
+        "haskell": HaskellPreferences,
+        "c": CPreferences,
+        "cpp": CppPreferences,
+        "rust": RustPreferences,
+        "go": GoPreferences,
+        "ocaml": OCamlPreferences,
     }
 
     @classmethod

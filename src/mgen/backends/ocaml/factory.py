@@ -1,6 +1,7 @@
 """OCaml backend factory for MGen."""
 
 from typing import List, Optional
+
 from ..base import AbstractFactory
 from ..preferences import BackendPreferences, OCamlPreferences
 
@@ -32,8 +33,8 @@ class OCamlFactory(AbstractFactory):
             ocaml_param_type = self._map_python_type_to_ocaml(param_type)
             param_types.append(ocaml_param_type)
 
-        type_signature = ' -> '.join(param_types + [ocaml_return_type])
-        param_names = ' '.join(param_name for param_name, _ in params)
+        type_signature = " -> ".join(param_types + [ocaml_return_type])
+        param_names = " ".join(param_name for param_name, _ in params)
 
         return f"let {name} {param_names} : {type_signature}"
 
@@ -48,23 +49,23 @@ class OCamlFactory(AbstractFactory):
     def _map_python_type_to_ocaml(self, python_type: str) -> str:
         """Map Python type to OCaml type."""
         type_mapping = {
-            'int': 'int',
-            'float': 'float',
-            'str': 'string',
-            'string': 'string',
-            'bool': 'bool',
-            'list': 'list',
-            'dict': 'map',
-            'set': 'set',
-            'None': 'unit',
-            'Any': "'a"
+            "int": "int",
+            "float": "float",
+            "str": "string",
+            "string": "string",
+            "bool": "bool",
+            "list": "list",
+            "dict": "map",
+            "set": "set",
+            "None": "unit",
+            "Any": "'a"
         }
         return type_mapping.get(python_type, python_type)
 
     def get_file_extension(self) -> str:
         """Get the file extension for OCaml files."""
-        return '.ml'
+        return ".ml"
 
     def get_runtime_files(self) -> list:
         """Get the list of runtime files needed for OCaml."""
-        return ['mgen_runtime.ml']
+        return ["mgen_runtime.ml"]

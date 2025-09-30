@@ -296,10 +296,10 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
         return {
             "memory_errors": [
                 {
-                    "type": error.error_type if hasattr(error, 'error_type') else "unknown",
-                    "message": error.message if hasattr(error, 'message') else str(error),
-                    "line": error.line_number if hasattr(error, 'line_number') else 0,
-                    "severity": error.severity if hasattr(error, 'severity') else "error",
+                    "type": error.error_type if hasattr(error, "error_type") else "unknown",
+                    "message": error.message if hasattr(error, "message") else str(error),
+                    "line": error.line_number if hasattr(error, "line_number") else 0,
+                    "severity": error.severity if hasattr(error, "severity") else "error",
                 }
                 for error in all_errors
             ],

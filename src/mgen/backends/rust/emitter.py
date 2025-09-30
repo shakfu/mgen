@@ -1,7 +1,7 @@
 """Enhanced Rust code emitter for MGen with comprehensive Python language support."""
 
 import ast
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from ..base import AbstractEmitter
 from ..preferences import BackendPreferences
@@ -40,8 +40,8 @@ class MGenPythonToRustConverter:
     def _to_snake_case(self, camel_str: str) -> str:
         """Convert CamelCase to snake_case."""
         import re
-        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', camel_str)
-        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+        s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", camel_str)
+        return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
     def _to_rust_method_name(self, method_name: str) -> str:
         """Convert Python method name to Rust method name (snake_case)."""
@@ -97,9 +97,9 @@ class MGenPythonToRustConverter:
 
         # Add main function if not present
         if not has_main:
-            main_func = '''fn main() {
+            main_func = """fn main() {
     print_value("Generated Rust code executed successfully");
-}'''
+}"""
             parts.append("")
             parts.append(main_func)
 
@@ -137,7 +137,7 @@ class MGenPythonToRustConverter:
                     other_methods.append(item)
 
         # Generate struct definition
-        struct_lines = [f"#[derive(Clone)]"]
+        struct_lines = ["#[derive(Clone)]"]
         struct_lines.append(f"struct {class_name} {{")
 
         if init_method:
@@ -162,7 +162,7 @@ class MGenPythonToRustConverter:
 
         # Store struct info for method generation
         self.struct_info[class_name] = {
-            'fields': self._extract_struct_fields(init_method) if init_method else []
+            "fields": self._extract_struct_fields(init_method) if init_method else []
         }
 
         # Generate impl block with constructor and methods
@@ -270,7 +270,7 @@ class MGenPythonToRustConverter:
         converted = []
         for stmt in statements:
             converted.append(self._convert_method_statement(stmt, class_name))
-        return '\n'.join(converted)
+        return "\n".join(converted)
 
     def _convert_method_statement(self, stmt: ast.stmt, class_name: str) -> str:
         """Convert a method statement with class context."""
@@ -310,7 +310,7 @@ class MGenPythonToRustConverter:
                     field_name = self._to_snake_case(target.attr)
                     statements.append(f"        {obj_expr}.{field_name} = {value_expr};")
 
-        return '\n'.join(statements)
+        return "\n".join(statements)
 
     def _convert_method_annotated_assignment(self, stmt: ast.AnnAssign, class_name: str) -> str:
         """Convert method annotated assignment with proper handling."""
@@ -431,21 +431,21 @@ class MGenPythonToRustConverter:
                 args = [self._convert_method_expression(arg, class_name) for arg in expr.args]
 
                 # Handle string methods
-                if method_name in ['upper', 'lower', 'strip', 'find', 'replace', 'split']:
-                    if method_name == 'upper':
+                if method_name in ["upper", "lower", "strip", "find", "replace", "split"]:
+                    if method_name == "upper":
                         return f"StrOps::upper(&{obj_expr})"
-                    elif method_name == 'lower':
+                    elif method_name == "lower":
                         return f"StrOps::lower(&{obj_expr})"
-                    elif method_name == 'strip':
+                    elif method_name == "strip":
                         if args:
                             return f"StrOps::strip_chars(&{obj_expr}, &{args[0]})"
                         else:
                             return f"StrOps::strip(&{obj_expr})"
-                    elif method_name == 'find':
+                    elif method_name == "find":
                         return f"StrOps::find(&{obj_expr}, &{args[0]})"
-                    elif method_name == 'replace':
+                    elif method_name == "replace":
                         return f"StrOps::replace(&{obj_expr}, &{args[0]}, &{args[1]})"
-                    elif method_name == 'split':
+                    elif method_name == "split":
                         if args:
                             return f"StrOps::split_sep(&{obj_expr}, &{args[0]})"
                         else:
@@ -489,7 +489,7 @@ class MGenPythonToRustConverter:
                     elif len(args) == 3:
                         return f"new_range_with_step({args[0]}, {args[1]}, {args[2]})"
                     else:
-                        return f"new_range(0)"  # Fallback for invalid range args
+                        return "new_range(0)"  # Fallback for invalid range args
                 else:
                     # Check if this is a class constructor
                     if func_name in self.struct_info:
@@ -558,7 +558,7 @@ class MGenPythonToRustConverter:
         converted = []
         for stmt in statements:
             converted.append(self._convert_statement(stmt))
-        return '\n'.join(converted)
+        return "\n".join(converted)
 
     def _convert_statement(self, stmt: ast.stmt) -> str:
         """Convert a Python statement to Rust."""
@@ -579,9 +579,9 @@ class MGenPythonToRustConverter:
         elif isinstance(stmt, ast.Expr):
             return self._convert_expression_statement(stmt)
         elif isinstance(stmt, ast.Try):
-            raise UnsupportedFeatureError(f"Exception handling (try/except) is not supported in Rust backend")
+            raise UnsupportedFeatureError("Exception handling (try/except) is not supported in Rust backend")
         elif isinstance(stmt, ast.With):
-            raise UnsupportedFeatureError(f"Context managers (with statement) are not supported in Rust backend")
+            raise UnsupportedFeatureError("Context managers (with statement) are not supported in Rust backend")
         else:
             raise UnsupportedFeatureError(f"Statement type {type(stmt).__name__} is not supported in Rust backend")
 
@@ -614,7 +614,7 @@ class MGenPythonToRustConverter:
                     else:
                         statements.append(f"    let mut {target.id} = {value_expr};")
 
-        return '\n'.join(statements)
+        return "\n".join(statements)
 
     def _convert_annotated_assignment(self, stmt: ast.AnnAssign) -> str:
         """Convert annotated assignment (type annotation)."""
@@ -629,7 +629,7 @@ class MGenPythonToRustConverter:
             var_type = self._map_type_annotation(stmt.annotation)
             return f"    let mut {stmt.target.id}: {var_type} = {value_expr};"
 
-        return f"    // TODO: Complex annotated assignment"
+        return "    // TODO: Complex annotated assignment"
 
     def _convert_aug_assignment(self, stmt: ast.AugAssign) -> str:
         """Convert augmented assignment."""
@@ -742,7 +742,7 @@ class MGenPythonToRustConverter:
         elif isinstance(expr, ast.Subscript):
             return self._convert_subscript(expr)
         elif isinstance(expr, ast.GeneratorExp):
-            raise UnsupportedFeatureError(f"Generator expressions are not supported in Rust backend")
+            raise UnsupportedFeatureError("Generator expressions are not supported in Rust backend")
         else:
             raise UnsupportedFeatureError(f"Expression type {type(expr).__name__} is not supported in Rust backend")
 
@@ -913,7 +913,7 @@ class MGenPythonToRustConverter:
                 elif len(args) == 3:
                     return f"new_range_with_step({args[0]}, {args[1]}, {args[2]}).collect()"
                 else:
-                    return f"new_range(0).collect()"  # Fallback for invalid range args
+                    return "new_range(0).collect()"  # Fallback for invalid range args
             else:
                 # Check if this is a class constructor
                 if func_name in self.struct_info:
@@ -936,21 +936,21 @@ class MGenPythonToRustConverter:
             args = [self._convert_expression(arg) for arg in expr.args]
 
             # Handle string methods
-            if method_name in ['upper', 'lower', 'strip', 'find', 'replace', 'split']:
-                if method_name == 'upper':
+            if method_name in ["upper", "lower", "strip", "find", "replace", "split"]:
+                if method_name == "upper":
                     return f"StrOps::upper(&{obj_expr})"
-                elif method_name == 'lower':
+                elif method_name == "lower":
                     return f"StrOps::lower(&{obj_expr})"
-                elif method_name == 'strip':
+                elif method_name == "strip":
                     if args:
                         return f"StrOps::strip_chars(&{obj_expr}, &{args[0]})"
                     else:
                         return f"StrOps::strip(&{obj_expr})"
-                elif method_name == 'find':
+                elif method_name == "find":
                     return f"StrOps::find(&{obj_expr}, &{args[0]})"
-                elif method_name == 'replace':
+                elif method_name == "replace":
                     return f"StrOps::replace(&{obj_expr}, &{args[0]}, &{args[1]})"
-                elif method_name == 'split':
+                elif method_name == "split":
                     if args:
                         return f"StrOps::split_sep(&{obj_expr}, &{args[0]})"
                     else:
@@ -1155,8 +1155,8 @@ class MGenPythonToRustConverter:
         fields = []
         for stmt in init_method.body:
             if isinstance(stmt, (ast.Assign, ast.AnnAssign)):
-                if isinstance(stmt.target if hasattr(stmt, 'target') else stmt.targets[0], ast.Attribute):
-                    target = stmt.target if hasattr(stmt, 'target') else stmt.targets[0]
+                if isinstance(stmt.target if hasattr(stmt, "target") else stmt.targets[0], ast.Attribute):
+                    target = stmt.target if hasattr(stmt, "target") else stmt.targets[0]
                     if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
                         fields.append(target.attr)
         return fields
@@ -1194,25 +1194,25 @@ class RustEmitter(AbstractEmitter):
         full_code = self.converter._convert_module(module)
 
         # Extract just the function part (remove imports and main)
-        lines = full_code.split('\n')
+        lines = full_code.split("\n")
         function_lines = []
         in_function = False
         brace_count = 0
 
         for line in lines:
-            if line.strip().startswith(f'fn {func_node.name}('):
+            if line.strip().startswith(f"fn {func_node.name}("):
                 in_function = True
                 function_lines.append(line)
-                if '{' in line:
-                    brace_count += line.count('{') - line.count('}')
+                if "{" in line:
+                    brace_count += line.count("{") - line.count("}")
             elif in_function:
                 function_lines.append(line)
-                if '{' in line or '}' in line:
-                    brace_count += line.count('{') - line.count('}')
+                if "{" in line or "}" in line:
+                    brace_count += line.count("{") - line.count("}")
                     if brace_count == 0:
                         break
 
-        return '\n'.join(function_lines)
+        return "\n".join(function_lines)
 
     def emit_module(self, source_code: str, analysis_result: Any) -> str:
         """Generate complete Rust module using converter."""

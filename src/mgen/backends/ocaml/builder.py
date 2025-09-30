@@ -1,9 +1,8 @@
 """OCaml builder for compiling generated OCaml code."""
 
-import os
 import subprocess
-from typing import List, Optional
 from pathlib import Path
+from typing import List, Optional
 
 from ..base import AbstractBuilder
 from ..preferences import BackendPreferences, OCamlPreferences
@@ -17,8 +16,7 @@ class OCamlBuilder(AbstractBuilder):
         self.preferences = preferences or OCamlPreferences()
 
     def build(self, output_file: str, makefile: bool = False) -> bool:
-        """
-        Build the OCaml code.
+        """Build the OCaml code.
 
         Args:
             output_file: The OCaml source file to compile
@@ -46,10 +44,10 @@ class OCamlBuilder(AbstractBuilder):
             self._copy_runtime_files(base_path)
 
         # Compile with OCaml compiler
-        executable = output_file.replace('.ml', '')
+        executable = output_file.replace(".ml", "")
         cmd = [
-            'ocamlc',
-            '-o', executable,
+            "ocamlc",
+            "-o", executable,
             str(runtime_path),
             output_file
         ]
@@ -80,7 +78,7 @@ class OCamlBuilder(AbstractBuilder):
 """
 
         dune_project_path = base_path / "dune-project"
-        with open(dune_project_path, 'w') as f:
+        with open(dune_project_path, "w") as f:
             f.write(dune_project_content)
 
         # Generate dune file
@@ -91,7 +89,7 @@ class OCamlBuilder(AbstractBuilder):
 """
 
         dune_file_path = base_path / "dune"
-        with open(dune_file_path, 'w') as f:
+        with open(dune_file_path, "w") as f:
             f.write(dune_content)
 
         print(f"Generated dune-project and dune files for {project_name}")
@@ -117,12 +115,12 @@ class OCamlBuilder(AbstractBuilder):
     def get_build_command(self, output_file: str) -> List[str]:
         """Get the command to build the OCaml file."""
         base_name = Path(output_file).stem
-        return ['ocamlc', '-o', base_name, 'mgen_runtime.ml', output_file]
+        return ["ocamlc", "-o", base_name, "mgen_runtime.ml", output_file]
 
     def get_run_command(self, output_file: str) -> List[str]:
         """Get the command to run the compiled OCaml executable."""
         executable = Path(output_file).stem
-        return [f'./{executable}']
+        return [f"./{executable}"]
 
     def clean(self, output_file: str) -> bool:
         """Clean build artifacts."""
@@ -185,4 +183,4 @@ class OCamlBuilder(AbstractBuilder):
 
     def get_compile_flags(self) -> List[str]:
         """Get compilation flags for OCaml."""
-        return ['-o']
+        return ["-o"]

@@ -7,7 +7,7 @@ for high-performance, type-safe container operations in generated C code.
 import ast
 import os
 import sys
-from typing import Callable, List, Dict, Optional, Any
+from typing import Callable, Dict, List
 
 # Add the ext.stc module to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))

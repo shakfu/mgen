@@ -318,7 +318,7 @@ class StaticPythonSubsetValidator:
         # Tier 3: Advanced Patterns (Research Required)
 
         # Match statement only available in Python 3.10+
-        if hasattr(ast, 'Match'):
+        if hasattr(ast, "Match"):
             rules["pattern_matching"] = FeatureRule(
                 name="Pattern Matching",
                 tier=SubsetTier.TIER_3_ADVANCED,

@@ -1,7 +1,7 @@
 """Enhanced OCaml code emitter for MGen with comprehensive Python language support."""
 
 import ast
-from typing import Any, Dict, List, Union, Set, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from ..base import AbstractEmitter
 from ..preferences import BackendPreferences
@@ -69,7 +69,7 @@ class MGenPythonToOCamlConverter:
 
         # Add main execution
         ocaml_code.append("(* Main execution *)")
-        ocaml_code.append("let () = print_value \"Generated OCaml code executed successfully\"")
+        ocaml_code.append('let () = print_value "Generated OCaml code executed successfully"')
 
         return "\n".join(ocaml_code)
 
@@ -317,7 +317,7 @@ class MGenPythonToOCamlConverter:
                 lines.append("  false")
             else:
                 lines.append("  (* Method implementation simplified *)")
-                lines.append("  failwith \"Method not implemented\"")
+                lines.append('  failwith "Method not implemented"')
 
         return lines
 
@@ -553,7 +553,7 @@ class MGenPythonToOCamlConverter:
                 delimiter = self._convert_expression(args[0])
                 return f"split {obj_name} {delimiter}"
             else:
-                return f"split {obj_name} \" \""  # Default to space
+                return f'split {obj_name} " "'  # Default to space
         else:
             raise UnsupportedFeatureError(f"Unsupported string method: {method_name}")
 
@@ -725,24 +725,24 @@ class MGenPythonToOCamlConverter:
     def _to_ocaml_var_name(self, name: str) -> str:
         """Convert Python variable name to OCaml style."""
         # Handle naming convention preferences
-        if self.preferences and self.preferences.get('naming_convention') == 'camelCase':
+        if self.preferences and self.preferences.get("naming_convention") == "camelCase":
             # Convert snake_case to camelCase
-            components = name.split('_')
+            components = name.split("_")
             if len(components) > 1:
-                return components[0] + ''.join(word.capitalize() for word in components[1:])
+                return components[0] + "".join(word.capitalize() for word in components[1:])
 
         # Default: keep snake_case but ensure it's valid OCaml
-        ocaml_name = name.replace('__', '_').lower()
+        ocaml_name = name.replace("__", "_").lower()
 
         # Handle OCaml keywords
         keywords = {
-            'and', 'as', 'assert', 'begin', 'class', 'constraint', 'do', 'done',
-            'downto', 'else', 'end', 'exception', 'external', 'false', 'for',
-            'fun', 'function', 'functor', 'if', 'in', 'include', 'inherit',
-            'initializer', 'lazy', 'let', 'match', 'method', 'module', 'mutable',
-            'new', 'object', 'of', 'open', 'or', 'private', 'rec', 'sig',
-            'struct', 'then', 'to', 'true', 'try', 'type', 'val', 'virtual',
-            'when', 'while', 'with'
+            "and", "as", "assert", "begin", "class", "constraint", "do", "done",
+            "downto", "else", "end", "exception", "external", "false", "for",
+            "fun", "function", "functor", "if", "in", "include", "inherit",
+            "initializer", "lazy", "let", "match", "method", "module", "mutable",
+            "new", "object", "of", "open", "or", "private", "rec", "sig",
+            "struct", "then", "to", "true", "try", "type", "val", "virtual",
+            "when", "while", "with"
         }
 
         if ocaml_name in keywords:
@@ -796,7 +796,7 @@ class MGenPythonToOCamlConverter:
             "'a list": "[]",
             "(string * 'a) list": "[]"
         }
-        return defaults.get(type_name, "failwith \"default value not implemented\"")
+        return defaults.get(type_name, 'failwith "default value not implemented"')
 
     def _convert_subscript(self, node: ast.Subscript) -> str:
         """Convert subscript access (e.g., list[0], dict[key])."""

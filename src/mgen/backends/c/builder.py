@@ -23,7 +23,7 @@ class CBuilder(AbstractBuilder):
         """Generate Makefile for C project with MGen runtime support."""
         # Get source file basenames
         source_basenames = [Path(f).name for f in source_files]
-        object_files = [f.replace('.c', '.o') for f in source_basenames]
+        object_files = [f.replace(".c", ".o") for f in source_basenames]
 
         # Add MGen runtime sources if available
         runtime_sources = []
@@ -32,7 +32,7 @@ class CBuilder(AbstractBuilder):
 
         if self.use_runtime:
             runtime_sources = self.get_runtime_sources()
-            runtime_objects = [Path(src).name.replace('.c', '.o') for src in runtime_sources]
+            runtime_objects = [Path(src).name.replace(".c", ".o") for src in runtime_sources]
             include_flags.append(f"-I{self.runtime_dir}")
 
         all_sources = source_basenames + [Path(src).name for src in runtime_sources]

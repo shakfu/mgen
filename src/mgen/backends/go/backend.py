@@ -2,12 +2,12 @@
 
 from typing import Optional
 
-from ..base import LanguageBackend, AbstractFactory, AbstractEmitter, AbstractBuilder, AbstractContainerSystem
+from ..base import AbstractBuilder, AbstractContainerSystem, AbstractEmitter, AbstractFactory, LanguageBackend
 from ..preferences import BackendPreferences, GoPreferences
-from .factory import GoFactory
-from .emitter import GoEmitter
 from .builder import GoBuilder
 from .containers import GoContainerSystem
+from .emitter import GoEmitter
+from .factory import GoFactory
 
 
 class GoBackend(LanguageBackend):

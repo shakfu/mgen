@@ -28,10 +28,10 @@ class GoFactory(AbstractFactory):
 
     def create_comment(self, text: str) -> str:
         """Create Go comment."""
-        if '\n' in text:
-            lines = text.split('\n')
+        if "\n" in text:
+            lines = text.split("\n")
             comment_lines = [f"// {line}" for line in lines]
-            return '\n'.join(comment_lines)
+            return "\n".join(comment_lines)
         return f"// {text}"
 
     def create_include(self, library: str) -> str:
