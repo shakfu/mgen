@@ -327,7 +327,7 @@ class MemoryAllocatorManager:
 
     def analyze_allocation_patterns(self) -> Dict[str, Any]:
         """Analyze allocation patterns for optimization suggestions."""
-        analysis = {"allocators": {}, "recommendations": [], "total_allocations": 0, "total_memory": 0}
+        analysis: Dict[str, Any] = {"allocators": {}, "recommendations": [], "total_allocations": 0, "total_memory": 0}
 
         for allocator_name, allocations in self.allocations.items():
             if not allocations:

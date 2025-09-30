@@ -206,8 +206,11 @@ class StaticAnalyzer(BaseAnalyzer):
                 self._analyze_function(context.ast_node)
             elif isinstance(context.ast_node, ast.Module):
                 self._analyze_module(context.ast_node)
-            else:
+            elif isinstance(context.ast_node, ast.stmt):
                 self._analyze_statements([context.ast_node])
+            else:
+                # For non-stmt nodes, skip analysis
+                pass
 
             # Perform additional analyses
             self._current_cfg.calculate_dominators()
@@ -275,6 +278,8 @@ class StaticAnalyzer(BaseAnalyzer):
     def _analyze_statements(self, statements: List[ast.stmt]) -> int:
         """Analyze a list of statements and return the last node ID."""
         current_node_id = self._current_cfg.entry_node
+        if current_node_id is None:
+            current_node_id = 0
 
         for stmt in statements:
             current_node_id = self._analyze_statement(stmt, current_node_id)

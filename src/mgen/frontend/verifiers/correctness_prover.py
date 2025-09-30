@@ -162,7 +162,7 @@ class CorrectnessProver:
         # Collect failed properties
         for result in all_proof_results:
             if not result.is_verified:
-                failed_properties.append(result.property.name)
+                failed_properties.append(result.proof_property.name)
 
         # Calculate confidence
         confidence = self._calculate_correctness_confidence(all_proof_results)
@@ -254,7 +254,8 @@ class CorrectnessProver:
 
     def _verify_functional_correctness(self, spec: FormalSpecification, context: AnalysisContext) -> List[ProofResult]:
         """Verify functional correctness specification."""
-        prop = self._create_functional_correctness_property(spec.name, spec.functional_spec)
+        func_spec = spec.functional_spec if spec.functional_spec is not None else ""
+        prop = self._create_functional_correctness_property(spec.name, func_spec)
         result = self.theorem_prover.verify_property(prop)
         return [result]
 
@@ -353,8 +354,8 @@ class CorrectnessProver:
         ranking_var = z3.Int(f"ranking_{loop_var}")
 
         # Ranking function must be non-negative and decrease each iteration
-        ranking_formula = z3.And(
-            ranking_var >= 0,
+        ranking_formula: Any = z3.And(
+            ranking_var >= 0,  # type: ignore[operator]
             # Additional constraints would be added based on loop analysis
         )
 

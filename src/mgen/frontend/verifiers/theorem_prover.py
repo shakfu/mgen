@@ -136,7 +136,7 @@ class ProofProperty:
 class ProofResult:
     """Result of a formal verification attempt."""
 
-    property: ProofProperty
+    proof_property: ProofProperty  # Renamed from 'property' to avoid conflict with @property decorator
     status: ProofStatus
     proof_time: float
     counterexample: Optional[Dict[str, Any]] = None
@@ -144,7 +144,7 @@ class ProofResult:
     z3_model: Optional[Any] = None
     verification_steps: Optional[List[str]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.verification_steps is None:
             self.verification_steps = []
 
@@ -195,7 +195,7 @@ class TheoremProver:
         """
         if not self.z3_available:
             return ProofResult(
-                property=prop,
+                proof_property=prop,
                 status=ProofStatus.ERROR,
                 proof_time=0.0,
                 error_message="Z3 not available. Install with: pip install z3-solver",
@@ -221,7 +221,7 @@ class TheoremProver:
                 model = solver.model()
                 counterexample = self._extract_counterexample(model)
                 return ProofResult(
-                    property=prop,
+                    proof_property=prop,
                     status=ProofStatus.DISPROVED,
                     proof_time=proof_time,
                     counterexample=counterexample,
@@ -230,7 +230,7 @@ class TheoremProver:
             elif result == z3.unsat:
                 # No counterexample - property is true
                 return ProofResult(
-                    property=prop,
+                    proof_property=prop,
                     status=ProofStatus.PROVED,
                     proof_time=proof_time,
                     verification_steps=[f"Z3 proved property in {proof_time:.3f}s"],
@@ -238,7 +238,7 @@ class TheoremProver:
             else:
                 # Unknown result (timeout or undecidable)
                 return ProofResult(
-                    property=prop,
+                    proof_property=prop,
                     status=ProofStatus.UNKNOWN,
                     proof_time=proof_time,
                     error_message="Z3 could not determine satisfiability",
@@ -246,7 +246,7 @@ class TheoremProver:
 
         except Exception as e:
             return ProofResult(
-                property=prop, status=ProofStatus.ERROR, proof_time=time.time() - start_time, error_message=str(e)
+                proof_property=prop, status=ProofStatus.ERROR, proof_time=time.time() - start_time, error_message=str(e)
             )
 
     def verify_multiple_properties(self, properties: List[ProofProperty]) -> List[ProofResult]:
@@ -408,7 +408,7 @@ class TheoremProver:
         """Template for bounds checking properties."""
         return self.create_bounds_check_property(**kwargs)
 
-    def _create_null_pointer_template(self, **kwargs) -> ProofProperty:
+    def _create_null_pointer_template(self, **kwargs: Any) -> ProofProperty:
         """Template for null pointer safety properties."""
         # Implementation for null pointer checks
         return ProofProperty(
@@ -423,7 +423,7 @@ class TheoremProver:
         """Template for overflow safety properties."""
         return self.create_overflow_safety_property(**kwargs)
 
-    def _create_loop_invariant_template(self, **kwargs) -> ProofProperty:
+    def _create_loop_invariant_template(self, **kwargs: Any) -> ProofProperty:
         """Template for loop invariant properties."""
         # Implementation for loop invariants
         return ProofProperty(

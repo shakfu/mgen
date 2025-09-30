@@ -1,8 +1,8 @@
 #!python
 # To generate "include/stc/priv/utf8_tab.c" file.
 
-import numpy as np
-import pandas as pd
+import numpy as np  # type: ignore[import-not-found]
+import pandas as pd  # type: ignore[import-untyped]
 
 _UNICODE_DIR = "https://www.unicode.org/Public/15.0.0/ucd"
 

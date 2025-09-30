@@ -8,7 +8,7 @@ import ast
 import operator as op
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from ..base import AnalysisContext, BaseOptimizer, OptimizationLevel, OptimizationResult
 
@@ -294,7 +294,7 @@ class CompileTimeEvaluator(BaseOptimizer):
 
                 return ast.Constant(value=result.value)
 
-        node.operand = operand
+        node.operand = cast(ast.expr, operand)
         return node
 
     def _optimize_comparison(self, node: ast.Compare, report: CompileTimeReport) -> ast.AST:
@@ -330,8 +330,8 @@ class CompileTimeEvaluator(BaseOptimizer):
                     except (TypeError, ValueError, ZeroDivisionError):
                         pass
 
-            node.left = left
-            node.comparators = [right]
+            node.left = cast(ast.expr, left)
+            node.comparators = [cast(ast.expr, right)]
 
         return node
 
@@ -352,21 +352,22 @@ class CompileTimeEvaluator(BaseOptimizer):
         if all_constants and len(optimized_values) > 1:
             if isinstance(node.op, ast.And):
                 # Short-circuit evaluation for 'and'
-                for val in optimized_values:
-                    const_val = self._evaluate_expression(val)
+                for opt_val in optimized_values:
+                    const_val = self._evaluate_expression(opt_val)
                     if const_val and not const_val.value:
                         report.expressions_optimized += 1
                         return ast.Constant(value=False)
                 # If we get here, all values are truthy
-                last_val = self._evaluate_expression(optimized_values[-1])
+                last_val_node = optimized_values[-1]
+                last_val = self._evaluate_expression(last_val_node)
                 if last_val:
                     report.expressions_optimized += 1
                     return ast.Constant(value=last_val.value)
 
             elif isinstance(node.op, ast.Or):
                 # Short-circuit evaluation for 'or'
-                for val in optimized_values:
-                    const_val = self._evaluate_expression(val)
+                for opt_val in optimized_values:
+                    const_val = self._evaluate_expression(opt_val)
                     if const_val and const_val.value:
                         report.expressions_optimized += 1
                         return ast.Constant(value=const_val.value)
@@ -374,7 +375,7 @@ class CompileTimeEvaluator(BaseOptimizer):
                 report.expressions_optimized += 1
                 return ast.Constant(value=False)
 
-        node.values = optimized_values
+        node.values = [cast(ast.expr, v) for v in optimized_values]
         return node
 
     def _optimize_function_call(self, node: ast.Call, report: CompileTimeReport) -> ast.AST:
@@ -434,7 +435,7 @@ class CompileTimeEvaluator(BaseOptimizer):
                     # Function call failed, keep original
                     pass
 
-            node.args = optimized_args
+            node.args = [cast(ast.expr, arg) for arg in optimized_args]
 
         return node
 
@@ -487,7 +488,7 @@ class CompileTimeEvaluator(BaseOptimizer):
                     return self._optimize_node(node.body[0], report)
                 else:
                     # Create a new block for multiple statements
-                    optimized_body = [self._optimize_node(stmt, report) for stmt in node.body]
+                    optimized_body = [cast(ast.stmt, self._optimize_node(stmt, report)) for stmt in node.body]
                     return ast.Module(body=optimized_body, type_ignores=[])
             else:
                 # Condition is always false - return else clause or pass
@@ -508,16 +509,16 @@ class CompileTimeEvaluator(BaseOptimizer):
                     if len(node.orelse) == 1:
                         return self._optimize_node(node.orelse[0], report)
                     else:
-                        optimized_else = [self._optimize_node(stmt, report) for stmt in node.orelse]
+                        optimized_else = [cast(ast.stmt, self._optimize_node(stmt, report)) for stmt in node.orelse]
                         return ast.Module(body=optimized_else, type_ignores=[])
                 else:
                     return ast.Pass()
 
         # Optimize body and else clause
-        node.test = optimized_test
-        node.body = [self._optimize_node(stmt, report) for stmt in node.body]
+        node.test = cast(ast.expr, optimized_test)
+        node.body = [cast(ast.stmt, self._optimize_node(stmt, report)) for stmt in node.body]
         if node.orelse:
-            node.orelse = [self._optimize_node(stmt, report) for stmt in node.orelse]
+            node.orelse = [cast(ast.stmt, self._optimize_node(stmt, report)) for stmt in node.orelse]
 
         return node
 
@@ -550,7 +551,7 @@ class CompileTimeEvaluator(BaseOptimizer):
     def _apply_unary_operator(self, op_node: ast.unaryop, operand: Any) -> Optional[ConstantValue]:
         """Apply a unary operator to a value."""
         op_func = self._unary_operators.get(type(op_node))
-        if not op_func:
+        if not op_func or not callable(op_func):
             return None
 
         try:
@@ -606,7 +607,7 @@ class CompileTimeEvaluator(BaseOptimizer):
                 return left
 
         # Return original binary operation
-        return ast.BinOp(left=left, op=op_node, right=right)
+        return ast.BinOp(left=cast(ast.expr, left), op=op_node, right=cast(ast.expr, right))
 
     def _generate_transformations(self, report: CompileTimeReport) -> List[str]:
         """Generate list of transformations performed."""
@@ -615,7 +616,7 @@ class CompileTimeEvaluator(BaseOptimizer):
         transformations.append(f"Found {len(report.constants_found)} compile-time constants")
         transformations.append(f"Optimized {report.expressions_optimized} expressions")
 
-        optimization_types = {}
+        optimization_types: Dict[str, int] = {}
         for opt in report.optimizations:
             optimization_types[opt.optimization_type] = optimization_types.get(opt.optimization_type, 0) + 1
 

@@ -60,12 +60,14 @@ class MemoryRegion:
         """Check if an index is safe for this region."""
         if not self.is_bounded():
             return False  # Unknown, assume unsafe
+        assert self.size is not None
         return 0 <= index < self.size
 
     def is_range_safe(self, start: int, end: int) -> bool:
         """Check if a range access is safe for this region."""
         if not self.is_bounded():
             return False
+        assert self.size is not None
         return 0 <= start <= end < self.size
 
 
@@ -113,14 +115,16 @@ class BoundsChecker(BaseAnalyzer):
             self._current_line = 0
 
             # Analyze the AST
-            violations = []
+            violations: List[BoundsViolation] = []
 
             if isinstance(context.ast_node, ast.FunctionDef):
                 violations.extend(self._analyze_function(context.ast_node))
             elif isinstance(context.ast_node, ast.Module):
                 violations.extend(self._analyze_module(context.ast_node))
             else:
-                violations.extend(self._analyze_statements([context.ast_node]))
+                # Cast to stmt for type safety
+                stmt_node = context.ast_node if isinstance(context.ast_node, ast.stmt) else ast.Pass()
+                violations.extend(self._analyze_statements([stmt_node]))
 
             # Calculate statistics
             safe_accesses = sum(1 for v in violations if v.severity == "info")
@@ -377,8 +381,10 @@ class BoundsChecker(BaseAnalyzer):
             elif isinstance(subscript.slice, ast.UnaryOp) and isinstance(subscript.slice.op, ast.USub):
                 # Negative index like arr[-5]
                 if isinstance(subscript.slice.operand, ast.Constant):
-                    index = -subscript.slice.operand.value
-                    violations.extend(self._check_constant_index(var_name, index, memory_region))
+                    operand_value = subscript.slice.operand.value
+                    if isinstance(operand_value, (int, float)):
+                        index = -int(operand_value)
+                        violations.extend(self._check_constant_index(var_name, index, memory_region))
             elif isinstance(subscript.slice, ast.Name):
                 # Variable index - need to track the index variable
                 index_var = subscript.slice.id
@@ -495,7 +501,7 @@ class BoundsChecker(BaseAnalyzer):
 
     def _handle_variable_assignment(self, var_name: str, value_expr: ast.expr) -> List[BoundsViolation]:
         """Handle assignment to a variable."""
-        violations = []
+        violations: List[BoundsViolation] = []
 
         # Create or update memory region for the variable
         if isinstance(value_expr, ast.List):
@@ -548,6 +554,7 @@ class BoundsChecker(BaseAnalyzer):
                 )
             )
         elif region.is_bounded() and not region.is_index_safe(index):
+            assert region.size is not None
             violations.append(
                 BoundsViolation(
                     violation_type=BoundsViolationType.ARRAY_INDEX_OUT_OF_BOUNDS,
@@ -582,6 +589,7 @@ class BoundsChecker(BaseAnalyzer):
 
         # General warning about variable indices
         if region.is_bounded():
+            assert region.size is not None
             violations.append(
                 BoundsViolation(
                     violation_type=BoundsViolationType.ARRAY_INDEX_OUT_OF_BOUNDS,
@@ -634,6 +642,7 @@ class BoundsChecker(BaseAnalyzer):
 
         for region in self._memory_regions.values():
             if region.is_bounded():
+                assert region.size is not None
                 # Estimate 4 bytes per integer element
                 element_size = 4 if region.element_type == "int" else 8
                 total_bytes += region.size * element_size

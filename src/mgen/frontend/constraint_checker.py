@@ -247,7 +247,8 @@ class StaticConstraintChecker:
                 func_name = node.func.id
                 if func_name in ["malloc", "calloc", "realloc"]:
                     # Memory allocation (hypothetical - Python doesn't have these)
-                    if isinstance(node.parent, ast.Assign):  # Would need parent tracking
+                    # Note: AST nodes don't have .parent attribute by default
+                    if hasattr(node, "parent") and isinstance(getattr(node, "parent", None), ast.Assign):
                         allocated_vars.add("allocated_memory")
                 elif func_name in ["free"]:
                     freed_vars.add("freed_memory")
@@ -437,7 +438,7 @@ class StaticConstraintChecker:
                             category=ConstraintCategory.C_COMPATIBILITY,
                             rule_id="CC001",
                             message=f"Unsupported feature for C conversion: {feature_name}",
-                            line_number=node.lineno,
+                            line_number=getattr(node, "lineno", 0),
                             suggestion="Rewrite using supported constructs",
                         )
                     )
@@ -681,11 +682,12 @@ class StaticConstraintChecker:
             if var_name in scope:
                 var_info = scope[var_name]
                 # If variable has a concrete type annotation like list[int], it's not None
-                if hasattr(var_info, "type_annotation") and var_info.type_annotation:
+                if hasattr(var_info, "type_annotation") and getattr(var_info, "type_annotation", None):
                     return False
                 # If variable is a built-in collection type, it's initialized
                 if hasattr(var_info, "inferred_type"):
-                    if var_info.inferred_type in ["list", "dict", "set", "tuple"]:
+                    inferred = getattr(var_info, "inferred_type", None)
+                    if inferred in ["list", "dict", "set", "tuple"]:
                         return False
 
         # For known variable patterns that are clearly initialized

@@ -230,30 +230,36 @@ class CallGraphAnalyzer(BaseAnalyzer):
 
         elif isinstance(node, ast.If):
             self._push_context(CallContext.CONDITIONAL)
-            for child in ast.iter_child_nodes(node):
-                self._visit_node_for_calls(child)
+            for child_node in ast.iter_child_nodes(node):
+                self._visit_node_for_calls(child_node)
             self._pop_context()
 
         elif isinstance(node, (ast.While, ast.For)):
             self._push_context(CallContext.LOOP)
-            for child in ast.iter_child_nodes(node):
-                self._visit_node_for_calls(child)
+            for child_node in ast.iter_child_nodes(node):
+                self._visit_node_for_calls(child_node)
             self._pop_context()
 
-        elif isinstance(node, (ast.Try, ast.ExceptHandler)):
+        elif isinstance(node, ast.Try):
             self._push_context(CallContext.EXCEPTION)
-            for child in ast.iter_child_nodes(node):
-                self._visit_node_for_calls(child)
+            for child_node in ast.iter_child_nodes(node):
+                self._visit_node_for_calls(child_node)
+            self._pop_context()
+
+        elif isinstance(node, ast.ExceptHandler):
+            self._push_context(CallContext.EXCEPTION)
+            for child_node in ast.iter_child_nodes(node):
+                self._visit_node_for_calls(child_node)
             self._pop_context()
 
         elif isinstance(node, ast.Call):
             self._process_call(node)
-            for child in ast.iter_child_nodes(node):
-                self._visit_node_for_calls(child)
+            for child_node in ast.iter_child_nodes(node):
+                self._visit_node_for_calls(child_node)
 
         else:
-            for child in ast.iter_child_nodes(node):
-                self._visit_node_for_calls(child)
+            for child_node in ast.iter_child_nodes(node):
+                self._visit_node_for_calls(child_node)
 
     def _push_context(self, context: CallContext) -> None:
         """Push a new call context onto the stack."""
@@ -381,7 +387,7 @@ class CallGraphAnalyzer(BaseAnalyzer):
         return paths
 
     def _generate_paths_from_function(
-        self, call_graph: Dict[str, FunctionNode], func_name: str, visited: Set[str], current_path: List[str] = None
+        self, call_graph: Dict[str, FunctionNode], func_name: str, visited: Set[str], current_path: Optional[List[str]] = None
     ) -> List[CallPath]:
         """Generate all paths starting from a given function."""
         if current_path is None:

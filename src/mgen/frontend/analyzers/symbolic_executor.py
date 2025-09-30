@@ -255,7 +255,7 @@ class SymbolicExecutor(BaseAnalyzer):
 
     def _execute_symbolically(self, node: ast.AST, initial_state: SymbolicState) -> List[ExecutionPath]:
         """Execute the AST node symbolically and return all execution paths."""
-        worklist = [(node, initial_state, [])]  # (node, state, path_history)
+        worklist: List[Tuple[ast.AST, SymbolicState, List[int]]] = [(node, initial_state, [])]  # (node, state, path_history)
         completed_paths = []
 
         while worklist and self._path_counter < self._max_paths:
@@ -353,7 +353,7 @@ class SymbolicExecutor(BaseAnalyzer):
         self, if_node: ast.If, state: SymbolicState, path_history: List[int]
     ) -> List[Tuple[Optional[ast.AST], SymbolicState, List[int]]]:
         """Execute an if statement, creating branches for both paths."""
-        results = []
+        results: List[Tuple[Optional[ast.AST], SymbolicState, List[int]]] = []
 
         # Evaluate condition symbolically
         condition_value = self._evaluate_expression(if_node.test, state)
@@ -381,7 +381,7 @@ class SymbolicExecutor(BaseAnalyzer):
         self, while_node: ast.While, state: SymbolicState, path_history: List[int]
     ) -> List[Tuple[Optional[ast.AST], SymbolicState, List[int]]]:
         """Execute a while loop with bounded unrolling."""
-        results = []
+        results: List[Tuple[Optional[ast.AST], SymbolicState, List[int]]] = []
 
         # For simplicity, we'll do limited loop unrolling
         max_iterations = 3

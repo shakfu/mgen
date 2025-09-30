@@ -35,7 +35,7 @@ class MGenPythonToHaskellConverter:
             "None": "()",
             "NoneType": "()",
         }
-        self.data_types: Dict[str, str] = {}  # Track data type definitions for classes
+        self.data_types: Dict[str, Any] = {}  # Track data type definitions for classes
         self.current_function: Optional[str] = None  # Track current function context
         self.declared_vars: Set[str] = set()  # Track declared variables in current function
         self.needed_imports: Set[str] = set()  # Track which imports are needed

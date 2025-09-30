@@ -8,7 +8,10 @@ and static analysis.
 import ast
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .flow_sensitive_inference import FlowSensitiveInferencer
 
 from ..common import log
 from .ast_analyzer import TypeInfo

@@ -43,7 +43,7 @@ class MemoryAccess:
     """Represents a memory access pattern."""
 
     variable: str
-    indices: List[ast.AST]
+    indices: List[ast.expr]  # Changed from List[ast.AST] to List[ast.expr]
     is_read: bool
     is_write: bool
     access_pattern: str  # "linear", "strided", "random", "irregular"
@@ -278,7 +278,7 @@ class VectorizationDetector(BaseOptimizer):
             stride=stride,
         )
 
-    def _analyze_access_pattern(self, indices: List[ast.AST], loop_node: ast.AST) -> Tuple[str, Optional[int]]:
+    def _analyze_access_pattern(self, indices: List[ast.expr], loop_node: ast.AST) -> Tuple[str, Optional[int]]:
         """Analyze the access pattern of array indices."""
         if len(indices) != 1:
             return "irregular", None
@@ -633,7 +633,7 @@ class VectorizationDetector(BaseOptimizer):
 
     def _analyze_constraint_frequency(self, candidates: List[VectorizationCandidate]) -> Dict[str, int]:
         """Analyze frequency of different constraints."""
-        frequency = {}
+        frequency: Dict[str, int] = {}
 
         for candidate in candidates:
             for constraint in candidate.constraints:

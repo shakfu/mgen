@@ -67,10 +67,10 @@ class PerformanceBound:
     average_case: str
     worst_case: str
     input_size_variable: str = "n"
-    constants: Dict[str, float] = None
-    conditions: List[str] = None
+    constants: Optional[Dict[str, float]] = None
+    conditions: Optional[List[str]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.constants is None:
             self.constants = {}
         if self.conditions is None:
@@ -459,18 +459,19 @@ class PerformanceAnalyzer:
         resource_usage = z3.Int(f"{resource_type.value}_usage")
 
         # Create complexity bound based on class
+        complexity_bound: Any
         if complexity_class == ComplexityClass.CONSTANT:
-            complexity_bound = resource_usage <= z3.IntVal(1)
+            complexity_bound = resource_usage <= z3.IntVal(1)  # type: ignore[operator]
         elif complexity_class == ComplexityClass.LINEAR:
-            complexity_bound = resource_usage <= n * z3.IntVal(10)  # With constant factor
+            complexity_bound = resource_usage <= n * z3.IntVal(10)  # type: ignore[operator]
         elif complexity_class == ComplexityClass.QUADRATIC:
-            complexity_bound = resource_usage <= n * n * z3.IntVal(10)
+            complexity_bound = resource_usage <= n * n * z3.IntVal(10)  # type: ignore[operator]
         elif complexity_class == ComplexityClass.LOGARITHMIC:
             # Approximate log with linear bound for large n
-            complexity_bound = resource_usage <= n
+            complexity_bound = resource_usage <= n  # type: ignore[operator]
         else:
             # Default bound
-            complexity_bound = resource_usage >= 0
+            complexity_bound = resource_usage >= 0  # type: ignore[operator]
 
         return ProofProperty(
             name=name,

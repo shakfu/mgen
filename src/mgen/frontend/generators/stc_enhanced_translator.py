@@ -7,7 +7,7 @@ for high-performance, type-safe container operations in generated C code.
 import ast
 import os
 import sys
-from typing import List, Dict, Optional, Any
+from typing import Callable, List, Dict, Optional, Any
 
 # Add the ext.stc module to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -33,7 +33,7 @@ class STCEnhancedTranslator:
         self.stc_type_definitions: List[str] = []
         self.stc_container_vars: Dict[str, str] = {}  # var_name -> STC container type
 
-        self.builtin_functions = {
+        self.builtin_functions: Dict[str, Callable[[ast.Call], str]] = {
             "print": self._translate_print_call,
             "len": self._translate_len,
             "abs": self._translate_abs,
@@ -559,23 +559,23 @@ class STCEnhancedTranslator:
         return "/* unary operation */"
 
     # Missing builtin function methods
-    def _translate_abs(self, args: List[ast.expr]) -> str:
+    def _translate_abs(self, call: ast.Call) -> str:
         """Translate abs() function call."""
         return "abs(/* arg */)"
 
-    def _translate_min(self, args: List[ast.expr]) -> str:
+    def _translate_min(self, call: ast.Call) -> str:
         """Translate min() function call."""
         return "min(/* args */)"
 
-    def _translate_max(self, args: List[ast.expr]) -> str:
+    def _translate_max(self, call: ast.Call) -> str:
         """Translate max() function call."""
         return "max(/* args */)"
 
-    def _translate_int_cast(self, args: List[ast.expr]) -> str:
+    def _translate_int_cast(self, call: ast.Call) -> str:
         """Translate int() cast function call."""
         return "(int)(/* arg */)"
 
-    def _translate_float_cast(self, args: List[ast.expr]) -> str:
+    def _translate_float_cast(self, call: ast.Call) -> str:
         """Translate float() cast function call."""
         return "(float)(/* arg */)"
 

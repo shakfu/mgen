@@ -323,9 +323,9 @@ class LoopAnalyzer(BaseOptimizer):
                         bounds.total_iterations = bounds.end
                 elif len(args) == 2:
                     # range(start, end)
-                    if isinstance(args[0], ast.Constant):
+                    if isinstance(args[0], ast.Constant) and isinstance(args[0].value, int):
                         bounds.start = args[0].value
-                    if isinstance(args[1], ast.Constant):
+                    if isinstance(args[1], ast.Constant) and isinstance(args[1].value, int):
                         bounds.end = args[1].value
                     bounds.step = 1
                     if bounds.start is not None and bounds.end is not None:
@@ -333,21 +333,26 @@ class LoopAnalyzer(BaseOptimizer):
                         bounds.total_iterations = max(0, bounds.end - bounds.start)
                 elif len(args) == 3:
                     # range(start, end, step)
-                    if isinstance(args[0], ast.Constant):
+                    if isinstance(args[0], ast.Constant) and isinstance(args[0].value, int):
                         bounds.start = args[0].value
-                    if isinstance(args[1], ast.Constant):
+                    if isinstance(args[1], ast.Constant) and isinstance(args[1].value, int):
                         bounds.end = args[1].value
-                    if isinstance(args[2], ast.Constant):
+                    if isinstance(args[2], ast.Constant) and isinstance(args[2].value, int):
                         bounds.step = args[2].value
                     if all(x is not None for x in [bounds.start, bounds.end, bounds.step]):
                         bounds.is_constant = True
-                        if bounds.step > 0:
+                        # Type narrowing: we know these are not None due to the all() check above
+                        start_val = bounds.start
+                        end_val = bounds.end
+                        step_val = bounds.step
+                        assert start_val is not None and end_val is not None and step_val is not None
+                        if step_val > 0:
                             bounds.total_iterations = max(
-                                0, (bounds.end - bounds.start + bounds.step - 1) // bounds.step
+                                0, (end_val - start_val + step_val - 1) // step_val
                             )
                         else:
                             bounds.total_iterations = max(
-                                0, (bounds.start - bounds.end - bounds.step - 1) // (-bounds.step)
+                                0, (start_val - end_val - step_val - 1) // (-step_val)
                             )
 
                 # Check if ascending
@@ -408,12 +413,12 @@ class LoopAnalyzer(BaseOptimizer):
     def _analyze_loop_body(self, body: List[ast.stmt], loop_info: LoopInfo, report: LoopAnalysisReport) -> None:
         """Analyze the body of a loop."""
         # Calculate complexity based on statement types
-        complexity = 0
+        complexity = 0.0
         for stmt in body:
-            complexity += 1
+            complexity += 1.0
             # Add extra complexity for control structures
             if isinstance(stmt, (ast.If, ast.For, ast.While)):
-                complexity += 2
+                complexity += 2.0
             # Count nested statements
             for child in ast.walk(stmt):
                 if isinstance(child, ast.stmt):
@@ -711,7 +716,7 @@ class LoopAnalyzer(BaseOptimizer):
         if report.vectorizable_loops > 0:
             transformations.append(f"Identified {report.vectorizable_loops} vectorizable loops")
 
-        optimization_counts = {}
+        optimization_counts: Dict[str, int] = {}
         for opt in report.optimizations:
             opt_type = opt.optimization_type.value
             optimization_counts[opt_type] = optimization_counts.get(opt_type, 0) + 1

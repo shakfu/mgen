@@ -486,10 +486,11 @@ class MGenPythonToCppConverter:
                 ast.Gt: ">", ast.GtE: ">=", ast.Is: "==", ast.IsNot: "!="
             }
 
-            for op, comp in zip(expr.ops, expr.comparators):
-                op_str = cmpop_map.get(type(op), "/*UNKNOWN_OP*/")
+            for op_node, comp in zip(expr.ops, expr.comparators):
+                op_type = type(op_node)
+                op_str_val = cmpop_map.get(op_type, "/*UNKNOWN_OP*/")
                 comp_expr = self._convert_method_expression(comp, class_name)
-                result = f"({result} {op_str} {comp_expr})"
+                result = f"({result} {op_str_val} {comp_expr})"
 
             return result
         elif isinstance(expr, ast.ListComp):
