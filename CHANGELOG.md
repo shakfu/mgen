@@ -17,6 +17,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.23]
+
+### Enhanced
+
+- **Go Emitter Type Inference Improvements**: Significant improvements to Go code generation type inference
+  - **Subscripted Type Annotations**: Added support for `list[int]`, `dict[str, int]`, `set[int]` → generates `[]int`, `map[string]int`, `map[int]bool`
+  - **List Literal Type Inference**: Homogeneous list literals now generate typed slices (e.g., `[1, 2, 3]` → `[]int{1, 2, 3}`)
+  - **Dict Literal Type Inference**: Homogeneous dict literals now generate typed maps (e.g., `{"a": 1}` → `map[string]int{"a": 1}`)
+  - **Set Literal Support**: Added conversion for set literals to Go maps with bool values
+  - **Comprehension Type Inference**: Improved type inference for list/dict/set comprehensions based on element expressions
+  - **Sum() Return Type**: Added type inference for `sum()` function calls (returns `int`)
+
+### Fixed
+
+- **List/Dict/Set Literal Generation**: Fixed missing conversion for `ast.List`, `ast.Dict`, and `ast.Set` nodes (previously generated `/* TODO */`)
+- **Type Annotation Mapping**: Fixed `_map_type_annotation` to handle subscripted types instead of defaulting to `interface{}`
+- **Default Value Generation**: Enhanced `_get_default_value` to handle specific slice and map types
+
+### Technical Details
+
+- **Type Inference Chain**: Added `_infer_comprehension_element_type()` method for analyzing comprehension element types
+- **Literal Type Detection**: Literals now detect homogeneous element types and generate appropriately typed Go code
+- **Backward Compatibility**: All 103 Go backend tests pass with zero regressions
+
+### Known Limitations
+
+- **Runtime Library Interface{}**: The Go runtime library uses `interface{}` for flexibility, so comprehensions return `[]interface{}` which may require type assertions when assigned to typed variables
+- **Type Conversion**: Some cases may still require explicit type conversions due to Go's strict type system and runtime library design
+
 ## [0.1.22]
 
 ### Enhanced

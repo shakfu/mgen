@@ -682,6 +682,12 @@ class MGenPythonToGoConverter:
             return self._convert_call(expr)
         elif isinstance(expr, ast.Attribute):
             return self._convert_attribute(expr)
+        elif isinstance(expr, ast.List):
+            return self._convert_list_literal(expr)
+        elif isinstance(expr, ast.Dict):
+            return self._convert_dict_literal(expr)
+        elif isinstance(expr, ast.Set):
+            return self._convert_set_literal(expr)
         elif isinstance(expr, ast.ListComp):
             return self._convert_list_comprehension(expr)
         elif isinstance(expr, ast.DictComp):
@@ -832,6 +838,70 @@ class MGenPythonToGoConverter:
         obj_expr = self._convert_expression(expr.value)
         return f"{obj_expr}.{self._to_camel_case(expr.attr)}"
 
+    def _convert_list_literal(self, expr: ast.List) -> str:
+        """Convert list literal to Go slice literal."""
+        if not expr.elts:
+            # Empty list
+            return "[]interface{}{}"
+
+        # Try to infer a common type for all elements
+        element_types = [self._infer_type_from_value(elt) for elt in expr.elts]
+        if element_types and all(t == element_types[0] and t != "interface{}" for t in element_types):
+            # All elements have the same specific type
+            element_type = element_types[0]
+            elements = [self._convert_expression(elt) for elt in expr.elts]
+            elements_str = ", ".join(elements)
+            return f"[]{element_type}{{{{{elements_str}}}}}"
+        else:
+            # Mixed types or interface{}, use interface{}
+            elements = [self._convert_expression(elt) for elt in expr.elts]
+            elements_str = ", ".join(elements)
+            return f"[]interface{{{{{elements_str}}}}}"
+
+    def _convert_dict_literal(self, expr: ast.Dict) -> str:
+        """Convert dict literal to Go map literal."""
+        if not expr.keys:
+            # Empty dict
+            return "make(map[interface{}]interface{})"
+
+        # Try to infer common types for keys and values
+        key_types = [self._infer_type_from_value(key) for key in expr.keys]
+        value_types = [self._infer_type_from_value(value) for value in expr.values]
+
+        if (key_types and all(t == key_types[0] and t != "interface{}" for t in key_types) and
+            value_types and all(t == value_types[0] and t != "interface{}" for t in value_types)):
+            # All keys and values have specific types
+            key_type = key_types[0]
+            value_type = value_types[0]
+            pairs = []
+            for key, value in zip(expr.keys, expr.values):
+                key_str = self._convert_expression(key)
+                value_str = self._convert_expression(value)
+                pairs.append(f"{key_str}: {value_str}")
+            pairs_str = ", ".join(pairs)
+            return f"map[{key_type}]{value_type}{{{{{pairs_str}}}}}"
+        else:
+            # Mixed types or interface{}, use interface{}
+            pairs = []
+            for key, value in zip(expr.keys, expr.values):
+                key_str = self._convert_expression(key)
+                value_str = self._convert_expression(value)
+                pairs.append(f"{key_str}: {value_str}")
+            pairs_str = ", ".join(pairs)
+            return f"map[interface{{}}]interface{{}}{{{{{pairs_str}}}}}"
+
+    def _convert_set_literal(self, expr: ast.Set) -> str:
+        """Convert set literal to Go map literal (sets as map[T]bool)."""
+        if not expr.elts:
+            # Empty set
+            return "make(map[interface{}]bool)"
+        elements = []
+        for elt in expr.elts:
+            elt_str = self._convert_expression(elt)
+            elements.append(f"{elt_str}: true")
+        elements_str = ", ".join(elements)
+        return f"map[interface{{}}]bool{{{{{elements_str}}}}}"
+
     def _convert_list_comprehension(self, expr: ast.ListComp) -> str:
         """Convert list comprehensions."""
         # Extract comprehension components
@@ -928,6 +998,30 @@ class MGenPythonToGoConverter:
         """Map Python type annotation to Go type."""
         if isinstance(annotation, ast.Name):
             return self.type_map.get(annotation.id, "interface{}")
+        elif isinstance(annotation, ast.Subscript):
+            # Handle subscripted types like list[int], dict[str, int], etc.
+            if isinstance(annotation.value, ast.Name):
+                container_type = annotation.value.id
+                if container_type == "list":
+                    # list[int] -> []int
+                    if isinstance(annotation.slice, ast.Name):
+                        element_type = self.type_map.get(annotation.slice.id, annotation.slice.id)
+                        return f"[]{element_type}"
+                    return "[]interface{}"
+                elif container_type == "dict":
+                    # dict[str, int] -> map[string]int
+                    if isinstance(annotation.slice, ast.Tuple) and len(annotation.slice.elts) == 2:
+                        key_type = self._map_type_annotation(annotation.slice.elts[0])
+                        value_type = self._map_type_annotation(annotation.slice.elts[1])
+                        return f"map[{key_type}]{value_type}"
+                    return "map[interface{}]interface{}"
+                elif container_type == "set":
+                    # set[int] -> map[int]bool
+                    if isinstance(annotation.slice, ast.Name):
+                        element_type = self.type_map.get(annotation.slice.id, annotation.slice.id)
+                        return f"map[{element_type}]bool"
+                    return "map[interface{}]bool"
+            return "interface{}"
         elif isinstance(annotation, ast.Constant):
             if annotation.value is None:
                 return ""  # None type should be empty return type
@@ -949,8 +1043,62 @@ class MGenPythonToGoConverter:
         elif isinstance(value, ast.Call) and isinstance(value.func, ast.Name):
             if value.func.id in self.struct_info:
                 return value.func.id
+            # Handle built-in function calls
+            elif value.func.id == "sum":
+                # sum() returns int by default
+                return "int"
+        elif isinstance(value, ast.ListComp):
+            # Infer type from list comprehension element
+            element_type = self._infer_comprehension_element_type(value.elt)
+            return f"[]{element_type}"
+        elif isinstance(value, ast.DictComp):
+            # Infer type from dict comprehension key and value
+            key_type = self._infer_comprehension_element_type(value.key)
+            value_type = self._infer_comprehension_element_type(value.value)
+            return f"map[{key_type}]{value_type}"
+        elif isinstance(value, ast.SetComp):
+            # Infer type from set comprehension element
+            element_type = self._infer_comprehension_element_type(value.elt)
+            return f"map[{element_type}]bool"
 
         return "interface{}"
+
+    def _infer_comprehension_element_type(self, expr: ast.expr) -> str:
+        """Infer the type of elements produced by a comprehension expression."""
+        if isinstance(expr, ast.Constant):
+            if isinstance(expr.value, bool):
+                return "bool"
+            elif isinstance(expr.value, int):
+                return "int"
+            elif isinstance(expr.value, float):
+                return "float64"
+            elif isinstance(expr.value, str):
+                return "string"
+        elif isinstance(expr, ast.Name):
+            # If it's a simple variable reference, we need more context
+            # Default to int for range-based comprehensions
+            return "int"
+        elif isinstance(expr, ast.BinOp):
+            # For binary operations, try to infer from operands
+            left_type = self._infer_comprehension_element_type(expr.left)
+            right_type = self._infer_comprehension_element_type(expr.right)
+            # If both are the same type, use that
+            if left_type == right_type:
+                return left_type
+            # If one is float and one is int, result is float
+            if {left_type, right_type} == {"int", "float64"}:
+                return "float64"
+            return "int"  # Default to int for arithmetic
+        elif isinstance(expr, ast.Call):
+            # Handle function calls in comprehensions
+            if isinstance(expr.func, ast.Attribute):
+                # Method calls like str.upper() return string
+                attr_name = expr.func.attr
+                if attr_name in ("upper", "lower", "strip", "replace"):
+                    return "string"
+            return "int"  # Default
+
+        return "int"  # Default to int
 
     def _infer_type_from_assignment(self, stmt: ast.Assign) -> str:
         """Infer type from assignment statement."""
@@ -998,6 +1146,12 @@ class MGenPythonToGoConverter:
             "map[interface{}]interface{}": "make(map[interface{}]interface{})",
             "map[interface{}]bool": "make(map[interface{}]bool)",
         }
+        # Handle specific slice types like []int, []string, etc.
+        if go_type.startswith("[]") and go_type != "[]interface{}":
+            return f"{go_type}{{}}"
+        # Handle specific map types
+        if go_type.startswith("map["):
+            return f"make({go_type})"
         return defaults.get(go_type, "nil")
 
 
