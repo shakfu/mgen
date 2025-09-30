@@ -30,7 +30,7 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
     - Performance optimization
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.enhanced_memory_manager = EnhancedMemoryManager()
 
@@ -61,10 +61,10 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
         type_info = super().analyze_variable_types(tree)
 
         class EnhancedTypeAnalyzer(ast.NodeVisitor):
-            def __init__(self, translator):
+            def __init__(self, translator: "EnhancedSTCTranslator") -> None:
                 self.translator = translator
 
-            def visit_AnnAssign(self, node):
+            def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
                 if isinstance(node.target, ast.Name):
                     var_name = node.target.id
                     type_annotation = ast.unparse(node.annotation)
@@ -81,7 +81,7 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
                             self.translator.allocator_variables[var_name] = allocator_type
                             type_info[var_name] = type_annotation
 
-            def visit_Call(self, node):
+            def visit_Call(self, node: ast.Call) -> None:
                 # Check for smart pointer factory functions
                 if isinstance(node.func, ast.Name):
                     func_name = node.func.id
@@ -256,9 +256,18 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
                 )
 
         # Generate initialization code for all components
-        init_includes, init_code = self.enhanced_memory_manager.generate_initialization_code()
-        includes.extend(init_includes)
-        type_defs.extend(init_code)
+        init_result = self.enhanced_memory_manager.generate_initialization_code()
+        init_includes_raw = init_result[0]
+        init_code_raw = init_result[1]
+        # Ensure we have lists
+        if isinstance(init_includes_raw, list):
+            includes.extend(init_includes_raw)
+        else:
+            includes.append(init_includes_raw)
+        if isinstance(init_code_raw, list):
+            type_defs.extend(init_code_raw)
+        else:
+            type_defs.append(init_code_raw)
 
         # Remove duplicates
         unique_includes = list(dict.fromkeys(includes))
@@ -287,10 +296,10 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
         return {
             "memory_errors": [
                 {
-                    "type": error.error_type,
-                    "message": error.message,
-                    "line": error.line_number,
-                    "severity": error.severity,
+                    "type": error.error_type if hasattr(error, 'error_type') else "unknown",
+                    "message": error.message if hasattr(error, 'message') else str(error),
+                    "line": error.line_number if hasattr(error, 'line_number') else 0,
+                    "severity": error.severity if hasattr(error, 'severity') else "error",
                 }
                 for error in all_errors
             ],

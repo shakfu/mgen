@@ -111,7 +111,7 @@ class CallGraphReport(AnalysisReport):
 class CallGraphAnalyzer(BaseAnalyzer):
     """Analyzer for constructing and analyzing function call graphs."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("CallGraphAnalyzer")
         self._defined_functions: Set[str] = set()
         self._call_sites: List[CallSite] = []

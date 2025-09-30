@@ -1,4 +1,5 @@
 #!python
+# type: ignore
 # To generate "include/stc/priv/utf8_tab.c" file.
 
 import numpy as np  # type: ignore[import-not-found]
@@ -86,7 +87,7 @@ def make_table(caselist):
 
         if abs(diff_a) > 2 or a - prev_a != diff_a or b - prev_b != diff_b or prev_offs != offset:
             if j > 0:  # and start_a not in [0xAB70, 0x13F8]: # BUG in CaseFolding.txt V14
-                table.append([start_a, prev_a, prev_b, start_name])
+                table.append([start_a, prev_a, prev_b, start_name])  # type: ignore[has-type]
             if j < n_1:
                 diff_a = caselist[j + 1][0] - a
                 diff_b = caselist[j + 1][1] - b
@@ -96,7 +97,7 @@ def make_table(caselist):
         prev_a, prev_b = a, b
         prev_offs = offset
 
-    table.append((start_a, a, b, start_name))
+    table.append((start_a, a, b, start_name))  # type: ignore[arg-type]
     return table
 
 

@@ -209,10 +209,10 @@ class STCMemoryManager:
         self.memory_errors = []
 
         class MemoryAnalyzer(ast.NodeVisitor):
-            def __init__(self, manager) -> None:
+            def __init__(self, manager: "STCMemoryManager") -> None:
                 self.manager = manager
 
-            def visit_FunctionDef(self, node) -> None:
+            def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
                 self.manager.enter_function(node.name)
 
                 # Check for missing cleanup in function
@@ -228,14 +228,14 @@ class STCMemoryManager:
                         node.lineno,
                     )
 
-            def visit_Return(self, node) -> None:
+            def visit_Return(self, node: ast.Return) -> None:
                 # Check if returning container without proper transfer
                 if isinstance(node.value, ast.Name):
                     var_name = node.value.id
                     if var_name in self.manager.allocations:
                         self.manager.register_return_value(var_name)
 
-            def visit_Call(self, node) -> None:
+            def visit_Call(self, node: ast.Call) -> None:
                 # Check for potential allocation failures
                 if isinstance(node.func, ast.Attribute):
                     method_name = node.func.attr
@@ -248,7 +248,7 @@ class STCMemoryManager:
                                 node.lineno,
                             )
 
-            def _check_function_cleanup(self, node) -> None:
+            def _check_function_cleanup(self, node: ast.FunctionDef) -> None:
                 # Check if function properly cleans up local containers
                 has_cleanup = False
                 for stmt in ast.walk(node):

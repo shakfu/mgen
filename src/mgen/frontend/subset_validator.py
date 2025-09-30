@@ -63,7 +63,7 @@ class ValidationResult:
 class StaticPythonSubsetValidator:
     """Validator for the Static Python Subset."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.log = log.config(self.__class__.__name__)
         self.feature_rules = self._initialize_feature_rules()
         self.validation_cache: Dict[str, ValidationResult] = {}
@@ -317,14 +317,16 @@ class StaticPythonSubsetValidator:
 
         # Tier 3: Advanced Patterns (Research Required)
 
-        rules["pattern_matching"] = FeatureRule(
-            name="Pattern Matching",
-            tier=SubsetTier.TIER_3_ADVANCED,
-            status=FeatureStatus.PLANNED,
-            description="Python 3.10+ match statements",
-            ast_nodes=[ast.Match],
-            c_mapping="Switch statements with guards",
-        )
+        # Match statement only available in Python 3.10+
+        if hasattr(ast, 'Match'):
+            rules["pattern_matching"] = FeatureRule(
+                name="Pattern Matching",
+                tier=SubsetTier.TIER_3_ADVANCED,
+                status=FeatureStatus.PLANNED,
+                description="Python 3.10+ match statements",
+                ast_nodes=[ast.Match],  # type: ignore[attr-defined]
+                c_mapping="Switch statements with guards",
+            )
 
         rules["generators"] = FeatureRule(
             name="Generator Functions",

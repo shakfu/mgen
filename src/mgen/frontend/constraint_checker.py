@@ -58,7 +58,7 @@ class ConstraintReport:
     conversion_safe: bool = True
     confidence_score: float = 1.0
 
-    def add_violation(self, violation: ConstraintViolation):
+    def add_violation(self, violation: ConstraintViolation) -> None:
         """Add a violation to the report."""
         self.violations.append(violation)
         if violation.severity in [ConstraintSeverity.ERROR, ConstraintSeverity.CRITICAL]:
@@ -76,7 +76,7 @@ class ConstraintReport:
 class StaticConstraintChecker:
     """Comprehensive static constraint checker for Python-to-C conversion."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.log = log.config(self.__class__.__name__)
         self.report = ConstraintReport()
         self.type_engine = TypeInferenceEngine()
@@ -136,7 +136,7 @@ class StaticConstraintChecker:
             )
             return self.report
 
-    def _analyze_tree(self, tree: ast.AST):
+    def _analyze_tree(self, tree: ast.AST) -> None:
         """Perform initial analysis of the AST."""
         # Build variable scope information
         for node in ast.walk(tree):
@@ -147,7 +147,7 @@ class StaticConstraintChecker:
                         type_info = self._extract_type_info(arg.annotation)
                         self.variable_scopes[node.name][arg.arg] = type_info
 
-    def _run_all_checks(self, tree: ast.AST):
+    def _run_all_checks(self, tree: ast.AST) -> None:
         """Run all constraint checking rules."""
         for rule_id, rule_func in self.rules.items():
             try:
@@ -165,7 +165,7 @@ class StaticConstraintChecker:
 
     # Memory Safety Rules
 
-    def _check_buffer_overflow_potential(self, tree: ast.AST):
+    def _check_buffer_overflow_potential(self, tree: ast.AST) -> None:
         """Check for potential buffer overflow conditions."""
         for node in ast.walk(tree):
             if isinstance(node, ast.Subscript):
@@ -216,7 +216,7 @@ class StaticConstraintChecker:
 
         return False
 
-    def _check_null_pointer_dereference(self, tree: ast.AST):
+    def _check_null_pointer_dereference(self, tree: ast.AST) -> None:
         """Check for potential null pointer dereferences."""
         for node in ast.walk(tree):
             if isinstance(node, ast.Attribute):
@@ -236,7 +236,7 @@ class StaticConstraintChecker:
                             )
                         )
 
-    def _check_memory_leak_potential(self, tree: ast.AST):
+    def _check_memory_leak_potential(self, tree: ast.AST) -> None:
         """Check for potential memory leaks."""
         # This is a simplified check - in real implementation would be more sophisticated
         allocated_vars = set()
@@ -265,7 +265,7 @@ class StaticConstraintChecker:
                 )
             )
 
-    def _check_dangling_pointer_risk(self, tree: ast.AST):
+    def _check_dangling_pointer_risk(self, tree: ast.AST) -> None:
         """Check for dangling pointer risks."""
         # Simplified check for returning local variable addresses
         for node in ast.walk(tree):
@@ -275,7 +275,7 @@ class StaticConstraintChecker:
 
     # Type Safety Rules
 
-    def _check_type_consistency(self, tree: ast.AST):
+    def _check_type_consistency(self, tree: ast.AST) -> None:
         """Check for type consistency violations."""
         for node in ast.walk(tree):
             if isinstance(node, ast.BinOp):
@@ -295,7 +295,7 @@ class StaticConstraintChecker:
                         )
                     )
 
-    def _check_implicit_conversions(self, tree: ast.AST):
+    def _check_implicit_conversions(self, tree: ast.AST) -> None:
         """Check for potentially dangerous implicit type conversions."""
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
@@ -319,7 +319,7 @@ class StaticConstraintChecker:
                                 )
                             )
 
-    def _check_division_by_zero(self, tree: ast.AST):
+    def _check_division_by_zero(self, tree: ast.AST) -> None:
         """Check for potential division by zero."""
         for node in ast.walk(tree):
             if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Div, ast.FloorDiv, ast.Mod)):
@@ -348,7 +348,7 @@ class StaticConstraintChecker:
                         )
                     )
 
-    def _check_integer_overflow(self, tree: ast.AST):
+    def _check_integer_overflow(self, tree: ast.AST) -> None:
         """Check for potential integer overflow."""
         for node in ast.walk(tree):
             if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Mult, ast.Pow)):
@@ -369,7 +369,7 @@ class StaticConstraintChecker:
 
     # Static Analysis Rules
 
-    def _check_unreachable_code(self, tree: ast.AST):
+    def _check_unreachable_code(self, tree: ast.AST) -> None:
         """Check for unreachable code."""
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
@@ -387,17 +387,17 @@ class StaticConstraintChecker:
                             )
                         )
 
-    def _check_unused_variables(self, tree: ast.AST):
+    def _check_unused_variables(self, tree: ast.AST) -> None:
         """Check for unused variables."""
         # This would need data flow analysis in practice
         pass
 
-    def _check_uninitialized_variables(self, tree: ast.AST):
+    def _check_uninitialized_variables(self, tree: ast.AST) -> None:
         """Check for use of uninitialized variables."""
         # This would need data flow analysis in practice
         pass
 
-    def _check_infinite_loops(self, tree: ast.AST):
+    def _check_infinite_loops(self, tree: ast.AST) -> None:
         """Check for potential infinite loops."""
         for node in ast.walk(tree):
             if isinstance(node, ast.While):
@@ -419,7 +419,7 @@ class StaticConstraintChecker:
 
     # C Compatibility Rules
 
-    def _check_unsupported_features(self, tree: ast.AST):
+    def _check_unsupported_features(self, tree: ast.AST) -> None:
         """Check for Python features not supported in C conversion."""
         unsupported_nodes = {
             ast.GeneratorExp: "Generator expressions",
@@ -491,7 +491,7 @@ class StaticConstraintChecker:
                     return True
         return False
 
-    def _check_name_conflicts(self, tree: ast.AST):
+    def _check_name_conflicts(self, tree: ast.AST) -> None:
         """Check for naming conflicts with C keywords/stdlib."""
         c_keywords = {
             "auto",
@@ -580,12 +580,12 @@ class StaticConstraintChecker:
                         )
                     )
 
-    def _check_reserved_keywords(self, tree: ast.AST):
+    def _check_reserved_keywords(self, tree: ast.AST) -> None:
         """Check for use of reserved keywords that might cause issues."""
         # Implementation similar to name conflicts
         pass
 
-    def _check_function_complexity(self, tree: ast.AST):
+    def _check_function_complexity(self, tree: ast.AST) -> None:
         """Check if functions are too complex for safe conversion."""
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
@@ -604,7 +604,7 @@ class StaticConstraintChecker:
 
     # Performance Rules
 
-    def _check_inefficient_patterns(self, tree: ast.AST):
+    def _check_inefficient_patterns(self, tree: ast.AST) -> None:
         """Check for inefficient coding patterns."""
         # Example: string concatenation in loops
         for node in ast.walk(tree):
@@ -625,19 +625,19 @@ class StaticConstraintChecker:
                                 )
                             )
 
-    def _check_repeated_computations(self, tree: ast.AST):
+    def _check_repeated_computations(self, tree: ast.AST) -> None:
         """Check for computations that could be cached."""
         # This would need more sophisticated analysis
         pass
 
-    def _check_memory_allocation_patterns(self, tree: ast.AST):
+    def _check_memory_allocation_patterns(self, tree: ast.AST) -> None:
         """Check for inefficient memory allocation patterns."""
         # This would analyze list/array creation patterns
         pass
 
     # Correctness Rules
 
-    def _check_return_path_coverage(self, tree: ast.AST):
+    def _check_return_path_coverage(self, tree: ast.AST) -> None:
         """Check that all code paths return a value when needed."""
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
@@ -656,12 +656,12 @@ class StaticConstraintChecker:
                             )
                         )
 
-    def _check_parameter_validation(self, tree: ast.AST):
+    def _check_parameter_validation(self, tree: ast.AST) -> None:
         """Check for proper parameter validation."""
         # This would check for bounds checking on parameters
         pass
 
-    def _check_bounds_checking(self, tree: ast.AST):
+    def _check_bounds_checking(self, tree: ast.AST) -> None:
         """Check for proper bounds checking on array access."""
         # Implementation would analyze array access patterns
         pass
@@ -761,7 +761,7 @@ class StaticConstraintChecker:
                 complexity += len(node.values) - 1
         return complexity
 
-    def _calculate_confidence_score(self):
+    def _calculate_confidence_score(self) -> None:
         """Calculate overall confidence score for conversion."""
         critical_errors = len(self.report.get_violations_by_severity(ConstraintSeverity.CRITICAL))
         errors = len(self.report.get_violations_by_severity(ConstraintSeverity.ERROR))

@@ -130,7 +130,7 @@ class MemoryAllocatorManager:
     - Memory usage analysis
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Track allocator instances
         self.allocators: Dict[str, AllocatorInstance] = {}
 
@@ -198,7 +198,7 @@ class MemoryAllocatorManager:
 
         return f"{type_def}\n{init_code}", include
 
-    def bind_container_to_allocator(self, container_name: str, allocator_name: str):
+    def bind_container_to_allocator(self, container_name: str, allocator_name: str) -> None:
         """Bind a container to use a specific allocator."""
         if allocator_name in self.allocators:
             self.container_allocators[container_name] = allocator_name
@@ -237,7 +237,7 @@ class MemoryAllocatorManager:
         element_type: str,
         is_array: bool = False,
         line_number: int = 0,
-    ):
+    ) -> None:
         """Track an allocation made with a specific allocator."""
         if allocator_name not in self.allocators:
             return

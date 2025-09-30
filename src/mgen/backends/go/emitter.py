@@ -1,9 +1,10 @@
 """Enhanced Go code emitter for MGen with comprehensive Python language support."""
 
 import ast
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 from ..base import AbstractEmitter
+from ..preferences import BackendPreferences
 
 
 class UnsupportedFeatureError(Exception):
@@ -19,7 +20,7 @@ class TypeMappingError(Exception):
 class MGenPythonToGoConverter:
     """Sophisticated Python-to-Go converter with comprehensive language support."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the converter."""
         self.type_map = {
             "int": "int",
@@ -32,9 +33,9 @@ class MGenPythonToGoConverter:
             "void": "",
             "None": "",
         }
-        self.struct_info = {}  # Track struct definitions for classes
-        self.current_function = None  # Track current function context
-        self.declared_vars = set()  # Track declared variables in current function
+        self.struct_info: Dict[str, Dict[str, Any]] = {}  # Track struct definitions for classes
+        self.current_function: Optional[str] = None  # Track current function context
+        self.declared_vars: set[str] = set()  # Track declared variables in current function
 
     def _to_camel_case(self, snake_str: str) -> str:
         """Convert snake_case to CamelCase."""
@@ -1003,7 +1004,7 @@ class MGenPythonToGoConverter:
 class GoEmitter(AbstractEmitter):
     """Enhanced Go code emitter implementation with comprehensive Python support."""
 
-    def __init__(self, preferences=None):
+    def __init__(self, preferences: Optional[BackendPreferences] = None) -> None:
         """Initialize Go emitter."""
         super().__init__(preferences)
         self.converter = MGenPythonToGoConverter()

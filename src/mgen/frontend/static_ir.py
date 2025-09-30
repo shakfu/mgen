@@ -76,12 +76,12 @@ class IRNode(ABC):
         self.children: List[IRNode] = []
         self.parent: Optional[IRNode] = None
 
-    def add_child(self, child: "IRNode"):
+    def add_child(self, child: "IRNode") -> None:
         """Add a child node."""
         child.parent = self
         self.children.append(child)
 
-    def remove_child(self, child: "IRNode"):
+    def remove_child(self, child: "IRNode") -> None:
         """Remove a child node."""
         if child in self.children:
             child.parent = None
@@ -167,12 +167,12 @@ class IRModule(IRNode):
         self.global_variables: List[IRVariable] = []
         self.type_declarations: List[IRTypeDeclaration] = []
 
-    def add_function(self, function: "IRFunction"):
+    def add_function(self, function: "IRFunction") -> None:
         """Add a function to the module."""
         self.add_child(function)
         self.functions.append(function)
 
-    def add_global_variable(self, variable: "IRVariable"):
+    def add_global_variable(self, variable: "IRVariable") -> None:
         """Add a global variable to the module."""
         self.add_child(variable)
         self.global_variables.append(variable)
@@ -205,18 +205,18 @@ class IRFunction(IRNode):
         self.is_inline: bool = False
         self.complexity: StaticComplexity = StaticComplexity.SIMPLE
 
-    def add_parameter(self, param: "IRVariable"):
+    def add_parameter(self, param: "IRVariable") -> None:
         """Add a parameter to the function."""
         param.is_parameter = True
         self.add_child(param)
         self.parameters.append(param)
 
-    def add_local_variable(self, var: "IRVariable"):
+    def add_local_variable(self, var: "IRVariable") -> None:
         """Add a local variable to the function."""
         self.add_child(var)
         self.local_variables.append(var)
 
-    def add_statement(self, stmt: "IRStatement"):
+    def add_statement(self, stmt: "IRStatement") -> None:
         """Add a statement to the function body."""
         self.add_child(stmt)
         self.body.append(stmt)
@@ -519,7 +519,7 @@ class IRTypeDeclaration(IRNode):
         self.declaration_type = declaration_type  # "struct", "union", "enum"
         self.fields: List[IRVariable] = []
 
-    def add_field(self, field: IRVariable):
+    def add_field(self, field: IRVariable) -> None:
         """Add a field to the type declaration."""
         self.add_child(field)
         self.fields.append(field)
@@ -595,7 +595,7 @@ class IRVisitor(ABC):
 class IRBuilder:
     """Builder for constructing IR from Python AST."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.current_module: Optional[IRModule] = None
         self.current_function: Optional[IRFunction] = None
         self.symbol_table: Dict[str, IRVariable] = {}

@@ -6,7 +6,7 @@ It provides a centralized system for tracking and generating unique STC template
 
 import hashlib
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 
 @dataclass
@@ -24,7 +24,7 @@ class STCTemplateInstance:
 class STCTemplateManager:
     """Manages STC template instantiation to avoid macro redefinition conflicts."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Track generated template instances by signature
         self.template_instances: Dict[str, STCTemplateInstance] = {}
         # Track which headers are needed
@@ -34,7 +34,7 @@ class STCTemplateManager:
         # Counter for generating unique names
         self.instance_counter = 0
         # Nested container manager (lazy initialization to avoid circular imports)
-        self._nested_container_manager = None
+        self._nested_container_manager: Optional[Any] = None
 
     def _generate_signature(self, stc_type: str, element_types: List[str]) -> str:
         """Generate a unique signature for a template instantiation."""
@@ -63,7 +63,7 @@ class STCTemplateManager:
         return type_mappings.get(type_name, type_name)
 
     @property
-    def nested_container_manager(self):
+    def nested_container_manager(self) -> Any:
         """Lazy initialization of nested container manager."""
         if self._nested_container_manager is None:
             from .nested_containers import NestedContainerManager
@@ -206,7 +206,7 @@ class STCTemplateManager:
             return f"{container_type} {variable_name} = {{0}};"
         return None
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear all registered template instances and mappings."""
         self.template_instances.clear()
         self.required_headers.clear()
@@ -232,7 +232,7 @@ def get_template_manager() -> STCTemplateManager:
     return _global_template_manager
 
 
-def reset_template_manager():
+def reset_template_manager() -> None:
     """Reset the global template manager."""
     global _global_template_manager
     _global_template_manager = STCTemplateManager()

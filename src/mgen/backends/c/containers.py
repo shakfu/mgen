@@ -8,7 +8,7 @@ from ..base import AbstractContainerSystem
 class CContainerSystem(AbstractContainerSystem):
     """C container system using STC (Smart Template Containers) with fallback."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize container system with STC preference."""
         self.use_stc = True  # Default to STC, fallback available
 

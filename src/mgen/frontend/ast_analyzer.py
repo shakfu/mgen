@@ -51,7 +51,7 @@ class TypeInfo:
     is_nullable: bool = False
     constraints: List[str] = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Set up C equivalent mappings."""
         if not self.c_equivalent:
             self.c_equivalent = self._map_to_c_type()
@@ -113,7 +113,7 @@ class AnalysisResult:
 class ASTAnalyzer(ast.NodeVisitor):
     """Enhanced AST analyzer for static Python code analysis."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.log = log.config(self.__class__.__name__)
         self.result = AnalysisResult()
         self.current_function: Optional[str] = None

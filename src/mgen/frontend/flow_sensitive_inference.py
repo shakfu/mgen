@@ -46,7 +46,7 @@ FLOW_UNKNOWN = FlowType("unknown", None, is_unknown=True)
 class TypeUnifier:
     """Type unification system based on mini module's approach."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.log = log.config(self.__class__.__name__)
 
     def unify(self, type_a: FlowType, type_b: FlowType) -> FlowType:
@@ -464,7 +464,7 @@ class FlowSensitiveInferencer:
             evidence=[f"Flow-sensitive analysis for '{var_name}'"],
         )
 
-    def _remember_var(self, var_name: str):
+    def _remember_var(self, var_name: str) -> None:
         """Track variable declaration order."""
         if var_name not in self.var_order:
             self.var_order.append(var_name)

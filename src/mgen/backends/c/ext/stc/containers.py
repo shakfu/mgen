@@ -5,7 +5,7 @@ along with code generation utilities for translating Python operations to STC.
 """
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional, Set, Tuple
 
 
 @dataclass
@@ -118,8 +118,8 @@ PYTHON_TO_C_TYPES = {
 class STCCodeGenerator:
     """Generates STC container code from Python type annotations."""
 
-    def __init__(self):
-        self.generated_types = set()
+    def __init__(self) -> None:
+        self.generated_types: Set[str] = set()
         from .template_manager import get_template_manager
 
         self.template_manager = get_template_manager()

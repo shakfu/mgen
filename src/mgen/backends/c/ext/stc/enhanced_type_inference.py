@@ -33,7 +33,7 @@ class InferredType:
 class EnhancedTypeInferenceEngine:
     """Advanced type inference engine for STC containers."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.type_cache: Dict[str, InferredType] = {}
         self.context_stack: List[str] = []
         self.usage_patterns: Dict[str, List[str]] = {}
@@ -56,14 +56,14 @@ class EnhancedTypeInferenceEngine:
 
         return self.type_cache
 
-    def _build_data_flow_graph(self, node: ast.AST):
+    def _build_data_flow_graph(self, node: ast.AST) -> None:
         """Build data flow graph to track variable relationships."""
 
         class DataFlowAnalyzer(ast.NodeVisitor):
-            def __init__(self, engine):
+            def __init__(self, engine: "EnhancedTypeInferenceEngine") -> None:
                 self.engine = engine
 
-            def visit_Assign(self, node):
+            def visit_Assign(self, node: ast.Assign) -> None:
                 """Track assignment relationships."""
                 if isinstance(node.value, ast.Name) and len(node.targets) == 1:
                     if isinstance(node.targets[0], ast.Name):
@@ -80,7 +80,7 @@ class EnhancedTypeInferenceEngine:
 
                 self.generic_visit(node)
 
-            def visit_Call(self, node):
+            def visit_Call(self, node: ast.Call) -> None:
                 """Track function call relationships."""
                 if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
                     obj_name = node.func.value.id
@@ -95,14 +95,14 @@ class EnhancedTypeInferenceEngine:
         analyzer = DataFlowAnalyzer(self)
         analyzer.visit(node)
 
-    def _analyze_usage_patterns(self, node: ast.AST):
+    def _analyze_usage_patterns(self, node: ast.AST) -> None:
         """Analyze how variables are used to infer their types."""
 
         class UsageAnalyzer(ast.NodeVisitor):
-            def __init__(self, engine):
+            def __init__(self, engine: "EnhancedTypeInferenceEngine") -> None:
                 self.engine = engine
 
-            def visit_Subscript(self, node):
+            def visit_Subscript(self, node: ast.Subscript) -> None:
                 """Analyze subscript usage patterns."""
                 if isinstance(node.value, ast.Name):
                     var_name = node.value.id
@@ -120,7 +120,7 @@ class EnhancedTypeInferenceEngine:
 
                 self.generic_visit(node)
 
-            def visit_For(self, node):
+            def visit_For(self, node: ast.For) -> None:
                 """Analyze for loop iteration patterns."""
                 if isinstance(node.iter, ast.Name):
                     var_name = node.iter.id
@@ -130,7 +130,7 @@ class EnhancedTypeInferenceEngine:
 
                 self.generic_visit(node)
 
-            def visit_Compare(self, node):
+            def visit_Compare(self, node: ast.Compare) -> None:
                 """Analyze comparison patterns (membership tests)."""
                 if len(node.ops) == 1 and isinstance(node.ops[0], ast.In):
                     if isinstance(node.comparators[0], ast.Name):
@@ -144,14 +144,14 @@ class EnhancedTypeInferenceEngine:
         analyzer = UsageAnalyzer(self)
         analyzer.visit(node)
 
-    def _infer_types_from_annotations(self, node: ast.AST):
+    def _infer_types_from_annotations(self, node: ast.AST) -> None:
         """Infer types from explicit type annotations."""
 
         class AnnotationAnalyzer(ast.NodeVisitor):
-            def __init__(self, engine):
+            def __init__(self, engine: "EnhancedTypeInferenceEngine") -> None:
                 self.engine = engine
 
-            def visit_AnnAssign(self, node):
+            def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
                 """Handle type-annotated assignments."""
                 if isinstance(node.target, ast.Name):
                     var_name = node.target.id
@@ -170,7 +170,7 @@ class EnhancedTypeInferenceEngine:
 
                 self.generic_visit(node)
 
-            def visit_FunctionDef(self, node):
+            def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
                 """Handle function parameter annotations."""
                 for arg in node.args.args:
                     if arg.annotation:
@@ -191,14 +191,14 @@ class EnhancedTypeInferenceEngine:
         analyzer = AnnotationAnalyzer(self)
         analyzer.visit(node)
 
-    def _infer_types_from_assignments(self, node: ast.AST):
+    def _infer_types_from_assignments(self, node: ast.AST) -> None:
         """Infer types from assignment patterns."""
 
         class AssignmentAnalyzer(ast.NodeVisitor):
-            def __init__(self, engine):
+            def __init__(self, engine: "EnhancedTypeInferenceEngine") -> None:
                 self.engine = engine
 
-            def visit_Assign(self, node):
+            def visit_Assign(self, node: ast.Assign) -> None:
                 """Analyze assignment patterns for type inference."""
                 for target in node.targets:
                     if isinstance(target, ast.Name):
@@ -323,14 +323,14 @@ class EnhancedTypeInferenceEngine:
         analyzer = AssignmentAnalyzer(self)
         analyzer.visit(node)
 
-    def _infer_types_from_operations(self, node: ast.AST):
+    def _infer_types_from_operations(self, node: ast.AST) -> None:
         """Infer types from operations and method calls."""
 
         class OperationAnalyzer(ast.NodeVisitor):
-            def __init__(self, engine):
+            def __init__(self, engine: "EnhancedTypeInferenceEngine") -> None:
                 self.engine = engine
 
-            def visit_Call(self, node):
+            def visit_Call(self, node: ast.Call) -> None:
                 """Infer types from method calls and operations."""
                 if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
                     obj_name = node.func.value.id
@@ -430,7 +430,7 @@ class EnhancedTypeInferenceEngine:
         analyzer = OperationAnalyzer(self)
         analyzer.visit(node)
 
-    def _propagate_types(self, node: ast.AST):
+    def _propagate_types(self, node: ast.AST) -> None:
         """Propagate types through data flow relationships."""
         changed = True
         iterations = 0
@@ -463,7 +463,7 @@ class EnhancedTypeInferenceEngine:
                             self.type_cache[target] = source_type
                             changed = True
 
-    def _resolve_ambiguities(self):
+    def _resolve_ambiguities(self) -> None:
         """Resolve ambiguous type inferences using context."""
         for var_name, inferred_type in self.type_cache.items():
             if inferred_type.confidence < TypeConfidence.MEDIUM.value:

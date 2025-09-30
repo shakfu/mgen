@@ -10,12 +10,12 @@ from ..base import AbstractBuilder
 class CppBuilder(AbstractBuilder):
     """Builder for C++ projects."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the C++ builder."""
         self.compiler = "g++"
         self.default_flags = ["-std=c++17", "-Wall", "-O2"]
-        self.runtime_sources = []
-        self.runtime_headers_dir = None
+        self.runtime_sources: List[str] = []
+        self.runtime_headers_dir: Optional[str] = None
 
     def get_build_filename(self) -> str:
         """Get the build file name (Makefile for C++)."""

@@ -19,75 +19,75 @@ Z3_AVAILABLE = False
 # Mock Z3 classes for development without Z3
 class z3:
         class Solver:
-            def __init__(self):
+            def __init__(self) -> None:
                 pass
 
-            def add(self, constraint):
+            def add(self, constraint: Any) -> None:
                 pass
 
-            def check(self):
+            def check(self) -> str:
                 return "unknown"
 
-            def model(self):
+            def model(self) -> None:
                 return None
 
-            def set(self, param, value):
+            def set(self, param: str, value: Any) -> None:
                 pass
 
         @staticmethod
-        def Not(expr):
+        def Not(expr: Any) -> None:
             return None
 
         @staticmethod
-        def IntVal(val):
+        def IntVal(val: int) -> None:
             return None
 
         sat = "sat"
         unsat = "unsat"
 
         class Int:
-            def __init__(self, name):
+            def __init__(self, name: str) -> None:
                 self.name = name
 
-            def __add__(self, other):
+            def __add__(self, other: Any) -> "z3.Int":
                 return z3.Int(f"({self.name} + {other})")
 
-            def __sub__(self, other):
+            def __sub__(self, other: Any) -> "z3.Int":
                 return z3.Int(f"({self.name} - {other})")
 
-            def __mul__(self, other):
+            def __mul__(self, other: Any) -> "z3.Int":
                 return z3.Int(f"({self.name} * {other})")
 
-            def __le__(self, other):
+            def __le__(self, other: Any) -> str:
                 return f"({self.name} <= {other})"
 
-            def __lt__(self, other):
+            def __lt__(self, other: Any) -> str:
                 return f"({self.name} < {other})"
 
-            def __ge__(self, other):
+            def __ge__(self, other: Any) -> str:
                 return f"({self.name} >= {other})"
 
-            def __gt__(self, other):
+            def __gt__(self, other: Any) -> str:
                 return f"({self.name} > {other})"
 
         class Bool:
-            def __init__(self, name):
+            def __init__(self, name: str) -> None:
                 self.name = name
 
         @staticmethod
-        def And(*args):
+        def And(*args: Any) -> str:
             return "And(" + str(args) + ")"
 
         @staticmethod
-        def Or(*args):
+        def Or(*args: Any) -> str:
             return "Or(" + str(args) + ")"
 
         @staticmethod
-        def Implies(a, b):
+        def Implies(a: Any, b: Any) -> str:
             return f"Implies({a}, {b})"
 
         @staticmethod
-        def ForAll(vars, body):
+        def ForAll(vars: Any, body: Any) -> str:
             return f"ForAll({vars}, {body})"
 
 
@@ -218,14 +218,14 @@ class TheoremProver:
 
             if result == z3.sat:
                 # Found counterexample - property is false
-                model = solver.model()
-                counterexample = self._extract_counterexample(model)
+                model_result = solver.model()  # type: ignore[func-returns-value]
+                counterexample = self._extract_counterexample(model_result) if model_result else {}
                 return ProofResult(
                     proof_property=prop,
                     status=ProofStatus.DISPROVED,
                     proof_time=proof_time,
                     counterexample=counterexample,
-                    z3_model=model,
+                    z3_model=model_result,
                 )
             elif result == z3.unsat:
                 # No counterexample - property is true
@@ -393,7 +393,7 @@ class TheoremProver:
         # Verify all properties
         return self.verify_multiple_properties(properties)
 
-    def _extract_counterexample(self, model) -> Dict[str, Any]:
+    def _extract_counterexample(self, model: Any) -> Dict[str, Any]:
         """Extract counterexample from Z3 model."""
         if not model:
             return {}
@@ -404,7 +404,7 @@ class TheoremProver:
 
         return counterexample
 
-    def _create_bounds_check_template(self, **kwargs) -> ProofProperty:
+    def _create_bounds_check_template(self, **kwargs: Any) -> ProofProperty:
         """Template for bounds checking properties."""
         return self.create_bounds_check_property(**kwargs)
 
@@ -419,7 +419,7 @@ class TheoremProver:
             context=kwargs
         )
 
-    def _create_overflow_template(self, **kwargs) -> ProofProperty:
+    def _create_overflow_template(self, **kwargs: Any) -> ProofProperty:
         """Template for overflow safety properties."""
         return self.create_overflow_safety_property(**kwargs)
 
@@ -438,13 +438,13 @@ class TheoremProver:
 class SafetyPropertyExtractor(ast.NodeVisitor):
     """AST visitor to extract safety properties from Python code."""
 
-    def __init__(self):
-        self.array_accesses = []
-        self.arithmetic_ops = []
-        self.function_calls = []
-        self.loop_bounds = []
+    def __init__(self) -> None:
+        self.array_accesses: List[Dict[str, Any]] = []
+        self.arithmetic_ops: List[Dict[str, Any]] = []
+        self.function_calls: List[Dict[str, Any]] = []
+        self.loop_bounds: List[Dict[str, Any]] = []
 
-    def visit_Subscript(self, node):
+    def visit_Subscript(self, node: ast.Subscript) -> None:
         """Extract array access patterns."""
         if isinstance(node.value, ast.Name):
             array_name = node.value.id
@@ -461,7 +461,7 @@ class SafetyPropertyExtractor(ast.NodeVisitor):
 
         self.generic_visit(node)
 
-    def visit_BinOp(self, node):
+    def visit_BinOp(self, node: ast.BinOp) -> None:
         """Extract arithmetic operations for overflow checking."""
         if isinstance(node.op, (ast.Add, ast.Sub, ast.Mult)):
             op_name = {ast.Add: "add", ast.Sub: "sub", ast.Mult: "mul"}[type(node.op)]
@@ -477,7 +477,7 @@ class SafetyPropertyExtractor(ast.NodeVisitor):
 
         self.generic_visit(node)
 
-    def visit_For(self, node):
+    def visit_For(self, node: ast.For) -> None:
         """Extract loop information for termination analysis."""
         if isinstance(node.iter, ast.Call) and isinstance(node.iter.func, ast.Name):
             if node.iter.func.id == "range":

@@ -20,36 +20,36 @@ except ImportError:
 # Mock z3 for when not available
 class z3:
     class Int:
-        def __init__(self, name):
+        def __init__(self, name: str) -> None:
             self.name = name
 
-        def __add__(self, other):
+        def __add__(self, other: Any) -> "z3.Int":
             return z3.Int(f"({self.name} + {other})")
 
-        def __sub__(self, other):
+        def __sub__(self, other: Any) -> "z3.Int":
             return z3.Int(f"({self.name} - {other})")
 
-        def __mul__(self, other):
+        def __mul__(self, other: Any) -> "z3.Int":
             return z3.Int(f"({self.name} * {other})")
 
-        def __le__(self, other):
+        def __le__(self, other: Any) -> str:
             return f"({self.name} <= {other})"
 
-        def __lt__(self, other):
+        def __lt__(self, other: Any) -> str:
             return f"({self.name} < {other})"
 
-        def __ge__(self, other):
+        def __ge__(self, other: Any) -> str:
             return f"({self.name} >= {other})"
 
-        def __gt__(self, other):
+        def __gt__(self, other: Any) -> str:
             return f"({self.name} > {other})"
 
     @staticmethod
-    def And(*args):
+    def And(*args: Any) -> None:
         return None
     @staticmethod
-    def IntVal(val):
-        return None
+    def IntVal(val: int) -> "z3.Int":
+        return z3.Int(str(val))
 
 from ..base import AnalysisContext
 from .theorem_prover import ProofProperty, ProofResult, ProofStatus, PropertyType, TheoremProver
@@ -384,14 +384,14 @@ class MemoryOperationExtractor(ast.NodeVisitor):
     def __init__(self) -> None:
         self.memory_regions: Dict[str, MemoryRegion] = {}
         self.memory_accesses: List[MemoryAccess] = []
-        self.current_function = None
+        self.current_function: Optional[str] = None
 
-    def visit_FunctionDef(self, node) -> None:
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         """Track function context."""
         self.current_function = node.name
         self.generic_visit(node)
 
-    def visit_Assign(self, node) -> None:
+    def visit_Assign(self, node: ast.Assign) -> None:
         """Extract memory region declarations."""
         if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
             var_name = node.targets[0].id
@@ -427,7 +427,7 @@ class MemoryOperationExtractor(ast.NodeVisitor):
 
         self.generic_visit(node)
 
-    def visit_Subscript(self, node) -> None:
+    def visit_Subscript(self, node: ast.Subscript) -> None:
         """Extract memory access operations."""
         if isinstance(node.value, ast.Name):
             array_name = node.value.id

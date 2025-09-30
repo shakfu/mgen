@@ -20,11 +20,11 @@ except ImportError:
 # Mock z3 for when not available
 class z3:
     class Int:
-        def __init__(self, name):
+        def __init__(self, name: str) -> None:
             self.name = name
 
     @staticmethod
-    def IntVal(val):
+    def IntVal(val: int) -> None:
         return None
 
 from ..base import AnalysisContext
@@ -501,26 +501,26 @@ class PerformanceAnalyzer:
 class AlgorithmStructureExtractor(ast.NodeVisitor):
     """Extract algorithm structure for performance analysis."""
 
-    def __init__(self):
-        self.loops = []
-        self.recursive_calls = []
-        self.function_calls = []
-        self.variables = set()
-        self.current_function = None
+    def __init__(self) -> None:
+        self.loops: List[Dict[str, Any]] = []
+        self.recursive_calls: List[Dict[str, Any]] = []
+        self.function_calls: List[Dict[str, Any]] = []
+        self.variables: set[str] = set()
+        self.current_function: Optional[str] = None
 
-    def visit_FunctionDef(self, node):
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self.current_function = node.name
         self.generic_visit(node)
 
-    def visit_For(self, node):
+    def visit_For(self, node: ast.For) -> None:
         self.loops.append({"type": "for", "line": node.lineno, "iterable": self._extract_iterable_info(node.iter)})
         self.generic_visit(node)
 
-    def visit_While(self, node):
+    def visit_While(self, node: ast.While) -> None:
         self.loops.append({"type": "while", "line": node.lineno})
         self.generic_visit(node)
 
-    def visit_Call(self, node):
+    def visit_Call(self, node: ast.Call) -> None:
         if isinstance(node.func, ast.Name):
             if node.func.id == self.current_function:
                 self.recursive_calls.append({"line": node.lineno, "function": node.func.id})
@@ -528,7 +528,7 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
                 self.function_calls.append({"line": node.lineno, "function": node.func.id})
         self.generic_visit(node)
 
-    def _extract_iterable_info(self, iter_node):
+    def _extract_iterable_info(self, iter_node: ast.expr) -> str:
         if isinstance(iter_node, ast.Call) and isinstance(iter_node.func, ast.Name):
             if iter_node.func.id == "range":
                 return "range"
@@ -538,16 +538,16 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
 class ComplexityPatternAnalyzer(ast.NodeVisitor):
     """Analyze complexity patterns in code."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.loop_depth = 0
         self.max_loop_depth = 0
-        self.loops = []
-        self.array_accesses = []
-        self.array_allocations = []
-        self.function_calls = []
+        self.loops: List[Dict[str, Any]] = []
+        self.array_accesses: List[Dict[str, Any]] = []
+        self.array_allocations: List[Dict[str, Any]] = []
+        self.function_calls: List[Dict[str, Any]] = []
         self.current_depth = 0
 
-    def visit_For(self, node):
+    def visit_For(self, node: ast.For) -> None:
         self.current_depth += 1
         self.loop_depth = max(self.loop_depth, self.current_depth)
         self.max_loop_depth = max(self.max_loop_depth, self.current_depth)
@@ -562,7 +562,7 @@ class ComplexityPatternAnalyzer(ast.NodeVisitor):
         self.generic_visit(node)
         self.current_depth -= 1
 
-    def visit_While(self, node):
+    def visit_While(self, node: ast.While) -> None:
         self.current_depth += 1
         self.loop_depth = max(self.loop_depth, self.current_depth)
         self.max_loop_depth = max(self.max_loop_depth, self.current_depth)
@@ -572,12 +572,12 @@ class ComplexityPatternAnalyzer(ast.NodeVisitor):
         self.generic_visit(node)
         self.current_depth -= 1
 
-    def visit_Subscript(self, node):
+    def visit_Subscript(self, node: ast.Subscript) -> None:
         if isinstance(node.value, ast.Name):
             self.array_accesses.append({"array": node.value.id, "line": node.lineno, "depth": self.current_depth})
         self.generic_visit(node)
 
-    def visit_Assign(self, node):
+    def visit_Assign(self, node: ast.Assign) -> None:
         # Check for array/list allocations
         if isinstance(node.value, ast.List):
             if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
@@ -586,7 +586,7 @@ class ComplexityPatternAnalyzer(ast.NodeVisitor):
                 )
         self.generic_visit(node)
 
-    def visit_Call(self, node):
+    def visit_Call(self, node: ast.Call) -> None:
         if isinstance(node.func, ast.Name):
             self.function_calls.append({"function": node.func.id, "line": node.lineno, "depth": self.current_depth})
         self.generic_visit(node)

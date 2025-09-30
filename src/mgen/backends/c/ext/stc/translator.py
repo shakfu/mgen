@@ -15,7 +15,7 @@ from .enhanced_type_inference import EnhancedTypeInferenceEngine
 class STCPythonToCTranslator:
     """Enhanced Python-to-C translator with STC container support."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.stc_generator = STCCodeGenerator()
         self.container_variables: Dict[str, str] = {}  # var_name -> container_type
         self.required_includes: Set[str] = set()
@@ -29,7 +29,9 @@ class STCPythonToCTranslator:
             Dictionary mapping variable names to their Python types
         """
         # Use enhanced type inference engine
-        inferred_types = self.type_inference_engine.analyze_module(node)
+        # Cast to Module for type safety
+        module_node = node if isinstance(node, ast.Module) else ast.Module(body=[], type_ignores=[])
+        inferred_types = self.type_inference_engine.analyze_module(module_node)
 
         # Convert InferredType objects to simple string mapping
         type_info = {}
@@ -47,7 +49,7 @@ class STCPythonToCTranslator:
         type_info = {}
 
         class TypeAnalyzer(ast.NodeVisitor):
-            def visit_AnnAssign(self, node):
+            def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
                 """Handle type-annotated assignments: var: List[int] = []"""
                 if isinstance(node.target, ast.Name):
                     var_name = node.target.id
@@ -62,7 +64,7 @@ class STCPythonToCTranslator:
                             if base_type in ["list", "dict", "set"]:
                                 type_info[var_name] = ast.unparse(node.annotation)
 
-            def visit_Assign(self, node):
+            def visit_Assign(self, node: ast.Assign) -> None:
                 """Handle regular assignments with type inference"""
                 for target in node.targets:
                     if isinstance(target, ast.Name):

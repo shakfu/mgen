@@ -8,7 +8,7 @@ from ..base import AbstractFactory
 class CFactory(AbstractFactory):
     """Factory for creating C code elements."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize factory."""
         pass
 

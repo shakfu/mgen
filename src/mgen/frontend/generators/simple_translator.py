@@ -10,7 +10,7 @@ container operations when use_stc_containers=True.
 import ast
 import os
 import sys
-from typing import List
+from typing import Dict, List, Set
 
 from ...common import log
 
@@ -28,19 +28,19 @@ except ImportError:
 class SimplePythonToCTranslator:
     """Simple translator that generates C code as strings with optional STC support."""
 
-    def __init__(self, use_stc_containers=True):
+    def __init__(self, use_stc_containers: bool = True) -> None:
         self.log = log.config(self.__class__.__name__)
-        self.variables = {}  # variable_name -> c_type
-        self.functions = {}  # function_name -> return_type
+        self.variables: Dict[str, str] = {}  # variable_name -> c_type
+        self.functions: Dict[str, str] = {}  # function_name -> return_type
         self.indent_level = 0
 
         # STC integration
         self.use_stc_containers = use_stc_containers and STC_AVAILABLE
         self.stc_translator = STCPythonToCTranslator() if self.use_stc_containers else None
-        self.stc_includes = set()
-        self.stc_type_definitions = []
-        self.stc_container_vars = {}  # var_name -> STC container type
-        self.stc_type_include_pairs = []  # (type_def, include) pairs to maintain proper order
+        self.stc_includes: Set[str] = set()
+        self.stc_type_definitions: List[str] = []
+        self.stc_container_vars: Dict[str, str] = {}  # var_name -> STC container type
+        self.stc_type_include_pairs: List[tuple] = []  # (type_def, include) pairs to maintain proper order
 
         self.builtin_functions = {
             "print": self._translate_print_call,

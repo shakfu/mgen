@@ -165,7 +165,7 @@ class NestedContainerManager:
 
         return base_name
 
-    def _update_dependency_graph(self, type_name: str, type_info: NestedTypeInfo):
+    def _update_dependency_graph(self, type_name: str, type_info: NestedTypeInfo) -> None:
         """Update the dependency graph with new type."""
         if type_name not in self.dependency_graph:
             self.dependency_graph[type_name] = set()
@@ -185,7 +185,7 @@ class NestedContainerManager:
         temp_visited = set()
         order = []
 
-        def dfs(node: str):
+        def dfs(node: str) -> None:
             if node in temp_visited:
                 raise ValueError(f"Circular dependency detected involving {node}")
             if node in visited:
@@ -209,7 +209,7 @@ class NestedContainerManager:
         self.instantiation_order = order
         return order
 
-    def generate_stc_template_definitions(self, template_manager) -> List[str]:
+    def generate_stc_template_definitions(self, template_manager: Any) -> List[str]:
         """Generate STC template definitions for all nested types.
 
         Args:
@@ -233,7 +233,7 @@ class NestedContainerManager:
 
         return definitions
 
-    def _generate_template_definition(self, type_name: str, type_info: NestedTypeInfo, template_manager) -> List[str]:
+    def _generate_template_definition(self, type_name: str, type_info: NestedTypeInfo, template_manager: Any) -> List[str]:
         """Generate template definition for a specific nested type."""
         definitions = []
 

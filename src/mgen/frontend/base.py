@@ -41,7 +41,7 @@ class AnalysisContext:
     target_architecture: str = "x86_64"
     metadata: Optional[Dict[str, Any]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.metadata is None:
             self.metadata = {}
 
@@ -214,7 +214,7 @@ class VerificationResult:
 class IntelligencePipeline:
     """Main pipeline for coordinating analyzers, optimizers, and verifiers."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.analyzers: List[BaseAnalyzer] = []
         self.optimizers: List[BaseOptimizer] = []
         self.verifiers: List[BaseVerifier] = []

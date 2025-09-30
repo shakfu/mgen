@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from ..base import AbstractEmitter
+from ..preferences import BackendPreferences
 from .factory import CppFactory
 
 
@@ -40,7 +41,7 @@ class TypeMappingError(Exception):
 class MGenPythonToCppConverter:
     """Enhanced Python to C++ converter with MGen STL runtime integration."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize converter with MGen STL runtime support."""
         self.type_mapping = {
             "int": "int",
@@ -57,7 +58,7 @@ class MGenPythonToCppConverter:
         self.variable_context: Dict[str, str] = {}  # var_name -> cpp_type
         self.defined_classes: Dict[str, Dict[str, Any]] = {}
         self.iterator_variables: Dict[str, str] = {}
-        self.includes_needed = set()
+        self.includes_needed: set[str] = set()
         self.use_runtime = True
 
     def convert_code(self, source_code: str) -> str:
@@ -1198,7 +1199,7 @@ class MGenPythonToCppConverter:
 class CppEmitter(AbstractEmitter):
     """Enhanced C++ emitter using MGen Python-to-C++ converter."""
 
-    def __init__(self, preferences=None):
+    def __init__(self, preferences: Optional[BackendPreferences] = None) -> None:
         """Initialize the C++ emitter."""
         super().__init__(preferences)
         self.factory = CppFactory()

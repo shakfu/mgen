@@ -44,7 +44,7 @@ class ConstantValue:
     confidence: float = 1.0
     source_expression: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate and normalize the constant value."""
         if self.type_name is None:
             self.type_name = type(self.value).__name__

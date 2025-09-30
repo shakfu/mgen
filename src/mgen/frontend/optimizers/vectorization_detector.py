@@ -65,7 +65,7 @@ class VectorizationCandidate:
     transformation_complexity: str  # "trivial", "moderate", "complex"
     required_intrinsics: List[str] = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate the candidate after initialization."""
         if not 1 <= self.vector_length <= 64:
             raise ValueError(f"Invalid vector length: {self.vector_length}")

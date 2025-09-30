@@ -20,19 +20,19 @@ except ImportError:
 # Mock z3 for when not available
 class z3:
     class Int:
-        def __init__(self, name):
+        def __init__(self, name: str) -> None:
             self.name = name
     class Real:
-        def __init__(self, name):
+        def __init__(self, name: str) -> None:
             self.name = name
     class Bool:
-        def __init__(self, name):
+        def __init__(self, name: str) -> None:
             self.name = name
     @staticmethod
-    def And(*args):
+    def And(*args: Any) -> None:
         return None
     @staticmethod
-    def Or(*args):
+    def Or(*args: Any) -> None:
         return None
 
 from ..base import AnalysisContext
@@ -386,7 +386,7 @@ class CorrectnessProver:
             z3_formula=z3_formula,
         )
 
-    def _parse_condition_to_z3(self, condition: str):
+    def _parse_condition_to_z3(self, condition: str) -> Any:
         """Parse a textual condition into a Z3 formula."""
         if not self.z3_available:
             return "mock_formula"
@@ -494,21 +494,21 @@ class CorrectnessProver:
 class AlgorithmStructureExtractor(ast.NodeVisitor):
     """Extract algorithm structure for correctness verification."""
 
-    def __init__(self):
-        self.loops = []
-        self.recursive_calls = []
-        self.assertions = []
-        self.variables = set()
-        self.current_function = None
+    def __init__(self) -> None:
+        self.loops: List[Dict[str, Any]] = []
+        self.recursive_calls: List[Dict[str, Any]] = []
+        self.assertions: List[Dict[str, Any]] = []
+        self.variables: set[str] = set()
+        self.current_function: Optional[str] = None
 
-    def visit_FunctionDef(self, node):
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         """Track function context."""
         self.current_function = node.name
         self.generic_visit(node)
 
-    def visit_For(self, node):
+    def visit_For(self, node: ast.For) -> None:
         """Extract for loop information."""
-        loop_info = {"type": "for", "line": node.lineno, "variable": None, "iterable": None, "body_lines": []}
+        loop_info: Dict[str, Any] = {"type": "for", "line": node.lineno, "variable": None, "iterable": None, "body_lines": []}
 
         # Extract loop variable
         if isinstance(node.target, ast.Name):
@@ -527,9 +527,9 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
         self.loops.append(loop_info)
         self.generic_visit(node)
 
-    def visit_While(self, node):
+    def visit_While(self, node: ast.While) -> None:
         """Extract while loop information."""
-        loop_info = {
+        loop_info: Dict[str, Any] = {
             "type": "while",
             "line": node.lineno,
             "condition": ast.unparse(node.test) if hasattr(ast, "unparse") else str(node.test),
@@ -543,7 +543,7 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
         self.loops.append(loop_info)
         self.generic_visit(node)
 
-    def visit_Call(self, node):
+    def visit_Call(self, node: ast.Call) -> None:
         """Extract function calls (including recursive calls)."""
         if isinstance(node.func, ast.Name):
             if node.func.id == self.current_function:
@@ -552,9 +552,9 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
 
         self.generic_visit(node)
 
-    def visit_Assert(self, node):
+    def visit_Assert(self, node: ast.Assert) -> None:
         """Extract assertion statements."""
-        assertion_info = {
+        assertion_info: Dict[str, Any] = {
             "line": node.lineno,
             "condition": ast.unparse(node.test) if hasattr(ast, "unparse") else str(node.test),
             "message": None,
@@ -566,7 +566,7 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
         self.assertions.append(assertion_info)
         self.generic_visit(node)
 
-    def visit_Name(self, node):
+    def visit_Name(self, node: ast.Name) -> None:
         """Extract variable names."""
         self.variables.add(node.id)
         self.generic_visit(node)

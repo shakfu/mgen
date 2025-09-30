@@ -10,7 +10,7 @@ from ..base import AbstractBuilder
 class CBuilder(AbstractBuilder):
     """C build system implementation with integrated runtime libraries."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize builder with runtime support."""
         self.runtime_dir = Path(__file__).parent / "runtime"
         self.use_runtime = self.runtime_dir.exists()

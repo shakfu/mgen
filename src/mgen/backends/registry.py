@@ -9,7 +9,7 @@ from .preferences import BackendPreferences, PreferencesRegistry
 class BackendRegistry:
     """Central registry for all language backends."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize registry with empty backend collection."""
         self._backends: Dict[str, Type[LanguageBackend]] = {}
         self._register_built_in_backends()

@@ -1,6 +1,6 @@
 """C++ code element factory."""
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from ..base import AbstractFactory
 
@@ -55,7 +55,7 @@ class CppFactory(AbstractFactory):
         """Create a C++ assignment."""
         return f"{target} = {value};"
 
-    def create_literal(self, value, literal_type: str) -> str:
+    def create_literal(self, value: Any, literal_type: str) -> str:
         """Create a C++ literal."""
         if literal_type == "string":
             return f'"{value}"'

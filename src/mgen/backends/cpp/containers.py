@@ -8,9 +8,9 @@ from ..base import AbstractContainerSystem
 class CppContainerSystem(AbstractContainerSystem):
     """Container system for C++ with STL containers."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the C++ container system."""
-        self.container_mappings = {
+        self.container_mappings: Dict[str, str] = {
             "list": "std::vector",
             "dict": "std::map",
             "set": "std::set",
@@ -23,7 +23,7 @@ class CppContainerSystem(AbstractContainerSystem):
             "unordered_set": "std::unordered_set",
         }
 
-        self.required_headers = {
+        self.required_headers: Dict[str, str] = {
             "std::vector": "vector",
             "std::map": "map",
             "std::set": "set",

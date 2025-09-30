@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from ..base import AbstractEmitter
+from ..preferences import BackendPreferences
 from .containers import CContainerSystem
 
 
@@ -38,7 +39,7 @@ class TypeMappingError(Exception):
 class MGenPythonToCConverter:
     """Enhanced Python to C converter with MGen runtime integration."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize converter with MGen runtime support."""
         self.type_mapping = {
             "int": "int",
@@ -56,7 +57,7 @@ class MGenPythonToCConverter:
         self.variable_context: Dict[str, str] = {}  # var_name -> c_type
         self.defined_structs: Dict[str, Dict[str, Any]] = {}
         self.iterator_variables: Dict[str, str] = {}
-        self.includes_needed = set()
+        self.includes_needed: set[str] = set()
         self.use_runtime = True
 
     def convert_code(self, source_code: str) -> str:
@@ -1327,7 +1328,7 @@ class MGenPythonToCConverter:
 class CEmitter(AbstractEmitter):
     """C code emitter with integrated runtime libraries and sophisticated py2c conversion."""
 
-    def __init__(self, preferences=None):
+    def __init__(self, preferences: Optional[BackendPreferences] = None) -> None:
         """Initialize C emitter with sophisticated py2c conversion and runtime support."""
         super().__init__(preferences)
         self.runtime_dir = Path(__file__).parent / "runtime"

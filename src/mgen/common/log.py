@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import sys
+from typing import Optional
 
 # ----------------------------------------------------------------------------
 # env helpers
@@ -50,17 +51,17 @@ class CustomFormatter(logging.Formatter):
         logging.CRITICAL: cfmt.format(bold_red, reset),
     }
 
-    def __init__(self, use_color=COLOR):
+    def __init__(self, use_color: bool = COLOR) -> None:
         self.use_color = use_color
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         """Custom logger formatting method"""
         if not self.use_color:
-            log_fmt = self.fmt
+            log_fmt: Optional[str] = self.fmt
         else:
             log_fmt = self.FORMATS.get(record.levelno)
         if PY_VER_MINOR > 10:
-            duration = datetime.datetime.fromtimestamp(record.relativeCreated / 1000, datetime.UTC)
+            duration = datetime.datetime.fromtimestamp(record.relativeCreated / 1000, datetime.timezone.utc)
         else:
             duration = datetime.datetime.utcfromtimestamp(record.relativeCreated / 1000)
         record.delta = duration.strftime("%H:%M:%S")
