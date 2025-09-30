@@ -225,6 +225,29 @@ auto list_comprehension(const Range& range, Func transform, Pred condition) -> s
     return result;
 }
 
+// Overloads for container iteration
+template<typename Container, typename Func>
+auto list_comprehension(const Container& container, Func transform)
+    -> std::vector<decltype(transform(*container.begin()))> {
+    std::vector<decltype(transform(*container.begin()))> result;
+    for (const auto& item : container) {
+        result.push_back(transform(item));
+    }
+    return result;
+}
+
+template<typename Container, typename Func, typename Pred>
+auto list_comprehension(const Container& container, Func transform, Pred condition)
+    -> std::vector<decltype(transform(*container.begin()))> {
+    std::vector<decltype(transform(*container.begin()))> result;
+    for (const auto& item : container) {
+        if (condition(item)) {
+            result.push_back(transform(item));
+        }
+    }
+    return result;
+}
+
 // ============================================================================
 // Dict Comprehension Helpers
 // ============================================================================
@@ -253,6 +276,35 @@ auto dict_comprehension(const Range& range, Func key_value_func, Pred condition)
     return result;
 }
 
+// Overloads for container iteration
+template<typename Container, typename Func>
+auto dict_comprehension(const Container& container, Func key_value_func)
+    -> std::unordered_map<decltype(key_value_func(*container.begin()).first),
+                          decltype(key_value_func(*container.begin()).second)> {
+    std::unordered_map<decltype(key_value_func(*container.begin()).first),
+                       decltype(key_value_func(*container.begin()).second)> result;
+    for (const auto& item : container) {
+        auto pair = key_value_func(item);
+        result[pair.first] = pair.second;
+    }
+    return result;
+}
+
+template<typename Container, typename Func, typename Pred>
+auto dict_comprehension(const Container& container, Func key_value_func, Pred condition)
+    -> std::unordered_map<decltype(key_value_func(*container.begin()).first),
+                          decltype(key_value_func(*container.begin()).second)> {
+    std::unordered_map<decltype(key_value_func(*container.begin()).first),
+                       decltype(key_value_func(*container.begin()).second)> result;
+    for (const auto& item : container) {
+        if (condition(item)) {
+            auto pair = key_value_func(item);
+            result[pair.first] = pair.second;
+        }
+    }
+    return result;
+}
+
 // ============================================================================
 // Set Comprehension Helpers
 // ============================================================================
@@ -272,6 +324,29 @@ auto set_comprehension(const Range& range, Func transform, Pred condition) -> st
     for (auto i : range) {
         if (condition(i)) {
             result.insert(transform(i));
+        }
+    }
+    return result;
+}
+
+// Overloads for container iteration
+template<typename Container, typename Func>
+auto set_comprehension(const Container& container, Func transform)
+    -> std::unordered_set<decltype(transform(*container.begin()))> {
+    std::unordered_set<decltype(transform(*container.begin()))> result;
+    for (const auto& item : container) {
+        result.insert(transform(item));
+    }
+    return result;
+}
+
+template<typename Container, typename Func, typename Pred>
+auto set_comprehension(const Container& container, Func transform, Pred condition)
+    -> std::unordered_set<decltype(transform(*container.begin()))> {
+    std::unordered_set<decltype(transform(*container.begin()))> result;
+    for (const auto& item : container) {
+        if (condition(item)) {
+            result.insert(transform(item));
         }
     }
     return result;
