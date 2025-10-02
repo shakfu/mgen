@@ -255,6 +255,24 @@ typedef void (*mgen_python_enumerate_callback_t)(const mgen_enumerate_item_t* it
 void mgen_enumerate_array(void* array, size_t size, size_t element_size,
                          mgen_python_enumerate_callback_t callback, void* userdata);
 
+/**
+ * Python print() function equivalents
+ */
+void print_int(int value);
+void print_float(double value);
+void print_string(const char* str);
+
+// Generic print macro using C11 _Generic for type-based dispatch
+#define print(x) _Generic((x), \
+    int: print_int, \
+    long: print_int, \
+    float: print_float, \
+    double: print_float, \
+    char*: print_string, \
+    const char*: print_string, \
+    default: print_int \
+)(x)
+
 #ifdef __cplusplus
 }
 #endif

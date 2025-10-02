@@ -38,7 +38,7 @@ class CBuilder(AbstractBuilder):
         all_objects = object_files + runtime_objects
 
         # Build compiler flags
-        base_flags = "-Wall -Wextra -std=c99 -O2"
+        base_flags = "-Wall -Wextra -std=c11 -O2"
         if include_flags:
             base_flags += " " + " ".join(include_flags)
 
@@ -91,7 +91,7 @@ release: clean $(TARGET)
             # Build gcc command with base flags
             cmd = [
                 "gcc",
-                "-Wall", "-Wextra", "-std=c99", "-O2",
+                "-Wall", "-Wextra", "-std=c11", "-O2",
             ]
 
             # Add MGen runtime support if available
@@ -127,7 +127,7 @@ release: clean $(TARGET)
 
     def get_compile_flags(self) -> list[str]:
         """Get C compilation flags including MGen runtime support."""
-        flags = ["-Wall", "-Wextra", "-std=c99", "-O2"]
+        flags = ["-Wall", "-Wextra", "-std=c11", "-O2"]
 
         if self.use_runtime:
             # Add include path for runtime

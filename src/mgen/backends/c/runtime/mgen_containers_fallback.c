@@ -17,13 +17,13 @@
 
 mgen_dyn_array_t* mgen_dyn_array_new(size_t element_size, size_t initial_capacity) {
     if (element_size == 0) {
-        mgen_handle_error(MGEN_ERROR_INVALID_ARG, "Element size cannot be zero");
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Element size cannot be zero");
         return NULL;
     }
 
     mgen_dyn_array_t* array = (mgen_dyn_array_t*)malloc(sizeof(mgen_dyn_array_t));
     if (!array) {
-        mgen_handle_error(MGEN_ERROR_MEMORY, "Failed to allocate dynamic array");
+        MGEN_SET_ERROR(MGEN_ERROR_MEMORY, "Failed to allocate dynamic array");
         return NULL;
     }
 
@@ -38,7 +38,7 @@ mgen_dyn_array_t* mgen_dyn_array_new(size_t element_size, size_t initial_capacit
 
     if (!array->data) {
         free(array);
-        mgen_handle_error(MGEN_ERROR_MEMORY, "Failed to allocate array data");
+        MGEN_SET_ERROR(MGEN_ERROR_MEMORY, "Failed to allocate array data");
         return NULL;
     }
 
@@ -56,7 +56,8 @@ void mgen_dyn_array_free(mgen_dyn_array_t* array) {
 
 mgen_error_t mgen_dyn_array_reserve(mgen_dyn_array_t* array, size_t new_capacity) {
     if (!array) {
-        return mgen_handle_error(MGEN_ERROR_NULL_PTR, "Array is NULL");
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Array is NULL");
+        return MGEN_ERROR_VALUE;
     }
 
     if (new_capacity <= array->capacity) {
@@ -65,7 +66,8 @@ mgen_error_t mgen_dyn_array_reserve(mgen_dyn_array_t* array, size_t new_capacity
 
     void* new_data = realloc(array->data, array->element_size * new_capacity);
     if (!new_data) {
-        return mgen_handle_error(MGEN_ERROR_MEMORY, "Failed to reserve array capacity");
+        MGEN_SET_ERROR(MGEN_ERROR_MEMORY, "Failed to reserve array capacity");
+        return MGEN_ERROR_MEMORY;
     }
 
     array->data = new_data;
@@ -75,11 +77,13 @@ mgen_error_t mgen_dyn_array_reserve(mgen_dyn_array_t* array, size_t new_capacity
 
 mgen_error_t mgen_dyn_array_append(mgen_dyn_array_t* array, const void* element) {
     if (!array) {
-        return mgen_handle_error(MGEN_ERROR_NULL_PTR, "Array is NULL");
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Array is NULL");
+        return MGEN_ERROR_VALUE;
     }
 
     if (!element) {
-        return mgen_handle_error(MGEN_ERROR_NULL_PTR, "Element is NULL");
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Element is NULL");
+        return MGEN_ERROR_VALUE;
     }
 
     // Grow array if needed
@@ -105,15 +109,18 @@ mgen_error_t mgen_dyn_array_append(mgen_dyn_array_t* array, const void* element)
 
 mgen_error_t mgen_dyn_array_insert(mgen_dyn_array_t* array, size_t index, const void* element) {
     if (!array) {
-        return mgen_handle_error(MGEN_ERROR_NULL_PTR, "Array is NULL");
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Array is NULL");
+        return MGEN_ERROR_VALUE;
     }
 
     if (!element) {
-        return mgen_handle_error(MGEN_ERROR_NULL_PTR, "Element is NULL");
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Element is NULL");
+        return MGEN_ERROR_VALUE;
     }
 
     if (index > array->size) {
-        return mgen_handle_error(MGEN_ERROR_OUT_OF_BOUNDS, "Insert index out of bounds");
+        MGEN_SET_ERROR(MGEN_ERROR_INDEX, "Insert index out of bounds");
+        return MGEN_ERROR_INDEX;
     }
 
     // Grow array if needed
@@ -143,11 +150,13 @@ mgen_error_t mgen_dyn_array_insert(mgen_dyn_array_t* array, size_t index, const 
 
 mgen_error_t mgen_dyn_array_remove(mgen_dyn_array_t* array, size_t index) {
     if (!array) {
-        return mgen_handle_error(MGEN_ERROR_NULL_PTR, "Array is NULL");
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Array is NULL");
+        return MGEN_ERROR_VALUE;
     }
 
     if (index >= array->size) {
-        return mgen_handle_error(MGEN_ERROR_OUT_OF_BOUNDS, "Remove index out of bounds");
+        MGEN_SET_ERROR(MGEN_ERROR_INDEX, "Remove index out of bounds");
+        return MGEN_ERROR_INDEX;
     }
 
     // Move elements after removal point
@@ -164,12 +173,12 @@ mgen_error_t mgen_dyn_array_remove(mgen_dyn_array_t* array, size_t index) {
 
 void* mgen_dyn_array_get(const mgen_dyn_array_t* array, size_t index) {
     if (!array) {
-        mgen_handle_error(MGEN_ERROR_NULL_PTR, "Array is NULL");
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Array is NULL");
         return NULL;
     }
 
     if (index >= array->size) {
-        mgen_handle_error(MGEN_ERROR_OUT_OF_BOUNDS, "Get index out of bounds");
+        MGEN_SET_ERROR(MGEN_ERROR_INDEX, "Get index out of bounds");
         return NULL;
     }
 
@@ -178,15 +187,18 @@ void* mgen_dyn_array_get(const mgen_dyn_array_t* array, size_t index) {
 
 mgen_error_t mgen_dyn_array_set(mgen_dyn_array_t* array, size_t index, const void* element) {
     if (!array) {
-        return mgen_handle_error(MGEN_ERROR_NULL_PTR, "Array is NULL");
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Array is NULL");
+        return MGEN_ERROR_VALUE;
     }
 
     if (!element) {
-        return mgen_handle_error(MGEN_ERROR_NULL_PTR, "Element is NULL");
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Element is NULL");
+        return MGEN_ERROR_VALUE;
     }
 
     if (index >= array->size) {
-        return mgen_handle_error(MGEN_ERROR_OUT_OF_BOUNDS, "Set index out of bounds");
+        MGEN_SET_ERROR(MGEN_ERROR_INDEX, "Set index out of bounds");
+        return MGEN_ERROR_INDEX;
     }
 
     void* dest = (char*)array->data + (index * array->element_size);
@@ -226,7 +238,8 @@ bool mgen_dyn_array_contains(const mgen_dyn_array_t* array, const void* element)
 
 mgen_error_t mgen_dyn_array_shrink_to_fit(mgen_dyn_array_t* array) {
     if (!array) {
-        return mgen_handle_error(MGEN_ERROR_NULL_PTR, "Array is NULL");
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Array is NULL");
+        return MGEN_ERROR_VALUE;
     }
 
     if (array->size == 0) {
@@ -240,7 +253,8 @@ mgen_error_t mgen_dyn_array_shrink_to_fit(mgen_dyn_array_t* array) {
 
     void* new_data = realloc(array->data, array->element_size * array->size);
     if (!new_data) {
-        return mgen_handle_error(MGEN_ERROR_MEMORY, "Failed to shrink array");
+        MGEN_SET_ERROR(MGEN_ERROR_MEMORY, "Failed to shrink array");
+        return MGEN_ERROR_MEMORY;
     }
 
     array->data = new_data;
@@ -258,11 +272,13 @@ void* mgen_dyn_array_back(const mgen_dyn_array_t* array) {
 
 mgen_error_t mgen_dyn_array_pop_back(mgen_dyn_array_t* array) {
     if (!array) {
-        return mgen_handle_error(MGEN_ERROR_NULL_PTR, "Array is NULL");
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Array is NULL");
+        return MGEN_ERROR_VALUE;
     }
 
     if (array->size == 0) {
-        return mgen_handle_error(MGEN_ERROR_OUT_OF_BOUNDS, "Cannot pop from empty array");
+        MGEN_SET_ERROR(MGEN_ERROR_INDEX, "Cannot pop from empty array");
+        return MGEN_ERROR_INDEX;
     }
 
     array->size--;

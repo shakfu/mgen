@@ -476,3 +476,18 @@ void mgen_enumerate_array(void* array, size_t size, size_t element_size,
         callback(&item, userdata);
     }
 }
+
+/**
+ * Python print() function implementations
+ */
+void print_int(int value) {
+    printf("%d\n", value);
+}
+
+void print_float(double value) {
+    printf("%g\n", value);
+}
+
+void print_string(const char* str) {
+    printf("%s\n", str ? str : "");
+}
