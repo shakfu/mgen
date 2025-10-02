@@ -673,6 +673,16 @@ class MGenPythonToCppConverter:
         if isinstance(stmt.target, ast.Name):
             var_name = stmt.target.id
             var_type = self._convert_type_annotation(stmt.annotation)
+
+            # For empty container literals with auto type, use concrete types
+            if stmt.value and isinstance(stmt.value, (ast.List, ast.Dict)) and not (stmt.value.elts if isinstance(stmt.value, ast.List) else stmt.value.keys):
+                # Empty container with bare type annotation - use concrete type
+                if var_type == "auto":
+                    if isinstance(stmt.value, ast.List):
+                        var_type = "std::vector<int>"
+                    elif isinstance(stmt.value, ast.Dict):
+                        var_type = "std::unordered_map<std::string, int>"
+
             self.variable_context[var_name] = var_type
 
             if stmt.value:
@@ -808,6 +818,12 @@ class MGenPythonToCppConverter:
             return self._convert_dict_comprehension(expr)
         elif isinstance(expr, ast.SetComp):
             return self._convert_set_comprehension(expr)
+        elif isinstance(expr, ast.List):
+            return self._convert_list_literal(expr)
+        elif isinstance(expr, ast.Dict):
+            return self._convert_dict_literal(expr)
+        elif isinstance(expr, ast.Subscript):
+            return self._convert_subscript(expr)
         else:
             return f"/* TODO: {type(expr).__name__} */"
 
@@ -876,9 +892,12 @@ class MGenPythonToCppConverter:
                 elif isinstance(op, ast.IsNot):
                     cpp_op = "!="
                 elif isinstance(op, ast.In):
-                    cpp_op = "/* IN */"
+                    # Use .count() or .find() for membership testing
+                    result = f"({right}.count({result}) > 0)"
+                    continue
                 elif isinstance(op, ast.NotIn):
-                    cpp_op = "/* NOT IN */"
+                    result = f"({right}.count({result}) == 0)"
+                    continue
                 else:
                     cpp_op = "/*UNKNOWN_CMP*/"
 
@@ -985,11 +1004,11 @@ class MGenPythonToCppConverter:
 
             # Create lambda for transformation
             target_name = target.id if isinstance(target, ast.Name) else "x"
-            transform_lambda = f"[]({target_name}) {{ return {self._convert_expression(element_expr)}; }}"
+            transform_lambda = f"[](auto {target_name}) {{ return {self._convert_expression(element_expr)}; }}"
 
             if conditions:
                 # With condition
-                condition_lambda = f"[]({target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
+                condition_lambda = f"[](auto {target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
                 return f"list_comprehension({range_call}, {transform_lambda}, {condition_lambda})"
             else:
                 # No condition
@@ -998,10 +1017,10 @@ class MGenPythonToCppConverter:
             # Container iteration (like iterating over a vector)
             container_expr = self._convert_expression(iter_expr)
             target_name = target.id if isinstance(target, ast.Name) else "x"
-            transform_lambda = f"[]({target_name}) {{ return {self._convert_expression(element_expr)}; }}"
+            transform_lambda = f"[](auto {target_name}) {{ return {self._convert_expression(element_expr)}; }}"
 
             if conditions:
-                condition_lambda = f"[]({target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
+                condition_lambda = f"[](auto {target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
                 return f"list_comprehension({container_expr}, {transform_lambda}, {condition_lambda})"
             else:
                 return f"list_comprehension({container_expr}, {transform_lambda})"
@@ -1022,11 +1041,11 @@ class MGenPythonToCppConverter:
 
             # Create lambda for key-value pairs
             target_name = target.id if isinstance(target, ast.Name) else "x"
-            key_val_lambda = f"[]({target_name}) {{ return std::make_pair({self._convert_expression(key_expr)}, {self._convert_expression(value_expr)}); }}"
+            key_val_lambda = f"[](auto {target_name}) {{ return std::make_pair({self._convert_expression(key_expr)}, {self._convert_expression(value_expr)}); }}"
 
             if conditions:
                 # With condition
-                condition_lambda = f"[]({target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
+                condition_lambda = f"[](auto {target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
                 return f"dict_comprehension({range_call}, {key_val_lambda}, {condition_lambda})"
             else:
                 # No condition
@@ -1035,10 +1054,10 @@ class MGenPythonToCppConverter:
             # Container iteration (like iterating over a vector)
             container_expr = self._convert_expression(iter_expr)
             target_name = target.id if isinstance(target, ast.Name) else "x"
-            key_val_lambda = f"[]({target_name}) {{ return std::make_pair({self._convert_expression(key_expr)}, {self._convert_expression(value_expr)}); }}"
+            key_val_lambda = f"[](auto {target_name}) {{ return std::make_pair({self._convert_expression(key_expr)}, {self._convert_expression(value_expr)}); }}"
 
             if conditions:
-                condition_lambda = f"[]({target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
+                condition_lambda = f"[](auto {target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
                 return f"dict_comprehension({container_expr}, {key_val_lambda}, {condition_lambda})"
             else:
                 return f"dict_comprehension({container_expr}, {key_val_lambda})"
@@ -1058,11 +1077,11 @@ class MGenPythonToCppConverter:
 
             # Create lambda for transformation
             target_name = target.id if isinstance(target, ast.Name) else "x"
-            transform_lambda = f"[]({target_name}) {{ return {self._convert_expression(element_expr)}; }}"
+            transform_lambda = f"[](auto {target_name}) {{ return {self._convert_expression(element_expr)}; }}"
 
             if conditions:
                 # With condition
-                condition_lambda = f"[]({target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
+                condition_lambda = f"[](auto {target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
                 return f"set_comprehension({range_call}, {transform_lambda}, {condition_lambda})"
             else:
                 # No condition
@@ -1071,13 +1090,46 @@ class MGenPythonToCppConverter:
             # Container iteration (like iterating over a vector)
             container_expr = self._convert_expression(iter_expr)
             target_name = target.id if isinstance(target, ast.Name) else "x"
-            transform_lambda = f"[]({target_name}) {{ return {self._convert_expression(element_expr)}; }}"
+            transform_lambda = f"[](auto {target_name}) {{ return {self._convert_expression(element_expr)}; }}"
 
             if conditions:
-                condition_lambda = f"[]({target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
+                condition_lambda = f"[](auto {target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
                 return f"set_comprehension({container_expr}, {transform_lambda}, {condition_lambda})"
             else:
                 return f"set_comprehension({container_expr}, {transform_lambda})"
+
+    def _convert_list_literal(self, expr: ast.List) -> str:
+        """Convert list literal to C++ initializer list."""
+        if not expr.elts:
+            return "{}"  # Empty initializer list
+        elements = [self._convert_expression(elt) for elt in expr.elts]
+        return "{" + ", ".join(elements) + "}"
+
+    def _convert_dict_literal(self, expr: ast.Dict) -> str:
+        """Convert dict literal to C++ initializer list."""
+        if not expr.keys:
+            return "{}"  # Empty initializer list
+        pairs = []
+        for key, value in zip(expr.keys, expr.values):
+            if key is None:
+                # Skip unpacking operations (e.g., **kwargs)
+                continue
+            key_str = self._convert_expression(key)
+            val_str = self._convert_expression(value)
+            pairs.append(f"{{{key_str}, {val_str}}}")
+        return "{" + ", ".join(pairs) + "}"
+
+    def _convert_subscript(self, expr: ast.Subscript) -> str:
+        """Convert subscript operation to C++ array access."""
+        value_expr = self._convert_expression(expr.value)
+
+        if isinstance(expr.slice, ast.Slice):
+            # Handle slicing (not fully supported in C++, would need custom implementation)
+            return f"/* TODO: Slice not supported */"
+        else:
+            # Simple subscript
+            index_expr = self._convert_expression(expr.slice)
+            return f"{value_expr}[{index_expr}]"
 
     def _convert_statements(self, statements: list[ast.stmt]) -> str:
         """Convert multiple statements."""
@@ -1133,12 +1185,23 @@ class MGenPythonToCppConverter:
     def _get_param_type(self, arg: ast.arg) -> str:
         """Get parameter type from annotation."""
         if arg.annotation:
+            # For function parameters, use concrete types for bare containers
+            if isinstance(arg.annotation, ast.Name) and arg.annotation.id in ("list", "dict", "set"):
+                if arg.annotation.id == "list":
+                    return "std::vector<int>"
+                elif arg.annotation.id == "dict":
+                    return "std::unordered_map<std::string, int>"
+                elif arg.annotation.id == "set":
+                    return "std::unordered_set<int>"
             return self._convert_type_annotation(arg.annotation)
         return "auto"
 
     def _convert_type_annotation(self, annotation: ast.expr) -> str:
-        """Convert Python type annotation to C++ type."""
+        """Convert Python type annotation to C++ type (for return types and variables)."""
         if isinstance(annotation, ast.Name):
+            # For bare container types without template args, use auto for return types
+            if annotation.id in ("list", "dict", "set"):
+                return "auto"
             return self.type_mapping.get(annotation.id, annotation.id)
         elif isinstance(annotation, ast.Constant):
             if annotation.value is None:
@@ -1172,11 +1235,11 @@ class MGenPythonToCppConverter:
             elif isinstance(value.value, str):
                 return "std::string"
         elif isinstance(value, ast.List):
-            return "std::vector<auto>"
+            return "auto"
         elif isinstance(value, ast.Dict):
-            return "std::unordered_map<auto, auto>"
+            return "auto"
         elif isinstance(value, ast.Set):
-            return "std::unordered_set<auto>"
+            return "auto"
         elif isinstance(value, ast.Call):
             # Infer type from function calls
             if isinstance(value.func, ast.Name):

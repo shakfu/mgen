@@ -709,6 +709,8 @@ class MGenPythonToGoConverter:
             return self._convert_dict_comprehension(expr)
         elif isinstance(expr, ast.SetComp):
             return self._convert_set_comprehension(expr)
+        elif isinstance(expr, ast.Subscript):
+            return self._convert_subscript(expr)
         else:
             return f"/* TODO: {type(expr).__name__} */"
 
@@ -770,13 +772,26 @@ class MGenPythonToGoConverter:
             if op_str is None:
                 if isinstance(op, ast.Is):
                     op_str = "=="
+                    comp_expr = self._convert_expression(comp)
+                    result = f"({result} {op_str} {comp_expr})"
                 elif isinstance(op, ast.IsNot):
                     op_str = "!="
+                    comp_expr = self._convert_expression(comp)
+                    result = f"({result} {op_str} {comp_expr})"
+                elif isinstance(op, ast.In):
+                    # Use map membership check with comma-ok idiom
+                    comp_expr = self._convert_expression(comp)
+                    result = f"func() bool {{ _, ok := {comp_expr}[{result}]; return ok }}()"
+                elif isinstance(op, ast.NotIn):
+                    comp_expr = self._convert_expression(comp)
+                    result = f"func() bool {{ _, ok := {comp_expr}[{result}]; return !ok }}()"
                 else:
                     op_str = "/*UNKNOWN_OP*/"
-
-            comp_expr = self._convert_expression(comp)
-            result = f"({result} {op_str} {comp_expr})"
+                    comp_expr = self._convert_expression(comp)
+                    result = f"({result} {op_str} {comp_expr})"
+            else:
+                comp_expr = self._convert_expression(comp)
+                result = f"({result} {op_str} {comp_expr})"
 
         return result
 
@@ -1030,6 +1045,18 @@ class MGenPythonToGoConverter:
             transform_lambda = f"func(item interface{{}}) interface{{}} {{ {target_name} := item; return {transform_expr} }}"
 
             return f"mgen.Comprehensions.SetComprehension({container_expr}, {transform_lambda})"
+
+    def _convert_subscript(self, expr: ast.Subscript) -> str:
+        """Convert subscript operation to Go array/map access."""
+        value_expr = self._convert_expression(expr.value)
+
+        if isinstance(expr.slice, ast.Slice):
+            # Handle slicing
+            return f"/* TODO: Slice not supported */"
+        else:
+            # Simple subscript
+            index_expr = self._convert_expression(expr.slice)
+            return f"{value_expr}[{index_expr}]"
 
     # Helper methods for type inference and mapping
 

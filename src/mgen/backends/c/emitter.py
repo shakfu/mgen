@@ -1392,7 +1392,7 @@ class CEmitter(AbstractEmitter):
         # Generate enhanced function body
         body = self._emit_function_body_enhanced(func_node, type_context)
 
-        return f"{signature} {{\\n{body}\\n}}"
+        return f"{signature} {{\n{body}\n}}"
 
     def _emit_function_body_enhanced(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Enhanced function body generation with runtime support."""
@@ -1435,7 +1435,7 @@ class CEmitter(AbstractEmitter):
         if not body_lines:
             body_lines.append("    /* Enhanced function body with runtime support */")
 
-        return "\\n".join(body_lines)
+        return "\n".join(body_lines)
 
     def _emit_expression_enhanced(self, expr: ast.expr) -> str:
         """Enhanced expression generation with runtime support."""

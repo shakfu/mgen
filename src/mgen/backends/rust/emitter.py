@@ -520,13 +520,26 @@ class MGenPythonToRustConverter:
             if op_str is None:
                 if isinstance(op, ast.Is):
                     op_str = "=="
+                    comp_expr = self._convert_method_expression(comp, class_name)
+                    result = f"({result} {op_str} {comp_expr})"
                 elif isinstance(op, ast.IsNot):
                     op_str = "!="
+                    comp_expr = self._convert_method_expression(comp, class_name)
+                    result = f"({result} {op_str} {comp_expr})"
+                elif isinstance(op, ast.In):
+                    # Use .contains_key() for maps or .contains() for sets
+                    comp_expr = self._convert_method_expression(comp, class_name)
+                    result = f"{comp_expr}.contains_key(&{result})"
+                elif isinstance(op, ast.NotIn):
+                    comp_expr = self._convert_method_expression(comp, class_name)
+                    result = f"!{comp_expr}.contains_key(&{result})"
                 else:
                     op_str = "/*UNKNOWN_OP*/"
-
-            comp_expr = self._convert_method_expression(comp, class_name)
-            result = f"({result} {op_str} {comp_expr})"
+                    comp_expr = self._convert_method_expression(comp, class_name)
+                    result = f"({result} {op_str} {comp_expr})"
+            else:
+                comp_expr = self._convert_method_expression(comp, class_name)
+                result = f"({result} {op_str} {comp_expr})"
 
         return result
 
@@ -836,13 +849,26 @@ class MGenPythonToRustConverter:
             if op_str is None:
                 if isinstance(op, ast.Is):
                     op_str = "=="
+                    comp_expr = self._convert_expression(comp)
+                    result = f"({result} {op_str} {comp_expr})"
                 elif isinstance(op, ast.IsNot):
                     op_str = "!="
+                    comp_expr = self._convert_expression(comp)
+                    result = f"({result} {op_str} {comp_expr})"
+                elif isinstance(op, ast.In):
+                    # Use .contains_key() for maps or .contains() for sets
+                    comp_expr = self._convert_expression(comp)
+                    result = f"{comp_expr}.contains_key(&{result})"
+                elif isinstance(op, ast.NotIn):
+                    comp_expr = self._convert_expression(comp)
+                    result = f"!{comp_expr}.contains_key(&{result})"
                 else:
                     op_str = "/*UNKNOWN_OP*/"
-
-            comp_expr = self._convert_expression(comp)
-            result = f"({result} {op_str} {comp_expr})"
+                    comp_expr = self._convert_expression(comp)
+                    result = f"({result} {op_str} {comp_expr})"
+            else:
+                comp_expr = self._convert_expression(comp)
+                result = f"({result} {op_str} {comp_expr})"
 
         return result
 
