@@ -140,7 +140,7 @@ class MGenPythonToHaskellConverter:
 main = printValue "Generated Haskell code executed successfully"'''
             parts.append(main_func)
 
-        return "\\n".join(parts)
+        return "\n".join(parts)
 
     def _scan_for_imports(self, node: ast.AST) -> None:
         """Scan AST for features that require imports."""
@@ -200,7 +200,7 @@ main = printValue "Generated Haskell code executed successfully"'''
         # Generate data type definition
         parts = []
         parts.append(f"data {class_name} = {class_name}")
-        parts.append("  { " + "\\n  , ".join(field.strip() for field in fields))
+        parts.append("  { " + "\n  , ".join(field.strip() for field in fields))
         parts.append("  } deriving (Show, Eq)")
 
         # Generate constructor function
@@ -215,7 +215,7 @@ main = printValue "Generated Haskell code executed successfully"'''
             parts.append("")
             parts.append(method_func)
 
-        return "\\n".join(parts)
+        return "\n".join(parts)
 
     def _convert_constructor(self, class_name: str, constructor: ast.FunctionDef) -> str:
         """Convert Python __init__ method to Haskell constructor function."""
@@ -265,7 +265,7 @@ main = printValue "Generated Haskell code executed successfully"'''
             param_pattern = ""
         body = f"{func_name}{param_pattern} = {class_name} {{ {', '.join(field_assignments)} }}"
 
-        return f"{signature}\\n{body}"
+        return f"{signature}\n{body}"
 
     def _convert_method(self, class_name: str, method: ast.FunctionDef) -> str:
         """Convert Python instance method to Haskell function."""
@@ -302,7 +302,7 @@ main = printValue "Generated Haskell code executed successfully"'''
 
         implementation = f"{method_name}{param_pattern} = {body}"
 
-        return f"{signature}\\n{implementation}"
+        return f"{signature}\n{implementation}"
 
     def _convert_function(self, node: ast.FunctionDef) -> str:
         """Convert Python function to Haskell."""
@@ -314,21 +314,54 @@ main = printValue "Generated Haskell code executed successfully"'''
             self.declared_vars = set()
 
             body_stmts = []
+            io_actions = []
+            let_bindings = []
+
             for stmt in node.body:
+                if isinstance(stmt, ast.Return):
+                    # Ignore return statements in main (Haskell main returns void)
+                    continue
+
                 converted_stmt = self._convert_statement(stmt)
-                if converted_stmt:
+                if not converted_stmt:
+                    continue
+
+                # Determine if this is an IO action or a let binding
+                if isinstance(stmt, (ast.Assign, ast.AnnAssign)):
+                    # It's a let binding
+                    let_bindings.append(converted_stmt)
+                elif isinstance(stmt, ast.Expr):
+                    # It's an IO action (like print)
+                    io_actions.append(converted_stmt)
+                else:
                     body_stmts.append(converted_stmt)
 
-            if not body_stmts:
-                body_stmts = ['printValue "No statements"']
-
-            # Main function in Haskell is IO ()
+            # Build main body with do notation if needed
             signature = "main :: IO ()"
-            body = "main = " + (" >> ".join(body_stmts) if len(body_stmts) > 1 else body_stmts[0])
+
+            if not let_bindings and not io_actions and not body_stmts:
+                body = 'main = printValue "No statements"'
+            elif not let_bindings and len(io_actions) == 1 and not body_stmts:
+                # Single IO action, no do notation needed
+                body = f"main = {io_actions[0]}"
+            else:
+                # Use do notation
+                do_lines = []
+                for binding in let_bindings:
+                    do_lines.append(f"  let {binding}")
+                for action in io_actions:
+                    do_lines.append(f"  {action}")
+                for stmt in body_stmts:
+                    do_lines.append(f"  {stmt}")
+
+                if do_lines:
+                    body = "main = do\n" + "\n".join(do_lines)
+                else:
+                    body = 'main = printValue "Empty main"'
 
             self.current_function = None
             self.declared_vars = set()
-            return f"{signature}\\n{body}"
+            return f"{signature}\n{body}"
 
         # Extract parameters
         params = []
@@ -371,7 +404,7 @@ main = printValue "Generated Haskell code executed successfully"'''
             body = body_stmts[0]
         else:
             # Multiple statements - use let expressions
-            body = "let\\n    " + "\\n    ".join(body_stmts[:-1]) + "\\n  in " + body_stmts[-1]
+            body = "let\n    " + "\n    ".join(body_stmts[:-1]) + "\n  in " + body_stmts[-1]
 
         param_names = [param[0] for param in params]
         if param_names:
@@ -384,7 +417,7 @@ main = printValue "Generated Haskell code executed successfully"'''
         self.current_function = None
         self.declared_vars = set()
 
-        return f"{signature}\\n{implementation}"
+        return f"{signature}\n{implementation}"
 
     def _convert_statement(self, node: ast.stmt) -> str:
         """Convert Python statement to Haskell."""
@@ -418,11 +451,8 @@ main = printValue "Generated Haskell code executed successfully"'''
                 return "-- Complex annotated assignment"
 
         elif isinstance(node, ast.Expr):
+            # Expression statements are already properly converted
             expr = self._convert_expression(node.value)
-            # Handle print statements and other expressions
-            if isinstance(node.value, ast.Call):
-                if isinstance(node.value.func, ast.Name) and node.value.func.id == "print":
-                    return f"printValue {expr.replace('print ', '')}"
             return expr
 
         elif isinstance(node, ast.AugAssign):
@@ -672,22 +702,22 @@ main = printValue "Generated Haskell code executed successfully"'''
             method_name = node.func.attr
             args = [self._convert_expression(arg) for arg in node.args]
 
-            # Handle string methods
+            # Handle string methods - use qualified names to avoid shadowing
             if method_name == "upper":
-                return f"(upper {obj})"
+                return f"(MGenRuntime.upper {obj})"
             elif method_name == "lower":
-                return f"(lower {obj})"
+                return f"(MGenRuntime.lower {obj})"
             elif method_name == "strip":
-                return f"(strip {obj})"
+                return f"(MGenRuntime.strip {obj})"
             elif method_name == "find":
                 if args:
-                    return f"(find {obj} {args[0]})"
+                    return f"(MGenRuntime.find {obj} {args[0]})"
             elif method_name == "replace":
                 if len(args) >= 2:
-                    return f"(replace {obj} {args[0]} {args[1]})"
+                    return f"(MGenRuntime.replace {obj} {args[0]} {args[1]})"
             elif method_name == "split":
                 if args:
-                    return f"(split {obj} {args[0]})"
+                    return f"(MGenRuntime.split {obj} {args[0]})"
             else:
                 # Regular method call - convert to function call
                 haskell_method_name = self._to_haskell_function_name(method_name)

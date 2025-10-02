@@ -61,6 +61,13 @@ class MGenPythonToOCamlConverter:
         ocaml_code.append("open Mgen_runtime")
         ocaml_code.append("")
 
+        # Track if main function exists
+        has_main = False
+        for stmt in node.body:
+            if isinstance(stmt, ast.FunctionDef) and stmt.name == "main":
+                has_main = True
+                break
+
         # Convert all statements
         for stmt in node.body:
             converted = self._convert_statement(stmt)
@@ -73,7 +80,10 @@ class MGenPythonToOCamlConverter:
 
         # Add main execution
         ocaml_code.append("(* Main execution *)")
-        ocaml_code.append('let () = print_value "Generated OCaml code executed successfully"')
+        if has_main:
+            ocaml_code.append('let () = ignore (main ())')
+        else:
+            ocaml_code.append('let () = print_value "Generated OCaml code executed successfully"')
 
         return "\n".join(ocaml_code)
 

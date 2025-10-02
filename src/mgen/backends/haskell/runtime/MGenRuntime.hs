@@ -195,7 +195,7 @@ instance ToString Bool where
     toString True = "True"
     toString False = "False"
 
-instance ToString String where
+instance {-# OVERLAPPING #-} ToString String where
     toString = id
 
 instance (ToString a) => ToString [a] where

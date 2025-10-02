@@ -1,5 +1,6 @@
 """Haskell build system for MGen."""
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -57,8 +58,11 @@ executable {target_name}
             output_dir = Path(output_path)
             executable_name = source_path.stem
 
-            # Check if runtime exists
-            runtime_path = source_path.parent / "MGenRuntime.hs"
+            # Copy runtime module if it exists
+            runtime_src = Path(__file__).parent / "runtime" / "MGenRuntime.hs"
+            if runtime_src.exists():
+                runtime_dst = output_dir / "MGenRuntime.hs"
+                shutil.copy2(runtime_src, runtime_dst)
 
             # Build GHC command
             cmd = [
@@ -70,7 +74,8 @@ executable {target_name}
                 "-XTypeSynonymInstances"
             ]
 
-            # Add runtime if it exists
+            # Add runtime if it was copied
+            runtime_path = output_dir / "MGenRuntime.hs"
             if runtime_path.exists():
                 cmd.extend([str(runtime_path)])
 
