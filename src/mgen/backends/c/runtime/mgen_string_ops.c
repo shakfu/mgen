@@ -4,6 +4,101 @@
 
 #include "mgen_string_ops.h"
 
+// String array implementation
+mgen_string_array_t* mgen_string_array_new(void) {
+    mgen_string_array_t* arr = malloc(sizeof(mgen_string_array_t));
+    if (!arr) {
+        MGEN_SET_ERROR(MGEN_ERROR_MEMORY, "Failed to allocate string array");
+        return NULL;
+    }
+
+    arr->strings = NULL;
+    arr->count = 0;
+    arr->capacity = 0;
+    return arr;
+}
+
+void mgen_string_array_free(mgen_string_array_t* arr) {
+    if (!arr) return;
+
+    for (size_t i = 0; i < arr->count; i++) {
+        free(arr->strings[i]);
+    }
+    free(arr->strings);
+    free(arr);
+}
+
+mgen_error_t mgen_string_array_add(mgen_string_array_t* arr, char* str) {
+    if (!arr) {
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "String array is NULL");
+        return MGEN_ERROR_VALUE;
+    }
+
+    if (arr->count >= arr->capacity) {
+        size_t new_capacity = arr->capacity == 0 ? 8 : arr->capacity * 2;
+        char** new_strings = realloc(arr->strings, new_capacity * sizeof(char*));
+        if (!new_strings) {
+            MGEN_SET_ERROR(MGEN_ERROR_MEMORY, "Failed to resize string array");
+            return MGEN_ERROR_MEMORY;
+        }
+        arr->strings = new_strings;
+        arr->capacity = new_capacity;
+    }
+
+    arr->strings[arr->count++] = str;
+    return MGEN_OK;
+}
+
+const char* mgen_string_array_get(mgen_string_array_t* arr, size_t index) {
+    if (!arr || index >= arr->count) {
+        return NULL;
+    }
+    return arr->strings[index];
+}
+
+size_t mgen_string_array_size(mgen_string_array_t* arr) {
+    return arr ? arr->count : 0;
+}
+
+char* mgen_join(const char* delimiter, mgen_string_array_t* strings) {
+    if (!strings || strings->count == 0) {
+        return mgen_strdup("");
+    }
+
+    if (!delimiter) delimiter = "";
+
+    // Calculate total length needed
+    size_t total_len = 0;
+    size_t delim_len = strlen(delimiter);
+
+    for (size_t i = 0; i < strings->count; i++) {
+        if (strings->strings[i]) {
+            total_len += strlen(strings->strings[i]);
+        }
+        if (i < strings->count - 1) {
+            total_len += delim_len;
+        }
+    }
+
+    char* result = malloc(total_len + 1);
+    if (!result) {
+        MGEN_SET_ERROR(MGEN_ERROR_MEMORY, "Failed to allocate memory for joined string");
+        return NULL;
+    }
+
+    result[0] = '\0';
+    for (size_t i = 0; i < strings->count; i++) {
+        if (strings->strings[i]) {
+            strcat(result, strings->strings[i]);
+        }
+        if (i < strings->count - 1) {
+            strcat(result, delimiter);
+        }
+    }
+
+    return result;
+}
+
 char* mgen_strdup(const char* str) {
     if (!str) {
         MGEN_SET_ERROR(MGEN_ERROR_VALUE, "String is NULL");

@@ -18,6 +18,44 @@
 extern "C" {
 #endif
 
+// String array structure for storing multiple strings
+typedef struct {
+    char** strings;
+    size_t count;
+    size_t capacity;
+} mgen_string_array_t;
+
+/**
+ * Create a new string array
+ */
+mgen_string_array_t* mgen_string_array_new(void);
+
+/**
+ * Free a string array and all its strings
+ */
+void mgen_string_array_free(mgen_string_array_t* arr);
+
+/**
+ * Add a string to the array (takes ownership of the string)
+ */
+mgen_error_t mgen_string_array_add(mgen_string_array_t* arr, char* str);
+
+/**
+ * Get string at index (returns NULL if out of bounds)
+ */
+const char* mgen_string_array_get(mgen_string_array_t* arr, size_t index);
+
+/**
+ * Get the number of strings in the array
+ */
+size_t mgen_string_array_size(mgen_string_array_t* arr);
+
+/**
+ * Python str.join() equivalent
+ * Joins strings in array with delimiter (caller must free result)
+ */
+char* mgen_join(const char* delimiter, mgen_string_array_t* strings);
+
 /**
  * Python str.upper() equivalent
  * Returns a new uppercase string (caller must free)

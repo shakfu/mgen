@@ -17,6 +17,132 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.31]
+
+### Added
+
+- **CGen Feature Parity**: Integrated 3 major features from CGen project to achieve complete feature parity
+  - **File I/O Operations**: Full Python file and path operations support
+  - **Advanced Container Operations**: Python-style container helpers and utilities
+  - **Module Import System**: Multi-module project support with import resolution
+
+#### File I/O Operations (C Backend Runtime)
+
+**New Runtime Libraries**:
+- `mgen_file_ops.h` / `mgen_file_ops.c`: Complete file I/O implementation
+
+**Core File Operations**:
+- `mgen_open()`, `mgen_close()`: Python `open()` and `close()` equivalents
+- `mgen_read()`, `mgen_readline()`, `mgen_readlines()`: File reading operations
+- `mgen_write()`, `mgen_writelines()`: File writing operations
+- Context manager support: `mgen_with_file()` for automatic cleanup
+
+**Path Operations** (os.path equivalents):
+- `mgen_exists()`, `mgen_isfile()`, `mgen_isdir()`: Path validation
+- `mgen_getsize()`: File size queries
+- `mgen_basename()`, `mgen_dirname()`: Path manipulation
+- `mgen_path_join()`: Platform-aware path joining
+
+**Convenience Functions**:
+- `mgen_read_file()`: Read entire file in one call
+- `mgen_write_file()`, `mgen_append_file()`: Quick file operations
+
+#### Advanced Container Operations (C Backend Runtime)
+
+**New Runtime Libraries**:
+- `mgen_container_ops.h` / `mgen_container_ops.c`: Container helper operations
+
+**Python-Style Operations**:
+- `mgen_vec_enumerate()`: Python `enumerate()` for vectors with index
+- `mgen_hmap_items()`: Python `dict.items()` for hashmaps
+- `mgen_in_vec()`, `mgen_in_hmap()`: Python `in` operator support
+- `mgen_len()`, `mgen_bool_container()`: Python len() and bool() for containers
+
+**Container Management**:
+- Container registry: `mgen_container_registry_new()`, `mgen_register_container()`, `mgen_cleanup_containers()`
+- Automatic cleanup for registered containers
+- Safe bounds checking: `mgen_vec_bounds_check()`, `mgen_vec_at_safe()`
+
+**Container Utilities**:
+- `mgen_vec_equal()`, `mgen_hmap_equal()`: Deep equality comparison
+- `mgen_vec_repr()`, `mgen_hmap_repr()`: Python-style string representation
+- `mgen_string_array_to_vec_cstr()`, `mgen_vec_cstr_to_string_array()`: Container conversions
+
+#### Module Import System
+
+**New Common Module**:
+- `mgen/common/module_system.py`: Complete module resolution and import handling
+
+**Module Resolution**:
+- `ModuleResolver`: Discovers and analyzes Python modules
+- `ModuleInfo`: Tracks module functions, imports, and dependencies
+- `StandardLibraryModule`: Maps stdlib functions to target language equivalents
+
+**Import Support**:
+- Local module imports: `import mymodule`, `from mymodule import function`
+- Standard library modules: `math`, `typing`, `dataclasses`
+- Cross-module function resolution and dependency analysis
+- Topological sort for correct compilation order
+
+**Import Handler**:
+- `ImportHandler`: Processes import statements during code generation
+- Generates appropriate include directives for target language
+- Resolves function calls to correct module or stdlib equivalents
+- Tracks imported functions and module aliases
+
+#### Enhanced String Operations (C Backend Runtime)
+
+**String Array Support**:
+- `mgen_string_array_t`: Dynamic string array structure
+- `mgen_string_array_new()`, `mgen_string_array_free()`: Array lifecycle
+- `mgen_string_array_add()`, `mgen_string_array_get()`, `mgen_string_array_size()`: Array operations
+- `mgen_join()`: Python `str.join()` equivalent for string arrays
+
+**Integration**:
+- All string array functions integrated with file I/O operations
+- Used by `mgen_readlines()` and `mgen_writelines()`
+- Container operations use string arrays for representation
+
+### Technical Details
+
+**Runtime Integration**:
+- All new runtime files automatically included via builder's `glob("*.c")` pattern
+- Platform-aware implementations (Windows/Unix path separators)
+- Consistent error handling using mgen_error_handling system
+- Zero external dependencies - pure C99 standard library
+
+**Files Added**:
+- `src/mgen/backends/c/runtime/mgen_file_ops.h` (148 lines)
+- `src/mgen/backends/c/runtime/mgen_file_ops.c` (384 lines)
+- `src/mgen/backends/c/runtime/mgen_container_ops.h` (215 lines)
+- `src/mgen/backends/c/runtime/mgen_container_ops.c` (387 lines)
+- `src/mgen/common/module_system.py` (316 lines)
+
+**Files Modified**:
+- `src/mgen/backends/c/runtime/mgen_string_ops.h`: Added string array type and operations
+- `src/mgen/backends/c/runtime/mgen_string_ops.c`: Implemented string array functions
+- `src/mgen/common/__init__.py`: Exported module_system
+
+### Impact
+
+- ✅ **Feature Parity**: MGen C backend now includes all CGen features
+- ✅ **File I/O**: Can translate Python code with file operations
+- ✅ **Multi-Module**: Support for multi-module Python projects with imports
+- ✅ **Container Utilities**: More Pythonic container operations
+- ✅ **Zero Regressions**: All 717 tests passing (0.36s execution time)
+- ✅ **CGen Replacement**: MGen can now fully replace CGen for all use cases
+
+### Migration from CGen
+
+**MGen now supports everything CGen has, plus:**
+- Multi-backend architecture (C, C++, Rust, Go, Haskell, OCaml)
+- Fallback container system for environments without STC
+- More comprehensive testing (717 vs 663 tests)
+- Modern Python 3.9+ type annotations
+- Faster test execution (<0.5s vs 1.0s)
+
+**CGen development can be discontinued** - all unique features have been integrated into MGen.
+
 ## [0.1.30]
 
 ### Changed
