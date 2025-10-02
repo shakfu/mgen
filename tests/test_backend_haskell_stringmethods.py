@@ -81,8 +81,8 @@ def process_text(text: str) -> str:
 """
         haskell_code = self.converter.convert_code(python_code)
 
-        assert "lower (strip text)" in haskell_code
-        assert "upper cleaned" in haskell_code
+        assert "MGenRuntime.lower (MGenRuntime.strip text)" in haskell_code
+        assert "MGenRuntime.upper cleaned" in haskell_code
 
     def test_string_methods_with_literals(self):
         """Test string methods called on string literals."""

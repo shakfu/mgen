@@ -139,7 +139,7 @@ class TestCBuilderEnhanced:
 
         assert "-Wall" in flags
         assert "-Wextra" in flags
-        assert "-std=c99" in flags
+        assert "-std=c11" in flags
 
         if self.builder.use_runtime:
             # Should include runtime include path

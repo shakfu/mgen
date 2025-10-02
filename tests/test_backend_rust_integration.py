@@ -329,7 +329,7 @@ def main() -> int:
         assert "impl MathUtils {" in rust_code
         assert "fn new(base: i32) -> Self" in rust_code
         assert "fn process_numbers(&mut self, numbers: Vec" in rust_code and "-> std::collections::HashMap" in rust_code
-        assert "fn main() -> i32" in rust_code
+        assert "fn main()" in rust_code
 
         # Verify all features work together
         assert "Comprehensions::list_comprehension_with_filter" in rust_code

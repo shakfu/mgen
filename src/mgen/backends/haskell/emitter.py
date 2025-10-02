@@ -351,8 +351,8 @@ main = printValue "Generated Haskell code executed successfully"'''
                     do_lines.append(f"  let {binding}")
                 for action in io_actions:
                     do_lines.append(f"  {action}")
-                for stmt in body_stmts:
-                    do_lines.append(f"  {stmt}")
+                for body_stmt in body_stmts:
+                    do_lines.append(f"  {body_stmt}")
 
                 if do_lines:
                     body = "main = do\n" + "\n".join(do_lines)

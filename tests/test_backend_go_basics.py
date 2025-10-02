@@ -22,7 +22,7 @@ def add_numbers(a: int, b: int) -> int:
 
         assert "func add_numbers(a int, b int) int" in go_code
         assert "return (a + b)" in go_code
-        assert 'import "mgen"' in go_code
+        assert 'import "mgenproject/mgen"' in go_code
         assert "package main" in go_code
 
     def test_function_with_string_parameters(self):

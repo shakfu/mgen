@@ -34,7 +34,7 @@ class OCamlBuilder(AbstractBuilder):
             return False
 
     def _compile_direct(self, output_file: str) -> bool:
-        """Compile OCaml code directly using ocamlc."""
+        """Compile OCaml code directly using ocamlc via opam."""
         base_path = Path(output_file).parent
         runtime_path = base_path / "mgen_runtime.ml"
 
@@ -42,9 +42,10 @@ class OCamlBuilder(AbstractBuilder):
         if not runtime_path.exists():
             self._copy_runtime_files(base_path)
 
-        # Compile with OCaml compiler
+        # Compile with OCaml compiler via opam
         executable = output_file.replace(".ml", "")
         cmd = [
+            "opam", "exec", "--",
             "ocamlc",
             "-o", executable,
             str(runtime_path),
@@ -109,7 +110,7 @@ class OCamlBuilder(AbstractBuilder):
     def get_build_command(self, output_file: str) -> list[str]:
         """Get the command to build the OCaml file."""
         base_name = Path(output_file).stem
-        return ["ocamlc", "-o", base_name, "mgen_runtime.ml", output_file]
+        return ["opam", "exec", "--", "ocamlc", "-o", base_name, "mgen_runtime.ml", output_file]
 
     def get_run_command(self, output_file: str) -> list[str]:
         """Get the command to run the compiled OCaml executable."""
@@ -170,9 +171,35 @@ class OCamlBuilder(AbstractBuilder):
         """Get build file name for OCaml."""
         return "dune-project"
 
-    def compile_direct(self, source_file: str, output_path: str) -> bool:
-        """Compile OCaml source directly using ocamlc."""
-        return self._compile_direct(source_file)
+    def compile_direct(self, source_file: str, output_dir: str) -> bool:
+        """Compile OCaml source directly using ocamlc via opam."""
+        base_path = Path(output_dir)
+        source_path = Path(source_file)
+        runtime_path = base_path / "mgen_runtime.ml"
+
+        # Copy runtime file if it doesn't exist
+        if not runtime_path.exists():
+            self._copy_runtime_files(base_path)
+
+        # Compile with OCaml compiler via opam
+        executable = base_path / source_path.stem
+        cmd = [
+            "opam", "exec", "--",
+            "ocamlc",
+            "-o", str(executable),
+            str(runtime_path),
+            source_file
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(base_path))
+
+        if result.returncode != 0:
+            # Log compilation errors for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"OCaml compilation failed: {result.stderr}")
+
+        return result.returncode == 0
 
     def get_compile_flags(self) -> list[str]:
         """Get compilation flags for OCaml."""

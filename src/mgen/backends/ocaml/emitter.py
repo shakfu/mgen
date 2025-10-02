@@ -473,8 +473,31 @@ class MGenPythonToOCamlConverter:
                 return self._convert_range_call(node.args)
             elif func_name == "print":
                 if node.args:
-                    arg = self._convert_expression(node.args[0])
-                    return f"print_value (to_string {arg})"
+                    arg_node = node.args[0]
+                    arg = self._convert_expression(arg_node)
+
+                    # Determine the conversion function based on type
+                    conversion_func: Optional[str] = "string_of_int"  # Default to int
+
+                    # Check if argument is a variable with known type
+                    if isinstance(arg_node, ast.Name):
+                        var_name = self._to_ocaml_var_name(arg_node.id)
+                        if var_name in self.variables:
+                            var_type = self.variables[var_name]
+                            if var_type == "string" or var_type == "str":
+                                conversion_func = None  # No conversion needed
+                            elif var_type == "float":
+                                conversion_func = "string_of_float"
+                            elif var_type == "bool":
+                                conversion_func = "Conversions.string_of_bool"
+                    # Check if argument is a string literal
+                    elif isinstance(arg_node, ast.Constant) and isinstance(arg_node.value, str):
+                        conversion_func = None  # No conversion needed
+
+                    if conversion_func:
+                        return f"print_value ({conversion_func} {arg})"
+                    else:
+                        return f"print_value {arg}"
                 else:
                     return 'print_value ""'
             else:
@@ -682,7 +705,7 @@ class MGenPythonToOCamlConverter:
     def _convert_annotated_assignment(self, node: ast.AnnAssign) -> str:
         """Convert Python annotated assignment to OCaml let binding.
 
-        Type annotations are ignored in OCaml as it has type inference.
+        Type annotations are tracked for type-aware code generation.
         """
         target = node.target
 
@@ -694,6 +717,12 @@ class MGenPythonToOCamlConverter:
 
         if isinstance(target, ast.Name):
             var_name = self._to_ocaml_var_name(target.id)
+
+            # Track variable type for type-aware code generation
+            if node.annotation:
+                type_name = self._get_type_annotation(node.annotation)
+                self.variables[var_name] = type_name
+
             return f"let {var_name} = {value} in"
         else:
             raise UnsupportedFeatureError("Complex assignment targets not supported")
@@ -732,6 +761,10 @@ class MGenPythonToOCamlConverter:
 
     def _convert_expression_statement(self, node: ast.Expr) -> str:
         """Convert expression statement."""
+        # Ignore docstrings (string constants)
+        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            return ""  # Ignore docstrings
+
         expr = self._convert_expression(node.value)
         return f"let _ = {expr} in"
 

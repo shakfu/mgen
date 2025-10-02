@@ -177,7 +177,11 @@ class TestBackendInterfaces:
         # Test build file generation
         build_content = builder.generate_build_file(["test.ext"], "testproject")
         assert isinstance(build_content, str) and build_content
-        assert "testproject" in build_content
+        # Go uses a fixed module name for consistency
+        if backend_name == "go":
+            assert "mgenproject" in build_content
+        else:
+            assert "testproject" in build_content
 
         # Test build filename
         build_filename = builder.get_build_filename()

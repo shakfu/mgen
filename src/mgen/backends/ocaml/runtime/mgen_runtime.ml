@@ -213,5 +213,10 @@ let dict_comprehension_with_filter = Comprehensions.dict_comprehension_with_filt
 let set_comprehension = Comprehensions.set_comprehension
 let set_comprehension_with_filter = Comprehensions.set_comprehension_with_filter
 
-let to_string = Conversions.string_of_int
+(* Type-specific conversion functions *)
+let to_string_int = string_of_int
+let to_string_float = string_of_float
+let to_string_bool = Conversions.string_of_bool
+let to_string x = x  (* For strings, identity function *)
+
 let print_value = Conversions.print_value

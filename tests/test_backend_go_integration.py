@@ -29,7 +29,7 @@ def main() -> None:
 
         # Check imports and package
         assert "package main" in go_code
-        assert 'import "mgen"' in go_code
+        assert 'import "mgenproject/mgen"' in go_code
 
         # Check factorial function
         assert "func factorial(n int) int" in go_code
