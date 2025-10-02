@@ -1,8 +1,11 @@
+BENCHMARK_RESULTS_DIR := build/benchmark_results
+
 # Makefile for MGen development
 
 .PHONY: help install test test-unit test-integration test-translation \
 		test-py2c test-benchmark test-build clean lint format type-check \
-		build docs
+		build docs benchmark benchmark-algorithms benchmark-data-structures \
+		benchmark-report benchmark-clean
 
 # Default target
 help:
@@ -22,6 +25,13 @@ help:
 	@echo "  test-py2c     Run Python-to-C conversion tests"
 	@echo "  test-benchmark    Run performance benchmarks"
 	@echo "  test-legacy   Display info about legacy unittest conversion"
+	@echo ""
+	@echo "Benchmarking:"
+	@echo "  benchmark              Run all benchmarks across all backends"
+	@echo "  benchmark-algorithms   Run algorithm benchmarks only"
+	@echo "  benchmark-data-structures  Run data structure benchmarks only"
+	@echo "  benchmark-report       Generate Markdown report from results"
+	@echo "  benchmark-clean        Clean benchmark results"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  lint          Run ruff linting"
@@ -134,3 +144,35 @@ verify-package: build
 dev-server:
 	@echo "Development server not yet implemented"
 	@echo "Planned: Web interface for code generation and testing"
+
+# Benchmarking
+benchmark:
+	@echo "Running all benchmarks across all backends..."
+	@mkdir -p $(BENCHMARK_RESULTS_DIR)
+	uv run python scripts/benchmark.py --category all --output $(BENCHMARK_RESULTS_DIR)
+	@echo ""
+	@echo "Generating report..."
+	uv run python scripts/generate_benchmark_report.py $(BENCHMARK_RESULTS_DIR)/benchmark_results.json --output $(BENCHMARK_RESULTS_DIR)/benchmark_report.md
+	@echo ""
+	@echo "Results saved to: $(BENCHMARK_RESULTS_DIR)/"
+	@echo "View report: $(BENCHMARK_RESULTS_DIR)/benchmark_report.md"
+
+benchmark-algorithms:
+	@echo "Running algorithm benchmarks..."
+	uv run python scripts/benchmark.py --category algorithms --output $(BENCHMARK_RESULTS_DIR)
+	uv run python scripts/generate_benchmark_report.py $(BENCHMARK_RESULTS_DIR)/benchmark_results.json --output $(BENCHMARK_RESULTS_DIR)/benchmark_report.md
+
+benchmark-data-structures:
+	@echo "Running data structure benchmarks..."
+	uv run python scripts/benchmark.py --category data_structures --output $(BENCHMARK_RESULTS_DIR)
+	uv run python scripts/generate_benchmark_report.py $(BENCHMARK_RESULTS_DIR)/benchmark_results.json --output $(BENCHMARK_RESULTS_DIR)/benchmark_report.md
+
+benchmark-report:
+	@echo "Generating benchmark report..."
+	uv run python scripts/generate_benchmark_report.py $(BENCHMARK_RESULTS_DIR)/benchmark_results.json --output $(BENCHMARK_RESULTS_DIR)/benchmark_report.md
+	@echo "Report saved to: $(BENCHMARK_RESULTS_DIR)/benchmark_report.md"
+
+benchmark-clean:
+	@echo "Cleaning benchmark results..."
+	rm -rf $(BENCHMARK_RESULTS_DIR)
+	@echo "Benchmark results cleaned"

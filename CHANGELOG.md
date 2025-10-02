@@ -17,6 +17,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.34] - 2025-10-02
+
+### Added
+
+- **Phase 2: Performance Benchmarking Framework** - Comprehensive benchmarking system for multi-backend performance evaluation
+  - **Benchmark Suite**: 7 benchmark programs across 2 categories
+    - Algorithm benchmarks: fibonacci (recursion), quicksort (array manipulation), matmul (numeric computation), wordcount (string/dict operations)
+    - Data structure benchmarks: list_ops, dict_ops, set_ops (comprehensions and operations)
+  - **Automated Runner**: `scripts/benchmark.py` for executing benchmarks across all backends
+  - **Metrics Collection**: Compilation time, execution time, binary size, lines of code
+  - **Report Generation**: `scripts/generate_benchmark_report.py` for Markdown reports
+  - **Makefile Targets**: `make benchmark`, `make benchmark-algorithms`, `make benchmark-data-structures`, `make benchmark-report`, `make benchmark-clean`
+  - **Documentation**: Comprehensive benchmarks/README.md with usage instructions
+
+### Changed
+
+- **Makefile**: Added benchmarking section with 5 new targets for easy benchmark execution
+- **Project Structure**: Added `benchmarks/` directory with algorithm and data structure categories
+
+### Impact
+
+- [x] **Benchmark Infrastructure**: Complete framework for performance evaluation across all 6 backends
+- [x] **Reproducible Performance Testing**: Automated benchmarking with JSON and Markdown output
+- [x] **Backend Comparison**: Side-by-side performance metrics for informed backend selection
+
+### Technical Details
+
+**New Files**:
+- `benchmarks/algorithms/fibonacci.py`: Recursive algorithm benchmark
+- `benchmarks/algorithms/quicksort.py`: Array manipulation benchmark
+- `benchmarks/algorithms/matmul.py`: Matrix multiplication benchmark
+- `benchmarks/algorithms/wordcount.py`: String/dictionary operations benchmark
+- `benchmarks/data_structures/list_ops.py`: List operations benchmark
+- `benchmarks/data_structures/dict_ops.py`: Dictionary operations benchmark
+- `benchmarks/data_structures/set_ops.py`: Set operations benchmark
+- `scripts/benchmark.py`: Automated benchmark runner (280 lines)
+- `scripts/generate_benchmark_report.py`: Report generator (220 lines)
+- `benchmarks/README.md`: Comprehensive documentation
+
+**Modified Files**:
+- `Makefile`: Added 5 benchmarking targets
+
+**Metrics Collected**:
+1. Compilation time (wall clock)
+2. Execution time (wall clock)
+3. Binary size (bytes)
+4. Lines of generated code
+5. Success rate (compilations/executions)
+
+**Output Formats**:
+- JSON: Detailed results with per-benchmark metrics
+- Markdown: Human-readable report with rankings and comparisons
+
 ## [0.1.33]
 
 ### Fixed

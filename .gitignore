@@ -1,8 +1,12 @@
 .DS_Store
 
+# benchmarking
+benchmark_results/
+
+
+# claude
 .claude
 Claude.md
-Multigen.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
