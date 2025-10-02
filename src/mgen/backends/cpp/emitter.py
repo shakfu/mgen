@@ -791,6 +791,9 @@ class MGenPythonToCppConverter:
 
     def _convert_expression_statement(self, stmt: ast.Expr) -> str:
         """Convert expression statement."""
+        # Skip docstrings (string constants as statements)
+        if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+            return f"        // {stmt.value.value}"
         expr = self._convert_expression(stmt.value)
         return f"        {expr};"
 
@@ -975,6 +978,11 @@ class MGenPythonToCppConverter:
                         return f"StringOps::split({obj_expr}, {args[0]})"
                     else:
                         return f"StringOps::split({obj_expr})"
+
+            # Handle container methods - map Python names to C++ names
+            if method_name == "append":
+                # Python's append -> C++'s push_back
+                return f"{obj_expr}.push_back({', '.join(args)})"
 
             # Regular method calls
             if args:

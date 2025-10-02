@@ -454,6 +454,13 @@ class MGenPythonToOCamlConverter:
         # Handle OCaml-specific comparison operators
         if isinstance(op, ast.NotEq):
             ocaml_op = "<>"  # OCaml uses <> instead of !=
+            return f"({left} {ocaml_op} {right})"
+        elif isinstance(op, ast.In):
+            # Use List.mem_assoc for membership in association lists (dicts)
+            return f"(List.mem_assoc {left} {right})"
+        elif isinstance(op, ast.NotIn):
+            # Use not with List.mem_assoc
+            return f"(not (List.mem_assoc {left} {right}))"
         else:
             # Use standard operator mapping from converter_utils for common operators
             op_result = get_standard_comparison_operator(op)
@@ -461,8 +468,7 @@ class MGenPythonToOCamlConverter:
                 raise UnsupportedFeatureError(f"Unsupported comparison operator: {type(op).__name__}")
             # OCaml uses = for equality (same as standard)
             ocaml_op = op_result
-
-        return f"({left} {ocaml_op} {right})"
+            return f"({left} {ocaml_op} {right})"
 
     def _convert_function_call(self, node: ast.Call) -> str:
         """Convert Python function call to OCaml."""

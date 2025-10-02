@@ -592,10 +592,16 @@ class MGenPythonToGoConverter:
         if stmt.value:
             value_expr = self._convert_expression(stmt.value)
             target_id = stmt.target.id if isinstance(stmt.target, ast.Name) else str(stmt.target)
+            # Track this variable as declared
+            if isinstance(stmt.target, ast.Name):
+                self.declared_vars.add(stmt.target.id)
             return f"    var {target_id} {var_type} = {value_expr}"
         else:
             default_value = self._get_default_value(var_type)
             target_id = stmt.target.id if isinstance(stmt.target, ast.Name) else str(stmt.target)
+            # Track this variable as declared
+            if isinstance(stmt.target, ast.Name):
+                self.declared_vars.add(stmt.target.id)
             return f"    var {target_id} {var_type} = {default_value}"
 
     def _convert_aug_assignment(self, stmt: ast.AugAssign) -> str:
@@ -679,6 +685,16 @@ class MGenPythonToGoConverter:
         if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
             return f"    // {stmt.value.value}"
         expr = self._convert_expression(stmt.value)
+
+        # Handle append operations - convert to assignment
+        if "__APPEND__" in expr:
+            # Extract the parts: __APPEND__<obj>__ARGS__<args>__END__
+            parts = expr.split("__")
+            if len(parts) >= 5 and parts[1] == "APPEND" and parts[3] == "ARGS" and parts[5] == "END":
+                obj = parts[2]
+                args = parts[4]
+                return f"    {obj} = append({obj}, {args})"
+
         return f"    {expr}"
 
     def _convert_expression(self, expr: ast.expr) -> str:
@@ -863,6 +879,15 @@ class MGenPythonToGoConverter:
                         return f"mgen.StrOps.SplitSep({obj_expr}, {args[0]})"
                     else:
                         return f"mgen.StrOps.Split({obj_expr})"
+
+            # Handle container methods - convert append to Go's builtin
+            # Note: This generates an expression that should be used in assignment
+            if method_name == "append":
+                # Python's list.append() -> Go's append() builtin
+                # This needs special handling because append returns the new slice
+                args_str = ", ".join(args)
+                # Return a marker that the statement converter can detect
+                return f"__APPEND__{obj_expr}__ARGS__{args_str}__END__"
 
             # Regular method call
             args_str = ", ".join(args)

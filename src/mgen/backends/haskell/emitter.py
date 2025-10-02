@@ -598,6 +598,12 @@ main = printValue "Generated Haskell code executed successfully"'''
             if isinstance(op, ast.NotEq):
                 # Haskell uses /= for inequality
                 return f"({left} /= {right})"
+            elif isinstance(op, ast.In):
+                # Use Data.Map.member for maps (assuming right is a map)
+                return f"(Data.Map.member {left} {right})"
+            elif isinstance(op, ast.NotIn):
+                # Use not . Data.Map.member for maps
+                return f"(not (Data.Map.member {left} {right}))"
 
             # Use standard comparison operator mapping from converter_utils
             haskell_op = get_standard_comparison_operator(op)
