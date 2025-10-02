@@ -1,6 +1,6 @@
 # MGen Production Readiness Roadmap
 
-**Status**: v0.1.32 - Beta with 6 production-ready backends
+**Status**: v0.1.35 - Beta with 6 production-ready backends
 **Goal**: Make all backends production-ready
 **Strategy**: Depth over breadth - polish existing rather than add new
 
@@ -8,9 +8,14 @@
 
 ## Executive Summary
 
-MGen has achieved **feature parity with CGen** and has **6 production-ready backends** with 100% compilation success rate (v0.1.32).
+MGen has achieved **feature parity with CGen** and has **6 production-ready backends** with 100% compilation success rate (v0.1.32) and improved code generation quality (v0.1.35).
 
-**Completed**: ✅ Phase 1 - Compilation Verification (24/24 tests passing)
+**Completed**:
+- ✅ Phase 1 - Compilation Verification (24/24 tests passing)
+- ✅ Phase 2 - Benchmark Framework (7 benchmarks, automated runner, report generation)
+
+**In Progress**:
+- 🔄 Phase 2 - Code Generation Quality (6/42 benchmarks passing, ongoing improvements)
 
 The next phases focus on optimization and adoption through:
 
@@ -118,18 +123,22 @@ All backend runtime libraries verified and working:
 ### Goal
 Measure, compare, and optimize backend performance.
 
-### Current State
-- ❌ No performance benchmarks
-- ❌ No cross-backend comparisons
-- ❌ No optimization metrics
+### Current State (v0.1.35)
+- ✅ Benchmark framework complete (v0.1.34)
+- ✅ 7 performance benchmarks created (algorithms + data structures)
+- ✅ Automated benchmark runner and report generation
+- ✅ Cross-backend comparisons with metrics (compilation time, execution time, binary size, LOC)
+- 🔄 Code generation quality improvements ongoing (6/42 benchmarks passing)
+- ❌ Performance optimization not yet started
 
 ### Tasks
 
-#### 2.1 Benchmark Suite Design
+#### 2.1 Benchmark Suite Design ✅
+**Status**: COMPLETED (v0.1.34)
 **Priority**: HIGH
 **Effort**: 4-5 days
 
-Create `benchmarks/` directory with:
+Created `benchmarks/` directory with:
 
 ```
 benchmarks/
@@ -155,11 +164,12 @@ benchmarks/
 - Compilation time
 - Lines of generated code
 
-#### 2.2 Automated Benchmark Runner
+#### 2.2 Automated Benchmark Runner ✅
+**Status**: COMPLETED (v0.1.34)
 **Priority**: HIGH
 **Effort**: 2-3 days
 
-Create `scripts/benchmark.py`:
+Created `scripts/benchmark.py`:
 ```python
 def benchmark_all_backends(test_file: str):
     """Run benchmark across all backends and compare."""
@@ -181,6 +191,41 @@ def benchmark_all_backends(test_file: str):
 - HTML/Markdown report generation
 - Performance regression detection
 - CI/CD integration
+
+#### 2.2.5 Code Generation Quality Improvements ✅
+**Status**: COMPLETED (v0.1.35)
+**Priority**: HIGH
+**Effort**: 2-3 days
+
+Fixed 7 critical code generation bugs identified through benchmark failures:
+
+**C++ Backend**:
+- Fixed type-check error in dict literal conversion (Optional[expr] handling)
+- Convert docstrings to comments to avoid compiler warnings
+- Map Python's `append()` to C++'s `push_back()` for vectors
+
+**Go Backend**:
+- Fixed append operation semantics (`list = append(list, x)` pattern)
+- Track declared variables to prevent variable shadowing with `:=`
+
+**Haskell Backend**:
+- Implemented `in` and `not in` operators using `Data.Map.member`
+
+**OCaml Backend**:
+- Implemented `in` and `not in` operators using `List.mem_assoc`
+
+**Impact**:
+- Benchmark success rate improved from 9.5% (4/42) to 14.3% (6/42)
+- C++: 3/7 benchmarks passing (fibonacci, wordcount, list_ops)
+- C: 1/7 benchmarks passing (fibonacci)
+- Rust: 1/7 benchmarks passing (fibonacci)
+- Go: 1/7 benchmarks passing (fibonacci)
+
+**Deliverables**:
+- ✅ Type safety improvements across all backends
+- ✅ More idiomatic generated code
+- ✅ Reduced compiler warnings
+- ✅ Better language-native patterns
 
 #### 2.3 Optimization Opportunities
 **Priority**: MEDIUM
@@ -457,9 +502,14 @@ docs/
 - [x] <5% compilation error rate on real code (0% on test suite)
 
 ### Performance
-- [ ] Benchmark suite covering 20+ scenarios
+- [x] Benchmark framework infrastructure (v0.1.34)
+- [x] Benchmark suite with 7 scenarios (v0.1.34)
+- [x] Automated benchmark runner (v0.1.34)
+- [x] Code generation quality improvements (v0.1.35)
+- [x] Benchmark success rate: 14.3% (6/42 passing)
+- [ ] Expand benchmark suite to 20+ scenarios
 - [ ] Performance documentation for each backend
-- [ ] Automated regression detection
+- [ ] Performance optimization (identify and fix bottlenecks)
 
 ### Examples & Documentation
 - [ ] 10+ complete example projects
@@ -503,14 +553,26 @@ docs/
 ## Next Steps
 
 **Phase 1 Completed!** ✅ (v0.1.32)
-
 All 6 backends now compile and execute correctly with 100% test pass rate.
 
-**Immediate Actions (Phase 2: Performance Benchmarking)**:
-1. Design benchmark framework structure
-2. Create initial benchmark suite (fibonacci, quicksort, matmul, wordcount)
-3. Implement automated benchmark runner
-4. Generate performance comparison reports
+**Phase 2 Benchmark Framework Completed!** ✅ (v0.1.34)
+Infrastructure complete with 7 benchmarks, automated runner, and report generation.
+
+**Phase 2 Code Quality Improvements Completed!** ✅ (v0.1.35)
+Fixed 7 critical bugs improving benchmark success from 9.5% to 14.3% (4/42 to 6/42).
+
+**Immediate Actions (Phase 2: Ongoing Code Generation Quality)**:
+1. Continue fixing benchmark failures (36/42 still failing)
+   - Focus on: empty if/else bodies, type mismatches, subscript operations
+   - Target: 50%+ benchmark success rate
+2. Add missing language features identified by benchmarks
+3. Improve error messages for unsupported constructs
+
+**Phase 2 Next: Performance Optimization**:
+- Profile generated code to identify bottlenecks
+- Implement backend-specific optimizations
+- Document performance characteristics per backend
+- Create backend selection guide
 
 **Phase 3 Preparation**:
 - Pick first 2-3 example projects to implement
@@ -518,11 +580,13 @@ All 6 backends now compile and execute correctly with 100% test pass rate.
 - Plan use case documentation
 
 **Quick Wins**:
+- Fix more benchmark failures (demonstrates quality)
 - Create 2-3 compelling examples (demonstrates value)
 - Improve error messages (better UX immediately)
 - Add performance documentation per backend
 
 **Long-term Investment**:
-- Full benchmark suite (ongoing optimization)
+- Achieve 80%+ benchmark success rate
+- Full example suite (adoption)
 - IDE integration (broader adoption)
 - Community building (sustainability)

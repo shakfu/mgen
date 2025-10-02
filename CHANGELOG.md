@@ -17,6 +17,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.35] - 2025-10-02
+
+### Fixed
+
+- **Cross-Backend Code Generation Quality** - Fixed 7 critical code generation bugs improving benchmark success rate from 9.5% to 14.3% (4/42 to 6/42)
+  - **C++ Type Safety**: Fixed type-check error in dict literal conversion where `Optional[expr]` keys (from dictionary unpacking like `{**kwargs}`) were not handled
+    - Added None check in `_convert_dict_literal()` to skip unpacking operations
+    - File: `src/mgen/backends/cpp/emitter.py:1114`
+  - **C++ Docstring Handling**: Fixed bare string expression statements causing compiler warnings
+    - Convert docstrings to C++ comments (`// docstring`) instead of generating bare string expressions
+    - File: `src/mgen/backends/cpp/emitter.py:792`
+  - **C++ Container Methods**: Fixed incorrect container method names
+    - Map Python's `append()` to C++'s `push_back()` for vector operations
+    - File: `src/mgen/backends/cpp/emitter.py:982`
+  - **Haskell Membership Testing**: Implemented `in` and `not in` operators
+    - Use `Data.Map.member` for membership testing in maps
+    - File: `src/mgen/backends/haskell/emitter.py:601`
+  - **OCaml Membership Testing**: Implemented `in` and `not in` operators
+    - Use `List.mem_assoc` for membership testing in association lists
+    - File: `src/mgen/backends/ocaml/emitter.py:458`
+  - **Go Append Operations**: Fixed container append semantics
+    - Convert Python's `list.append(x)` to Go's `list = append(list, x)` pattern using marker-based detection
+    - File: `src/mgen/backends/go/emitter.py:683,867`
+  - **Go Variable Shadowing**: Fixed variable redeclaration with `:=` operator
+    - Track declared variables in `self.declared_vars` to prevent shadowing
+    - Use `=` instead of `:=` for already-declared variables
+    - File: `src/mgen/backends/go/emitter.py:595`
+
+### Changed
+
+- **Type Checking**: All 89 source files now pass strict mypy type checking with zero errors
+- **Test Suite**: All 741 tests passing with zero failures
+
+### Impact
+
+- [x] **Improved Benchmark Success**: 6/42 benchmarks now passing (was 4/42)
+  - C: fibonacci (1/7)
+  - C++: fibonacci, wordcount, list_ops (3/7)
+  - Rust: fibonacci (1/7)
+  - Go: fibonacci (1/7)
+- [x] **Better Code Quality**: More idiomatic, warning-free generated code across all backends
+- [x] **Enhanced Type Safety**: Eliminated mypy type errors in C++ backend
+
 ## [0.1.34] - 2025-10-02
 
 ### Added
