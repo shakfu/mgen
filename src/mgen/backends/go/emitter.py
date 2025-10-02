@@ -675,6 +675,9 @@ class MGenPythonToGoConverter:
 
     def _convert_expression_statement(self, stmt: ast.Expr) -> str:
         """Convert expression statement."""
+        # Skip docstrings (string constants used as statements)
+        if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+            return f"    // {stmt.value.value}"
         expr = self._convert_expression(stmt.value)
         return f"    {expr}"
 

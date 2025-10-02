@@ -363,8 +363,8 @@ class MGenPythonToRustConverter:
         """Convert method return statement."""
         if stmt.value:
             value_expr = self._convert_method_expression(stmt.value, class_name)
-            return f"        {value_expr}"
-        return "        ()"
+            return f"        return {value_expr};"
+        return "        return ();"
 
     def _convert_method_if(self, stmt: ast.If, class_name: str) -> str:
         """Convert if statement in method context."""
@@ -613,8 +613,8 @@ class MGenPythonToRustConverter:
 
         if stmt.value:
             value_expr = self._convert_expression(stmt.value)
-            return f"    {value_expr}"
-        return "    ()"
+            return f"    return {value_expr};"
+        return "    return ();"
 
     def _convert_assignment(self, stmt: ast.Assign) -> str:
         """Convert assignment statement."""

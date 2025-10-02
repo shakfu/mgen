@@ -159,6 +159,9 @@ class MGenPythonToOCamlConverter:
             # Multiple statements - use let expressions
             body_lines = []
             for _i, stmt in enumerate(node.body):
+                # Skip docstrings (expression statements with string constants)
+                if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+                    continue
                 if isinstance(stmt, ast.Return):
                     if stmt.value:
                         body_lines.append(f"  {self._convert_expression(stmt.value)}")
@@ -779,9 +782,24 @@ class MGenPythonToOCamlConverter:
         """Convert if statement to OCaml match or if expression."""
         condition = self._convert_expression(node.test)
 
-        # For now, return simplified if expression
-        then_part = "(* then clause *)"
-        else_part = "(* else clause *)" if node.orelse else "()"
+        # Convert then branch
+        then_stmts = []
+        for stmt in node.body:
+            converted = self._convert_statement(stmt)
+            if converted:
+                then_stmts.append(converted)
+        then_part = then_stmts[-1] if then_stmts else "()"
+
+        # Convert else branch
+        if node.orelse:
+            else_stmts = []
+            for stmt in node.orelse:
+                converted = self._convert_statement(stmt)
+                if converted:
+                    else_stmts.append(converted)
+            else_part = else_stmts[-1] if else_stmts else "()"
+        else:
+            else_part = "()"
 
         return f"if {condition} then {then_part} else {else_part}"
 

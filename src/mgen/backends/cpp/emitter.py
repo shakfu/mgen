@@ -1107,7 +1107,28 @@ class MGenPythonToCppConverter:
             if isinstance(func_node.returns, ast.Constant) and func_node.returns.value is None:
                 return "void"
             return self._convert_type_annotation(func_node.returns)
-        return "auto"
+
+        # Try to infer from return statements
+        has_return_stmt = False
+        for stmt in ast.walk(func_node):
+            if isinstance(stmt, ast.Return) and stmt.value:
+                has_return_stmt = True
+                inferred_type = self._infer_type_from_value(stmt.value)
+                # If we get an incomplete type like "std::vector", default to int specialization
+                if inferred_type == "std::vector":
+                    return "std::vector<int>"
+                elif inferred_type == "std::unordered_map":
+                    return "std::unordered_map<std::string, int>"
+                elif inferred_type == "std::unordered_set":
+                    return "std::unordered_set<int>"
+                elif inferred_type and inferred_type != "auto":
+                    return inferred_type
+
+        # If we found return statements but couldn't infer type, use auto
+        if has_return_stmt:
+            return "auto"
+
+        return "void"  # No return statements, so return void
 
     def _get_param_type(self, arg: ast.arg) -> str:
         """Get parameter type from annotation."""

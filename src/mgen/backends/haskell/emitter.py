@@ -393,6 +393,9 @@ main = printValue "Generated Haskell code executed successfully"'''
 
         body_stmts = []
         for stmt in node.body:
+            # Skip docstrings (expression statements with string constants)
+            if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+                continue
             converted_stmt = self._convert_statement(stmt)
             if converted_stmt:
                 body_stmts.append(converted_stmt)

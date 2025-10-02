@@ -1370,7 +1370,7 @@ class CEmitter(AbstractEmitter):
 
         # Combine all parts
         parts = includes + [""] + functions
-        return "\\n".join(parts)
+        return "\n".join(parts)
 
     def _emit_function_enhanced(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> str:
         """Enhanced C function generation with runtime support."""
