@@ -85,6 +85,8 @@ class MGenPythonToOCamlConverter:
             return self._convert_class_def(node)
         elif isinstance(node, ast.Assign):
             return self._convert_assignment(node)
+        elif isinstance(node, ast.AnnAssign):
+            return self._convert_annotated_assignment(node)
         elif isinstance(node, ast.AugAssign):
             return self._convert_augmented_assignment(node)
         elif isinstance(node, ast.Expr):
@@ -659,6 +661,25 @@ class MGenPythonToOCamlConverter:
             raise UnsupportedFeatureError("Multiple assignment targets not supported")
 
         target = node.targets[0]
+        value = self._convert_expression(node.value)
+
+        if isinstance(target, ast.Name):
+            var_name = self._to_ocaml_var_name(target.id)
+            return f"let {var_name} = {value} in"
+        else:
+            raise UnsupportedFeatureError("Complex assignment targets not supported")
+
+    def _convert_annotated_assignment(self, node: ast.AnnAssign) -> str:
+        """Convert Python annotated assignment to OCaml let binding.
+
+        Type annotations are ignored in OCaml as it has type inference.
+        """
+        target = node.target
+
+        if not node.value:
+            # Annotation without value - not supported in OCaml
+            raise UnsupportedFeatureError("Annotated assignment without value not supported")
+
         value = self._convert_expression(node.value)
 
         if isinstance(target, ast.Name):

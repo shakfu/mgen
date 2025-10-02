@@ -541,16 +541,22 @@ class MGenPythonToRustConverter:
         params_str = ", ".join(params)
 
         # Get return type
-        return_type = ""
-        if node.returns:
+        # Special case: Rust's main function must return () or Result
+        if node.name == "main":
+            return_type = ""
+        elif node.returns:
             mapped_type = self._map_type_annotation(node.returns)
             if mapped_type and mapped_type != "()":
                 return_type = f" -> {mapped_type}"
+            else:
+                return_type = ""
         else:
             # Infer return type from function body if no annotation
             inferred_type = self._infer_return_type(node)
             if inferred_type and inferred_type != "()":
                 return_type = f" -> {inferred_type}"
+            else:
+                return_type = ""
 
         # Build function signature
         func_signature = f"fn {node.name}({params_str}){return_type}"
@@ -600,6 +606,11 @@ class MGenPythonToRustConverter:
 
     def _convert_return(self, stmt: ast.Return) -> str:
         """Convert return statement."""
+        # Special case: in main(), ignore return values
+        if self.current_function == "main":
+            # Just omit the return statement in main
+            return ""
+
         if stmt.value:
             value_expr = self._convert_expression(stmt.value)
             return f"    {value_expr}"

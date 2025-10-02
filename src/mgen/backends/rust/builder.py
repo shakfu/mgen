@@ -1,5 +1,6 @@
 """Rust build system for MGen."""
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -30,6 +31,12 @@ edition = "2021"
             source_path = Path(source_file)
             output_dir = Path(output_path)
             executable_name = source_path.stem
+
+            # Copy runtime module if it exists
+            runtime_src = Path(__file__).parent / "runtime" / "mgen_rust_runtime.rs"
+            if runtime_src.exists():
+                runtime_dst = output_dir / "mgen_rust_runtime.rs"
+                shutil.copy2(runtime_src, runtime_dst)
 
             # Build rustc command
             cmd = [

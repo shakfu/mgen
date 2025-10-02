@@ -89,8 +89,11 @@ help:
             source_path = Path(source_file)
             output_path = Path(output_dir) / source_path.stem
 
+            # Setup runtime environment (copy headers if needed)
+            self._setup_runtime_environment(output_dir)
+
             # Build the compilation command
-            cmd = [self.compiler] + self.default_flags + [str(source_path), "-o", str(output_path)]
+            cmd = [self.compiler] + self.get_compile_flags() + [str(source_path), "-o", str(output_path)]
 
             # Execute compilation
             result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)

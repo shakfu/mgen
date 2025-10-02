@@ -1,5 +1,6 @@
 """Go build system for MGen."""
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -15,7 +16,8 @@ class GoBuilder(AbstractBuilder):
 
     def generate_build_file(self, source_files: list[str], target_name: str) -> str:
         """Generate go.mod for Go project."""
-        go_mod_content = f"""module {target_name}
+        # Use a standard module name for all mgen projects
+        go_mod_content = """module mgenproject
 
 go 1.21
 """
@@ -27,6 +29,20 @@ go 1.21
             source_path = Path(source_file)
             output_dir = Path(output_path)
             executable_name = source_path.stem
+
+            # Create go.mod file for module support
+            go_mod_path = output_dir / "go.mod"
+            go_mod_content = self.generate_build_file([str(source_path)], executable_name)
+            go_mod_path.write_text(go_mod_content)
+
+            # Copy runtime package if it exists
+            runtime_src = Path(__file__).parent / "runtime" / "mgen_go_runtime.go"
+            if runtime_src.exists():
+                # Create mgen package directory
+                mgen_pkg_dir = output_dir / "mgen"
+                mgen_pkg_dir.mkdir(exist_ok=True)
+                runtime_dst = mgen_pkg_dir / "mgen.go"
+                shutil.copy2(runtime_src, runtime_dst)
 
             # Build go build command
             cmd = [

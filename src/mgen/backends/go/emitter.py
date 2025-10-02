@@ -104,15 +104,8 @@ class MGenPythonToGoConverter:
 
     def _collect_required_imports(self, node: ast.Module) -> list[str]:
         """Collect required imports based on code features."""
-        imports = ["mgen"]  # Always import our runtime
-
-        # Check for print usage
-        for n in ast.walk(node):
-            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name):
-                if n.func.id == "print":
-                    if "fmt" not in imports:
-                        imports.append("fmt")
-
+        imports = ["mgenproject/mgen"]  # Always import our runtime
+        # All required functionality is in the mgen runtime package
         return imports
 
     def _convert_class(self, node: ast.ClassDef) -> str:
@@ -504,16 +497,18 @@ class MGenPythonToGoConverter:
         params_str = ", ".join(params)
 
         # Get return type
+        # Special case: Go's main function must not have a return type
         return_type = ""
-        if node.returns:
-            mapped_type = self._map_type_annotation(node.returns)
-            if mapped_type:  # Only add space if type is not empty
-                return_type = " " + mapped_type
-        else:
-            # Infer return type from function body if no annotation
-            inferred_type = self._infer_return_type(node)
-            if inferred_type:
-                return_type = " " + inferred_type
+        if node.name != "main":
+            if node.returns:
+                mapped_type = self._map_type_annotation(node.returns)
+                if mapped_type:  # Only add space if type is not empty
+                    return_type = " " + mapped_type
+            else:
+                # Infer return type from function body if no annotation
+                inferred_type = self._infer_return_type(node)
+                if inferred_type:
+                    return_type = " " + inferred_type
 
         # Build function signature
         func_signature = f"func {node.name}({params_str}){return_type}"
@@ -559,6 +554,10 @@ class MGenPythonToGoConverter:
 
     def _convert_return(self, stmt: ast.Return) -> str:
         """Convert return statement."""
+        # Special case: in main(), ignore return statements
+        if self.current_function == "main":
+            return ""
+
         if stmt.value:
             value_expr = self._convert_expression(stmt.value)
             return f"    return {value_expr}"
