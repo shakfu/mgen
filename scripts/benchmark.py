@@ -54,11 +54,31 @@ class BenchmarkRunner:
         src_runtime_dir = Path(__file__).parent.parent / "src" / "mgen" / "backends" / backend / "runtime"
 
         if src_runtime_dir.exists():
-            # Copy all runtime files from backend's runtime directory
-            for src_file in src_runtime_dir.glob("*"):
-                if src_file.is_file():
-                    dest_file = build_dir / src_file.name
-                    shutil.copy2(src_file, dest_file)
+            # C++ expects runtime files in a runtime/ subdirectory
+            if backend == "cpp":
+                dest_runtime_dir = build_dir / "runtime"
+                dest_runtime_dir.mkdir(exist_ok=True)
+                for src_file in src_runtime_dir.glob("*"):
+                    if src_file.is_file():
+                        dest_file = dest_runtime_dir / src_file.name
+                        shutil.copy2(src_file, dest_file)
+            elif backend == "go":
+                # Go expects runtime in mgen/ subdirectory with go.mod
+                mgen_dir = build_dir / "mgen"
+                mgen_dir.mkdir(exist_ok=True)
+                for src_file in src_runtime_dir.glob("*"):
+                    if src_file.is_file():
+                        dest_file = mgen_dir / src_file.name
+                        shutil.copy2(src_file, dest_file)
+                # Create go.mod file
+                go_mod_content = "module mgenproject\n\ngo 1.21\n"
+                (build_dir / "go.mod").write_text(go_mod_content)
+            else:
+                # Other backends: copy directly to build directory
+                for src_file in src_runtime_dir.glob("*"):
+                    if src_file.is_file():
+                        dest_file = build_dir / src_file.name
+                        shutil.copy2(src_file, dest_file)
 
     def count_lines(self, file_path: Path) -> int:
         """Count lines of code in a file."""
@@ -204,6 +224,73 @@ class BenchmarkRunner:
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 if result.returncode != 0:
                     return False, result.stderr[:200]  # First 200 chars of error
+                return True, ""
+
+            elif backend == "cpp":
+                # Compile C++ code - header-only runtime
+                cmd = [
+                    "g++", "-Wall", "-Wextra", "-std=c++17", "-O2",
+                    f"-I{output_dir.absolute()}",
+                    str(source_file.absolute()),
+                    "-o", str((output_dir / executable_name).absolute())
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    return False, result.stderr[:200]
+                return True, ""
+
+            elif backend == "rust":
+                # Compile Rust code - rustc with runtime module
+                cmd = [
+                    "rustc",
+                    "-O",
+                    str(source_file.absolute()),
+                    "-o", str((output_dir / executable_name).absolute())
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
+                if result.returncode != 0:
+                    return False, result.stderr[:200]
+                return True, ""
+
+            elif backend == "go":
+                # Compile Go code - go build with module support
+                cmd = [
+                    "go", "build",
+                    "-o", str((output_dir / executable_name).absolute()),
+                    str(source_file.absolute())
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
+                if result.returncode != 0:
+                    return False, result.stderr[:200]
+                return True, ""
+
+            elif backend == "haskell":
+                # Compile Haskell code - ghc with runtime module
+                runtime_files = list(output_dir.glob("*.hs"))
+                runtime_files = [f for f in runtime_files if f != source_file]
+                cmd = [
+                    "ghc", "-O2",
+                    str(source_file.absolute()),
+                    *[str(f.absolute()) for f in runtime_files],
+                    "-o", str((output_dir / executable_name).absolute())
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
+                if result.returncode != 0:
+                    return False, result.stderr[:200]
+                return True, ""
+
+            elif backend == "ocaml":
+                # Compile OCaml code - ocamlopt with runtime module
+                runtime_files = list(output_dir.glob("mgen_*.ml"))
+                cmd = [
+                    "ocamlopt",
+                    *[str(f.absolute()) for f in runtime_files],
+                    str(source_file.absolute()),
+                    "-o", str((output_dir / executable_name).absolute())
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
+                if result.returncode != 0:
+                    return False, result.stderr[:200]
                 return True, ""
 
             # Other backends would be handled here
