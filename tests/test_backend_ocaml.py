@@ -2,10 +2,11 @@
 
 import pytest
 
-from mgen.backends.ocaml.emitter import MGenPythonToOCamlConverter, UnsupportedFeatureError
+from mgen.backends.ocaml.converter import MGenPythonToOCamlConverter
 from mgen.backends.ocaml.containers import OCamlContainerSystem
 from mgen.backends.ocaml.builder import OCamlBuilder
 from mgen.backends.preferences import OCamlPreferences
+from mgen.backends.errors import UnsupportedFeatureError
 
 
 class TestOCamlBasics:

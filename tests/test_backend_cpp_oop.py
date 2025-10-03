@@ -2,8 +2,8 @@
 
 import pytest
 
-from mgen.backends.cpp.emitter import MGenPythonToCppConverter, UnsupportedFeatureError
-
+from mgen.backends.cpp.converter import MGenPythonToCppConverter
+from mgen.backends.errors import UnsupportedFeatureError
 
 class TestCppOOPBasics:
     """Test basic OOP conversion functionality."""

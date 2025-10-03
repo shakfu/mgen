@@ -2,7 +2,7 @@
 
 import pytest
 
-from mgen.backends.haskell.emitter import MGenPythonToHaskellConverter
+from mgen.backends.haskell.converter import MGenPythonToHaskellConverter
 
 
 class TestHaskellListComprehensions:

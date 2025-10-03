@@ -2,8 +2,8 @@
 
 import pytest
 
-from mgen.backends.c.emitter import MGenPythonToCConverter, UnsupportedFeatureError, TypeMappingError
-
+from mgen.backends.c.emitter import MGenPythonToCConverter
+from mgen.backends.errors import UnsupportedFeatureError, TypeMappingError
 
 class TestAugmentedAssignmentBasics:
     """Test basic augmented assignment functionality."""

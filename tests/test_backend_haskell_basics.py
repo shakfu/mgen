@@ -2,7 +2,8 @@
 
 import pytest
 
-from mgen.backends.haskell.emitter import MGenPythonToHaskellConverter, UnsupportedFeatureError
+from mgen.backends.haskell.converter import MGenPythonToHaskellConverter
+from mgen.backends.errors import UnsupportedFeatureError
 
 
 class TestHaskellBasics:

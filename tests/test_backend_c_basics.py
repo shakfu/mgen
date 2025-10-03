@@ -3,7 +3,8 @@
 
 import pytest
 
-from mgen.backends.c.emitter import MGenPythonToCConverter, UnsupportedFeatureError
+from mgen.backends.c.converter import MGenPythonToCConverter
+from mgen.backends.errors import UnsupportedFeatureError
 
 
 class TestPy2CBasicConversion:

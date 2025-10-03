@@ -2,7 +2,8 @@
 
 import pytest
 
-from mgen.backends.go.emitter import MGenPythonToGoConverter, UnsupportedFeatureError
+from mgen.backends.go.converter import MGenPythonToGoConverter
+from mgen.backends.errors import UnsupportedFeatureError
 
 
 class TestGoBasicsConversion:

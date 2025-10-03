@@ -7,7 +7,8 @@ import pytest
 
 from mgen.backends.c.builder import CBuilder
 from mgen.backends.c.containers import CContainerSystem
-from mgen.backends.c.emitter import CEmitter, MGenPythonToCConverter
+from mgen.backends.c.converter import MGenPythonToCConverter
+from mgen.backends.c.emitter import CEmitter
 from mgen.backends.c.factory import CFactory
 
 

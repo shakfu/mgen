@@ -2,7 +2,8 @@
 
 import pytest
 
-from mgen.backends.rust.emitter import MGenPythonToRustConverter, UnsupportedFeatureError
+from mgen.backends.rust.converter import MGenPythonToRustConverter
+from mgen.backends.errors import UnsupportedFeatureError
 
 
 class TestRustBasicConversion:

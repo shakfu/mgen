@@ -1,7 +1,7 @@
 """Tests for Python builtins support in C backend."""
 
 
-from mgen.backends.c.emitter import MGenPythonToCConverter
+from mgen.backends.c.converter import MGenPythonToCConverter
 
 
 class TestPy2CBuiltinFunctions:
