@@ -16,6 +16,12 @@ __pycache__/
 # C extensions
 *.so
 
+# object files
+*.o
+*.hi
+*.cmi
+*.cmo
+
 # Distribution / packaging
 .Python
 build/
