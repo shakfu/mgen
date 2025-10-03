@@ -425,22 +425,20 @@ class MGenPythonToCConverter:
             c_types_used.add(f"set_{sanitized}")
 
         # Generate inline implementations for containers
-        # For now, only map_str_int is fully implemented
         generated_containers = set()
 
         for c_type in sorted(c_types_used):
             if c_type in generated_containers:
                 continue
 
-            # Only generate map_str_int for now (prototype)
-            if c_type == "map_str_int":
+            # Generate supported container types
+            if c_type in ["map_str_int", "vec_int", "set_int", "map_int_int"]:
                 generated_code = self.container_generator.generate_container(c_type)
                 if generated_code:
                     code_lines.append(generated_code)
                     generated_containers.add(c_type)
-            # TODO: Add vec_int, set_int, map_int_int generation
             # For other containers, fall back to STC (for now)
-            # Future: Generate all container types inline
+            # Future: Generate parameterized containers for arbitrary types
 
         return code_lines
 

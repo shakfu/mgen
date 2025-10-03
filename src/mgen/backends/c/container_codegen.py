@@ -153,23 +153,209 @@ class ContainerCodeGenerator:
 
         return "\n".join(sections)
 
+    def generate_vec_int(self) -> str:
+        """Generate complete implementation for integer vector (dynamic array).
+
+        Returns:
+            Complete C code for integer vector implementation
+        """
+        # Load templates
+        header = self._load_template("mgen_vec_int.h")
+        implementation = self._load_template("mgen_vec_int.c")
+
+        # Strip includes from implementation
+        impl_code = self._strip_includes_and_headers(implementation)
+
+        # Remove error handling macros for self-contained code
+        impl_code = self._remove_error_handling_macros(impl_code)
+
+        # Strip header guards and includes from header
+        header_lines = []
+        in_header_guard = False
+        for line in header.split("\n"):
+            stripped = line.strip()
+
+            # Skip header guards
+            if stripped.startswith("#ifndef") and "_H" in stripped:
+                in_header_guard = True
+                continue
+            if stripped.startswith("#define") and "_H" in stripped:
+                continue
+            if stripped.startswith("#endif") and in_header_guard:
+                in_header_guard = False
+                continue
+
+            # Skip includes, extern C
+            if (stripped.startswith("#include")
+                or stripped.startswith("#ifdef __cplusplus")
+                or stripped.startswith("extern \"C\"")
+                or stripped.startswith("#endif")
+                or stripped == "}"):
+                continue
+
+            header_lines.append(line)
+
+        header_code = "\n".join(header_lines)
+
+        # Combine into generated implementation
+        sections = [
+            "// ========== Generated Container: vec_int ==========",
+            "// Integer vector (dynamic array) implementation",
+            "// Generated inline for this program (no external dependencies)",
+            "",
+            "// Type definitions and API",
+            header_code.strip(),
+            "",
+            "// Implementation",
+            impl_code.strip(),
+            "",
+            "// ========== End of Generated Container ==========",
+            "",
+        ]
+
+        return "\n".join(sections)
+
+    def generate_set_int(self) -> str:
+        """Generate complete implementation for integer hash set.
+
+        Returns:
+            Complete C code for integer hash set implementation
+        """
+        # Load templates
+        header = self._load_template("mgen_set_int.h")
+        implementation = self._load_template("mgen_set_int.c")
+
+        # Strip includes from implementation
+        impl_code = self._strip_includes_and_headers(implementation)
+
+        # Remove error handling macros for self-contained code
+        impl_code = self._remove_error_handling_macros(impl_code)
+
+        # Strip header guards and includes from header
+        header_lines = []
+        in_header_guard = False
+        for line in header.split("\n"):
+            stripped = line.strip()
+
+            # Skip header guards
+            if stripped.startswith("#ifndef") and "_H" in stripped:
+                in_header_guard = True
+                continue
+            if stripped.startswith("#define") and "_H" in stripped:
+                continue
+            if stripped.startswith("#endif") and in_header_guard:
+                in_header_guard = False
+                continue
+
+            # Skip includes, extern C
+            if (stripped.startswith("#include")
+                or stripped.startswith("#ifdef __cplusplus")
+                or stripped.startswith("extern \"C\"")
+                or stripped.startswith("#endif")
+                or stripped == "}"):
+                continue
+
+            header_lines.append(line)
+
+        header_code = "\n".join(header_lines)
+
+        # Combine into generated implementation
+        sections = [
+            "// ========== Generated Container: set_int ==========",
+            "// Integer hash set implementation",
+            "// Generated inline for this program (no external dependencies)",
+            "",
+            "// Type definitions and API",
+            header_code.strip(),
+            "",
+            "// Implementation",
+            impl_code.strip(),
+            "",
+            "// ========== End of Generated Container ==========",
+            "",
+        ]
+
+        return "\n".join(sections)
+
+    def generate_map_int_int(self) -> str:
+        """Generate complete implementation for int→int hash map.
+
+        Returns:
+            Complete C code for int→int map implementation
+        """
+        # Load templates
+        header = self._load_template("mgen_map_int_int.h")
+        implementation = self._load_template("mgen_map_int_int.c")
+
+        # Strip includes from implementation
+        impl_code = self._strip_includes_and_headers(implementation)
+
+        # Remove error handling macros for self-contained code
+        impl_code = self._remove_error_handling_macros(impl_code)
+
+        # Strip header guards and includes from header
+        header_lines = []
+        in_header_guard = False
+        for line in header.split("\n"):
+            stripped = line.strip()
+
+            # Skip header guards
+            if stripped.startswith("#ifndef") and "_H" in stripped:
+                in_header_guard = True
+                continue
+            if stripped.startswith("#define") and "_H" in stripped:
+                continue
+            if stripped.startswith("#endif") and in_header_guard:
+                in_header_guard = False
+                continue
+
+            # Skip includes, extern C
+            if (stripped.startswith("#include")
+                or stripped.startswith("#ifdef __cplusplus")
+                or stripped.startswith("extern \"C\"")
+                or stripped.startswith("#endif")
+                or stripped == "}"):
+                continue
+
+            header_lines.append(line)
+
+        header_code = "\n".join(header_lines)
+
+        # Combine into generated implementation
+        sections = [
+            "// ========== Generated Container: map_int_int ==========",
+            "// Integer → Integer hash map implementation",
+            "// Generated inline for this program (no external dependencies)",
+            "",
+            "// Type definitions and API",
+            header_code.strip(),
+            "",
+            "// Implementation",
+            impl_code.strip(),
+            "",
+            "// ========== End of Generated Container ==========",
+            "",
+        ]
+
+        return "\n".join(sections)
+
     def generate_container(self, container_type: str) -> Optional[str]:
         """Generate code for a specific container type.
 
         Args:
-            container_type: Container type identifier (e.g., "map_str_int")
+            container_type: Container type identifier (e.g., "map_str_int", "vec_int", "set_int", "map_int_int")
 
         Returns:
             Generated C code, or None if type not supported
         """
         if container_type == "map_str_int":
             return self.generate_str_int_map()
-
-        # Future: Add more container types
-        # elif container_type == "vec_int":
-        #     return self.generate_vec_int()
-        # elif container_type == "map_int_int":
-        #     return self.generate_map_int_int()
+        elif container_type == "vec_int":
+            return self.generate_vec_int()
+        elif container_type == "set_int":
+            return self.generate_set_int()
+        elif container_type == "map_int_int":
+            return self.generate_map_int_int()
 
         return None
 
@@ -183,9 +369,14 @@ class ContainerCodeGenerator:
             List of required #include directives
         """
         # str_int_map needs: stdlib.h (malloc/free), string.h (strcmp/strdup)
+        # vec_int needs: stdlib.h (malloc/free), stdbool.h (bool)
+        # set_int needs: stdlib.h (malloc/free), stdbool.h (bool)
+        # map_int_int needs: stdlib.h (malloc/free), stdbool.h (bool)
         # These are already in standard includes, but we track them for completeness
         if container_type == "map_str_int":
             return ["<stdlib.h>", "<string.h>", "<stdbool.h>"]
+        elif container_type in ["vec_int", "set_int", "map_int_int"]:
+            return ["<stdlib.h>", "<stdbool.h>"]
 
         return []
 
