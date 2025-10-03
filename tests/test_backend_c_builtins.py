@@ -39,4 +39,4 @@ def test_len(arr):
 """
         c_code = self.converter.convert_code(python_code)
 
-        assert "mgen_len_safe" in c_code
+        assert "vec_int_size" in c_code

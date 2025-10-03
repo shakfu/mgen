@@ -75,12 +75,15 @@ class MGenPythonToCConverter:
         # First pass: check for string methods to populate includes_needed
         self._detect_string_methods(node)
 
+        # First pass: detect container variables to generate STC declarations
+        self._detect_container_variables(node)
+
         # Add includes
         parts.extend(self._generate_includes())
         parts.append("")
 
         # Add STC container declarations if needed
-        if self._uses_containers(node) or self.uses_comprehensions:
+        if self._uses_containers(node) or self.uses_comprehensions or self.container_variables:
             parts.extend(self._generate_container_declarations())
             parts.append("")
 
@@ -110,6 +113,23 @@ class MGenPythonToCConverter:
                     # For pre-scan, we're more liberal - assume any call to these methods is a string method
                     self.includes_needed.add('#include "mgen_string_ops.h"')
                     break  # Only need to add it once
+
+    def _detect_container_variables(self, node: ast.AST) -> None:
+        """Pre-scan AST to detect container variable declarations for STC generation."""
+        for child in ast.walk(node):
+            # Look for annotated assignments: var: list = ...
+            if isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name):
+                var_name = child.target.id
+                type_annotation = self._get_type_annotation(child.annotation)
+
+                # Track list, dict, and set declarations
+                if type_annotation in ["list", "dict", "set"]:
+                    if var_name not in self.container_variables:
+                        self.container_variables[var_name] = {
+                            "type": type_annotation,
+                            "element_type": "int",  # Default to int
+                            "c_type": self.type_mapping.get(type_annotation, type_annotation)
+                        }
 
     def _generate_includes(self) -> list[str]:
         """Generate C includes with MGen runtime support."""
@@ -340,6 +360,16 @@ class MGenPythonToCConverter:
 
             self.variable_context[var_name] = c_type
 
+            # Track container variables for STC declaration generation
+            if type_annotation in ["list", "dict", "set"]:
+                # Default to int element type for containers
+                if var_name not in self.container_variables:
+                    self.container_variables[var_name] = {
+                        "type": type_annotation,
+                        "element_type": "int",
+                        "c_type": c_type
+                    }
+
             if stmt.value:
                 value_expr = self._convert_expression(stmt.value)
                 return f"{c_type} {var_name} = {value_expr};"
@@ -504,7 +534,8 @@ class MGenPythonToCConverter:
     def _convert_builtin_with_runtime(self, func_name: str, args: list[str]) -> str:
         """Convert built-in functions using MGen runtime."""
         if func_name == "len":
-            return f"mgen_len_safe({args[0]}, vec_int_size)"  # Simplified
+            # For STC containers, call size function directly
+            return f"vec_int_size(&{args[0]})"
         elif func_name == "bool":
             return f"mgen_bool_int({args[0]})"
         elif func_name == "abs":
