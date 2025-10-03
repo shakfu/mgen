@@ -104,6 +104,7 @@ class MGenPythonToHaskellConverter:
         # Add imports
         base_imports = [
             "import MGenRuntime",
+            "import Control.Monad (foldM)",
             "import qualified Data.Map as Map",
             "import qualified Data.Set as Set",
             "import Data.Map (Map)",
@@ -313,51 +314,40 @@ main = printValue "Generated Haskell code executed successfully"'''
             self.current_function = "main"
             self.declared_vars = set()
 
-            body_stmts = []
-            io_actions = []
-            let_bindings = []
+            do_lines = []
 
             for stmt in node.body:
                 if isinstance(stmt, ast.Return):
                     # Ignore return statements in main (Haskell main returns void)
                     continue
 
+                # Skip docstrings (expression statements with string constants)
+                if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+                    continue
+
                 converted_stmt = self._convert_statement(stmt)
                 if not converted_stmt:
                     continue
 
-                # Determine if this is an IO action or a let binding
+                # Categorize and add to do notation, preserving order
                 if isinstance(stmt, (ast.Assign, ast.AnnAssign)):
                     # It's a let binding
-                    let_bindings.append(converted_stmt)
-                elif isinstance(stmt, ast.Expr):
-                    # It's an IO action (like print)
-                    io_actions.append(converted_stmt)
+                    do_lines.append(f"  let {converted_stmt}")
                 else:
-                    body_stmts.append(converted_stmt)
+                    # It's an IO action or other statement
+                    do_lines.append(f"  {converted_stmt}")
 
             # Build main body with do notation if needed
             signature = "main :: IO ()"
 
-            if not let_bindings and not io_actions and not body_stmts:
+            if not do_lines:
                 body = 'main = printValue "No statements"'
-            elif not let_bindings and len(io_actions) == 1 and not body_stmts:
+            elif len(do_lines) == 1 and not do_lines[0].strip().startswith('let'):
                 # Single IO action, no do notation needed
-                body = f"main = {io_actions[0]}"
+                body = f"main = {do_lines[0].strip()}"
             else:
                 # Use do notation
-                do_lines = []
-                for binding in let_bindings:
-                    do_lines.append(f"  let {binding}")
-                for action in io_actions:
-                    do_lines.append(f"  {action}")
-                for body_stmt in body_stmts:
-                    do_lines.append(f"  {body_stmt}")
-
-                if do_lines:
-                    body = "main = do\n" + "\n".join(do_lines)
-                else:
-                    body = 'main = printValue "Empty main"'
+                body = "main = do\n" + "\n".join(do_lines)
 
             self.current_function = None
             self.declared_vars = set()
@@ -391,23 +381,51 @@ main = printValue "Generated Haskell code executed successfully"'''
         self.current_function = func_name
         self.declared_vars = set()
 
-        body_stmts = []
+        # Filter out docstrings first
+        filtered_body = []
         for stmt in node.body:
             # Skip docstrings (expression statements with string constants)
             if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
                 continue
-            converted_stmt = self._convert_statement(stmt)
-            if converted_stmt:
-                body_stmts.append(converted_stmt)
+            filtered_body.append(stmt)
 
-        # Handle return statements and function body
-        if not body_stmts:
-            body = "undefined"
-        elif len(body_stmts) == 1:
-            body = body_stmts[0]
+        # Check for early return pattern BEFORE converting statements
+        # Pattern: if cond: return X; return Y  ->  if cond then X else Y
+        if (len(filtered_body) == 2 and
+            isinstance(filtered_body[0], ast.If) and
+            len(filtered_body[0].body) == 1 and
+            isinstance(filtered_body[0].body[0], ast.Return) and
+            isinstance(filtered_body[1], ast.Return) and
+            not filtered_body[0].orelse):
+            # Convert directly to if-expression
+            condition = self._convert_expression(filtered_body[0].test)
+            then_expr = filtered_body[0].body[0].value
+            else_expr = filtered_body[1].value
+            if then_expr and else_expr:
+                then_value = self._convert_expression(then_expr)
+                else_value = self._convert_expression(else_expr)
+                body = f"if {condition} then {then_value} else {else_value}"
+            else:
+                # Fall back to normal conversion if return values are None
+                then_value = self._convert_expression(then_expr) if then_expr else "()"
+                else_value = self._convert_expression(else_expr) if else_expr else "()"
+                body = f"if {condition} then {then_value} else {else_value}"
         else:
-            # Multiple statements - use let expressions
-            body = "let\n    " + "\n    ".join(body_stmts[:-1]) + "\n  in " + body_stmts[-1]
+            # Normal conversion path
+            body_stmts = []
+            for stmt in filtered_body:
+                converted_stmt = self._convert_statement(stmt)
+                if converted_stmt:
+                    body_stmts.append(converted_stmt)
+
+            # Handle return statements and function body
+            if not body_stmts:
+                body = "undefined"
+            elif len(body_stmts) == 1:
+                body = body_stmts[0]
+            else:
+                # Multiple statements - use let expressions
+                body = "let\n    " + "\n    ".join(body_stmts[:-1]) + "\n  in " + body_stmts[-1]
 
         param_names = [param[0] for param in params]
         if param_names:
@@ -944,9 +962,23 @@ main = printValue "Generated Haskell code executed successfully"'''
             var_name = self._to_haskell_var_name(node.target.id)
             iterable = self._convert_expression(node.iter)
 
+            # Check if loop body is a single assignment that updates an outer variable
+            # Pattern: for i in range(n): var = expr(i)  ->  var' = foldl (\_ i -> expr(i)) var range
+            if (self.current_function == "main" and
+                len(node.body) == 1 and
+                isinstance(node.body[0], ast.Assign)):
+                stmt: ast.Assign = node.body[0]
+                if len(stmt.targets) == 1:
+                    target = stmt.targets[0]
+                    if isinstance(target, ast.Name):
+                        updated_var = self._to_haskell_var_name(target.id)
+                        value_expr = self._convert_expression(stmt.value)
+                        # Use foldM to update variable through iterations (shadowing in do notation)
+                        return f"{updated_var} <- foldM (\\acc {var_name} -> return ({value_expr})) {updated_var} ({iterable})"
+
             body_stmts = []
-            for stmt in node.body:
-                converted = self._convert_statement(stmt)
+            for body_stmt in node.body:
+                converted = self._convert_statement(body_stmt)
                 if converted:
                     body_stmts.append(converted)
 

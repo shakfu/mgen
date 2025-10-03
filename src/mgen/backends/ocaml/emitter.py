@@ -137,31 +137,66 @@ class MGenPythonToOCamlConverter:
             # This is a regular function
             return self._convert_regular_function(node, params, return_type)
 
+    def _is_recursive_function(self, node: ast.FunctionDef, func_name: str) -> bool:
+        """Check if a function is recursive by looking for calls to itself."""
+        for child in ast.walk(node):
+            if isinstance(child, ast.Call):
+                if isinstance(child.func, ast.Name) and child.func.id == func_name:
+                    return True
+        return False
+
     def _convert_regular_function(self, node: ast.FunctionDef, params: list[tuple], return_type: str) -> list[str]:
         """Convert a regular function definition."""
         func_name = self._to_ocaml_var_name(node.name)
 
+        # Check if function is recursive
+        is_recursive = self._is_recursive_function(node, node.name)
+
         # Function signature
+        rec_keyword = "rec " if is_recursive else ""
         if params:
             param_list = " ".join([name for name, _ in params])
-            signature = f"let {func_name} {param_list} ="
+            signature = f"let {rec_keyword}{func_name} {param_list} ="
         else:
-            signature = f"let {func_name} () ="
+            signature = f"let {rec_keyword}{func_name} () ="
 
         lines = [signature]
 
-        # Convert function body
-        if len(node.body) == 1 and isinstance(node.body[0], ast.Return):
+        # Filter out docstrings first
+        filtered_body = []
+        for stmt in node.body:
+            if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+                continue
+            filtered_body.append(stmt)
+
+        # Check for early return pattern: if cond: return X; return Y
+        if (len(filtered_body) == 2 and
+            isinstance(filtered_body[0], ast.If) and
+            len(filtered_body[0].body) == 1 and
+            isinstance(filtered_body[0].body[0], ast.Return) and
+            isinstance(filtered_body[1], ast.Return) and
+            not filtered_body[0].orelse):
+            # Convert directly to if-expression
+            condition = self._convert_expression(filtered_body[0].test)
+            then_expr = filtered_body[0].body[0].value
+            else_expr = filtered_body[1].value
+            if then_expr and else_expr:
+                then_value = self._convert_expression(then_expr)
+                else_value = self._convert_expression(else_expr)
+                lines.append(f"  if {condition} then {then_value} else {else_value}")
+            else:
+                # Fall back to normal conversion if return values are None
+                then_value = self._convert_expression(then_expr) if then_expr else "()"
+                else_value = self._convert_expression(else_expr) if else_expr else "()"
+                lines.append(f"  if {condition} then {then_value} else {else_value}")
+        elif len(filtered_body) == 1 and isinstance(filtered_body[0], ast.Return):
             # Single return statement
-            expr = self._convert_expression(node.body[0].value) if node.body[0].value else "()"
+            expr = self._convert_expression(filtered_body[0].value) if filtered_body[0].value else "()"
             lines.append(f"  {expr}")
         else:
             # Multiple statements - use let expressions
             body_lines = []
-            for _i, stmt in enumerate(node.body):
-                # Skip docstrings (expression statements with string constants)
-                if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
-                    continue
+            for _i, stmt in enumerate(filtered_body):
                 if isinstance(stmt, ast.Return):
                     if stmt.value:
                         body_lines.append(f"  {self._convert_expression(stmt.value)}")
@@ -814,11 +849,38 @@ class MGenPythonToOCamlConverter:
         condition = self._convert_expression(node.test)
         return f"(* while {condition} do ... done *)"
 
-    def _convert_for_statement(self, node: ast.For) -> str:
-        """Convert for statement (simplified)."""
-        target = self._convert_expression(node.target)
+    def _convert_for_statement(self, node: ast.For) -> list[str]:
+        """Convert for statement to OCaml."""
+        if not isinstance(node.target, ast.Name):
+            return [f"(* Complex for loop target not supported *)"]
+
+        target = self._to_ocaml_var_name(node.target.id)
         iter_expr = self._convert_expression(node.iter)
-        return f"(* for {target} in {iter_expr} do ... done *)"
+
+        # Check for single assignment pattern: for i in range(n): var = expr
+        if (len(node.body) == 1 and
+            isinstance(node.body[0], ast.Assign) and
+            len(node.body[0].targets) == 1 and
+            isinstance(node.body[0].targets[0], ast.Name)):
+            updated_var = self._to_ocaml_var_name(node.body[0].targets[0].id)
+            value_expr = self._convert_expression(node.body[0].value)
+            # Use fold_left to thread state through iterations
+            return [f"let {updated_var} = List.fold_left (fun _ {target} -> {value_expr}) {updated_var} ({iter_expr}) in"]
+
+        # General case - convert body to let expressions
+        body_lines = []
+        for stmt in node.body:
+            converted = self._convert_statement(stmt)
+            if isinstance(converted, list):
+                body_lines.extend(converted)
+            else:
+                body_lines.append(converted)
+
+        if body_lines:
+            body_str = "; ".join(body_lines)
+            return [f"List.iter (fun {target} -> {body_str}) ({iter_expr});"]
+        else:
+            return [f"(* Empty for loop *)"]
 
     def _to_ocaml_var_name(self, name: str) -> str:
         """Convert Python variable name to OCaml style."""
