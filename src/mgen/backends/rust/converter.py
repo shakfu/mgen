@@ -671,6 +671,8 @@ class MGenPythonToRustConverter:
                     # First declaration of variable
                     self.declared_vars.add(target.id)
                     var_type = self._infer_type_from_value(stmt.value)
+                    # Track variable type for later use
+                    self.variable_types[target.id] = var_type
 
                     # Use explicit type annotation only for primitive literals (constants)
                     # For constructor calls and expressions, let Rust infer the type
@@ -678,6 +680,11 @@ class MGenPythonToRustConverter:
                         statements.append(f"    let mut {target.id}: {var_type} = {value_expr};")
                     else:
                         statements.append(f"    let mut {target.id} = {value_expr};")
+            elif isinstance(target, ast.Subscript):
+                # Handle subscript assignment: container[index] = value
+                container_expr = self._convert_expression(target.value)
+                index_expr = self._convert_expression(target.slice)
+                statements.append(f"    {container_expr}.insert({index_expr}, {value_expr});")
 
         return "\n".join(statements)
 
@@ -981,15 +988,19 @@ class MGenPythonToRustConverter:
         # Check if the value is a variable we know about
         if isinstance(expr.value, ast.Name):
             var_name = expr.value.id
-            # Try to infer the type
-            var_type = self._infer_type_from_value(expr.value) if hasattr(expr.value, 'inferred_type') else None
+            # Get the tracked type if available
+            var_type = self.variable_types.get(var_name, None)
 
-            # For Vec types, use direct indexing
-            # Assume Vec if we don't have type info (safer default for lists)
-            return f"{value}[{slice_expr} as usize]"
+            # Check if it's a HashMap type
+            if var_type and "HashMap" in var_type:
+                # Use HashMap .get() method
+                return f"{value}.get(&{slice_expr}).unwrap_or(&0)"
+            else:
+                # For Vec types, use direct indexing
+                return f"{value}[{slice_expr} as usize]"
 
-        # For complex expressions or unknown types, use HashMap-style access
-        return f"{value}.get(&{slice_expr}).unwrap().clone()"
+        # For complex expressions or unknown types, assume Vec (safer default)
+        return f"{value}[{slice_expr} as usize]"
 
     def _convert_call(self, expr: ast.Call) -> str:
         """Convert function calls."""
@@ -1121,6 +1132,19 @@ class MGenPythonToRustConverter:
                 args_str = ", ".join(args)
                 return f"{obj_expr}.append({args_str})"
 
+            # Handle dict methods - translate to Rust HashMap iteration
+            elif method_name == "items":
+                # Python's dict.items() -> Rust HashMap doesn't have .items()
+                # For iteration contexts, just return the HashMap itself (can iterate directly)
+                # Rust's for (k, v) in &hashmap is equivalent to for k, v in dict.items()
+                return f"&{obj_expr}"
+            elif method_name == "values":
+                # Python's dict.values() -> Rust's .values()
+                return f"{obj_expr}.values()"
+            elif method_name == "keys":
+                # Python's dict.keys() -> Rust's .keys()
+                return f"{obj_expr}.keys()"
+
             # Regular method call
             args_str = ", ".join(args)
             return f"{obj_expr}.{self._to_rust_method_name(method_name)}({args_str})"
@@ -1186,6 +1210,30 @@ class MGenPythonToRustConverter:
         target = expr.generators[0].target
         iter_expr = expr.generators[0].iter
         conditions = expr.generators[0].ifs
+
+        # Handle tuple unpacking for dict iteration: {k: v for k, v in dict.items()}
+        if isinstance(target, ast.Tuple) and len(target.elts) == 2:
+            # Tuple unpacking pattern
+            key_var = target.elts[0].id if isinstance(target.elts[0], ast.Name) else "k"
+            value_var = target.elts[1].id if isinstance(target.elts[1], ast.Name) else "v"
+            target_pattern = f"&({key_var}, {value_var})"
+
+            # Convert the iterator expression (should be dict.items() which converts to &dict)
+            container_expr = self._convert_expression(iter_expr)
+            key_transform = self._convert_expression(key_expr)
+            value_transform = self._convert_expression(value_expr)
+
+            # Convert HashMap to Vec of tuples for iteration
+            # container_expr from .items() is "&dict", so we get dict reference
+            # We need to iter() it and collect to Vec
+            vec_expr = f"{container_expr}.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>()"
+
+            if conditions:
+                condition_expr = self._convert_expression(conditions[0])
+                # Function expects Vec<T> (owned)
+                return f"Comprehensions::dict_comprehension_with_filter({vec_expr}, |{target_pattern}| ({key_transform}, {value_transform}), |{target_pattern}| {condition_expr})"
+            else:
+                return f"Comprehensions::dict_comprehension({vec_expr}, |{target_pattern}| ({key_transform}, {value_transform}))"
 
         if isinstance(iter_expr, ast.Call) and isinstance(iter_expr.func, ast.Name) and iter_expr.func.id == "range":
             # Range-based comprehension
@@ -1337,7 +1385,7 @@ class MGenPythonToRustConverter:
                     and all(t == value_types[0] for t in value_types)
                 ):
                     return f"std::collections::HashMap<{key_types[0]}, {value_types[0]}>"
-            return "std::collections::HashMap<String, i32>"  # Default
+            return "std::collections::HashMap<i32, i32>"  # Default to int keys/values (most common)
         elif isinstance(value, ast.Set):
             # Infer type from set literal elements
             if value.elts:
