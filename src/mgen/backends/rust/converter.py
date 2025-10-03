@@ -748,6 +748,16 @@ class MGenPythonToRustConverter:
 
     def _convert_expression_statement(self, stmt: ast.Expr) -> str:
         """Convert expression statement."""
+        # Check if this is a docstring (string literal as standalone statement)
+        if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+            # Convert docstring to Rust comment
+            docstring = stmt.value.value
+            if '\n' in docstring:
+                lines = docstring.split('\n')
+                return "    // " + "\n    // ".join(lines)
+            else:
+                return f"    // {docstring}"
+
         expr = self._convert_expression(stmt.value)
         return f"    {expr};"
 

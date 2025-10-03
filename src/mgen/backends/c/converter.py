@@ -131,16 +131,8 @@ class MGenPythonToCConverter:
             if self.container_variables or self._needs_containers():
                 includes.append('#include "mgen_stc_bridge.h"')
 
-        # Add STC includes for comprehensions
-        if hasattr(self, "uses_comprehensions") and self.uses_comprehensions:
-            includes.extend(
-                [
-                    "#define STC_ENABLED",
-                    '#include "ext/stc/include/stc/vec.h"',
-                    '#include "ext/stc/include/stc/hmap.h"',
-                    '#include "ext/stc/include/stc/hset.h"',
-                ]
-            )
+        # Note: STC includes are handled in _generate_container_declarations()
+        # with proper defines, so we don't include them here
 
         # Add dynamically needed includes
         includes.extend(sorted(self.includes_needed))
@@ -169,13 +161,14 @@ class MGenPythonToCConverter:
             sanitized = self._sanitize_type_name(element_type)
 
             # Vector declaration for list comprehensions
+            # Note: STC vec uses i_key for element type, not i_val
             declarations.extend(
                 [
                     f"#define i_type vec_{sanitized}",
-                    f"#define i_val {element_type}",
+                    f"#define i_key {element_type}",
                     '#include "ext/stc/include/stc/vec.h"',
                     "#undef i_type",
-                    "#undef i_val",
+                    "#undef i_key",
                     "",
                 ]
             )
@@ -492,7 +485,10 @@ class MGenPythonToCConverter:
                 return f"{func_name}_new({args_str})"
 
             # Handle built-in functions with runtime support
-            elif func_name in ["len", "bool", "abs", "min", "max", "sum"] and self.use_runtime:
+            elif func_name in ["len", "bool", "abs", "min", "max", "sum", "print"] and self.use_runtime:
+                # Pass original AST args to print for type detection
+                if func_name == "print":
+                    return self._convert_print_call(expr.args, args)
                 return self._convert_builtin_with_runtime(func_name, args)
             else:
                 args_str = ", ".join(args)
@@ -517,6 +513,39 @@ class MGenPythonToCConverter:
             return f"mgen_{func_name}_int_array({args[0]}, {args[1]})"  # Simplified
         else:
             return f"{func_name}({', '.join(args)})"
+
+    def _convert_print_call(self, ast_args: list[ast.expr], converted_args: list[str]) -> str:
+        """Convert print() to printf() with appropriate format specifiers."""
+        if len(ast_args) == 0:
+            return 'printf("\\n")'
+
+        if len(ast_args) == 1:
+            # Single argument - detect type and use appropriate format
+            arg_expr = ast_args[0]
+            c_arg = converted_args[0]
+
+            # Check if it's a string literal
+            if isinstance(arg_expr, ast.Constant) and isinstance(arg_expr.value, str):
+                return f'printf("%s\\n", {c_arg})'
+
+            # Check variable type from context
+            if isinstance(arg_expr, ast.Name):
+                var_name = arg_expr.id
+                if var_name in self.variable_context:
+                    var_type = self.variable_context[var_name]
+                    if var_type in ["str", "char*"]:
+                        return f'printf("%s\\n", {c_arg})'
+                    elif var_type == "double":
+                        return f'printf("%f\\n", {c_arg})'
+                    elif var_type == "bool":
+                        return f'printf("%s\\n", {c_arg} ? "true" : "false")'
+
+            # Default to integer
+            return f'printf("%d\\n", {c_arg})'
+        else:
+            # Multiple arguments - use %d for all (simplified)
+            format_specs = " ".join(["%d"] * len(ast_args))
+            return f'printf("{format_specs}\\n", {", ".join(converted_args)})'
 
     def _convert_method_call(self, expr: ast.Call) -> str:
         """Convert method calls: obj.method(args) -> ClassName_method(&obj, args)."""
@@ -876,6 +905,17 @@ class MGenPythonToCConverter:
 
     def _convert_expression_statement(self, stmt: ast.Expr) -> str:
         """Convert expression statement."""
+        # Check if this is a docstring (string literal as standalone statement)
+        if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+            # Convert docstring to C comment
+            docstring = stmt.value.value
+            # Handle multi-line docstrings
+            if '\n' in docstring:
+                lines = docstring.split('\n')
+                return "/* " + "\n * ".join(lines) + " */"
+            else:
+                return f"/* {docstring} */"
+
         expr = self._convert_expression(stmt.value)
         return f"{expr};"
 
@@ -903,6 +943,17 @@ class MGenPythonToCConverter:
             index = self._convert_expression(expr.slice.value)  # type: ignore
         else:  # Python >= 3.9
             index = self._convert_expression(expr.slice)
+
+        # Check if this is an STC vector access
+        if isinstance(expr.value, ast.Name):
+            var_name = expr.value.id
+            if var_name in self.variable_context:
+                var_type = self.variable_context[var_name]
+                # If it's an STC vector type, use vec_*_at() function
+                if var_type.startswith("vec_"):
+                    return f"*{var_type}_at(&{obj}, {index})"
+
+        # Default: use direct array subscript
         return f"{obj}[{index}]"
 
     def _convert_class(self, node: ast.ClassDef) -> str:

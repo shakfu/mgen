@@ -12,13 +12,11 @@ from typing import Any, Optional
 
 class UnsupportedFeatureError(Exception):
     """Raised when encountering unsupported Python features."""
-
     pass
 
 
 class TypeMappingError(Exception):
     """Raised when type mapping fails."""
-
     pass
 
 
