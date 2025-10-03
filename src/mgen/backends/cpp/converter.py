@@ -690,7 +690,7 @@ class MGenPythonToCppConverter:
                     if isinstance(stmt.value, ast.List):
                         var_type = "std::vector<int>"
                     elif isinstance(stmt.value, ast.Dict):
-                        var_type = "std::unordered_map<std::string, int>"
+                        var_type = "std::unordered_map<int, int>"  # Default to int keys
 
             self.variable_context[var_name] = var_type
 
@@ -1240,7 +1240,7 @@ class MGenPythonToCppConverter:
                 if inferred_type == "std::vector":
                     return "std::vector<int>"
                 elif inferred_type == "std::unordered_map":
-                    return "std::unordered_map<std::string, int>"
+                    return "std::unordered_map<int, int>"  # Default to int keys
                 elif inferred_type == "std::unordered_set":
                     return "std::unordered_set<int>"
                 elif inferred_type and inferred_type != "auto":
@@ -1260,7 +1260,7 @@ class MGenPythonToCppConverter:
                 if arg.annotation.id == "list":
                     return "std::vector<int>"
                 elif arg.annotation.id == "dict":
-                    return "std::unordered_map<std::string, int>"
+                    return "std::unordered_map<int, int>"  # Default to int keys
                 elif arg.annotation.id == "set":
                     return "std::unordered_set<int>"
             return self._convert_type_annotation(arg.annotation)
