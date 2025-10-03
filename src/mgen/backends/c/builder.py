@@ -33,6 +33,10 @@ class CBuilder(AbstractBuilder):
             runtime_sources = self.get_runtime_sources()
             runtime_objects = [Path(src).name.replace(".c", ".o") for src in runtime_sources]
             include_flags.append(f"-I{self.runtime_dir}")
+            # Add include path for STC headers
+            stc_include_dir = Path(__file__).parent / "ext" / "stc" / "include"
+            if stc_include_dir.exists():
+                include_flags.append(f"-I{stc_include_dir}")
 
         all_sources = source_basenames + [Path(src).name for src in runtime_sources]
         all_objects = object_files + runtime_objects

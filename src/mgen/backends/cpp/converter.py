@@ -810,6 +810,8 @@ class MGenPythonToCppConverter:
             return self._convert_list_literal(expr)
         elif isinstance(expr, ast.Dict):
             return self._convert_dict_literal(expr)
+        elif isinstance(expr, ast.Set):
+            return self._convert_set_literal(expr)
         elif isinstance(expr, ast.Subscript):
             return self._convert_subscript(expr)
         else:
@@ -898,6 +900,17 @@ class MGenPythonToCppConverter:
         if isinstance(expr.func, ast.Name):
             func_name = expr.func.id
             args = [self._convert_expression(arg) for arg in expr.args]
+
+            # Handle empty container constructors
+            if func_name == "set" and len(args) == 0:
+                # set() with no args -> std::unordered_set<int>{}
+                return "std::unordered_set<int>{}"
+            elif func_name == "dict" and len(args) == 0:
+                # dict() with no args -> std::unordered_map<int, int>{}
+                return "std::unordered_map<int, int>{}"
+            elif func_name == "list" and len(args) == 0:
+                # list() with no args -> std::vector<int>{}
+                return "std::vector<int>{}"
 
             # Map Python built-ins to C++ equivalents
             builtin_map = {
@@ -1111,6 +1124,13 @@ class MGenPythonToCppConverter:
             val_str = self._convert_expression(value)
             pairs.append(f"{{{key_str}, {val_str}}}")
         return "{" + ", ".join(pairs) + "}"
+
+    def _convert_set_literal(self, expr: ast.Set) -> str:
+        """Convert set literal to C++ initializer list."""
+        if not expr.elts:
+            return "{}"  # Empty initializer list
+        elements = [self._convert_expression(elt) for elt in expr.elts]
+        return "{" + ", ".join(elements) + "}"
 
     def _convert_subscript(self, expr: ast.Subscript) -> str:
         """Convert subscript operation to C++ array access."""

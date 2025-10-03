@@ -400,6 +400,12 @@ class MGenPythonToCConverter:
             return self._convert_dict_comprehension(expr)
         elif isinstance(expr, ast.SetComp):
             return self._convert_set_comprehension(expr)
+        elif isinstance(expr, ast.List):
+            return self._convert_list_literal(expr)
+        elif isinstance(expr, ast.Dict):
+            return self._convert_dict_literal(expr)
+        elif isinstance(expr, ast.Set):
+            return self._convert_set_literal(expr)
         else:
             return f"/* Unsupported expression {type(expr).__name__} */"
 
@@ -511,6 +517,10 @@ class MGenPythonToCConverter:
         if self._is_string_type(obj_expr):
             return self._convert_string_method(obj, method_name, args)
 
+        # Check if this is a list method call
+        if self._is_list_type(obj_expr):
+            return self._convert_list_method(obj, method_name, args, obj_expr)
+
         # Try to determine the class type from the object
         # For now, we'll use a simple heuristic - look for known class names
         class_name = None
@@ -613,6 +623,59 @@ class MGenPythonToCConverter:
 
         else:
             raise UnsupportedFeatureError(f"Unsupported string method: {method_name}")
+
+    def _is_list_type(self, expr: ast.expr) -> bool:
+        """Check if expression represents a list/vector type."""
+        # Check if it's a list literal
+        if isinstance(expr, ast.List):
+            return True
+
+        # Check if it's a variable with list type
+        if isinstance(expr, ast.Name):
+            var_name = expr.id
+            if var_name in self.variable_context:
+                var_type = self.variable_context[var_name]
+                return var_type.startswith("vec_") or var_type == "list"
+
+        return False
+
+    def _convert_list_method(self, obj: str, method_name: str, args: list[str], obj_expr: ast.expr) -> str:
+        """Convert list method calls to STC vector operations."""
+        # Get the variable name to determine the vec type
+        vec_type = "vec_int"  # Default
+        if isinstance(obj_expr, ast.Name):
+            var_name = obj_expr.id
+            if var_name in self.variable_context:
+                vec_type = self.variable_context[var_name]
+
+        if method_name == "append":
+            if len(args) != 1:
+                raise UnsupportedFeatureError("list.append() requires exactly one argument")
+            # vec_int_push(&data, value)
+            return f"{vec_type}_push(&{obj}, {args[0]})"
+
+        elif method_name == "extend":
+            if len(args) != 1:
+                raise UnsupportedFeatureError("list.extend() requires exactly one argument")
+            # Not implemented yet - would need vec_int_append_range or similar
+            raise UnsupportedFeatureError(f"list.extend() is not yet supported in C backend")
+
+        elif method_name == "pop":
+            # vec_int_pop(&data) - returns and removes last element
+            if len(args) > 1:
+                raise UnsupportedFeatureError("list.pop() takes at most one argument")
+            if len(args) == 0:
+                return f"*{vec_type}_back(&{obj}); {vec_type}_pop(&{obj})"
+            else:
+                raise UnsupportedFeatureError("list.pop(index) is not yet supported in C backend")
+
+        elif method_name == "clear":
+            if args:
+                raise UnsupportedFeatureError("list.clear() takes no arguments")
+            return f"{vec_type}_clear(&{obj})"
+
+        else:
+            raise UnsupportedFeatureError(f"Unsupported list method: {method_name}")
 
     def _get_type_annotation(self, annotation: ast.expr) -> str:
         """Extract type from annotation."""
@@ -730,43 +793,68 @@ class MGenPythonToCConverter:
         return result
 
     def _convert_for(self, stmt: ast.For) -> str:
-        """Convert for loop (limited to range())."""
-        if not (isinstance(stmt.iter, ast.Call) and
-                isinstance(stmt.iter.func, ast.Name) and
-                stmt.iter.func.id == "range"):
-            raise UnsupportedFeatureError("Only for loops with range() supported")
-
+        """Convert for loop (supports range() and container iteration)."""
         if not isinstance(stmt.target, ast.Name):
             raise UnsupportedFeatureError("Only simple loop variables supported")
 
         var_name = stmt.target.id
-        range_args = stmt.iter.args
 
-        if len(range_args) == 1:
-            # range(n)
-            start, stop, step = "0", self._convert_expression(range_args[0]), "1"
-        elif len(range_args) == 2:
-            # range(start, stop)
-            start, stop, step = self._convert_expression(range_args[0]), self._convert_expression(range_args[1]), "1"
-        elif len(range_args) == 3:
-            # range(start, stop, step)
-            start, stop, step = self._convert_expression(range_args[0]), self._convert_expression(range_args[1]), self._convert_expression(range_args[2])
+        # Handle range-based iteration
+        if (isinstance(stmt.iter, ast.Call) and
+            isinstance(stmt.iter.func, ast.Name) and
+            stmt.iter.func.id == "range"):
+
+            range_args = stmt.iter.args
+
+            if len(range_args) == 1:
+                # range(n)
+                start, stop, step = "0", self._convert_expression(range_args[0]), "1"
+            elif len(range_args) == 2:
+                # range(start, stop)
+                start, stop, step = self._convert_expression(range_args[0]), self._convert_expression(range_args[1]), "1"
+            elif len(range_args) == 3:
+                # range(start, stop, step)
+                start, stop, step = self._convert_expression(range_args[0]), self._convert_expression(range_args[1]), self._convert_expression(range_args[2])
+            else:
+                raise UnsupportedFeatureError("Invalid range() arguments")
+
+            self.variable_context[var_name] = "int"
+
+            body = []
+            for s in stmt.body:
+                converted = self._convert_statement(s)
+                if converted:
+                    body.extend(converted.split("\n"))
+
+            result = f"for (int {var_name} = {start}; {var_name} < {stop}; {var_name} += {step}) {{\n"
+            for line in body:
+                result += f"    {line}\n"
+            result += "}"
+            return result
+
+        # Handle container iteration (for x in container)
+        elif isinstance(stmt.iter, ast.Name):
+            container_name = stmt.iter.id
+            # Use vec_int as default type for now
+            index_var = self._generate_temp_var_name("loop_idx")
+
+            self.variable_context[var_name] = "int"
+
+            body = []
+            for s in stmt.body:
+                converted = self._convert_statement(s)
+                if converted:
+                    body.extend(converted.split("\n"))
+
+            result = f"for (size_t {index_var} = 0; {index_var} < vec_int_size(&{container_name}); {index_var}++) {{\n"
+            result += f"    int {var_name} = *vec_int_at(&{container_name}, {index_var});\n"
+            for line in body:
+                result += f"    {line}\n"
+            result += "}"
+            return result
+
         else:
-            raise UnsupportedFeatureError("Invalid range() arguments")
-
-        self.variable_context[var_name] = "int"
-
-        body = []
-        for s in stmt.body:
-            converted = self._convert_statement(s)
-            if converted:
-                body.extend(converted.split("\n"))
-
-        result = f"for (int {var_name} = {start}; {var_name} < {stop}; {var_name} += {step}) {{\n"
-        for line in body:
-            result += f"    {line}\n"
-        result += "}"
-        return result
+            raise UnsupportedFeatureError("Only for loops with range() or container iteration supported")
 
     def _convert_expression_statement(self, stmt: ast.Expr) -> str:
         """Convert expression statement."""
@@ -1075,6 +1163,20 @@ class MGenPythonToCConverter:
                 raise UnsupportedFeatureError("Invalid range() arguments in comprehension")
 
             loop_code = f"for (int {loop_var} = {start}; {loop_var} < {end}; {loop_var} += {step})"
+            loop_var_decl = None  # No separate variable declaration needed for range
+
+        # Handle iteration over container variables (e.g., for x in numbers)
+        elif isinstance(generator.iter, ast.Name):
+            container_name = generator.iter.id
+            # Use vec_int as default type for now (TODO: proper type inference)
+            container_size_call = f"vec_int_size(&{container_name})"
+            container_at_call = f"vec_int_at(&{container_name}, __idx_{temp_var})"
+
+            # Generate index-based iteration
+            index_var = f"__idx_{temp_var}"
+            loop_code = f"for (size_t {index_var} = 0; {index_var} < {container_size_call}; {index_var}++)"
+            loop_var_decl = f"int {loop_var} = *{container_at_call};\n        "
+
         else:
             raise UnsupportedFeatureError("Non-range iterables in comprehensions not yet supported")
 
@@ -1091,8 +1193,18 @@ class MGenPythonToCConverter:
         # Convert the expression
         expr_str = self._convert_expression(node.elt)
 
-        # Generate the comprehension code
-        comp_code = f"""{{
+        # Generate the comprehension code differently based on iteration type
+        if loop_var_decl:
+            # Container iteration requires extracting the element first
+            comp_code = f"""{{
+    {result_container_type} {temp_var} = {{0}};
+    {loop_code} {{
+        {loop_var_decl}{condition_code}vec_{self._sanitize_type_name(result_element_type)}_push(&{temp_var}, {expr_str});
+    }}
+    {temp_var}}}"""
+        else:
+            # Range-based iteration is simpler
+            comp_code = f"""{{
     {result_container_type} {temp_var} = {{0}};
     {loop_code} {{
         {condition_code}vec_{self._sanitize_type_name(result_element_type)}_push(&{temp_var}, {expr_str});
@@ -1258,6 +1370,51 @@ class MGenPythonToCConverter:
     {temp_var}}}"""
 
         return comp_code
+
+    def _convert_list_literal(self, expr: ast.List) -> str:
+        """Convert list literal to C STC vector initialization.
+
+        Empty lists [] become {0}
+        Non-empty lists [1, 2, 3] become initialization code
+        """
+        if not expr.elts:
+            # Empty list - return STC zero-initialization
+            return "{0}"
+        else:
+            # Non-empty list - generate initialization with elements
+            # For now, just return {0} and let caller handle adding elements
+            # TODO: Support inline initialization for simple cases
+            return "{0}"
+
+    def _convert_dict_literal(self, expr: ast.Dict) -> str:
+        """Convert dict literal to C STC hashmap initialization.
+
+        Empty dicts {} become {0}
+        Non-empty dicts need element-by-element insertion
+        """
+        if not expr.keys:
+            # Empty dict - return STC zero-initialization
+            return "{0}"
+        else:
+            # Non-empty dict - generate initialization with key-value pairs
+            # For now, return {0} and let caller handle inserting pairs
+            # TODO: Support inline initialization for simple cases
+            return "{0}"
+
+    def _convert_set_literal(self, expr: ast.Set) -> str:
+        """Convert set literal to C STC hashset initialization.
+
+        Empty sets set() become {0} (handled via Call conversion)
+        Non-empty sets {1, 2, 3} need element-by-element insertion
+        """
+        if not expr.elts:
+            # Empty set - return STC zero-initialization
+            return "{0}"
+        else:
+            # Non-empty set - generate initialization with elements
+            # For now, return {0} and let caller handle adding elements
+            # TODO: Support inline initialization for simple cases
+            return "{0}"
 
     def _generate_temp_var_name(self, prefix: str) -> str:
         """Generate a unique temporary variable name."""

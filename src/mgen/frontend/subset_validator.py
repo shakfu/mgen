@@ -424,15 +424,19 @@ class StaticPythonSubsetValidator:
         if isinstance(node, ast.For):
             # For loops can use range() or iterate over containers
             if isinstance(node.iter, ast.Call):
-                # range() calls
+                # Allow range() calls and method calls that return iterables
                 if isinstance(node.iter.func, ast.Name):
+                    # range() calls
                     return node.iter.func.id == "range"
+                elif isinstance(node.iter.func, ast.Attribute):
+                    # Method calls like dict.items(), dict.values(), dict.keys()
+                    return True
                 return False
             elif isinstance(node.iter, ast.Name):
                 # Container iteration: for item in container
                 return True
             elif isinstance(node.iter, ast.Attribute):
-                # Method calls that return iterables (like list.keys())
+                # Attribute access (shouldn't normally be iterable, but allowed)
                 return True
             return False
         elif isinstance(node, ast.Assert):

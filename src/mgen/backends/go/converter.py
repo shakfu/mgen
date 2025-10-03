@@ -806,6 +806,17 @@ class MGenPythonToGoConverter:
             func_name = expr.func.id
             args = [self._convert_expression(arg) for arg in expr.args]
 
+            # Handle empty container constructors
+            if func_name == "list" and len(args) == 0:
+                # list() with no args -> []interface{}{}
+                return "[]interface{}{}"
+            elif func_name == "dict" and len(args) == 0:
+                # dict() with no args -> make(map[interface{}]interface{})
+                return "make(map[interface{}]interface{})"
+            elif func_name == "set" and len(args) == 0:
+                # set() with no args -> make(map[interface{}]bool)
+                return "make(map[interface{}]bool)"
+
             # Handle built-in functions
             if func_name == "print":
                 args_str = ", ".join(args)

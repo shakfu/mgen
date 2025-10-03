@@ -936,6 +936,17 @@ class MGenPythonToRustConverter:
             func_name = expr.func.id
             args = [self._convert_expression(arg) for arg in expr.args]
 
+            # Handle empty container constructors
+            if func_name == "list" and len(args) == 0:
+                # list() with no args -> vec![]
+                return "vec![]"
+            elif func_name == "dict" and len(args) == 0:
+                # dict() with no args -> HashMap::new()
+                return "std::collections::HashMap::new()"
+            elif func_name == "set" and len(args) == 0:
+                # set() with no args -> HashSet::new()
+                return "std::collections::HashSet::new()"
+
             # Handle built-in functions
             if func_name == "print":
                 args_str = ", ".join(args)
@@ -1016,6 +1027,16 @@ class MGenPythonToRustConverter:
                         return f"StrOps::split_sep(&{obj_expr}, &{args[0]})"
                     else:
                         return f"StrOps::split(&{obj_expr})"
+
+            # Handle list/vector methods - map Python names to Rust names
+            if method_name == "append":
+                # Python's append() -> Rust's push()
+                args_str = ", ".join(args)
+                return f"{obj_expr}.push({args_str})"
+            elif method_name == "extend":
+                # Python's extend() -> Rust's append() (for Vec)
+                args_str = ", ".join(args)
+                return f"{obj_expr}.append({args_str})"
 
             # Regular method call
             args_str = ", ".join(args)

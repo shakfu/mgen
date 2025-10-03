@@ -101,15 +101,17 @@ def test_complex_target() -> list:
         with pytest.raises(UnsupportedFeatureError, match="Only simple loop variables"):
             self.converter.convert_code(python_code)
 
-    def test_list_comprehension_non_range_iterable_error(self):
-        """Test that non-range iterables raise appropriate error."""
+    def test_list_comprehension_non_range_iterable(self):
+        """Test that non-range iterables are supported via container iteration."""
         python_code = """
 def test_non_range() -> list:
     items = [1, 2, 3]
     return [x for x in items]
 """
-        with pytest.raises(UnsupportedFeatureError, match="Non-range iterables"):
-            self.converter.convert_code(python_code)
+        c_code = self.converter.convert_code(python_code)
+        # Should generate container iteration using vec_int_size and vec_int_at
+        assert "vec_int_size" in c_code
+        assert "vec_int_at" in c_code
 
 
 class TestDictComprehensions:
