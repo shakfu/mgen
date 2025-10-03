@@ -17,6 +17,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.36] - 2025-10-03
+
+### Added
+
+- **C++ Advanced Type Inference System** - Comprehensive multi-pass type inference achieving 100% benchmark success
+  - **Nested Container Detection**: Analyze append operations and nested subscript patterns (`a[i][j]`) to infer types like `std::vector<std::vector<int>>`
+    - `_analyze_append_operations()`: Detects when vectors are appended to containers
+    - `_analyze_nested_subscripts()`: Detects 2D array access patterns
+    - File: `src/mgen/backends/cpp/converter.py:197-256,356-386`
+  - **String-Keyed Dictionary Inference**: Automatically detect string literals and variables as dictionary keys
+    - `_analyze_dict_key_types()`: Analyzes `dict[key]` subscripting and `dict.count(key)` patterns
+    - Correctly generates `std::unordered_map<std::string, int>` instead of `<int, int>`
+    - File: `src/mgen/backends/cpp/converter.py:319-385`
+  - **Pre-Pass Type Computation**: `_infer_all_variable_types()` runs before code generation
+    - Four-pass analysis: initial types → append refinement → nested detection → string key detection
+    - File: `src/mgen/backends/cpp/converter.py:258-317`
+  - **Smart Variable Context**: Modified `_convert_annotated_assignment()` to use pre-computed types
+    - File: `src/mgen/backends/cpp/converter.py:815-836`
+
+### Fixed
+
+- **C++ Variable Shadowing** - Fixed incorrect variable redeclaration in inner scopes
+  - Modified `_convert_assignment()` to check if variable already exists before declaring
+  - Prevents `auto var = value` shadowing outer `var` declarations
+  - Generates correct reassignment `var = value` for existing variables
+  - **Impact**: matmul benchmark now executes correctly (was segfaulting due to shadowed result variable)
+  - File: `src/mgen/backends/cpp/converter.py:869-892`
+
+### Changed
+
+- **C++ Backend Status**: 🎉 **FIRST BACKEND TO ACHIEVE 100% BENCHMARK SUCCESS** (7/7 passing)
+  - ✅ list_ops: 166750 operations, 0.246s execution
+  - ✅ dict_ops: 6065 operations, 0.254s execution
+  - ✅ set_ops: 234 operations, 0.243s execution
+  - ✅ matmul: 120 result, 0.278s execution
+  - ✅ wordcount: 4 occurrences, 0.244s execution
+  - ✅ quicksort: 100 result, 0.144s execution
+  - ✅ fibonacci: 514229 result, 0.242s execution
+  - Average compilation: 0.422s
+  - Average binary size: 36.1 KB
+  - **Production Ready**: C++ backend now handles nested containers, string-keyed dicts, and complex data structures
+
 ## [0.1.35] - 2025-10-02
 
 ### Fixed

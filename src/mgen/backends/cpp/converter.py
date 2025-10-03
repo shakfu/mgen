@@ -874,9 +874,16 @@ class MGenPythonToCppConverter:
         for target in stmt.targets:
             if isinstance(target, ast.Name):
                 var_name = target.id
-                var_type = self._infer_type_from_value(stmt.value)
-                self.variable_context[var_name] = var_type
-                statements.append(f"        {var_type} {var_name} = {value_expr};")
+
+                # Check if variable already exists in context
+                if var_name in self.variable_context:
+                    # Variable already declared - just reassign
+                    statements.append(f"        {var_name} = {value_expr};")
+                else:
+                    # New variable - declare with type
+                    var_type = self._infer_type_from_value(stmt.value)
+                    self.variable_context[var_name] = var_type
+                    statements.append(f"        {var_type} {var_name} = {value_expr};")
             else:
                 # Handle other target types (attributes, subscripts, etc.)
                 target_expr = self._convert_expression(target)
