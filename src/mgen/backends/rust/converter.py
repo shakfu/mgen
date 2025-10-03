@@ -31,6 +31,7 @@ class MGenPythonToRustConverter:
         self.current_function: Optional[str] = None  # Track current function context
         self.declared_vars: set[str] = set()  # Track declared variables in current function
         self.function_return_types: dict[str, str] = {}  # Track function return types
+        self.variable_types: dict[str, str] = {}  # Track variable types in current function scope
 
     def _to_snake_case(self, camel_str: str) -> str:
         """Convert CamelCase to snake_case."""
@@ -601,9 +602,12 @@ class MGenPythonToRustConverter:
         # Convert function body
         self.current_function = node.name
         self.declared_vars = set()  # Reset for new function
-        # Add parameters to declared variables
+        self.variable_types = {}  # Reset variable type tracking for new function
+        # Add parameters to declared variables and their types
         for arg in node.args.args:
             self.declared_vars.add(arg.arg)
+            param_type = self._infer_parameter_type(arg, node)
+            self.variable_types[arg.arg] = param_type
         body = self._convert_statements(node.body)
         self.current_function = None
 
@@ -688,6 +692,8 @@ class MGenPythonToRustConverter:
             value_expr = self._get_default_value(var_type)
 
         if isinstance(stmt.target, ast.Name):
+            # Track the variable type for later reference
+            self.variable_types[stmt.target.id] = var_type
             # Local variable with type annotation
             return f"    let mut {stmt.target.id}: {var_type} = {value_expr};"
 
@@ -1298,6 +1304,10 @@ class MGenPythonToRustConverter:
 
     def _infer_type_from_value(self, value: ast.expr) -> str:
         """Infer Rust type from Python value."""
+        # Check if this is a variable reference with known type
+        if isinstance(value, ast.Name) and value.id in self.variable_types:
+            return self.variable_types[value.id]
+
         if isinstance(value, ast.Constant):
             if isinstance(value.value, bool):  # Check bool first since bool is subclass of int
                 return "bool"
