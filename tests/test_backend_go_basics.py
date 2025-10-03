@@ -255,7 +255,8 @@ def test_len(items: list) -> int:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "return mgen.Len[interface{}](items)" in go_code
+        # list annotation defaults to []int now
+        assert "return mgen.Len[int](items)" in go_code
 
     def test_abs_function(self):
         """Test abs() function conversion."""
@@ -287,5 +288,6 @@ def test_min_max(items: list) -> int:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Min[interface{}](items)" in go_code
-        assert "mgen.Max[interface{}](items)" in go_code
+        # list annotation defaults to []int now
+        assert "mgen.Min[int](items)" in go_code
+        assert "mgen.Max[int](items)" in go_code

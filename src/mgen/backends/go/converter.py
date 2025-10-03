@@ -21,9 +21,9 @@ class MGenPythonToGoConverter:
             "float": "float64",
             "bool": "bool",
             "str": "string",
-            "list": "[]interface{}",
-            "dict": "map[interface{}]interface{}",
-            "set": "map[interface{}]bool",
+            "list": "[]int",  # Default to int elements for unsubscripted list
+            "dict": "map[int]int",  # Default to int keys/values for unsubscripted dict
+            "set": "map[int]bool",  # Default to int keys for unsubscripted set
             "void": "",
             "None": "",
         }
@@ -635,14 +635,13 @@ class MGenPythonToGoConverter:
 
     def _convert_annotated_assignment(self, stmt: ast.AnnAssign) -> str:
         """Convert annotated assignment."""
+        # Always use annotation if present - Python annotations are explicit type declarations
+        var_type = self._map_type_annotation(stmt.annotation)
+
         if stmt.value:
             value_expr = self._convert_expression(stmt.value)
-            # With generics, use inferred type for both declaration and tracking
-            var_type = self._infer_type_from_value(stmt.value)
         else:
             value_expr = None
-            # No value, use annotation
-            var_type = self._map_type_annotation(stmt.annotation)
 
         if stmt.value:
             target_id = stmt.target.id if isinstance(stmt.target, ast.Name) else str(stmt.target)
@@ -875,14 +874,14 @@ class MGenPythonToGoConverter:
 
             # Handle empty container constructors
             if func_name == "list" and len(args) == 0:
-                # list() with no args -> []interface{}{}
-                return "[]interface{}{}"
+                # list() with no args -> []int{} (default to int)
+                return "[]int{}"
             elif func_name == "dict" and len(args) == 0:
-                # dict() with no args -> make(map[interface{}]interface{})
-                return "make(map[interface{}]interface{})"
+                # dict() with no args -> make(map[int]int) (default to int keys/values)
+                return "make(map[int]int)"
             elif func_name == "set" and len(args) == 0:
-                # set() with no args -> make(map[interface{}]bool)
-                return "make(map[interface{}]bool)"
+                # set() with no args -> make(map[int]bool) (default to int keys)
+                return "make(map[int]bool)"
 
             # Handle built-in functions
             if func_name == "print":
@@ -978,9 +977,9 @@ class MGenPythonToGoConverter:
 
             # Handle dict methods - translate to Go map iteration
             elif method_name == "items":
-                # Python's dict.items() - In Go, we iterate over map directly
-                # For range-based iteration, just return the map itself
-                return obj_expr
+                # Python's dict.items() - Convert to slice of key-value pairs for comprehensions
+                # mgen.MapItems() returns []mgen.KV[K, V]
+                return f"mgen.MapItems({obj_expr})"
             elif method_name == "values":
                 # Python's dict.values() - need to extract values from map
                 # This would need runtime support, for now use map directly
@@ -1003,8 +1002,8 @@ class MGenPythonToGoConverter:
     def _convert_list_literal(self, expr: ast.List) -> str:
         """Convert list literal to Go slice literal."""
         if not expr.elts:
-            # Empty list
-            return "[]interface{}{}"
+            # Empty list - default to []int{}
+            return "[]int{}"
 
         # Try to infer a common type for all elements
         element_types = [self._infer_type_from_value(elt) for elt in expr.elts]
@@ -1023,8 +1022,8 @@ class MGenPythonToGoConverter:
     def _convert_dict_literal(self, expr: ast.Dict) -> str:
         """Convert dict literal to Go map literal."""
         if not expr.keys:
-            # Empty dict
-            return "make(map[interface{}]interface{})"
+            # Empty dict - default to map[int]int
+            return "make(map[int]int)"
 
         # Check for None keys (dictionary unpacking with **)
         has_unpacking = any(key is None for key in expr.keys)
@@ -1076,8 +1075,8 @@ class MGenPythonToGoConverter:
     def _convert_set_literal(self, expr: ast.Set) -> str:
         """Convert set literal to Go map literal (sets as map[T]bool)."""
         if not expr.elts:
-            # Empty set
-            return "make(map[interface{}]bool)"
+            # Empty set - default to map[int]bool
+            return "make(map[int]bool)"
         elements = []
         for elt in expr.elts:
             elt_str = self._convert_expression(elt)
@@ -1157,16 +1156,41 @@ class MGenPythonToGoConverter:
 
             return f"mgen.DictComprehensionFromRange[{key_type}, {value_type}]({range_call}, {transform_lambda})"
         else:
-            source_type = self._infer_type_from_value(iter_expr)
-            element_type = source_type[2:] if source_type.startswith("[]") else "interface{}"
+            # Handle tuple unpacking for dict iteration: {k: v for k, v in dict.items()}
+            if isinstance(target, ast.Tuple) and len(target.elts) == 2:
+                # Tuple unpacking from .items()
+                key_var = target.elts[0].id if isinstance(target.elts[0], ast.Name) else "k"
+                value_var = target.elts[1].id if isinstance(target.elts[1], ast.Name) else "v"
 
-            container_expr = self._convert_expression(iter_expr)
-            target_name = target.id if isinstance(target, ast.Name) else "x"
-            key_transform = self._convert_expression(key_expr)
-            value_transform = self._convert_expression(value_expr)
-            transform_lambda = f"func({target_name} {element_type}) ({key_type}, {value_type}) {{ return {key_transform}, {value_transform} }}"
+                # Convert dict.items() to mgen.MapItems() call that returns []KV struct
+                container_expr = self._convert_expression(iter_expr)
+                key_transform = self._convert_expression(key_expr)
+                value_transform = self._convert_expression(value_expr)
 
-            return f"mgen.DictComprehension[{element_type}, {key_type}, {value_type}]({container_expr}, {transform_lambda})"
+                # For Go, we need to convert map to slice of key-value pairs
+                # The mgen.MapItems() function will handle this
+                transform_lambda = f"func(kv mgen.KV[{key_type}, {value_type}]) ({key_type}, {value_type}) {{ {key_var}, {value_var} := kv.Key, kv.Value; return {key_transform}, {value_transform} }}"
+
+                # Check if we need to handle filtering
+                conditions = expr.generators[0].ifs
+                if conditions:
+                    condition_expr = self._convert_expression(conditions[0])
+                    filter_lambda = f"func(kv mgen.KV[{key_type}, {value_type}]) bool {{ {key_var}, {value_var} := kv.Key, kv.Value; return {condition_expr} }}"
+                    return f"mgen.DictComprehensionWithFilter[mgen.KV[{key_type}, {value_type}], {key_type}, {value_type}]({container_expr}, {transform_lambda}, {filter_lambda})"
+                else:
+                    return f"mgen.DictComprehension[mgen.KV[{key_type}, {value_type}], {key_type}, {value_type}]({container_expr}, {transform_lambda})"
+            else:
+                # Non-tuple unpacking case
+                source_type = self._infer_type_from_value(iter_expr)
+                element_type = source_type[2:] if source_type.startswith("[]") else "interface{}"
+
+                container_expr = self._convert_expression(iter_expr)
+                target_name = target.id if isinstance(target, ast.Name) else "x"
+                key_transform = self._convert_expression(key_expr)
+                value_transform = self._convert_expression(value_expr)
+                transform_lambda = f"func({target_name} {element_type}) ({key_type}, {value_type}) {{ return {key_transform}, {value_transform} }}"
+
+                return f"mgen.DictComprehension[{element_type}, {key_type}, {value_type}]({container_expr}, {transform_lambda})"
 
     def _convert_set_comprehension(self, expr: ast.SetComp) -> str:
         """Convert set comprehensions using Go 1.18+ generics."""
