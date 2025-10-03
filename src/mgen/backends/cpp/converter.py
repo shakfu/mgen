@@ -1011,6 +1011,17 @@ class MGenPythonToCppConverter:
                 # Python's append -> C++'s push_back
                 return f"{obj_expr}.push_back({', '.join(args)})"
 
+            # Handle dict.items() - in C++, we just iterate over the map directly
+            # Range-based for automatically gives us pairs
+            if method_name == "items":
+                return obj_expr  # Just return the map itself
+
+            # Handle dict.values() - extract values from map
+            # We'll use a lambda-based values extractor helper
+            if method_name == "values":
+                # Use a helper function from runtime to extract values
+                return f"mgen::values({obj_expr})"
+
             # Regular method calls
             if args:
                 return f"{obj_expr}.{method_name}({', '.join(args)})"
@@ -1086,16 +1097,33 @@ class MGenPythonToCppConverter:
                 # No condition
                 return f"dict_comprehension({range_call}, {key_val_lambda})"
         else:
-            # Container iteration (like iterating over a vector)
+            # Container iteration (like iterating over a vector or map.items())
             container_expr = self._convert_expression(iter_expr)
-            target_name = target.id if isinstance(target, ast.Name) else "x"
-            key_val_lambda = f"[](auto {target_name}) {{ return std::make_pair({self._convert_expression(key_expr)}, {self._convert_expression(value_expr)}); }}"
 
-            if conditions:
-                condition_lambda = f"[](auto {target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
-                return f"dict_comprehension({container_expr}, {key_val_lambda}, {condition_lambda})"
+            # Check if target is a tuple (e.g., for k, v in dict.items())
+            if isinstance(target, ast.Tuple) and len(target.elts) == 2:
+                # Tuple unpacking for pairs - use temporary pair and .first/.second
+                # Note: C++17 doesn't support structured bindings in lambda parameters
+                k_name = target.elts[0].id if isinstance(target.elts[0], ast.Name) else "k"
+                v_name = target.elts[1].id if isinstance(target.elts[1], ast.Name) else "v"
+                # Use pair.first and pair.second instead of structured bindings
+                key_val_lambda = f"[](const auto& __pair) {{ const auto& {k_name} = __pair.first; const auto& {v_name} = __pair.second; return std::make_pair({self._convert_expression(key_expr)}, {self._convert_expression(value_expr)}); }}"
+
+                if conditions:
+                    condition_lambda = f"[](const auto& __pair) {{ const auto& {k_name} = __pair.first; const auto& {v_name} = __pair.second; return {self._convert_expression(conditions[0])}; }}"
+                    return f"dict_comprehension({container_expr}, {key_val_lambda}, {condition_lambda})"
+                else:
+                    return f"dict_comprehension({container_expr}, {key_val_lambda})"
             else:
-                return f"dict_comprehension({container_expr}, {key_val_lambda})"
+                # Simple target
+                target_name = target.id if isinstance(target, ast.Name) else "x"
+                key_val_lambda = f"[](auto {target_name}) {{ return std::make_pair({self._convert_expression(key_expr)}, {self._convert_expression(value_expr)}); }}"
+
+                if conditions:
+                    condition_lambda = f"[](auto {target_name}) {{ return {self._convert_expression(conditions[0])}; }}"
+                    return f"dict_comprehension({container_expr}, {key_val_lambda}, {condition_lambda})"
+                else:
+                    return f"dict_comprehension({container_expr}, {key_val_lambda})"
 
     def _convert_set_comprehension(self, expr: ast.SetComp) -> str:
         """Convert set comprehensions using STL and runtime helpers."""

@@ -352,6 +352,24 @@ auto set_comprehension(const Container& container, Func transform, Pred conditio
     return result;
 }
 
+// ============================================================================
+// Dictionary Helper Functions
+// ============================================================================
+
+/**
+ * Extract values from a map (Python dict.values())
+ * Returns a vector of values for iteration
+ */
+template<typename Map>
+auto values(const Map& map) -> std::vector<typename Map::mapped_type> {
+    std::vector<typename Map::mapped_type> result;
+    result.reserve(map.size());
+    for (const auto& [key, value] : map) {
+        result.push_back(value);
+    }
+    return result;
+}
+
 } // namespace mgen
 
 #endif // MGEN_CPP_RUNTIME_HPP

@@ -661,13 +661,14 @@ class MGenPythonToRustConverter:
         """Convert annotated assignment (type annotation)."""
         if stmt.value:
             value_expr = self._convert_expression(stmt.value)
+            # Infer type from value if possible, otherwise use annotation
+            var_type = self._infer_type_from_value(stmt.value)
         else:
-            type_name = self._map_type_annotation(stmt.annotation)
-            value_expr = self._get_default_value(type_name)
+            var_type = self._map_type_annotation(stmt.annotation)
+            value_expr = self._get_default_value(var_type)
 
         if isinstance(stmt.target, ast.Name):
             # Local variable with type annotation
-            var_type = self._map_type_annotation(stmt.annotation)
             return f"    let mut {stmt.target.id}: {var_type} = {value_expr};"
 
         return "    // TODO: Complex annotated assignment"
@@ -950,9 +951,18 @@ class MGenPythonToRustConverter:
         value = self._convert_expression(expr.value)
         slice_expr = self._convert_expression(expr.slice)
 
-        # For now, treat all subscripts as HashMap/dict access with get()
-        # This is a simplification - in a full implementation we'd need to
-        # distinguish between lists, dicts, etc.
+        # Determine if this is a vector/array access or HashMap access
+        # Check if the value is a variable we know about
+        if isinstance(expr.value, ast.Name):
+            var_name = expr.value.id
+            # Try to infer the type
+            var_type = self._infer_type_from_value(expr.value) if hasattr(expr.value, 'inferred_type') else None
+
+            # For Vec types, use direct indexing
+            # Assume Vec if we don't have type info (safer default for lists)
+            return f"{value}[{slice_expr} as usize]"
+
+        # For complex expressions or unknown types, use HashMap-style access
         return f"{value}.get(&{slice_expr}).unwrap().clone()"
 
     def _convert_call(self, expr: ast.Call) -> str:
@@ -978,7 +988,29 @@ class MGenPythonToRustConverter:
                 return f"print_value({args_str})"
             elif func_name == "len":
                 if args:
-                    return f"Builtins::len_string(&{args[0]})"
+                    # Infer which len function to use based on argument type
+                    arg_expr = expr.args[0]
+                    arg_type = self._infer_type_from_value(arg_expr)
+
+                    # All len functions return usize, cast to i32 for Python semantics
+                    if arg_type.startswith("Vec<"):
+                        return f"(Builtins::len_vec(&{args[0]}) as i32)"
+                    elif arg_type.startswith("std::collections::HashMap<"):
+                        return f"(Builtins::len_hashmap(&{args[0]}) as i32)"
+                    elif arg_type.startswith("std::collections::HashSet<"):
+                        return f"(Builtins::len_hashset(&{args[0]}) as i32)"
+                    elif arg_type == "String":
+                        return f"(Builtins::len_string(&{args[0]}) as i32)"
+                    elif arg_type == "i32":
+                        # Unknown type inferred as i32 default - check if it's likely a string parameter
+                        # If the argument is a simple variable name, assume it's a string (common case)
+                        if isinstance(arg_expr, ast.Name):
+                            return f"(Builtins::len_string(&{args[0]}) as i32)"
+                        # Otherwise default to len_vec for list-like containers
+                        return f"(Builtins::len_vec(&{args[0]}) as i32)"
+                    else:
+                        # Default to len_vec for unknown types (safer for lists)
+                        return f"(Builtins::len_vec(&{args[0]}) as i32)"
                 return "0"
             elif func_name == "abs":
                 return f"Builtins::abs_i32({args[0]})"
@@ -1112,6 +1144,10 @@ class MGenPythonToRustConverter:
 
             if conditions:
                 condition_expr = self._convert_expression(conditions[0])
+                # For filtered comprehensions, the lambda receives &T, so clone if needed
+                if isinstance(element_expr, ast.Name) and element_expr.id == target_name:
+                    # Identity transform - need to clone the reference
+                    transform_expr = f"{transform_expr}.clone()"
                 return f"Comprehensions::list_comprehension_with_filter({container_expr}, |{target_name}| {transform_expr}, |{target_name}| {condition_expr})"
             else:
                 return f"Comprehensions::list_comprehension({container_expr}, |{target_name}| {transform_expr})"
@@ -1300,7 +1336,7 @@ class MGenPythonToRustConverter:
                 elif func_name == "sum":
                     return "i32"  # sum() returns integer
                 elif func_name == "len":
-                    return "usize"  # len() returns usize in Rust
+                    return "i32"  # Python len() returns int, map to i32
                 elif func_name == "abs":
                     return "i32"  # Default for abs
                 elif func_name == "min" or func_name == "max":
