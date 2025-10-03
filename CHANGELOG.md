@@ -17,6 +17,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.39] - 2025-10-04
+
+### Added
+
+- **Extended Container Code Generation System** - Expanded to support 4 fundamental container types
+  - **vec_int (Integer Vectors)** - Dynamic array implementation
+    - New template files: `mgen_vec_int.h` (75 lines), `mgen_vec_int.c` (119 lines)
+    - STC-compatible API: `vec_int_push`, `vec_int_at`, `vec_int_size`, `vec_int_drop`
+    - Value-based type (not pointer) - supports `{0}` initialization
+    - Automatic capacity growth (8 → 16 → 32 → ...)
+    - Generates ~183 lines of inline code
+    - Verified with list_ops benchmark (output: 166750)
+  - **set_int (Integer Hash Sets)** - Hash table with separate chaining
+    - New template files: `mgen_set_int.h` (95 lines), `mgen_set_int.c` (218 lines)
+    - Hash-based container with lazy bucket allocation for `{0}` initialization
+    - **Iterator Protocol**: `set_int_iter`, `set_int_begin()`, `set_int_next()` for set comprehensions
+    - STC-compatible API: `set_int_insert`, `set_int_contains`, `set_int_remove`
+    - djb2-variant hash function for integers (handles negative values)
+    - Generates ~220+ lines of inline code (with iterator)
+    - Verified with set_ops benchmark (output: 234)
+  - **map_int_int (Integer→Integer Maps)** - Hash table for int→int mappings
+    - New template files: `mgen_map_int_int.h` (78 lines), `mgen_map_int_int.c` (180 lines)
+    - Hash-based container with lazy bucket allocation for `{0}` initialization
+    - STC-compatible API: `map_int_int_insert`, `map_int_int_get`, `map_int_int_contains`
+    - Separate chaining for collision resolution
+    - Generates ~190 lines of inline code
+    - Verified with set_ops benchmark (dict operations)
+  - **Architecture Improvements**:
+    - Unique helper function names to avoid symbol collisions (`set_int_entry_new` vs `map_int_int_entry_new`)
+    - Lazy initialization pattern for hash-based containers (allocate buckets on first insert)
+    - Complete iterator protocol for set traversal in comprehensions
+    - All containers use standard error codes (MGEN_ERROR_VALUE, MGEN_ERROR_INDEX, MGEN_ERROR_MEMORY)
+  - **ContainerCodeGenerator Updates** (`container_codegen.py`):
+    - Added `generate_vec_int()` method (~60 lines)
+    - Added `generate_set_int()` method (~60 lines)
+    - Added `generate_map_int_int()` method (~60 lines)
+    - Updated `get_required_includes()` to handle all 4 container types
+  - **Converter Integration** (`converter.py`):
+    - Extended `_generate_inline_containers()` to support all 4 types
+    - Updated container type detection to generate `["map_str_int", "vec_int", "set_int", "map_int_int"]`
+
+### Changed
+
+- **Container Code Generation Philosophy** - Now supports 4 fundamental data structures inline
+  - Previous: Only `map_str_int` supported
+  - Current: `map_str_int`, `vec_int`, `set_int`, `map_int_int` all fully supported
+  - Each container type generates clean, self-contained C code
+  - Zero external dependencies beyond standard library
+
+### Fixed
+
+- **Hash Container Initialization** - Lazy bucket allocation for zero-initialized containers
+  - `set_int` and `map_int_int` now properly handle `{0}` initialization
+  - First `insert()` operation allocates bucket array if needed
+  - Prevents segmentation faults on zero-initialized containers
+- **Symbol Collision Prevention** - Unique static helper function names per container
+  - Each container uses prefixed helpers: `set_int_entry_new`, `map_int_int_entry_new`
+  - Prevents linker errors when multiple containers are generated in same file
+
+### Testing
+
+- **All 741 unit tests passing** (zero regressions)
+- **Benchmark Verification**:
+  - list_ops: Correct output (166750) with vec_int
+  - set_ops: Correct output (234) with set_int and map_int_int
+- **Code Generation Quality**: 4/4 container types compile and execute correctly
+
 ## [0.1.38] - 2025-10-04
 
 ### Added
