@@ -30,6 +30,7 @@ class MGenPythonToRustConverter:
         self.struct_info: dict[str, dict[str, Any]] = {}  # Track struct definitions for classes
         self.current_function: Optional[str] = None  # Track current function context
         self.declared_vars: set[str] = set()  # Track declared variables in current function
+        self.function_return_types: dict[str, str] = {}  # Track function return types
 
     def _to_snake_case(self, camel_str: str) -> str:
         """Convert CamelCase to snake_case."""
@@ -76,6 +77,19 @@ class MGenPythonToRustConverter:
                 struct_def = self._convert_class(item)
                 parts.append(struct_def)
                 parts.append("")
+
+        # First pass: collect function return types
+        for item in node.body:
+            if isinstance(item, ast.FunctionDef):
+                # Extract return type without converting the whole function
+                if item.name == "main":
+                    self.function_return_types[item.name] = "()"
+                elif item.returns:
+                    mapped_type = self._map_type_annotation(item.returns)
+                    self.function_return_types[item.name] = mapped_type if mapped_type else "()"
+                else:
+                    # Default to i32 if no annotation
+                    self.function_return_types[item.name] = "i32"
 
         # Convert functions
         functions = []
@@ -561,8 +575,10 @@ class MGenPythonToRustConverter:
         # Special case: Rust's main function must return () or Result
         if node.name == "main":
             return_type = ""
+            actual_return_type = "()"
         elif node.returns:
             mapped_type = self._map_type_annotation(node.returns)
+            actual_return_type = mapped_type if mapped_type else "()"
             if mapped_type and mapped_type != "()":
                 return_type = f" -> {mapped_type}"
             else:
@@ -570,10 +586,14 @@ class MGenPythonToRustConverter:
         else:
             # Infer return type from function body if no annotation
             inferred_type = self._infer_return_type(node)
+            actual_return_type = inferred_type if inferred_type else "()"
             if inferred_type and inferred_type != "()":
                 return_type = f" -> {inferred_type}"
             else:
                 return_type = ""
+
+        # Store function return type for later reference
+        self.function_return_types[node.name] = actual_return_type
 
         # Build function signature
         func_signature = f"fn {node.name}({params_str}){return_type}"
@@ -1331,7 +1351,10 @@ class MGenPythonToRustConverter:
         elif isinstance(value, ast.Call):
             if isinstance(value.func, ast.Name):
                 func_name = value.func.id
-                if func_name in self.struct_info:
+                # Check if it's a user-defined function with known return type
+                if func_name in self.function_return_types:
+                    return self.function_return_types[func_name]
+                elif func_name in self.struct_info:
                     return func_name
                 elif func_name == "sum":
                     return "i32"  # sum() returns integer
