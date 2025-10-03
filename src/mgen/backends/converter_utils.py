@@ -96,16 +96,12 @@ def extract_instance_variables(class_node: ast.ClassDef) -> dict[str, Optional[a
             for stmt in item.body:
                 if isinstance(stmt, ast.Assign):
                     for target in stmt.targets:
-                        if isinstance(target, ast.Attribute) and isinstance(
-                            target.value, ast.Name
-                        ):
+                        if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name):
                             if target.value.id == "self":
                                 variables[target.attr] = None
 
                 elif isinstance(stmt, ast.AnnAssign):
-                    if isinstance(stmt.target, ast.Attribute) and isinstance(
-                        stmt.target.value, ast.Name
-                    ):
+                    if isinstance(stmt.target, ast.Attribute) and isinstance(stmt.target.value, ast.Name):
                         if stmt.target.value.id == "self":
                             var_name = stmt.target.attr
                             # Store annotation for type inference
@@ -269,9 +265,7 @@ def escape_string_for_c_family(s: str) -> str:
     Returns:
         Escaped string suitable for C/C++/Java/Go/Rust string literals
     """
-    return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace(
-        "\r", "\\r"
-    ).replace("\t", "\\t")
+    return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
 
 
 def to_snake_case(camel_str: str) -> str:

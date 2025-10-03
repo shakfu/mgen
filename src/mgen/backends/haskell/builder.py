@@ -68,10 +68,11 @@ executable {target_name}
             cmd = [
                 "ghc",
                 str(source_path),
-                "-o", str(output_dir / executable_name),
+                "-o",
+                str(output_dir / executable_name),
                 "-XOverloadedStrings",
                 "-XFlexibleInstances",
-                "-XTypeSynonymInstances"
+                "-XTypeSynonymInstances",
             ]
 
             # Add runtime if it was copied
@@ -80,12 +81,7 @@ executable {target_name}
                 cmd.extend([str(runtime_path)])
 
             # Run compilation
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                cwd=output_dir
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
 
             return result.returncode == 0
 
@@ -100,5 +96,5 @@ executable {target_name}
             "-XFlexibleInstances",
             "-XTypeSynonymInstances",
             "-Wall",  # Enable warnings
-            "-fwarn-incomplete-patterns"
+            "-fwarn-incomplete-patterns",
         ]

@@ -71,19 +71,16 @@ class CppContainerSystem(AbstractContainerSystem):
             "clear": "clear",
             "size": "size",
             "empty": "empty",
-
             # Dict/Map methods
             "get": "at",
             "keys": "/* keys() not directly available */",
             "values": "/* values() not directly available */",
             "items": "/* items() not directly available */",
-
             # Set methods
             "add": "insert",
             "discard": "erase",
             "union": "/* union via set_union */",
             "intersection": "/* intersection via set_intersection */",
-
             # Common methods
             "find": "find",
             "count": "count",

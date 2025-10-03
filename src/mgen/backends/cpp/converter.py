@@ -46,7 +46,7 @@ class MGenPythonToCppConverter:
             "None": "void",
             "list": "std::vector",  # Will be specialized
             "dict": "std::unordered_map",  # Will be specialized
-            "set": "std::unordered_set",   # Will be specialized
+            "set": "std::unordered_set",  # Will be specialized
         }
         self.current_function: Optional[str] = None
         self.container_variables: dict[str, dict[str, Any]] = {}
@@ -65,7 +65,7 @@ class MGenPythonToCppConverter:
             # Re-raise our specific exceptions without wrapping
             raise
         except Exception as e:
-            raise UnsupportedFeatureError(f"Failed to convert Python code: {e}")
+            raise UnsupportedFeatureError(f"Failed to convert Python code: {e}") from e
 
     def _convert_module(self, node: ast.Module) -> str:
         """Convert a Python module to C++ code."""
@@ -112,7 +112,7 @@ class MGenPythonToCppConverter:
             "#include <set>",
             "#include <unordered_set>",
             "#include <algorithm>",
-            "#include <memory>"
+            "#include <memory>",
         ]
 
         # Add MGen runtime
@@ -187,10 +187,7 @@ class MGenPythonToCppConverter:
         methods = self._extract_methods(node)
 
         # Store class info for method resolution
-        self.defined_classes[class_name] = {
-            "attributes": instance_vars,
-            "methods": [m.name for m in methods]
-        }
+        self.defined_classes[class_name] = {"attributes": instance_vars, "methods": [m.name for m in methods]}
 
         # Generate class parts
         parts = []
@@ -235,17 +232,18 @@ class MGenPythonToCppConverter:
                 for init_stmt in stmt.body:
                     if isinstance(init_stmt, ast.AnnAssign) and isinstance(init_stmt.target, ast.Attribute):
                         # self.attr: type = value
-                        if (isinstance(init_stmt.target.value, ast.Name) and
-                            init_stmt.target.value.id == "self"):
+                        if isinstance(init_stmt.target.value, ast.Name) and init_stmt.target.value.id == "self":
                             attr_name = init_stmt.target.attr
                             attr_type = self._convert_type_annotation(init_stmt.annotation)
                             instance_vars[attr_name] = attr_type
                     elif isinstance(init_stmt, ast.Assign):
                         # self.attr = value
                         for target in init_stmt.targets:
-                            if (isinstance(target, ast.Attribute) and
-                                isinstance(target.value, ast.Name) and
-                                target.value.id == "self"):
+                            if (
+                                isinstance(target, ast.Attribute)
+                                and isinstance(target.value, ast.Name)
+                                and target.value.id == "self"
+                            ):
                                 attr_name = target.attr
                                 attr_type = self._infer_type_from_value(init_stmt.value)
                                 instance_vars[attr_name] = attr_type
@@ -260,8 +258,9 @@ class MGenPythonToCppConverter:
                 methods.append(stmt)
         return methods
 
-    def _generate_constructor(self, class_name: str, init_method: ast.FunctionDef,
-                            instance_vars: dict[str, str]) -> str:
+    def _generate_constructor(
+        self, class_name: str, init_method: ast.FunctionDef, instance_vars: dict[str, str]
+    ) -> str:
         """Generate C++ constructor from Python __init__."""
         # Get constructor parameters (skip 'self')
         params = []
@@ -276,8 +275,7 @@ class MGenPythonToCppConverter:
         for stmt in init_method.body:
             if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Attribute):
                 # self.attr: type = value
-                if (isinstance(stmt.target.value, ast.Name) and
-                    stmt.target.value.id == "self"):
+                if isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self":
                     attr_name = stmt.target.attr
                     if stmt.value:
                         value_expr = self._convert_method_expression(stmt.value, class_name)
@@ -285,9 +283,11 @@ class MGenPythonToCppConverter:
             elif isinstance(stmt, ast.Assign):
                 # self.attr = value
                 for target in stmt.targets:
-                    if (isinstance(target, ast.Attribute) and
-                        isinstance(target.value, ast.Name) and
-                        target.value.id == "self"):
+                    if (
+                        isinstance(target, ast.Attribute)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == "self"
+                    ):
                         attr_name = target.attr
                         value_expr = self._convert_method_expression(stmt.value, class_name)
                         body_parts.append(f"        this->{attr_name} = {value_expr};")
@@ -360,7 +360,7 @@ class MGenPythonToCppConverter:
         for target in stmt.targets:
             if isinstance(target, ast.Attribute):
                 # self.attr = value -> this->attr = value
-                if (isinstance(target.value, ast.Name) and target.value.id == "self"):
+                if isinstance(target.value, ast.Name) and target.value.id == "self":
                     statements.append(f"        this->{target.attr} = {value_expr};")
                 else:
                     # obj.attr = value
@@ -381,7 +381,7 @@ class MGenPythonToCppConverter:
 
         if isinstance(stmt.target, ast.Attribute):
             # self.attr += value -> this->attr += value
-            if (isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self"):
+            if isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self":
                 return f"        this->{stmt.target.attr} {op}= {value_expr};"
             else:
                 # obj.attr += value
@@ -519,11 +519,15 @@ class MGenPythonToCppConverter:
             range_call = f"Range({', '.join(range_args)})"
             # Create lambda for transformation
             target_name = target.id if isinstance(target, ast.Name) else "x"
-            transform_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(element_expr, class_name)}; }}"
+            transform_lambda = (
+                f"[]({target_name}) {{ return {self._convert_method_expression(element_expr, class_name)}; }}"
+            )
 
             if conditions:
                 # Comprehension with condition
-                condition_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                condition_lambda = (
+                    f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                )
                 return f"list_comprehension({range_call}, {transform_lambda}, {condition_lambda})"
             else:
                 # Simple comprehension
@@ -532,10 +536,14 @@ class MGenPythonToCppConverter:
             # Iteration over container (like words)
             container_expr = self._convert_method_expression(iter_expr, class_name)
             target_name = target.id if isinstance(target, ast.Name) else "x"
-            transform_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(element_expr, class_name)}; }}"
+            transform_lambda = (
+                f"[]({target_name}) {{ return {self._convert_method_expression(element_expr, class_name)}; }}"
+            )
 
             if conditions:
-                condition_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                condition_lambda = (
+                    f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                )
                 return f"list_comprehension({container_expr}, {transform_lambda}, {condition_lambda})"
             else:
                 return f"list_comprehension({container_expr}, {transform_lambda})"
@@ -560,7 +568,9 @@ class MGenPythonToCppConverter:
             transform_lambda = f"[]({target_name}) {{ return make_pair({key_transform}, {value_transform}); }}"
 
             if conditions:
-                condition_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                condition_lambda = (
+                    f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                )
                 return f"dict_comprehension({range_call}, {transform_lambda}, {condition_lambda})"
             else:
                 return f"dict_comprehension({range_call}, {transform_lambda})"
@@ -572,7 +582,9 @@ class MGenPythonToCppConverter:
             transform_lambda = f"[]({target_name}) {{ return make_pair({key_transform}, {value_transform}); }}"
 
             if conditions:
-                condition_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                condition_lambda = (
+                    f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                )
                 return f"dict_comprehension({container_expr}, {transform_lambda}, {condition_lambda})"
             else:
                 return f"dict_comprehension({container_expr}, {transform_lambda})"
@@ -589,20 +601,28 @@ class MGenPythonToCppConverter:
             range_args = [self._convert_method_expression(arg, class_name) for arg in iter_expr.args]
             range_call = f"Range({', '.join(range_args)})"
             target_name = target.id if isinstance(target, ast.Name) else "x"
-            transform_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(element_expr, class_name)}; }}"
+            transform_lambda = (
+                f"[]({target_name}) {{ return {self._convert_method_expression(element_expr, class_name)}; }}"
+            )
 
             if conditions:
-                condition_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                condition_lambda = (
+                    f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                )
                 return f"set_comprehension({range_call}, {transform_lambda}, {condition_lambda})"
             else:
                 return f"set_comprehension({range_call}, {transform_lambda})"
         else:
             container_expr = self._convert_method_expression(iter_expr, class_name)
             target_name = target.id if isinstance(target, ast.Name) else "x"
-            transform_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(element_expr, class_name)}; }}"
+            transform_lambda = (
+                f"[]({target_name}) {{ return {self._convert_method_expression(element_expr, class_name)}; }}"
+            )
 
             if conditions:
-                condition_lambda = f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                condition_lambda = (
+                    f"[]({target_name}) {{ return {self._convert_method_expression(conditions[0], class_name)}; }}"
+                )
                 return f"set_comprehension({container_expr}, {transform_lambda}, {condition_lambda})"
             else:
                 return f"set_comprehension({container_expr}, {transform_lambda})"
@@ -660,7 +680,11 @@ class MGenPythonToCppConverter:
             var_type = self._convert_type_annotation(stmt.annotation)
 
             # For empty container literals with auto type, use concrete types
-            if stmt.value and isinstance(stmt.value, (ast.List, ast.Dict)) and not (stmt.value.elts if isinstance(stmt.value, ast.List) else stmt.value.keys):
+            if (
+                stmt.value
+                and isinstance(stmt.value, (ast.List, ast.Dict))
+                and not (stmt.value.elts if isinstance(stmt.value, ast.List) else stmt.value.keys)
+            ):
                 # Empty container with bare type annotation - use concrete type
                 if var_type == "auto":
                     if isinstance(stmt.value, ast.List):
@@ -921,14 +945,15 @@ class MGenPythonToCppConverter:
                 "max": "mgen::max",
                 "sum": "mgen::sum",
                 "bool": "mgen::bool_value",
-                "range": "Range"
+                "range": "Range",
             }
 
             if func_name in builtin_map:
                 mapped_name = builtin_map[func_name]
                 if func_name == "print":
                     if args:
-                        return f"cout << {' << " " << '.join(args)} << endl"
+                        separator = ' << " " << '
+                        return f"cout << {separator.join(args)} << endl"
                     else:
                         return "cout << endl"
                 elif func_name == "range":
@@ -947,7 +972,11 @@ class MGenPythonToCppConverter:
         """Convert method calls including string methods."""
         if isinstance(expr.func, ast.Attribute):
             # Check if this is a method call on 'self' attribute
-            if isinstance(expr.func.value, ast.Attribute) and isinstance(expr.func.value.value, ast.Name) and expr.func.value.value.id == "self":
+            if (
+                isinstance(expr.func.value, ast.Attribute)
+                and isinstance(expr.func.value.value, ast.Name)
+                and expr.func.value.value.id == "self"
+            ):
                 # self.attr.method() -> handle string methods on instance variables
                 obj_expr = f"this->{expr.func.value.attr}"
             else:
@@ -1268,7 +1297,14 @@ class MGenPythonToCppConverter:
                 else:
                     # Try to infer from function context (if we know the return type)
                     # For now, check if function name suggests a type
-                    if func_name.endswith("_int") or func_name in ["factorial", "calculate", "compute", "add", "subtract", "multiply"]:
+                    if func_name.endswith("_int") or func_name in [
+                        "factorial",
+                        "calculate",
+                        "compute",
+                        "add",
+                        "subtract",
+                        "multiply",
+                    ]:
                         return "int"
                     elif func_name.endswith("_str") or func_name in ["format", "get_name", "to_string"]:
                         return "std::string"
@@ -1294,13 +1330,11 @@ class MGenPythonToCppConverter:
                 return left_type
 
             # If one side is int and other is float, result is float
-            if (left_type == "int" and right_type == "double") or \
-               (left_type == "double" and right_type == "int"):
+            if (left_type == "int" and right_type == "double") or (left_type == "double" and right_type == "int"):
                 return "double"
 
             # For string concatenation
-            if isinstance(value.op, ast.Add) and \
-               (left_type == "std::string" or right_type == "std::string"):
+            if isinstance(value.op, ast.Add) and (left_type == "std::string" or right_type == "std::string"):
                 return "std::string"
         return "auto"
 
@@ -1373,16 +1407,3 @@ class CppEmitter(AbstractEmitter):
             return self.converter._convert_set_comprehension(node)
         else:
             return "/* Unknown comprehension type */"
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -16,79 +16,80 @@ from typing import Any
 # import z3  # TODO: Fix missing z3 dependency
 Z3_AVAILABLE = False
 
+
 # Mock Z3 classes for development without Z3
 class z3:
-        class Solver:
-            def __init__(self) -> None:
-                pass
+    class Solver:
+        def __init__(self) -> None:
+            pass
 
-            def add(self, constraint: Any) -> None:
-                pass
+        def add(self, constraint: Any) -> None:
+            pass
 
-            def check(self) -> str:
-                return "unknown"
+        def check(self) -> str:
+            return "unknown"
 
-            def model(self) -> None:
-                return None
-
-            def set(self, param: str, value: Any) -> None:
-                pass
-
-        @staticmethod
-        def Not(expr: Any) -> None:
+        def model(self) -> None:
             return None
 
-        @staticmethod
-        def IntVal(val: int) -> None:
-            return None
+        def set(self, param: str, value: Any) -> None:
+            pass
 
-        sat = "sat"
-        unsat = "unsat"
+    @staticmethod
+    def Not(expr: Any) -> None:
+        return None
 
-        class Int:
-            def __init__(self, name: str) -> None:
-                self.name = name
+    @staticmethod
+    def IntVal(val: int) -> None:
+        return None
 
-            def __add__(self, other: Any) -> z3.Int:
-                return z3.Int(f"({self.name} + {other})")
+    sat = "sat"
+    unsat = "unsat"
 
-            def __sub__(self, other: Any) -> z3.Int:
-                return z3.Int(f"({self.name} - {other})")
+    class Int:
+        def __init__(self, name: str) -> None:
+            self.name = name
 
-            def __mul__(self, other: Any) -> z3.Int:
-                return z3.Int(f"({self.name} * {other})")
+        def __add__(self, other: Any) -> z3.Int:
+            return z3.Int(f"({self.name} + {other})")
 
-            def __le__(self, other: Any) -> str:
-                return f"({self.name} <= {other})"
+        def __sub__(self, other: Any) -> z3.Int:
+            return z3.Int(f"({self.name} - {other})")
 
-            def __lt__(self, other: Any) -> str:
-                return f"({self.name} < {other})"
+        def __mul__(self, other: Any) -> z3.Int:
+            return z3.Int(f"({self.name} * {other})")
 
-            def __ge__(self, other: Any) -> str:
-                return f"({self.name} >= {other})"
+        def __le__(self, other: Any) -> str:
+            return f"({self.name} <= {other})"
 
-            def __gt__(self, other: Any) -> str:
-                return f"({self.name} > {other})"
+        def __lt__(self, other: Any) -> str:
+            return f"({self.name} < {other})"
 
-        class Bool:
-            def __init__(self, name: str) -> None:
-                self.name = name
+        def __ge__(self, other: Any) -> str:
+            return f"({self.name} >= {other})"
 
-        @staticmethod
-        def And(*args: Any) -> str:
-            return "And(" + str(args) + ")"
+        def __gt__(self, other: Any) -> str:
+            return f"({self.name} > {other})"
 
-        @staticmethod
-        def Or(*args: Any) -> str:
-            return "Or(" + str(args) + ")"
+    class Bool:
+        def __init__(self, name: str) -> None:
+            self.name = name
 
-        @staticmethod
-        def Implies(a: Any, b: Any) -> str:
-            return f"Implies({a}, {b})"
+    @staticmethod
+    def And(*args: Any) -> str:
+        return "And(" + str(args) + ")"
 
-        @staticmethod
-        def ForAll(vars: Any, body: Any) -> str:
-            return f"ForAll({vars}, {body})"
+    @staticmethod
+    def Or(*args: Any) -> str:
+        return "Or(" + str(args) + ")"
+
+    @staticmethod
+    def Implies(a: Any, b: Any) -> str:
+        return f"Implies({a}, {b})"
+
+    @staticmethod
+    def ForAll(vars: Any, body: Any) -> str:
+        return f"ForAll({vars}, {body})"
 
 
 from ..base import AnalysisContext
@@ -416,7 +417,7 @@ class TheoremProver:
             property_type=PropertyType.NULL_POINTER_SAFETY,
             description="Null pointer safety check",
             z3_formula="true",  # Placeholder formula
-            context=kwargs
+            context=kwargs,
         )
 
     def _create_overflow_template(self, **kwargs: Any) -> ProofProperty:
@@ -431,7 +432,7 @@ class TheoremProver:
             property_type=PropertyType.LOOP_INVARIANT,
             description="Loop invariant property",
             z3_formula="true",  # Placeholder formula
-            context=kwargs
+            context=kwargs,
         )
 
 

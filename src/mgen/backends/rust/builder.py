@@ -39,20 +39,10 @@ edition = "2021"
                 shutil.copy2(runtime_src, runtime_dst)
 
             # Build rustc command
-            cmd = [
-                "rustc",
-                str(source_path),
-                "-o", str(output_dir / executable_name),
-                "--edition", "2021"
-            ]
+            cmd = ["rustc", str(source_path), "-o", str(output_dir / executable_name), "--edition", "2021"]
 
             # Run compilation
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                cwd=output_dir
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
 
             return result.returncode == 0
 

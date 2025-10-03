@@ -308,7 +308,11 @@ class IRAssignment(IRStatement):
             self.add_child(value)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"type": "assignment", "target": self.target.to_dict(), "value": self.value.to_dict() if self.value else None}
+        return {
+            "type": "assignment",
+            "target": self.target.to_dict(),
+            "value": self.value.to_dict() if self.value else None,
+        }
 
     def accept(self, visitor: "IRVisitor") -> Any:
         return visitor.visit_assignment(self)
@@ -673,6 +677,7 @@ class IRBuilder:
         # Fallback for complex targets - create a dummy assignment with placeholder
         # This should be handled properly by the caller
         from warnings import warn
+
         warn(f"Complex annotated assignment target not supported: {type(node.target)}", stacklevel=2)
         # Return a dummy assignment to satisfy type checker
         dummy_var = IRVariable("_unknown", IRType(IRDataType.VOID), self._get_location(node))

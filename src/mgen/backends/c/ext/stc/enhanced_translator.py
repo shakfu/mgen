@@ -251,9 +251,7 @@ class EnhancedSTCTranslator(STCPythonToCTranslator):
                 element_type = self._extract_element_type_from_annotation(type_str)
 
                 # Register container
-                self.enhanced_memory_manager.register_container_with_allocator(
-                    var_name, container_type, element_type
-                )
+                self.enhanced_memory_manager.register_container_with_allocator(var_name, container_type, element_type)
 
         # Generate initialization code for all components
         init_result = self.enhanced_memory_manager.generate_initialization_code()

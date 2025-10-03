@@ -92,11 +92,7 @@ class TypeUnifier:
         if len(options) == 1:
             return next(iter(options))
 
-        return FlowType(
-            name="union",
-            is_union=True,
-            union_options=set(options)
-        )
+        return FlowType(name="union", is_union=True, union_options=set(options))
 
 
 class FlowSensitiveInferencer:
@@ -279,11 +275,12 @@ class FlowSensitiveInferencer:
 
     def _handle_for(self, stmt: ast.For, env: dict[str, FlowType]) -> dict[str, FlowType]:
         """Handle for loops (currently only range-based)."""
-        if (isinstance(stmt.target, ast.Name) and
-            isinstance(stmt.iter, ast.Call) and
-            isinstance(stmt.iter.func, ast.Name) and
-            stmt.iter.func.id == "range"):
-
+        if (
+            isinstance(stmt.target, ast.Name)
+            and isinstance(stmt.iter, ast.Call)
+            and isinstance(stmt.iter.func, ast.Name)
+            and stmt.iter.func.id == "range"
+        ):
             # Range-based for loop - iteration variable is int
             iter_var = stmt.target.id
             new_env = dict(env)
@@ -348,7 +345,7 @@ class FlowSensitiveInferencer:
             elif isinstance(expr.op, ast.Div):
                 return FLOW_FLOAT  # True division always returns float
             elif isinstance(expr.op, ast.FloorDiv):
-                return FLOW_INT    # Floor division returns int
+                return FLOW_INT  # Floor division returns int
             else:
                 return self.unifier.unify(left_type, right_type)
 

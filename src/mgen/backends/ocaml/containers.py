@@ -47,7 +47,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
                 "reverse": "List.rev",
                 "concat": "List.concat",
                 "head": "List.hd",
-                "tail": "List.tl"
+                "tail": "List.tl",
             }
         else:
             # Use runtime functions for consistency
@@ -60,7 +60,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
                 "reverse": "List.rev",
                 "concat": "List.concat",
                 "head": "List.hd",
-                "tail": "List.tl"
+                "tail": "List.tl",
             }
 
     def get_dict_operations(self) -> dict[str, str]:
@@ -74,7 +74,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
                 "mem": "Hashtbl.mem",
                 "length": "Hashtbl.length",
                 "iter": "Hashtbl.iter",
-                "fold": "Hashtbl.fold"
+                "fold": "Hashtbl.fold",
             }
         else:
             # Map module operations
@@ -86,7 +86,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
                 "mem": "Map.mem",
                 "length": "Map.cardinal",
                 "iter": "Map.iter",
-                "fold": "Map.fold"
+                "fold": "Map.fold",
             }
 
     def get_set_operations(self) -> dict[str, str]:
@@ -102,7 +102,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
             "subset": "Set.subset",
             "length": "Set.cardinal",
             "iter": "Set.iter",
-            "fold": "Set.fold"
+            "fold": "Set.fold",
         }
 
     def generate_list_literal(self, elements: list, element_type: str) -> str:
@@ -144,7 +144,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
                 key_str = f'"{key}"' if key_type in ["str", "string"] else str(key)
                 value_str = f'"{value}"' if value_type in ["str", "string"] else str(value)
                 pairs.append(f"Map.add {key_str} {value_str}")
-            return f"({' ('.join(pairs)} Map.empty{')'*len(pairs)})"
+            return f"({' ('.join(pairs)} Map.empty{')' * len(pairs)})"
 
     def generate_set_literal(self, elements: list, element_type: str) -> str:
         """Generate OCaml set literal."""
@@ -160,7 +160,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
                 ocaml_elements.append(str(element))
 
         adds = " ".join(f"Set.add {elem}" for elem in ocaml_elements)
-        return f"({adds} Set.empty{')'*len(ocaml_elements)})"
+        return f"({adds} Set.empty{')' * len(ocaml_elements)})"
 
     def _map_python_type_to_ocaml(self, python_type: str) -> str:
         """Map Python type to OCaml type."""
@@ -175,7 +175,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
             "set": "set",
             "tuple": "tuple",
             "None": "unit",
-            "Any": "any"
+            "Any": "any",
         }
         return type_mapping.get(python_type, python_type)
 
@@ -232,9 +232,6 @@ class OCamlContainerSystem(AbstractContainerSystem):
         else:
             imports.append("module StringMap = Map.Make(String)")
 
-        imports.extend([
-            "open List",
-            "module StringSet = Set.Make(String)"
-        ])
+        imports.extend(["open List", "module StringSet = Set.Make(String)"])
 
         return imports

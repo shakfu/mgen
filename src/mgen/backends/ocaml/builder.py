@@ -44,13 +44,7 @@ class OCamlBuilder(AbstractBuilder):
 
         # Compile with OCaml compiler via opam
         executable = output_file.replace(".ml", "")
-        cmd = [
-            "opam", "exec", "--",
-            "ocamlc",
-            "-o", executable,
-            str(runtime_path),
-            output_file
-        ]
+        cmd = ["opam", "exec", "--", "ocamlc", "-o", executable, str(runtime_path), output_file]
 
         result = subprocess.run(cmd, capture_output=True, text=True)
 
@@ -131,7 +125,7 @@ class OCamlBuilder(AbstractBuilder):
             "mgen_runtime.cmo",
             "_build",  # dune build directory
             "dune-project",
-            "dune"
+            "dune",
         ]
 
         removed_count = 0
@@ -143,6 +137,7 @@ class OCamlBuilder(AbstractBuilder):
                     removed_count += 1
                 elif artifact_path.is_dir():
                     import shutil
+
                     shutil.rmtree(artifact_path)
                     removed_count += 1
             except Exception:
@@ -162,7 +157,7 @@ class OCamlBuilder(AbstractBuilder):
         dune_content = f"""(executable
  (public_name {target_name})
  (name {target_name})
- (modules mgen_runtime {' '.join(Path(f).stem for f in source_files)}))
+ (modules mgen_runtime {" ".join(Path(f).stem for f in source_files)}))
 """
 
         return dune_project_content + "\n" + dune_content
@@ -183,19 +178,14 @@ class OCamlBuilder(AbstractBuilder):
 
         # Compile with OCaml compiler via opam
         executable = base_path / source_path.stem
-        cmd = [
-            "opam", "exec", "--",
-            "ocamlc",
-            "-o", str(executable),
-            str(runtime_path),
-            source_file
-        ]
+        cmd = ["opam", "exec", "--", "ocamlc", "-o", str(executable), str(runtime_path), source_file]
 
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(base_path))
 
         if result.returncode != 0:
             # Log compilation errors for debugging
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"OCaml compilation failed: {result.stderr}")
 

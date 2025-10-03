@@ -51,7 +51,9 @@ try:
         VectorizationDetector,
         analyze_python_code,
     )
-    from .frontend.base import AnalysisLevel, OptimizationLevel as FrontendOptimizationLevel
+    from .frontend.base import AnalysisLevel
+    from .frontend.base import OptimizationLevel as FrontendOptimizationLevel
+
     FRONTEND_AVAILABLE = True
 except ImportError:
     # Fallback if frontend components not available
@@ -60,6 +62,7 @@ except ImportError:
 
 class OptimizationLevel(Enum):
     """Optimization levels for code generation."""
+
     NONE = "none"
     BASIC = "basic"
     MODERATE = "moderate"
@@ -68,6 +71,7 @@ class OptimizationLevel(Enum):
 
 class BuildMode(Enum):
     """Build modes for the pipeline."""
+
     NONE = "none"  # Generate code only
     MAKEFILE = "makefile"  # Generate build file (Makefile, Cargo.toml, etc.)
     DIRECT = "direct"  # Compile directly to executable
@@ -75,6 +79,7 @@ class BuildMode(Enum):
 
 class PipelinePhase(Enum):
     """Pipeline phase identifiers."""
+
     VALIDATION = "validation"
     ANALYSIS = "analysis"
     PYTHON_OPTIMIZATION = "python_optimization"
@@ -87,6 +92,7 @@ class PipelinePhase(Enum):
 @dataclass
 class PipelineConfig:
     """Configuration for the MGen pipeline."""
+
     optimization_level: OptimizationLevel = OptimizationLevel.MODERATE
     target_language: str = "c"
     output_dir: Optional[str] = None
@@ -109,18 +115,14 @@ class PipelineConfig:
             self.libraries = []
         if self.compiler is None:
             # Set default compiler based on target language
-            compiler_defaults = {
-                "c": "gcc",
-                "rust": "rustc",
-                "go": "go",
-                "cpp": "g++"
-            }
+            compiler_defaults = {"c": "gcc", "rust": "rustc", "go": "go", "cpp": "g++"}
             self.compiler = compiler_defaults.get(self.target_language, "gcc")
 
 
 @dataclass
 class PipelineResult:
     """Result from pipeline execution."""
+
     success: bool
     input_file: str
     output_files: dict[str, str]  # file_type -> file_path
@@ -132,7 +134,6 @@ class PipelineResult:
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     generated_files: list[str] = field(default_factory=list)
-
 
 
 def _map_optimization_level(pipeline_level: OptimizationLevel) -> "FrontendOptimizationLevel":
@@ -173,7 +174,7 @@ class MGenPipeline:
             self.factory = self.backend.get_factory()
             self.container_system = self.backend.get_container_system()
         except ValueError as e:
-            raise ValueError(f"Unsupported target language '{self.config.target_language}': {e}")
+            raise ValueError(f"Unsupported target language '{self.config.target_language}': {e}") from e
 
         # Initialize frontend analysis components if available
         if FRONTEND_AVAILABLE and self.config.enable_advanced_analysis:
@@ -231,10 +232,7 @@ class MGenPipeline:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         result = PipelineResult(
-            success=True,
-            input_file=str(input_path),
-            output_files={},
-            target_language=self.config.target_language
+            success=True, input_file=str(input_path), output_files={}, target_language=self.config.target_language
         )
 
         try:
@@ -319,7 +317,9 @@ class MGenPipeline:
                             result.warnings.append(f"Constraint warning: {violation.message}")
 
                     # Fail if there are critical constraint violations
-                    critical_errors = [v for v in constraint_report.violations if v.severity.name in ["ERROR", "CRITICAL"]]
+                    critical_errors = [
+                        v for v in constraint_report.violations if v.severity.name in ["ERROR", "CRITICAL"]
+                    ]
                     if critical_errors:
                         result.success = False
                         return False
@@ -344,9 +344,7 @@ class MGenPipeline:
             if FRONTEND_AVAILABLE and self.config.enable_advanced_analysis:
                 # Use comprehensive AST analysis
                 analysis_result = self.ast_analyzer.analyze(source_code)
-                result.phase_results[PipelinePhase.ANALYSIS] = {
-                    "ast_analysis": analysis_result
-                }
+                result.phase_results[PipelinePhase.ANALYSIS] = {"ast_analysis": analysis_result}
 
                 if not analysis_result.convertible:
                     result.success = False
@@ -366,7 +364,7 @@ class MGenPipeline:
                     ast_node=ast_root,
                     analysis_result=analysis_result,
                     analysis_level=AnalysisLevel.INTERMEDIATE,
-                    optimization_level=FrontendOptimizationLevel.MODERATE
+                    optimization_level=FrontendOptimizationLevel.MODERATE,
                 )
 
                 # Static analysis (control flow, data flow)
@@ -420,13 +418,17 @@ class MGenPipeline:
                     return SimpleAnalysisResult(source_code, simple_analysis)
                 except:
                     # Fallback to basic analysis
-                    basic_result = type("BasicAnalysis", (), {
-                        "source_code": source_code,
-                        "ast_root": ast.parse(source_code),
-                        "convertible": True,
-                        "errors": [],
-                        "warnings": []
-                    })()
+                    basic_result = type(
+                        "BasicAnalysis",
+                        (),
+                        {
+                            "source_code": source_code,
+                            "ast_root": ast.parse(source_code),
+                            "convertible": True,
+                            "errors": [],
+                            "warnings": [],
+                        },
+                    )()
                     result.phase_results[PipelinePhase.ANALYSIS] = {"basic": True}
                     return basic_result
 
@@ -521,7 +523,9 @@ class MGenPipeline:
             result.warnings.append(f"Target optimization phase warning: {str(e)}")
             return analysis_result
 
-    def _generation_phase(self, source_code: str, analysis_result: Any, output_dir: Path, result: PipelineResult) -> bool:
+    def _generation_phase(
+        self, source_code: str, analysis_result: Any, output_dir: Path, result: PipelineResult
+    ) -> bool:
         """Phase 6: Target language code generation."""
         try:
             # Generate code using selected backend
@@ -538,7 +542,7 @@ class MGenPipeline:
             result.phase_results[PipelinePhase.GENERATION] = {
                 "source_file": str(source_file_path),
                 "backend": self.backend.get_name(),
-                "generated_lines": len(generated_code.splitlines())
+                "generated_lines": len(generated_code.splitlines()),
             }
             return True
 
@@ -560,10 +564,7 @@ class MGenPipeline:
 
             if self.config.build_mode == BuildMode.MAKEFILE:
                 # Generate build file using backend
-                build_content = self.builder.generate_build_file(
-                    [str(source_file_path)],
-                    source_file_path.stem
-                )
+                build_content = self.builder.generate_build_file([str(source_file_path)], source_file_path.stem)
                 build_file_path = output_dir / self.builder.get_build_filename()
                 build_file_path.write_text(build_content)
 
@@ -610,7 +611,7 @@ def convert_python_to_language(
         optimization_level=optimization_level,
         build_mode=build_mode,
         target_language=target_language,
-        output_dir=str(output_path) if output_path else "build/src"
+        output_dir=str(output_path) if output_path else "build/src",
     )
     pipeline = MGenPipeline(config)
     return pipeline.convert(input_path, output_path)

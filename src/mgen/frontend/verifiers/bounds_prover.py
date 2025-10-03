@@ -17,6 +17,7 @@ try:
 except ImportError:
     Z3_AVAILABLE = False
 
+
 # Mock z3 for when not available
 class z3:
     class Int:
@@ -47,9 +48,11 @@ class z3:
     @staticmethod
     def And(*args: Any) -> None:
         return None
+
     @staticmethod
     def IntVal(val: int) -> "z3.Int":
         return z3.Int(str(val))
+
 
 from ..base import AnalysisContext
 from .theorem_prover import ProofProperty, ProofResult, ProofStatus, PropertyType, TheoremProver

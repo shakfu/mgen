@@ -34,6 +34,7 @@ class MGenPythonToRustConverter:
     def _to_snake_case(self, camel_str: str) -> str:
         """Convert CamelCase to snake_case."""
         import re
+
         s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", camel_str)
         return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
@@ -50,7 +51,7 @@ class MGenPythonToRustConverter:
             # Re-raise UnsupportedFeatureError without wrapping
             raise
         except Exception as e:
-            raise TypeMappingError(f"Failed to convert Python code: {e}")
+            raise TypeMappingError(f"Failed to convert Python code: {e}") from e
 
     def _convert_module(self, node: ast.Module) -> str:
         """Convert a Python module to Rust."""
@@ -139,12 +140,20 @@ class MGenPythonToRustConverter:
             for stmt in init_method.body:
                 if isinstance(stmt, ast.Assign):
                     for target in stmt.targets:
-                        if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+                        if (
+                            isinstance(target, ast.Attribute)
+                            and isinstance(target.value, ast.Name)
+                            and target.value.id == "self"
+                        ):
                             field_name = self._to_snake_case(target.attr)
                             field_type = self._infer_type_from_assignment(stmt)
                             struct_lines.append(f"    {field_name}: {field_type},")
                 elif isinstance(stmt, ast.AnnAssign):
-                    if isinstance(stmt.target, ast.Attribute) and isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self":
+                    if (
+                        isinstance(stmt.target, ast.Attribute)
+                        and isinstance(stmt.target.value, ast.Name)
+                        and stmt.target.value.id == "self"
+                    ):
                         field_name = self._to_snake_case(stmt.target.attr)
                         field_type = self._map_type_annotation(stmt.annotation)
                         struct_lines.append(f"    {field_name}: {field_type},")
@@ -155,9 +164,7 @@ class MGenPythonToRustConverter:
         struct_lines.append("}")
 
         # Store struct info for method generation
-        self.struct_info[class_name] = {
-            "fields": self._extract_struct_fields(init_method) if init_method else []
-        }
+        self.struct_info[class_name] = {"fields": self._extract_struct_fields(init_method) if init_method else []}
 
         # Generate impl block with constructor and methods
         impl_lines = []
@@ -200,12 +207,20 @@ class MGenPythonToRustConverter:
         for stmt in init_method.body:
             if isinstance(stmt, ast.Assign):
                 for target in stmt.targets:
-                    if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+                    if (
+                        isinstance(target, ast.Attribute)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == "self"
+                    ):
                         field_name = self._to_snake_case(target.attr)
                         value_expr = self._convert_expression(stmt.value)
                         lines.append(f"            {field_name}: {value_expr},")
             elif isinstance(stmt, ast.AnnAssign):
-                if isinstance(stmt.target, ast.Attribute) and isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self":
+                if (
+                    isinstance(stmt.target, ast.Attribute)
+                    and isinstance(stmt.target.value, ast.Name)
+                    and stmt.target.value.id == "self"
+                ):
                     field_name = self._to_snake_case(stmt.target.attr)
                     if stmt.value:
                         value_expr = self._convert_expression(stmt.value)
@@ -1239,8 +1254,12 @@ class MGenPythonToRustConverter:
             if value.keys and value.values:
                 key_types = [self._infer_type_from_value(key) for key in value.keys if key]
                 value_types = [self._infer_type_from_value(val) for val in value.values if val]
-                if (key_types and all(t == key_types[0] for t in key_types) and
-                    value_types and all(t == value_types[0] for t in value_types)):
+                if (
+                    key_types
+                    and all(t == key_types[0] for t in key_types)
+                    and value_types
+                    and all(t == value_types[0] for t in value_types)
+                ):
                     return f"std::collections::HashMap<{key_types[0]}, {value_types[0]}>"
             return "std::collections::HashMap<String, i32>"  # Default
         elif isinstance(value, ast.Set):
@@ -1344,9 +1363,7 @@ class MGenPythonToRustConverter:
 
     def _is_constructor_call(self, value: ast.expr) -> bool:
         """Check if the expression is a constructor call."""
-        return (isinstance(value, ast.Call) and
-                isinstance(value.func, ast.Name) and
-                value.func.id in self.struct_info)
+        return isinstance(value, ast.Call) and isinstance(value.func, ast.Name) and value.func.id in self.struct_info
 
     def _extract_struct_fields(self, init_method: ast.FunctionDef) -> list[str]:
         """Extract struct field names from __init__ method."""
@@ -1355,7 +1372,11 @@ class MGenPythonToRustConverter:
             if isinstance(stmt, (ast.Assign, ast.AnnAssign)):
                 if isinstance(stmt.target if hasattr(stmt, "target") else stmt.targets[0], ast.Attribute):
                     target = stmt.target if hasattr(stmt, "target") else stmt.targets[0]
-                    if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+                    if (
+                        isinstance(target, ast.Attribute)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == "self"
+                    ):
                         fields.append(target.attr)
         return fields
 

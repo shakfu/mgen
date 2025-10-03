@@ -255,7 +255,9 @@ class SymbolicExecutor(BaseAnalyzer):
 
     def _execute_symbolically(self, node: ast.AST, initial_state: SymbolicState) -> list[ExecutionPath]:
         """Execute the AST node symbolically and return all execution paths."""
-        worklist: list[tuple[ast.AST, SymbolicState, list[int]]] = [(node, initial_state, [])]  # (node, state, path_history)
+        worklist: list[tuple[ast.AST, SymbolicState, list[int]]] = [
+            (node, initial_state, [])
+        ]  # (node, state, path_history)
         completed_paths = []
 
         while worklist and self._path_counter < self._max_paths:

@@ -233,7 +233,9 @@ class NestedContainerManager:
 
         return definitions
 
-    def _generate_template_definition(self, type_name: str, type_info: NestedTypeInfo, template_manager: Any) -> list[str]:
+    def _generate_template_definition(
+        self, type_name: str, type_info: NestedTypeInfo, template_manager: Any
+    ) -> list[str]:
         """Generate template definition for a specific nested type."""
         definitions = []
 

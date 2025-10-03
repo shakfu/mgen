@@ -1,6 +1,5 @@
 """Rust container system for MGen."""
 
-
 from ..base import AbstractContainerSystem
 
 

@@ -347,13 +347,9 @@ class LoopAnalyzer(BaseOptimizer):
                         step_val = bounds.step
                         assert start_val is not None and end_val is not None and step_val is not None
                         if step_val > 0:
-                            bounds.total_iterations = max(
-                                0, (end_val - start_val + step_val - 1) // step_val
-                            )
+                            bounds.total_iterations = max(0, (end_val - start_val + step_val - 1) // step_val)
                         else:
-                            bounds.total_iterations = max(
-                                0, (start_val - end_val - step_val - 1) // (-step_val)
-                            )
+                            bounds.total_iterations = max(0, (start_val - end_val - step_val - 1) // (-step_val))
 
                 # Check if ascending
                 if bounds.step is not None:

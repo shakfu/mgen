@@ -17,23 +17,29 @@ try:
 except ImportError:
     Z3_AVAILABLE = False
 
+
 # Mock z3 for when not available
 class z3:
     class Int:
         def __init__(self, name: str) -> None:
             self.name = name
+
     class Real:
         def __init__(self, name: str) -> None:
             self.name = name
+
     class Bool:
         def __init__(self, name: str) -> None:
             self.name = name
+
     @staticmethod
     def And(*args: Any) -> None:
         return None
+
     @staticmethod
     def Or(*args: Any) -> None:
         return None
+
 
 from ..base import AnalysisContext
 from .theorem_prover import ProofProperty, ProofResult, ProofStatus, PropertyType, TheoremProver
@@ -508,7 +514,13 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
 
     def visit_For(self, node: ast.For) -> None:
         """Extract for loop information."""
-        loop_info: dict[str, Any] = {"type": "for", "line": node.lineno, "variable": None, "iterable": None, "body_lines": []}
+        loop_info: dict[str, Any] = {
+            "type": "for",
+            "line": node.lineno,
+            "variable": None,
+            "iterable": None,
+            "body_lines": [],
+        }
 
         # Extract loop variable
         if isinstance(node.target, ast.Name):

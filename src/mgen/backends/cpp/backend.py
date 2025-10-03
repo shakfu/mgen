@@ -29,19 +29,23 @@ class CppBackend(LanguageBackend):
     def get_factory(self) -> "AbstractFactory":
         """Get the C++ code element factory."""
         from .factory import CppFactory
+
         return CppFactory()
 
     def get_emitter(self) -> "AbstractEmitter":
         """Get the C++ code emitter."""
         from .emitter import CppEmitter
+
         return CppEmitter(self.preferences)
 
     def get_builder(self) -> "AbstractBuilder":
         """Get the C++ builder."""
         from .builder import CppBuilder
+
         return CppBuilder()
 
     def get_container_system(self) -> "AbstractContainerSystem":
         """Get the C++ container system."""
         from .containers import CppContainerSystem
+
         return CppContainerSystem()

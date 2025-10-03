@@ -48,7 +48,7 @@ class CEmitter(AbstractEmitter):
             "void": "void",
             "list": "vec_int",  # Default to int vector, will be specialized
             "dict": "map_str_int",  # Default to string->int map
-            "set": "set_int",   # Default to int set
+            "set": "set_int",  # Default to int set
         }
 
     def map_python_type(self, python_type: str) -> str:

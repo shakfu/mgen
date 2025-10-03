@@ -83,16 +83,3 @@ class CppEmitter(AbstractEmitter):
             return self.converter._convert_set_comprehension(node)
         else:
             return "/* Unknown comprehension type */"
-
-
-
-
-
-
-
-
-
-
-
-
-

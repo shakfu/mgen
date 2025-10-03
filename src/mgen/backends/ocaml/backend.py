@@ -56,9 +56,9 @@ class OCamlBackend(LanguageBackend):
     def is_available(self) -> bool:
         """Check if OCaml compiler is available."""
         import subprocess
+
         try:
-            result = subprocess.run(["ocamlc", "-version"],
-                                 capture_output=True, text=True, timeout=5)
+            result = subprocess.run(["ocamlc", "-version"], capture_output=True, text=True, timeout=5)
             return result.returncode == 0
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return False
@@ -66,9 +66,9 @@ class OCamlBackend(LanguageBackend):
     def get_version_info(self) -> str:
         """Get OCaml compiler version information."""
         import subprocess
+
         try:
-            result = subprocess.run(["ocamlc", "-version"],
-                                 capture_output=True, text=True, timeout=5)
+            result = subprocess.run(["ocamlc", "-version"], capture_output=True, text=True, timeout=5)
             if result.returncode == 0:
                 return result.stdout.strip()
             else:
@@ -88,7 +88,7 @@ class OCamlBackend(LanguageBackend):
             "Dictionary and set comprehensions",
             "Type annotations with OCaml type system",
             "Module system with nested organization",
-            "OCaml standard library integration"
+            "OCaml standard library integration",
         ]
 
         # Add preference-specific features
@@ -120,5 +120,5 @@ class OCamlBackend(LanguageBackend):
             "Module Structure": self.preferences.get("module_structure", "nested"),
             "List Operations": self.preferences.get("list_operations", "functional"),
             "String Handling": self.preferences.get("string_handling", "stdlib"),
-            "Naming Convention": self.preferences.get("naming_convention", "snake_case")
+            "Naming Convention": self.preferences.get("naming_convention", "snake_case"),
         }

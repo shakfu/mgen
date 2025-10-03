@@ -280,9 +280,10 @@ class BenchmarkRunner:
                 return True, ""
 
             elif backend == "ocaml":
-                # Compile OCaml code - ocamlopt with runtime module
+                # Compile OCaml code - ocamlopt with runtime module via opam
                 runtime_files = list(output_dir.glob("mgen_*.ml"))
                 cmd = [
+                    "opam", "exec", "--",
                     "ocamlopt",
                     *[str(f.absolute()) for f in runtime_files],
                     str(source_file.absolute()),

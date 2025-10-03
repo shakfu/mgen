@@ -47,7 +47,7 @@ class MGenPythonToGoConverter:
             tree = ast.parse(python_code)
             return self._convert_module(tree)
         except Exception as e:
-            raise TypeMappingError(f"Failed to convert Python code: {e}")
+            raise TypeMappingError(f"Failed to convert Python code: {e}") from e
 
     def _convert_module(self, node: ast.Module) -> str:
         """Convert a Python module to Go."""
@@ -120,12 +120,20 @@ class MGenPythonToGoConverter:
             for stmt in init_method.body:
                 if isinstance(stmt, ast.Assign):
                     for target in stmt.targets:
-                        if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+                        if (
+                            isinstance(target, ast.Attribute)
+                            and isinstance(target.value, ast.Name)
+                            and target.value.id == "self"
+                        ):
                             field_name = self._to_camel_case(target.attr)  # Capitalize for Go visibility
                             field_type = self._infer_type_from_assignment(stmt)
                             struct_lines.append(f"    {field_name} {field_type}")
                 elif isinstance(stmt, ast.AnnAssign):
-                    if isinstance(stmt.target, ast.Attribute) and isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self":
+                    if (
+                        isinstance(stmt.target, ast.Attribute)
+                        and isinstance(stmt.target.value, ast.Name)
+                        and stmt.target.value.id == "self"
+                    ):
                         field_name = self._to_camel_case(stmt.target.attr)
                         field_type = self._map_type_annotation(stmt.annotation)
                         struct_lines.append(f"    {field_name} {field_type}")
@@ -133,9 +141,7 @@ class MGenPythonToGoConverter:
         struct_lines.append("}")
 
         # Store struct info for method generation
-        self.struct_info[class_name] = {
-            "fields": self._extract_struct_fields(init_method) if init_method else []
-        }
+        self.struct_info[class_name] = {"fields": self._extract_struct_fields(init_method) if init_method else []}
 
         # Generate constructor
         constructor_lines = []
@@ -172,12 +178,20 @@ class MGenPythonToGoConverter:
         for stmt in init_method.body:
             if isinstance(stmt, ast.Assign):
                 for target in stmt.targets:
-                    if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+                    if (
+                        isinstance(target, ast.Attribute)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == "self"
+                    ):
                         field_name = self._to_camel_case(target.attr)
                         value_expr = self._convert_expression(stmt.value)
                         body_lines.append(f"    obj.{field_name} = {value_expr}")
             elif isinstance(stmt, ast.AnnAssign):
-                if isinstance(stmt.target, ast.Attribute) and isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self":
+                if (
+                    isinstance(stmt.target, ast.Attribute)
+                    and isinstance(stmt.target.value, ast.Name)
+                    and stmt.target.value.id == "self"
+                ):
                     field_name = self._to_camel_case(stmt.target.attr)
                     if stmt.value:
                         value_expr = self._convert_expression(stmt.value)
@@ -660,7 +674,9 @@ class MGenPythonToGoConverter:
             else:
                 # Invalid range arguments
                 body = self._convert_statements(stmt.body)
-                return f"    for {target_name} := 0; {target_name} < 0; {target_name}++ {{\n{body}\n    }}"  # Empty loop
+                return (
+                    f"    for {target_name} := 0; {target_name} < 0; {target_name}++ {{\n{body}\n    }}"  # Empty loop
+                )
         else:
             # Iteration over container
             container_expr = self._convert_expression(stmt.iter)
@@ -757,9 +773,7 @@ class MGenPythonToGoConverter:
         """Convert unary operations."""
         operand = self._convert_expression(expr.operand)
 
-        op_map = {
-            ast.UAdd: "+", ast.USub: "-", ast.Not: "!", ast.Invert: "^"
-        }
+        op_map = {ast.UAdd: "+", ast.USub: "-", ast.Not: "!", ast.Invert: "^"}
 
         op = op_map.get(type(expr.op), "/*UNKNOWN_OP*/")
         return f"({op}{operand})"
@@ -945,8 +959,12 @@ class MGenPythonToGoConverter:
         key_types = [self._infer_type_from_value(key) for key in expr.keys if key is not None]
         value_types = [self._infer_type_from_value(value) for value in expr.values]
 
-        if (key_types and all(t == key_types[0] and t != "interface{}" for t in key_types) and
-            value_types and all(t == value_types[0] and t != "interface{}" for t in value_types)):
+        if (
+            key_types
+            and all(t == key_types[0] and t != "interface{}" for t in key_types)
+            and value_types
+            and all(t == value_types[0] and t != "interface{}" for t in value_types)
+        ):
             # All keys and values have specific types
             key_type = key_types[0]
             value_type = value_types[0]
@@ -997,12 +1015,16 @@ class MGenPythonToGoConverter:
             # Create transform function
             target_name = target.id if isinstance(target, ast.Name) else "x"
             transform_expr = self._convert_expression(element_expr)
-            transform_lambda = f"func(item interface{{}}) interface{{}} {{ {target_name} := item.(int); return {transform_expr} }}"
+            transform_lambda = (
+                f"func(item interface{{}}) interface{{}} {{ {target_name} := item.(int); return {transform_expr} }}"
+            )
 
             if conditions:
                 # With condition
                 condition_expr = self._convert_expression(conditions[0])
-                condition_lambda = f"func(item interface{{}}) bool {{ {target_name} := item.(int); return {condition_expr} }}"
+                condition_lambda = (
+                    f"func(item interface{{}}) bool {{ {target_name} := item.(int); return {condition_expr} }}"
+                )
                 return f"mgen.Comprehensions.ListComprehensionWithFilter({range_call}, {transform_lambda}, {condition_lambda})"
             else:
                 # No condition
@@ -1012,7 +1034,9 @@ class MGenPythonToGoConverter:
             container_expr = self._convert_expression(iter_expr)
             target_name = target.id if isinstance(target, ast.Name) else "x"
             transform_expr = self._convert_expression(element_expr)
-            transform_lambda = f"func(item interface{{}}) interface{{}} {{ {target_name} := item; return {transform_expr} }}"
+            transform_lambda = (
+                f"func(item interface{{}}) interface{{}} {{ {target_name} := item; return {transform_expr} }}"
+            )
 
             if conditions:
                 condition_expr = self._convert_expression(conditions[0])
@@ -1060,14 +1084,18 @@ class MGenPythonToGoConverter:
             range_call = f"mgen.NewRange({', '.join(range_args)})"
             target_name = target.id if isinstance(target, ast.Name) else "x"
             transform_expr = self._convert_expression(element_expr)
-            transform_lambda = f"func(item interface{{}}) interface{{}} {{ {target_name} := item.(int); return {transform_expr} }}"
+            transform_lambda = (
+                f"func(item interface{{}}) interface{{}} {{ {target_name} := item.(int); return {transform_expr} }}"
+            )
 
             return f"mgen.Comprehensions.SetComprehension({range_call}, {transform_lambda})"
         else:
             container_expr = self._convert_expression(iter_expr)
             target_name = target.id if isinstance(target, ast.Name) else "x"
             transform_expr = self._convert_expression(element_expr)
-            transform_lambda = f"func(item interface{{}}) interface{{}} {{ {target_name} := item; return {transform_expr} }}"
+            transform_lambda = (
+                f"func(item interface{{}}) interface{{}} {{ {target_name} := item; return {transform_expr} }}"
+            )
 
             return f"mgen.Comprehensions.SetComprehension({container_expr}, {transform_lambda})"
 
@@ -1211,9 +1239,7 @@ class MGenPythonToGoConverter:
 
     def _is_constructor_call(self, value: ast.expr) -> bool:
         """Check if the expression is a constructor call."""
-        return (isinstance(value, ast.Call) and
-                isinstance(value.func, ast.Name) and
-                value.func.id in self.struct_info)
+        return isinstance(value, ast.Call) and isinstance(value.func, ast.Name) and value.func.id in self.struct_info
 
     def _extract_struct_fields(self, init_method: ast.FunctionDef) -> list[str]:
         """Extract struct field names from __init__ method."""
@@ -1222,7 +1248,11 @@ class MGenPythonToGoConverter:
             if isinstance(stmt, (ast.Assign, ast.AnnAssign)):
                 if isinstance(stmt.target if hasattr(stmt, "target") else stmt.targets[0], ast.Attribute):
                     target = stmt.target if hasattr(stmt, "target") else stmt.targets[0]
-                    if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+                    if (
+                        isinstance(target, ast.Attribute)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == "self"
+                    ):
                         fields.append(target.attr)
         return fields
 
@@ -1244,4 +1274,3 @@ class MGenPythonToGoConverter:
         if go_type.startswith("map["):
             return f"make({go_type})"
         return defaults.get(go_type, "nil")
-

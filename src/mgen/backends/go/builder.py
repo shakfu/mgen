@@ -45,20 +45,10 @@ go 1.21
                 shutil.copy2(runtime_src, runtime_dst)
 
             # Build go build command
-            cmd = [
-                "go",
-                "build",
-                "-o", str(output_dir / executable_name),
-                str(source_path)
-            ]
+            cmd = ["go", "build", "-o", str(output_dir / executable_name), str(source_path)]
 
             # Run compilation
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                cwd=output_dir
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
 
             return result.returncode == 0
 

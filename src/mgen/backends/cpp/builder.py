@@ -28,7 +28,7 @@ class CppBuilder(AbstractBuilder):
         makefile_content = f"""# Generated Makefile for {target_name}
 
 CXX = {self.compiler}
-CXXFLAGS = {' '.join(self.default_flags)}
+CXXFLAGS = {" ".join(self.default_flags)}
 TARGET = {target_name}
 SOURCES = {sources}
 OBJECTS = $(SOURCES:.cpp=.o)
@@ -208,13 +208,15 @@ install(TARGETS {target_name} DESTINATION bin)
                 with open(source_file) as f:
                     content = f.read()
                     # Check for MGen runtime usage patterns
-                    if ("mgen_cpp_runtime.hpp" in content or
-                        "mgen::" in content or
-                        "StringOps::" in content or
-                        "Range(" in content or
-                        "list_comprehension" in content or
-                        "dict_comprehension" in content or
-                        "set_comprehension" in content):
+                    if (
+                        "mgen_cpp_runtime.hpp" in content
+                        or "mgen::" in content
+                        or "StringOps::" in content
+                        or "Range(" in content
+                        or "list_comprehension" in content
+                        or "dict_comprehension" in content
+                        or "set_comprehension" in content
+                    ):
                         # Runtime is needed, but it's header-only for C++
                         # Just ensure the include path is set
                         source_dir = Path(source_file).parent
@@ -240,6 +242,7 @@ install(TARGETS {target_name} DESTINATION bin)
         if backend_runtime.exists():
             # Copy runtime headers to build directory
             import shutil
+
             for header_file in backend_runtime.glob("*.hpp"):
                 target_file = runtime_dir / header_file.name
                 if not target_file.exists():

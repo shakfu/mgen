@@ -43,7 +43,7 @@ class MGenPythonToCConverter:
             "None": "void",
             "list": "vec_int",  # Default, will be specialized
             "dict": "map_str_int",  # Default, will be specialized
-            "set": "set_int",   # Default, will be specialized
+            "set": "set_int",  # Default, will be specialized
         }
         self.container_system = CContainerSystem()
         self.current_function: Optional[str] = None
@@ -63,7 +63,7 @@ class MGenPythonToCConverter:
             # Re-raise our specific exceptions without wrapping
             raise
         except Exception as e:
-            raise UnsupportedFeatureError(f"Failed to convert Python code: {e}")
+            raise UnsupportedFeatureError(f"Failed to convert Python code: {e}") from e
 
     def _convert_module(self, node: ast.Module) -> str:
         """Convert a Python module to C code."""
@@ -120,23 +120,27 @@ class MGenPythonToCConverter:
         ]
 
         if self.use_runtime:
-            includes.extend([
-                '#include "mgen_error_handling.h"',
-                '#include "mgen_python_ops.h"',
-                '#include "mgen_memory_ops.h"',
-            ])
+            includes.extend(
+                [
+                    '#include "mgen_error_handling.h"',
+                    '#include "mgen_python_ops.h"',
+                    '#include "mgen_memory_ops.h"',
+                ]
+            )
 
             if self.container_variables or self._needs_containers():
                 includes.append('#include "mgen_stc_bridge.h"')
 
         # Add STC includes for comprehensions
         if hasattr(self, "uses_comprehensions") and self.uses_comprehensions:
-            includes.extend([
-                "#define STC_ENABLED",
-                '#include "ext/stc/include/stc/vec.h"',
-                '#include "ext/stc/include/stc/hmap.h"',
-                '#include "ext/stc/include/stc/hset.h"',
-            ])
+            includes.extend(
+                [
+                    "#define STC_ENABLED",
+                    '#include "ext/stc/include/stc/vec.h"',
+                    '#include "ext/stc/include/stc/hmap.h"',
+                    '#include "ext/stc/include/stc/hset.h"',
+                ]
+            )
 
         # Add dynamically needed includes
         includes.extend(sorted(self.includes_needed))
@@ -165,37 +169,42 @@ class MGenPythonToCConverter:
             sanitized = self._sanitize_type_name(element_type)
 
             # Vector declaration for list comprehensions
-            declarations.extend([
-                f"#define i_type vec_{sanitized}",
-                f"#define i_val {element_type}",
-                '#include "ext/stc/include/stc/vec.h"',
-                "#undef i_type",
-                "#undef i_val",
-                ""
-            ])
+            declarations.extend(
+                [
+                    f"#define i_type vec_{sanitized}",
+                    f"#define i_val {element_type}",
+                    '#include "ext/stc/include/stc/vec.h"',
+                    "#undef i_type",
+                    "#undef i_val",
+                    "",
+                ]
+            )
 
             # Map declaration for dict comprehensions (int -> int)
-            declarations.extend([
-                f"#define i_type map_{sanitized}_{sanitized}",
-                f"#define i_key {element_type}",
-                f"#define i_val {element_type}",
-                '#include "ext/stc/include/stc/hmap.h"',
-                "#undef i_type",
-                "#undef i_key",
-                "#undef i_val",
-                ""
-            ])
+            declarations.extend(
+                [
+                    f"#define i_type map_{sanitized}_{sanitized}",
+                    f"#define i_key {element_type}",
+                    f"#define i_val {element_type}",
+                    '#include "ext/stc/include/stc/hmap.h"',
+                    "#undef i_type",
+                    "#undef i_key",
+                    "#undef i_val",
+                    "",
+                ]
+            )
 
             # Set declaration for set comprehensions
-            declarations.extend([
-                f"#define i_type set_{sanitized}",
-                f"#define i_key {element_type}",
-                '#include "ext/stc/include/stc/hset.h"',
-                "#undef i_type",
-                "#undef i_key",
-                ""
-            ])
-
+            declarations.extend(
+                [
+                    f"#define i_type set_{sanitized}",
+                    f"#define i_key {element_type}",
+                    '#include "ext/stc/include/stc/hset.h"',
+                    "#undef i_type",
+                    "#undef i_key",
+                    "",
+                ]
+            )
 
         return declarations
 
@@ -279,8 +288,12 @@ class MGenPythonToCConverter:
             value_expr = self._convert_expression(stmt.value)
 
             # If this is a self reference in a method, use pointer access
-            if (isinstance(target.value, ast.Name) and target.value.id == "self" and
-                self.current_function and "_" in self.current_function):
+            if (
+                isinstance(target.value, ast.Name)
+                and target.value.id == "self"
+                and self.current_function
+                and "_" in self.current_function
+            ):
                 return f"self->{attr_name} = {value_expr};"
             else:
                 return f"{obj}.{attr_name} = {value_expr};"
@@ -313,8 +326,12 @@ class MGenPythonToCConverter:
             if stmt.value:
                 value_expr = self._convert_expression(stmt.value)
                 # If this is a self reference in a method, use pointer access
-                if (isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self" and
-                    self.current_function and "_" in self.current_function):
+                if (
+                    isinstance(stmt.target.value, ast.Name)
+                    and stmt.target.value.id == "self"
+                    and self.current_function
+                    and "_" in self.current_function
+                ):
                     return f"self->{attr_name} = {value_expr};"
                 else:
                     return f"{obj}.{attr_name} = {value_expr};"
@@ -658,7 +675,7 @@ class MGenPythonToCConverter:
             if len(args) != 1:
                 raise UnsupportedFeatureError("list.extend() requires exactly one argument")
             # Not implemented yet - would need vec_int_append_range or similar
-            raise UnsupportedFeatureError(f"list.extend() is not yet supported in C backend")
+            raise UnsupportedFeatureError("list.extend() is not yet supported in C backend")
 
         elif method_name == "pop":
             # vec_int_pop(&data) - returns and removes last element
@@ -800,10 +817,7 @@ class MGenPythonToCConverter:
         var_name = stmt.target.id
 
         # Handle range-based iteration
-        if (isinstance(stmt.iter, ast.Call) and
-            isinstance(stmt.iter.func, ast.Name) and
-            stmt.iter.func.id == "range"):
-
+        if isinstance(stmt.iter, ast.Call) and isinstance(stmt.iter.func, ast.Name) and stmt.iter.func.id == "range":
             range_args = stmt.iter.args
 
             if len(range_args) == 1:
@@ -811,10 +825,14 @@ class MGenPythonToCConverter:
                 start, stop, step = "0", self._convert_expression(range_args[0]), "1"
             elif len(range_args) == 2:
                 # range(start, stop)
-                start, stop, step = self._convert_expression(range_args[0]), self._convert_expression(range_args[1]), "1"
+                start = self._convert_expression(range_args[0])
+                stop = self._convert_expression(range_args[1])
+                step = "1"
             elif len(range_args) == 3:
                 # range(start, stop, step)
-                start, stop, step = self._convert_expression(range_args[0]), self._convert_expression(range_args[1]), self._convert_expression(range_args[2])
+                start = self._convert_expression(range_args[0])
+                stop = self._convert_expression(range_args[1])
+                step = self._convert_expression(range_args[2])
             else:
                 raise UnsupportedFeatureError("Invalid range() arguments")
 
@@ -866,8 +884,12 @@ class MGenPythonToCConverter:
         obj = self._convert_expression(expr.value)
 
         # If this is a self reference in a method, use pointer access
-        if (isinstance(expr.value, ast.Name) and expr.value.id == "self" and
-            self.current_function and "_" in self.current_function):
+        if (
+            isinstance(expr.value, ast.Name)
+            and expr.value.id == "self"
+            and self.current_function
+            and "_" in self.current_function
+        ):
             return f"self->{expr.attr}"
 
         # Regular struct member access
@@ -902,7 +924,7 @@ class MGenPythonToCConverter:
         self.defined_structs[class_name] = {
             "instance_vars": instance_vars,
             "attributes": instance_vars,  # For compatibility with string method detection
-            "methods": [m.name for m in methods]
+            "methods": [m.name for m in methods],
         }
 
         # Generate method declarations
@@ -930,24 +952,32 @@ class MGenPythonToCConverter:
                     if isinstance(body_stmt, ast.Assign):
                         # Look for self.var = value assignments
                         for target in body_stmt.targets:
-                            if (isinstance(target, ast.Attribute) and
-                                isinstance(target.value, ast.Name) and
-                                target.value.id == "self"):
+                            if (
+                                isinstance(target, ast.Attribute)
+                                and isinstance(target.value, ast.Name)
+                                and target.value.id == "self"
+                            ):
                                 var_name = target.attr
                                 # Try to infer type from the assignment
                                 var_type = self._infer_expression_type(body_stmt.value)
                                 instance_vars[var_name] = var_type
                     elif isinstance(body_stmt, ast.AnnAssign):
                         # Look for self.var: type = value assignments
-                        if (isinstance(body_stmt.target, ast.Attribute) and
-                            isinstance(body_stmt.target.value, ast.Name) and
-                            body_stmt.target.value.id == "self"):
+                        if (
+                            isinstance(body_stmt.target, ast.Attribute)
+                            and isinstance(body_stmt.target.value, ast.Name)
+                            and body_stmt.target.value.id == "self"
+                        ):
                             var_name = body_stmt.target.attr
                             if body_stmt.annotation:
                                 var_type = self._get_type_annotation(body_stmt.annotation)
                                 var_type = self.type_mapping.get(var_type, var_type)
                             else:
-                                var_type = self._infer_expression_type(body_stmt.value) if body_stmt.value is not None else "void*"
+                                var_type = (
+                                    self._infer_expression_type(body_stmt.value)
+                                    if body_stmt.value is not None
+                                    else "void*"
+                                )
                             instance_vars[var_name] = var_type
 
         return instance_vars
@@ -975,8 +1005,9 @@ class MGenPythonToCConverter:
 
         return "\n".join(lines)
 
-    def _generate_constructor(self, class_name: str, init_method: ast.FunctionDef,
-                            instance_vars: dict[str, str]) -> str:
+    def _generate_constructor(
+        self, class_name: str, init_method: ast.FunctionDef, instance_vars: dict[str, str]
+    ) -> str:
         """Generate constructor function for class."""
         # Build parameter list (skip 'self')
         params = []
@@ -1005,17 +1036,21 @@ class MGenPythonToCConverter:
             if isinstance(stmt, ast.Assign):
                 # Convert self.var = value to obj.var = value
                 for target in stmt.targets:
-                    if (isinstance(target, ast.Attribute) and
-                        isinstance(target.value, ast.Name) and
-                        target.value.id == "self"):
+                    if (
+                        isinstance(target, ast.Attribute)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == "self"
+                    ):
                         var_name = target.attr
                         value_expr = self._convert_expression(stmt.value)
                         body_lines.append(f"    obj.{var_name} = {value_expr};")
             elif isinstance(stmt, ast.AnnAssign):
                 # Convert self.var: type = value to obj.var = value
-                if (isinstance(stmt.target, ast.Attribute) and
-                    isinstance(stmt.target.value, ast.Name) and
-                    stmt.target.value.id == "self"):
+                if (
+                    isinstance(stmt.target, ast.Attribute)
+                    and isinstance(stmt.target.value, ast.Name)
+                    and stmt.target.value.id == "self"
+                ):
                     var_name = stmt.target.attr
                     if stmt.value:
                         value_expr = self._convert_expression(stmt.value)
@@ -1082,9 +1117,7 @@ class MGenPythonToCConverter:
         target = stmt.targets[0]
 
         # Handle self.attr = value
-        if (isinstance(target, ast.Attribute) and
-            isinstance(target.value, ast.Name) and
-            target.value.id == "self"):
+        if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
             attr_name = target.attr
             value_expr = self._convert_expression(stmt.value)
             return f"self->{attr_name} = {value_expr};"
@@ -1103,7 +1136,7 @@ class MGenPythonToCConverter:
     def _convert_method_expression(self, expr: ast.expr, class_name: str) -> str:
         """Convert expression in method context, handling self references."""
         if isinstance(expr, ast.Attribute):
-            if (isinstance(expr.value, ast.Name) and expr.value.id == "self"):
+            if isinstance(expr.value, ast.Name) and expr.value.id == "self":
                 # self.attr becomes self->attr
                 return f"self->{expr.attr}"
 
@@ -1141,10 +1174,11 @@ class MGenPythonToCConverter:
         loop_var = generator.target.id
 
         # Handle range-based iteration (most common case)
-        if (isinstance(generator.iter, ast.Call) and
-            isinstance(generator.iter.func, ast.Name) and
-            generator.iter.func.id == "range"):
-
+        if (
+            isinstance(generator.iter, ast.Call)
+            and isinstance(generator.iter.func, ast.Name)
+            and generator.iter.func.id == "range"
+        ):
             # Generate range-based for loop
             range_args = generator.iter.args
             if len(range_args) == 1:
@@ -1245,10 +1279,11 @@ class MGenPythonToCConverter:
         loop_var = generator.target.id
 
         # Handle range-based iteration
-        if (isinstance(generator.iter, ast.Call) and
-            isinstance(generator.iter.func, ast.Name) and
-            generator.iter.func.id == "range"):
-
+        if (
+            isinstance(generator.iter, ast.Call)
+            and isinstance(generator.iter.func, ast.Name)
+            and generator.iter.func.id == "range"
+        ):
             range_args = generator.iter.args
             if len(range_args) == 1:
                 start = "0"
@@ -1324,10 +1359,11 @@ class MGenPythonToCConverter:
         loop_var = generator.target.id
 
         # Handle range-based iteration
-        if (isinstance(generator.iter, ast.Call) and
-            isinstance(generator.iter.func, ast.Name) and
-            generator.iter.func.id == "range"):
-
+        if (
+            isinstance(generator.iter, ast.Call)
+            and isinstance(generator.iter.func, ast.Name)
+            and generator.iter.func.id == "range"
+        ):
             range_args = generator.iter.args
             if len(range_args) == 1:
                 start = "0"
@@ -1419,4 +1455,5 @@ class MGenPythonToCConverter:
     def _generate_temp_var_name(self, prefix: str) -> str:
         """Generate a unique temporary variable name."""
         import time
+
         return f"{prefix}_{int(time.time() * 1000000) % 1000000}"

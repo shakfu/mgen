@@ -6,10 +6,4 @@ from .containers import OCamlContainerSystem
 from .emitter import OCamlEmitter
 from .factory import OCamlFactory
 
-__all__ = [
-    "OCamlBackend",
-    "OCamlFactory",
-    "OCamlEmitter",
-    "OCamlBuilder",
-    "OCamlContainerSystem"
-]
+__all__ = ["OCamlBackend", "OCamlFactory", "OCamlEmitter", "OCamlBuilder", "OCamlContainerSystem"]

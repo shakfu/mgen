@@ -380,6 +380,7 @@ class TypeInferenceEngine:
         if self._flow_sensitive_inferencer is None:
             # Lazy import to avoid circular dependency
             from .flow_sensitive_inference import FlowSensitiveInferencer
+
             self._flow_sensitive_inferencer = FlowSensitiveInferencer(self)
 
         try:

@@ -387,7 +387,11 @@ class CallGraphAnalyzer(BaseAnalyzer):
         return paths
 
     def _generate_paths_from_function(
-        self, call_graph: dict[str, FunctionNode], func_name: str, visited: set[str], current_path: Optional[list[str]] = None
+        self,
+        call_graph: dict[str, FunctionNode],
+        func_name: str,
+        visited: set[str],
+        current_path: Optional[list[str]] = None,
     ) -> list[CallPath]:
         """Generate all paths starting from a given function."""
         if current_path is None:

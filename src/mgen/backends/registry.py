@@ -43,6 +43,7 @@ class BackendRegistry:
         # Try to register C backend
         try:
             from .c.backend import CBackend
+
             self.register_backend("c", CBackend)
         except ImportError:
             pass  # C backend not yet implemented
@@ -50,6 +51,7 @@ class BackendRegistry:
         # Try to register Rust backend
         try:
             from .rust.backend import RustBackend
+
             self.register_backend("rust", RustBackend)
         except ImportError:
             pass  # Rust backend not yet implemented
@@ -57,6 +59,7 @@ class BackendRegistry:
         # Try to register Go backend
         try:
             from .go.backend import GoBackend
+
             self.register_backend("go", GoBackend)
         except ImportError:
             pass  # Go backend not yet implemented
@@ -64,6 +67,7 @@ class BackendRegistry:
         # Try to register C++ backend
         try:
             from .cpp.backend import CppBackend
+
             self.register_backend("cpp", CppBackend)
         except ImportError:
             pass  # C++ backend not yet implemented
@@ -71,6 +75,7 @@ class BackendRegistry:
         # Try to register Haskell backend
         try:
             from .haskell.backend import HaskellBackend
+
             self.register_backend("haskell", HaskellBackend)
         except ImportError:
             pass  # Haskell backend not yet implemented
@@ -78,6 +83,7 @@ class BackendRegistry:
         # Try to register OCaml backend
         try:
             from .ocaml.backend import OCamlBackend
+
             self.register_backend("ocaml", OCamlBackend)
         except ImportError:
             pass  # OCaml backend not yet implemented

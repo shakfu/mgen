@@ -75,7 +75,7 @@ class BaseConverter(ABC):
         except UnsupportedFeatureError:
             raise
         except Exception as e:
-            raise TypeMappingError(f"Failed to convert Python code: {e}")
+            raise TypeMappingError(f"Failed to convert Python code: {e}") from e
 
     # ============================================================================
     # Abstract Methods - Must be implemented by subclasses
@@ -181,9 +181,7 @@ class BaseConverter(ABC):
         pass
 
     @abstractmethod
-    def _format_variable_declaration(
-        self, name: str, var_type: str, value: Optional[str]
-    ) -> str:
+    def _format_variable_declaration(self, name: str, var_type: str, value: Optional[str]) -> str:
         """Format a variable declaration/assignment.
 
         Args:
@@ -209,9 +207,7 @@ class BaseConverter(ABC):
         pass
 
     @abstractmethod
-    def _format_if_statement(
-        self, condition: str, then_block: str, else_block: Optional[str]
-    ) -> str:
+    def _format_if_statement(self, condition: str, then_block: str, else_block: Optional[str]) -> str:
         """Format an if statement.
 
         Args:
@@ -265,9 +261,7 @@ class BaseConverter(ABC):
         pass
 
     @abstractmethod
-    def _format_method_call(
-        self, object_expr: str, method_name: str, args: list[str]
-    ) -> str:
+    def _format_method_call(self, object_expr: str, method_name: str, args: list[str]) -> str:
         """Format a method call.
 
         Args:
@@ -339,19 +333,11 @@ class BaseConverter(ABC):
         params = []
         for arg in node.args.args:
             param_name = arg.arg
-            param_type = (
-                self._convert_type_annotation(arg.annotation)
-                if arg.annotation
-                else self._map_type("Any")
-            )
+            param_type = self._convert_type_annotation(arg.annotation) if arg.annotation else self._map_type("Any")
             params.append((param_name, param_type))
 
         # Extract return type
-        return_type = (
-            self._convert_type_annotation(node.returns)
-            if node.returns
-            else self._map_type("None")
-        )
+        return_type = self._convert_type_annotation(node.returns) if node.returns else self._map_type("None")
 
         # Convert function body
         body_statements = [self._convert_statement(stmt) for stmt in node.body]
@@ -373,9 +359,7 @@ class BaseConverter(ABC):
         """
         # This is a complex operation that varies significantly by language
         # Subclasses should override with language-specific implementation
-        raise UnsupportedFeatureError(
-            f"Class conversion not implemented in {self.__class__.__name__}"
-        )
+        raise UnsupportedFeatureError(f"Class conversion not implemented in {self.__class__.__name__}")
 
     def _convert_statement(self, stmt: ast.stmt) -> str:
         """Convert a Python statement to target language.
@@ -798,9 +782,7 @@ class BaseConverter(ABC):
         Raises:
             UnsupportedFeatureError: Default implementation doesn't support comprehensions
         """
-        raise UnsupportedFeatureError(
-            f"List comprehensions not implemented in {self.__class__.__name__}"
-        )
+        raise UnsupportedFeatureError(f"List comprehensions not implemented in {self.__class__.__name__}")
 
     def _convert_dict_comprehension(self, expr: ast.DictComp) -> str:
         """Convert dict comprehension.
@@ -816,9 +798,7 @@ class BaseConverter(ABC):
         Raises:
             UnsupportedFeatureError: Default implementation doesn't support comprehensions
         """
-        raise UnsupportedFeatureError(
-            f"Dict comprehensions not implemented in {self.__class__.__name__}"
-        )
+        raise UnsupportedFeatureError(f"Dict comprehensions not implemented in {self.__class__.__name__}")
 
     def _convert_set_comprehension(self, expr: ast.SetComp) -> str:
         """Convert set comprehension.
@@ -834,9 +814,7 @@ class BaseConverter(ABC):
         Raises:
             UnsupportedFeatureError: Default implementation doesn't support comprehensions
         """
-        raise UnsupportedFeatureError(
-            f"Set comprehensions not implemented in {self.__class__.__name__}"
-        )
+        raise UnsupportedFeatureError(f"Set comprehensions not implemented in {self.__class__.__name__}")
 
     def _convert_ternary(self, expr: ast.IfExp) -> str:
         """Convert ternary expression (if-else expression).

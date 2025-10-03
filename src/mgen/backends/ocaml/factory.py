@@ -58,7 +58,7 @@ class OCamlFactory(AbstractFactory):
             "dict": "map",
             "set": "set",
             "None": "unit",
-            "Any": "'a"
+            "Any": "'a",
         }
         return type_mapping.get(python_type, python_type)
 

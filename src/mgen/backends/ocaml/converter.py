@@ -41,7 +41,7 @@ class MGenPythonToOCamlConverter:
             tree = ast.parse(python_code)
             return self._convert_module(tree)
         except SyntaxError as e:
-            raise UnsupportedFeatureError(f"Python syntax error: {e}")
+            raise UnsupportedFeatureError(f"Python syntax error: {e}") from e
 
     def _convert_module(self, node: ast.Module) -> str:
         """Convert a Python module to OCaml."""
@@ -155,17 +155,23 @@ class MGenPythonToOCamlConverter:
         # Filter out docstrings first
         filtered_body = []
         for stmt in node.body:
-            if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+            if (
+                isinstance(stmt, ast.Expr)
+                and isinstance(stmt.value, ast.Constant)
+                and isinstance(stmt.value.value, str)
+            ):
                 continue
             filtered_body.append(stmt)
 
         # Check for early return pattern: if cond: return X; return Y
-        if (len(filtered_body) == 2 and
-            isinstance(filtered_body[0], ast.If) and
-            len(filtered_body[0].body) == 1 and
-            isinstance(filtered_body[0].body[0], ast.Return) and
-            isinstance(filtered_body[1], ast.Return) and
-            not filtered_body[0].orelse):
+        if (
+            len(filtered_body) == 2
+            and isinstance(filtered_body[0], ast.If)
+            and len(filtered_body[0].body) == 1
+            and isinstance(filtered_body[0].body[0], ast.Return)
+            and isinstance(filtered_body[1], ast.Return)
+            and not filtered_body[0].orelse
+        ):
             # Convert directly to if-expression
             condition = self._convert_expression(filtered_body[0].test)
             then_expr = filtered_body[0].body[0].value
@@ -260,12 +266,20 @@ class MGenPythonToOCamlConverter:
         for stmt in init_method.body:
             if isinstance(stmt, ast.Assign):
                 for target in stmt.targets:
-                    if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+                    if (
+                        isinstance(target, ast.Attribute)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == "self"
+                    ):
                         field_name = self._to_ocaml_var_name(target.attr)
                         field_type = self._infer_type_from_value(stmt.value)
                         fields.append((field_name, field_type))
             elif isinstance(stmt, ast.AnnAssign):
-                if isinstance(stmt.target, ast.Attribute) and isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self":
+                if (
+                    isinstance(stmt.target, ast.Attribute)
+                    and isinstance(stmt.target.value, ast.Name)
+                    and stmt.target.value.id == "self"
+                ):
                     field_name = self._to_ocaml_var_name(stmt.target.attr)
                     field_type = self._get_type_annotation(stmt.annotation) if stmt.annotation else "'a"
                     fields.append((field_name, field_type))
@@ -299,12 +313,20 @@ class MGenPythonToOCamlConverter:
         for stmt in node.body:
             if isinstance(stmt, ast.Assign):
                 for target in stmt.targets:
-                    if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+                    if (
+                        isinstance(target, ast.Attribute)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == "self"
+                    ):
                         field_name = self._to_ocaml_var_name(target.attr)
                         field_value = self._convert_expression(stmt.value)
                         field_assignments.append(f"    {field_name} = {field_value};")
             elif isinstance(stmt, ast.AnnAssign):
-                if isinstance(stmt.target, ast.Attribute) and isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self":
+                if (
+                    isinstance(stmt.target, ast.Attribute)
+                    and isinstance(stmt.target.value, ast.Name)
+                    and stmt.target.value.id == "self"
+                ):
                     field_name = self._to_ocaml_var_name(stmt.target.attr)
                     if stmt.value:
                         field_value = self._convert_expression(stmt.value)
@@ -852,13 +874,13 @@ class MGenPythonToOCamlConverter:
             stmt = node.body[0]
 
             # Handle regular assignment: for i in range(n): var = expr
-            if (isinstance(stmt, ast.Assign) and
-                len(stmt.targets) == 1 and
-                isinstance(stmt.targets[0], ast.Name)):
+            if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
                 updated_var = self._to_ocaml_var_name(stmt.targets[0].id)
                 value_expr = self._convert_expression(stmt.value)
                 # Use fold_left to thread state through iterations
-                return [f"let {updated_var} = List.fold_left (fun _ {target} -> {value_expr}) {updated_var} ({iter_expr}) in"]
+                return [
+                    f"let {updated_var} = List.fold_left (fun _ {target} -> {value_expr}) {updated_var} ({iter_expr}) in"
+                ]
 
             # Handle augmented assignment: for i in range(n): var += expr
             elif isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
@@ -866,7 +888,9 @@ class MGenPythonToOCamlConverter:
                 value_expr = self._convert_expression(stmt.value)
                 op = self._convert_operator(stmt.op)
                 # Use fold_left for accumulation
-                return [f"let {updated_var} = List.fold_left (fun acc {target} -> acc {op} ({value_expr})) {updated_var} ({iter_expr}) in"]
+                return [
+                    f"let {updated_var} = List.fold_left (fun acc {target} -> acc {op} ({value_expr})) {updated_var} ({iter_expr}) in"
+                ]
 
         # General case - convert body to let expressions
         body_lines = []
@@ -897,13 +921,54 @@ class MGenPythonToOCamlConverter:
 
         # Handle OCaml keywords
         keywords = {
-            "and", "as", "assert", "begin", "class", "constraint", "do", "done",
-            "downto", "else", "end", "exception", "external", "false", "for",
-            "fun", "function", "functor", "if", "in", "include", "inherit",
-            "initializer", "lazy", "let", "match", "method", "module", "mutable",
-            "new", "object", "of", "open", "or", "private", "rec", "sig",
-            "struct", "then", "to", "true", "try", "type", "val", "virtual",
-            "when", "while", "with"
+            "and",
+            "as",
+            "assert",
+            "begin",
+            "class",
+            "constraint",
+            "do",
+            "done",
+            "downto",
+            "else",
+            "end",
+            "exception",
+            "external",
+            "false",
+            "for",
+            "fun",
+            "function",
+            "functor",
+            "if",
+            "in",
+            "include",
+            "inherit",
+            "initializer",
+            "lazy",
+            "let",
+            "match",
+            "method",
+            "module",
+            "mutable",
+            "new",
+            "object",
+            "of",
+            "open",
+            "or",
+            "private",
+            "rec",
+            "sig",
+            "struct",
+            "then",
+            "to",
+            "true",
+            "try",
+            "type",
+            "val",
+            "virtual",
+            "when",
+            "while",
+            "with",
         }
 
         if ocaml_name in keywords:
@@ -955,7 +1020,7 @@ class MGenPythonToOCamlConverter:
             "string": '""',
             "unit": "()",
             "'a list": "[]",
-            "(string * 'a) list": "[]"
+            "(string * 'a) list": "[]",
         }
         return defaults.get(type_name, 'failwith "default value not implemented"')
 

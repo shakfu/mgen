@@ -50,8 +50,8 @@ class CBuilder(AbstractBuilder):
 CC = gcc
 CFLAGS = {base_flags}
 TARGET = {target_name}
-SOURCES = {' '.join(all_sources)}
-OBJECTS = {' '.join(all_objects)}
+SOURCES = {" ".join(all_sources)}
+OBJECTS = {" ".join(all_objects)}
 
 all: $(TARGET)
 
@@ -95,7 +95,10 @@ release: clean $(TARGET)
             # Build gcc command with base flags
             cmd = [
                 "gcc",
-                "-Wall", "-Wextra", "-std=c11", "-O2",
+                "-Wall",
+                "-Wextra",
+                "-std=c11",
+                "-O2",
             ]
 
             # Add MGen runtime support if available
@@ -111,18 +114,10 @@ release: clean $(TARGET)
                 cmd.extend(self.get_runtime_sources())
 
             # Add main source file and output
-            cmd.extend([
-                str(source_path),
-                "-o", str(output_dir / executable_name)
-            ])
+            cmd.extend([str(source_path), "-o", str(output_dir / executable_name)])
 
             # Run compilation
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                cwd=output_dir
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
 
             return result.returncode == 0
 

@@ -49,10 +49,31 @@ class MGenPythonToHaskellConverter:
 
         # Check for Haskell reserved keywords
         haskell_keywords = {
-            "case", "class", "data", "default", "deriving", "do", "else",
-            "foreign", "if", "import", "in", "infix", "infixl", "infixr",
-            "instance", "let", "module", "newtype", "of", "then", "type",
-            "where", "as", "qualified", "hiding"
+            "case",
+            "class",
+            "data",
+            "default",
+            "deriving",
+            "do",
+            "else",
+            "foreign",
+            "if",
+            "import",
+            "in",
+            "infix",
+            "infixl",
+            "infixr",
+            "instance",
+            "let",
+            "module",
+            "newtype",
+            "of",
+            "then",
+            "type",
+            "where",
+            "as",
+            "qualified",
+            "hiding",
         }
 
         components = function_name.split("_")
@@ -79,7 +100,7 @@ class MGenPythonToHaskellConverter:
             # Re-raise UnsupportedFeatureError without wrapping
             raise
         except Exception as e:
-            raise TypeMappingError(f"Failed to convert Python code: {e}")
+            raise TypeMappingError(f"Failed to convert Python code: {e}") from e
 
     def _convert_module(self, node: ast.Module) -> str:
         """Convert a Python module to Haskell."""
@@ -113,7 +134,7 @@ class MGenPythonToHaskellConverter:
             "import qualified Data.Map as Map",
             "import qualified Data.Set as Set",
             "import Data.Map (Map)",
-            "import Data.Set (Set)"
+            "import Data.Set (Set)",
         ]
 
         for imp in base_imports:
@@ -180,12 +201,20 @@ main = printValue "Generated Haskell code executed successfully"'''
                     for stmt in item.body:
                         if isinstance(stmt, ast.Assign):
                             for target in stmt.targets:
-                                if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+                                if (
+                                    isinstance(target, ast.Attribute)
+                                    and isinstance(target.value, ast.Name)
+                                    and target.value.id == "self"
+                                ):
                                     field_name = self._to_haskell_var_name(target.attr)
                                     field_type = self._infer_type_from_node(stmt.value)
                                     fields.append(f"    {field_name} :: {field_type}")
                         elif isinstance(stmt, ast.AnnAssign):
-                            if isinstance(stmt.target, ast.Attribute) and isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self":
+                            if (
+                                isinstance(stmt.target, ast.Attribute)
+                                and isinstance(stmt.target.value, ast.Name)
+                                and stmt.target.value.id == "self"
+                            ):
                                 field_name = self._to_haskell_var_name(stmt.target.attr)
                                 field_type = self._convert_type_annotation(stmt.annotation)
                                 fields.append(f"    {field_name} :: {field_type}")
@@ -200,7 +229,7 @@ main = printValue "Generated Haskell code executed successfully"'''
         self.data_types[class_name] = {
             "fields": [field.strip().split(" :: ")[0] for field in fields],
             "constructor": constructor,
-            "methods": methods
+            "methods": methods,
         }
 
         # Generate data type definition
@@ -249,12 +278,20 @@ main = printValue "Generated Haskell code executed successfully"'''
         for stmt in constructor.body:
             if isinstance(stmt, ast.Assign):
                 for target in stmt.targets:
-                    if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+                    if (
+                        isinstance(target, ast.Attribute)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == "self"
+                    ):
                         field_name = self._to_haskell_var_name(target.attr)
                         value = self._convert_expression(stmt.value)
                         field_assignments.append(f"{field_name} = {value}")
             elif isinstance(stmt, ast.AnnAssign):
-                if isinstance(stmt.target, ast.Attribute) and isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == "self":
+                if (
+                    isinstance(stmt.target, ast.Attribute)
+                    and isinstance(stmt.target.value, ast.Name)
+                    and stmt.target.value.id == "self"
+                ):
                     field_name = self._to_haskell_var_name(stmt.target.attr)
                     if stmt.value:
                         value = self._convert_expression(stmt.value)
@@ -327,7 +364,11 @@ main = printValue "Generated Haskell code executed successfully"'''
                     continue
 
                 # Skip docstrings (expression statements with string constants)
-                if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+                if (
+                    isinstance(stmt, ast.Expr)
+                    and isinstance(stmt.value, ast.Constant)
+                    and isinstance(stmt.value.value, str)
+                ):
                     continue
 
                 converted_stmt = self._convert_statement(stmt)
@@ -390,18 +431,24 @@ main = printValue "Generated Haskell code executed successfully"'''
         filtered_body = []
         for stmt in node.body:
             # Skip docstrings (expression statements with string constants)
-            if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+            if (
+                isinstance(stmt, ast.Expr)
+                and isinstance(stmt.value, ast.Constant)
+                and isinstance(stmt.value.value, str)
+            ):
                 continue
             filtered_body.append(stmt)
 
         # Check for early return pattern BEFORE converting statements
         # Pattern: if cond: return X; return Y  ->  if cond then X else Y
-        if (len(filtered_body) == 2 and
-            isinstance(filtered_body[0], ast.If) and
-            len(filtered_body[0].body) == 1 and
-            isinstance(filtered_body[0].body[0], ast.Return) and
-            isinstance(filtered_body[1], ast.Return) and
-            not filtered_body[0].orelse):
+        if (
+            len(filtered_body) == 2
+            and isinstance(filtered_body[0], ast.If)
+            and len(filtered_body[0].body) == 1
+            and isinstance(filtered_body[0].body[0], ast.Return)
+            and isinstance(filtered_body[1], ast.Return)
+            and not filtered_body[0].orelse
+        ):
             # Convert directly to if-expression
             condition = self._convert_expression(filtered_body[0].test)
             then_expr = filtered_body[0].body[0].value
@@ -974,7 +1021,7 @@ main = printValue "Generated Haskell code executed successfully"'''
                 stmt = node.body[0]
 
                 # Handle regular assignment in main (IO context)
-                if (self.current_function == "main" and isinstance(stmt, ast.Assign)):
+                if self.current_function == "main" and isinstance(stmt, ast.Assign):
                     if len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
                         updated_var = self._to_haskell_var_name(stmt.targets[0].id)
                         value_expr = self._convert_expression(stmt.value)
@@ -1040,4 +1087,3 @@ main = printValue "Generated Haskell code executed successfully"'''
             return "Set a"
 
         return "a"  # Default generic type
-

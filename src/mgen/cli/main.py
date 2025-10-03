@@ -71,10 +71,16 @@ Build Directory Structure:
         # Global options
         parser.add_argument("--build-dir", "-d", type=str, default="build", help="Build directory (default: build)")
         parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
-        parser.add_argument("--target", "-t", type=str, default="c",
-                          help=f"Target language (default: c, available: {backends_str})")
-        parser.add_argument("--prefer", "-p", action="append", metavar="KEY=VALUE",
-                          help="Set backend preferences (e.g., --prefer use_native_comprehensions=true)")
+        parser.add_argument(
+            "--target", "-t", type=str, default="c", help=f"Target language (default: c, available: {backends_str})"
+        )
+        parser.add_argument(
+            "--prefer",
+            "-p",
+            action="append",
+            metavar="KEY=VALUE",
+            help="Set backend preferences (e.g., --prefer use_native_comprehensions=true)",
+        )
 
         # Subcommands
         subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -119,7 +125,12 @@ Build Directory Structure:
             help="Batch translate all Python files in a directory",
             description="Translate all Python files in a directory to target language in build/src",
         )
-        batch_parser.add_argument("-s", "--source-dir", default=".", help="Directory containing Python files to translate (default: current directory)")
+        batch_parser.add_argument(
+            "-s",
+            "--source-dir",
+            default=".",
+            help="Directory containing Python files to translate (default: current directory)",
+        )
         batch_parser.add_argument(
             "-o",
             "--output-dir",
@@ -139,9 +150,7 @@ Build Directory Structure:
             default="moderate",
             help="Optimization level (default: moderate)",
         )
-        batch_parser.add_argument(
-            "-b", "--build", action="store_true", help="Build (compile) files after translation"
-        )
+        batch_parser.add_argument("-b", "--build", action="store_true", help="Build (compile) files after translation")
         batch_parser.add_argument("--compiler", help="Compiler to use (uses backend default if not specified)")
 
         return parser
@@ -232,13 +241,20 @@ Build Directory Structure:
             src_runtime_dir = Path(__file__).parent.parent / "runtime"
             if src_runtime_dir.exists():
                 c_runtime_files = [
-                    "cgen_string_ops.h", "cgen_string_ops.c",
-                    "cgen_error_handling.h", "cgen_error_handling.c",
-                    "cgen_python_ops.h", "cgen_python_ops.c",
-                    "cgen_file_ops.h", "cgen_file_ops.c",
-                    "cgen_stc_bridge.h", "cgen_stc_bridge.c",
-                    "cgen_memory_ops.h", "cgen_memory_ops.c",
-                    "cgen_container_ops.h", "cgen_container_ops.c",
+                    "cgen_string_ops.h",
+                    "cgen_string_ops.c",
+                    "cgen_error_handling.h",
+                    "cgen_error_handling.c",
+                    "cgen_python_ops.h",
+                    "cgen_python_ops.c",
+                    "cgen_file_ops.h",
+                    "cgen_file_ops.c",
+                    "cgen_stc_bridge.h",
+                    "cgen_stc_bridge.c",
+                    "cgen_memory_ops.h",
+                    "cgen_memory_ops.c",
+                    "cgen_container_ops.h",
+                    "cgen_container_ops.c",
                 ]
                 for filename in c_runtime_files:
                     src_file = src_runtime_dir / filename
@@ -373,7 +389,9 @@ Build Directory Structure:
             source_key = f"{target}_source"
             source_file = result.output_files.get(source_key, "N/A")
             build_file = result.output_files.get(build_file_key, "N/A")
-            self.log.info(f"Build preparation successful! {target.upper()} source: {source_file}, Build file: {build_file}")
+            self.log.info(
+                f"Build preparation successful! {target.upper()} source: {source_file}, Build file: {build_file}"
+            )
         else:
             # Direct compilation mode
             if result.executable_path:
@@ -520,14 +538,21 @@ Build Directory Structure:
                     successful_translations += 1
 
                     # Count lines in generated file
-                    generated_file_path = output_file if not build_after_translation else str(build_dir / "src" / output_filename)
+                    generated_file_path = (
+                        output_file if not build_after_translation else str(build_dir / "src" / output_filename)
+                    )
                     try:
                         with open(generated_file_path) as f:
                             lines_generated = len(f.readlines())
                     except Exception:
                         lines_generated = 0
 
-                    result_data = {"input": filename, "output": output_filename, "status": "SUCCESS", "lines": lines_generated}
+                    result_data = {
+                        "input": filename,
+                        "output": output_filename,
+                        "status": "SUCCESS",
+                        "lines": lines_generated,
+                    }
 
                     # If building, check for executable and track build success
                     if build_after_translation:
@@ -543,7 +568,9 @@ Build Directory Structure:
 
                     if not summary_only:
                         if build_after_translation and result.executable_path:
-                            self.log.info(f"{output_filename} ({lines_generated} lines) -> {Path(result.executable_path).name}")
+                            self.log.info(
+                                f"{output_filename} ({lines_generated} lines) -> {Path(result.executable_path).name}"
+                            )
                         else:
                             self.log.info(f"{output_filename} ({lines_generated} lines)")
                 else:

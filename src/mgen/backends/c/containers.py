@@ -98,18 +98,22 @@ class CContainerSystem(AbstractContainerSystem):
         ]
 
         if self.use_stc:
-            imports.extend([
-                '#include "mgen_stc_bridge.h"',
-                '#include "mgen_error_handling.h"',
-                '#include "mgen_python_ops.h"',
-                "// STC template headers will be included as needed",
-            ])
+            imports.extend(
+                [
+                    '#include "mgen_stc_bridge.h"',
+                    '#include "mgen_error_handling.h"',
+                    '#include "mgen_python_ops.h"',
+                    "// STC template headers will be included as needed",
+                ]
+            )
         else:
-            imports.extend([
-                '#include "mgen_error_handling.h"',
-                '#include "mgen_memory_ops.h"',
-                '#include "mgen_containers_fallback.h"',
-            ])
+            imports.extend(
+                [
+                    '#include "mgen_error_handling.h"',
+                    '#include "mgen_memory_ops.h"',
+                    '#include "mgen_containers_fallback.h"',
+                ]
+            )
 
         return imports
 
