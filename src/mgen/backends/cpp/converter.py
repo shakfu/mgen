@@ -55,6 +55,7 @@ class MGenPythonToCppConverter:
         self.iterator_variables: dict[str, str] = {}
         self.includes_needed: set[str] = set()
         self.use_runtime = True
+        self.append_map: dict[str, str] = {}  # container -> appended_item (from pre-pass)
 
     def convert_code(self, source_code: str) -> str:
         """Convert Python source code to C++ code."""
@@ -154,13 +155,27 @@ class MGenPythonToCppConverter:
         # Get return type
         return_type = self._get_return_type(node)
 
+        # Pre-pass 0: Analyze parameter usage to detect nested containers
+        nested_params = self._analyze_nested_subscripts(node.body)
+
         # Get parameters with types
         params = []
         for arg in node.args.args:
-            param_type = self._get_param_type(arg)
             param_name = arg.arg
+            param_type = self._get_param_type(arg)
+
+            # If parameter is used with nested subscripting and is bare list, make it nested
+            if param_name in nested_params and param_type == "std::vector<int>":
+                param_type = "std::vector<std::vector<int>>"
+
             params.append(f"{param_type} {param_name}")
             self.variable_context[param_name] = param_type
+
+        # Pre-pass 1: Build append map
+        self.append_map = self._analyze_append_operations(node.body)
+
+        # Pre-pass 2: Infer all variable types (including nested containers)
+        self._infer_all_variable_types(node.body)
 
         # Generate function body
         body_parts = []
@@ -176,7 +191,203 @@ class MGenPythonToCppConverter:
         function = f"{return_type} {node.name}({param_str}) {{\n{self._indent_block(body)}\n}}"
 
         self.current_function = None
+        self.append_map = {}  # Clear after function
         return function
+
+    def _analyze_nested_subscripts(self, stmts: list[ast.stmt]) -> set[str]:
+        """Detect variables used with nested subscripts like a[i][j]."""
+        nested_vars: set[str] = set()
+
+        def check_expr(expr: ast.expr) -> None:
+            # Check for nested subscript: outer[index1][index2]
+            if isinstance(expr, ast.Subscript):
+                # Check if the value being subscripted is itself a subscript
+                if isinstance(expr.value, ast.Subscript):
+                    # Get the base variable name
+                    base = expr.value.value
+                    if isinstance(base, ast.Name):
+                        nested_vars.add(base.id)
+                # Recursively check the subscripted value
+                check_expr(expr.value)
+                if not isinstance(expr.slice, ast.Slice):
+                    check_expr(expr.slice)
+            elif isinstance(expr, ast.BinOp):
+                check_expr(expr.left)
+                check_expr(expr.right)
+            elif isinstance(expr, ast.Call):
+                for arg in expr.args:
+                    check_expr(arg)
+            elif isinstance(expr, ast.Compare):
+                check_expr(expr.left)
+                for comp in expr.comparators:
+                    check_expr(comp)
+
+        def check_stmt(stmt: ast.stmt) -> None:
+            if isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    check_expr(target)
+                check_expr(stmt.value)
+            elif isinstance(stmt, ast.AnnAssign):
+                if stmt.value:
+                    check_expr(stmt.value)
+            elif isinstance(stmt, ast.AugAssign):
+                check_expr(stmt.target)
+                check_expr(stmt.value)
+            elif isinstance(stmt, ast.Expr):
+                check_expr(stmt.value)
+            elif isinstance(stmt, (ast.For, ast.While)):
+                for s in stmt.body:
+                    check_stmt(s)
+                if hasattr(stmt, 'orelse'):
+                    for s in stmt.orelse:
+                        check_stmt(s)
+            elif isinstance(stmt, ast.If):
+                check_expr(stmt.test)
+                for s in stmt.body:
+                    check_stmt(s)
+                for s in stmt.orelse:
+                    check_stmt(s)
+            elif isinstance(stmt, ast.Return) and stmt.value:
+                check_expr(stmt.value)
+
+        for stmt in stmts:
+            check_stmt(stmt)
+
+        return nested_vars
+
+    def _infer_all_variable_types(self, stmts: list[ast.stmt]) -> None:
+        """Pre-pass to infer all variable types, including nested containers."""
+        # First pass: collect initial types from annotations
+        initial_types: dict[str, str] = {}
+
+        def collect_initial_types(stmts: list[ast.stmt]) -> None:
+            for stmt in stmts:
+                if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                    var_name = stmt.target.id
+                    var_type = self._convert_type_annotation(stmt.annotation)
+
+                    # Infer from value if available
+                    if var_type == "auto" and stmt.value:
+                        inferred = self._infer_type_from_value(stmt.value)
+                        if inferred != "auto":
+                            var_type = inferred
+                        elif isinstance(stmt.value, ast.List) and not stmt.value.elts:
+                            var_type = "std::vector<int>"  # Default for now
+                        elif isinstance(stmt.value, ast.Dict) and not stmt.value.keys:
+                            var_type = "std::unordered_map<int, int>"
+
+                    initial_types[var_name] = var_type
+
+                # Recurse into loops and conditionals
+                if isinstance(stmt, (ast.For, ast.While)):
+                    collect_initial_types(stmt.body)
+                    if hasattr(stmt, 'orelse'):
+                        collect_initial_types(stmt.orelse)
+                elif isinstance(stmt, ast.If):
+                    collect_initial_types(stmt.body)
+                    collect_initial_types(stmt.orelse)
+
+        collect_initial_types(stmts)
+
+        # Second pass: refine types based on append operations
+        # If a container has a vector appended to it, it's a vector of vectors
+        for container_name, appended_var in self.append_map.items():
+            if appended_var in initial_types:
+                appended_type = initial_types[appended_var]
+                if appended_type.startswith("std::vector<"):
+                    # Upgrade container to nested type
+                    initial_types[container_name] = f"std::vector<{appended_type}>"
+
+        # Third pass: detect nested subscripting and upgrade vector<int> to vector<vector<int>>
+        nested_vars = self._analyze_nested_subscripts(stmts)
+        for var_name in nested_vars:
+            if var_name in initial_types and initial_types[var_name] == "std::vector<int>":
+                initial_types[var_name] = "std::vector<std::vector<int>>"
+
+        # Fourth pass: detect string-keyed dict usage
+        string_keyed_dicts = self._analyze_dict_key_types(stmts)
+        for var_name, key_type in string_keyed_dicts.items():
+            if var_name in initial_types:
+                current_type = initial_types[var_name]
+                # If it's a default dict<int, int>, upgrade to dict<string, int>
+                if current_type == "std::unordered_map<int, int>" and key_type == "std::string":
+                    initial_types[var_name] = "std::unordered_map<std::string, int>"
+
+        # Store in variable_context
+        self.variable_context.update(initial_types)
+
+    def _analyze_dict_key_types(self, stmts: list[ast.stmt]) -> dict[str, str]:
+        """Analyze dict subscript and .count() usage to infer key types."""
+        key_types: dict[str, str] = {}
+
+        def check_for_dict_usage(expr: ast.expr) -> None:
+            # Check for dict[key] subscripting
+            if isinstance(expr, ast.Subscript) and isinstance(expr.value, ast.Name):
+                dict_name = expr.value.id
+                # Check if the index is a string literal or variable
+                if isinstance(expr.slice, ast.Constant) and isinstance(expr.slice.value, str):
+                    # String literal key - definitely a string-keyed dict
+                    key_types[dict_name] = "std::string"
+                elif isinstance(expr.slice, ast.Name):
+                    # Variable key - check if it looks like a string variable
+                    if expr.slice.id.endswith("word") or expr.slice.id.endswith("_word"):
+                        key_types[dict_name] = "std::string"
+            # Check for dict.count(key) method calls
+            elif isinstance(expr, ast.Call):
+                if isinstance(expr.func, ast.Attribute) and expr.func.attr == "count":
+                    if isinstance(expr.func.value, ast.Name) and expr.args:
+                        dict_name = expr.func.value.id
+                        # Check the argument type
+                        if isinstance(expr.args[0], ast.Constant) and isinstance(expr.args[0].value, str):
+                            # String literal argument
+                            key_types[dict_name] = "std::string"
+                        elif isinstance(expr.args[0], ast.Name):
+                            if expr.args[0].id.endswith("word") or expr.args[0].id.endswith("_word"):
+                                key_types[dict_name] = "std::string"
+                # Recursively check call arguments
+                for arg in expr.args:
+                    check_for_dict_usage(arg)
+            # Recursively check other expression types
+            elif isinstance(expr, ast.BinOp):
+                check_for_dict_usage(expr.left)
+                check_for_dict_usage(expr.right)
+            elif isinstance(expr, ast.Compare):
+                check_for_dict_usage(expr.left)
+                for comp in expr.comparators:
+                    check_for_dict_usage(comp)
+
+        def check_stmt(stmt: ast.stmt) -> None:
+            if isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    check_for_dict_usage(target)
+                check_for_dict_usage(stmt.value)
+            elif isinstance(stmt, ast.AnnAssign):
+                if stmt.value:
+                    check_for_dict_usage(stmt.value)
+            elif isinstance(stmt, ast.AugAssign):
+                check_for_dict_usage(stmt.target)
+                check_for_dict_usage(stmt.value)
+            elif isinstance(stmt, ast.Expr):
+                check_for_dict_usage(stmt.value)
+            elif isinstance(stmt, (ast.For, ast.While)):
+                for s in stmt.body:
+                    check_stmt(s)
+                if hasattr(stmt, 'orelse'):
+                    for s in stmt.orelse:
+                        check_stmt(s)
+            elif isinstance(stmt, ast.If):
+                check_for_dict_usage(stmt.test)
+                for s in stmt.body:
+                    check_stmt(s)
+                for s in stmt.orelse:
+                    check_stmt(s)
+            elif isinstance(stmt, ast.Return) and stmt.value:
+                check_for_dict_usage(stmt.value)
+
+        for stmt in stmts:
+            check_stmt(stmt)
+
+        return key_types
 
     def _convert_class(self, node: ast.ClassDef) -> str:
         """Convert a Python class to C++ class."""
@@ -677,22 +888,29 @@ class MGenPythonToCppConverter:
         """Convert annotated assignment (var: type = value)."""
         if isinstance(stmt.target, ast.Name):
             var_name = stmt.target.id
-            var_type = self._convert_type_annotation(stmt.annotation)
 
-            # For empty container literals with auto type, use concrete types
-            if (
-                stmt.value
-                and isinstance(stmt.value, (ast.List, ast.Dict))
-                and not (stmt.value.elts if isinstance(stmt.value, ast.List) else stmt.value.keys)
-            ):
-                # Empty container with bare type annotation - use concrete type
-                if var_type == "auto":
-                    if isinstance(stmt.value, ast.List):
-                        var_type = "std::vector<int>"
-                    elif isinstance(stmt.value, ast.Dict):
-                        var_type = "std::unordered_map<int, int>"  # Default to int keys
+            # Check if we already inferred the type in the pre-pass
+            if var_name in self.variable_context:
+                # Use the pre-computed type from _infer_all_variable_types
+                var_type = self.variable_context[var_name]
+            else:
+                # Fallback to computing the type now
+                var_type = self._convert_type_annotation(stmt.annotation)
 
-            self.variable_context[var_name] = var_type
+                # If annotation gives us "auto" but we have a value, try to infer concrete type
+                if var_type == "auto" and stmt.value:
+                    inferred_type = self._infer_type_from_value(stmt.value)
+                    # Use inferred type if it's not also "auto"
+                    if inferred_type != "auto":
+                        var_type = inferred_type
+                    # For empty containers with "auto", use default concrete types
+                    elif isinstance(stmt.value, (ast.List, ast.Dict)):
+                        if isinstance(stmt.value, ast.List) and not stmt.value.elts:
+                            var_type = "std::vector<int>"
+                        elif isinstance(stmt.value, ast.Dict) and not stmt.value.keys:
+                            var_type = "std::unordered_map<int, int>"
+
+                self.variable_context[var_name] = var_type
 
             if stmt.value:
                 value_expr = self._convert_expression(stmt.value)
@@ -1009,6 +1227,23 @@ class MGenPythonToCppConverter:
             # Handle container methods - map Python names to C++ names
             if method_name == "append":
                 # Python's append -> C++'s push_back
+                # Also check if we need to update the container type to handle nested containers
+                if isinstance(expr.func.value, ast.Name) and expr.args:
+                    container_name = expr.func.value.id
+                    # Check if the argument is a variable with a known type
+                    if isinstance(expr.args[0], ast.Name):
+                        appended_var = expr.args[0].id
+                        if appended_var in self.variable_context:
+                            appended_type = self.variable_context[appended_var]
+                            # If appending a vector to a container that's currently vector<int>,
+                            # upgrade it to vector<vector<...>>
+                            if container_name in self.variable_context:
+                                current_type = self.variable_context[container_name]
+                                if appended_type.startswith("std::vector<") and current_type == "std::vector<int>":
+                                    # This is likely a case where we defaulted to vector<int> but it's really nested
+                                    # Update the type in our context
+                                    self.variable_context[container_name] = f"std::vector<{appended_type}>"
+
                 return f"{obj_expr}.push_back({', '.join(args)})"
 
             # Handle dict.items() - in C++, we just iterate over the map directly
@@ -1266,6 +1501,38 @@ class MGenPythonToCppConverter:
             return self._convert_type_annotation(arg.annotation)
         return "auto"
 
+    def _analyze_append_operations(self, stmts: list[ast.stmt]) -> dict[str, str]:
+        """Analyze append operations to detect what types are appended to containers.
+
+        Returns a mapping of container_name -> appended_item_name.
+        """
+        append_map: dict[str, str] = {}
+
+        def analyze_stmts(stmts: list[ast.stmt]) -> None:
+            for stmt in stmts:
+                # Recursively analyze nested statements (loops, ifs, etc.)
+                if isinstance(stmt, (ast.For, ast.While)):
+                    analyze_stmts(stmt.body)
+                    if hasattr(stmt, 'orelse'):
+                        analyze_stmts(stmt.orelse)
+                elif isinstance(stmt, ast.If):
+                    analyze_stmts(stmt.body)
+                    analyze_stmts(stmt.orelse)
+                elif isinstance(stmt, ast.Expr):
+                    # Check for append method calls: container.append(item)
+                    if isinstance(stmt.value, ast.Call):
+                        if isinstance(stmt.value.func, ast.Attribute) and stmt.value.func.attr == "append":
+                            if isinstance(stmt.value.func.value, ast.Name) and stmt.value.args:
+                                container_name = stmt.value.func.value.id
+                                # Record what's being appended
+                                append_arg = stmt.value.args[0]
+                                if isinstance(append_arg, ast.Name):
+                                    # Store the mapping: container -> appended_variable
+                                    append_map[container_name] = append_arg.id
+
+        analyze_stmts(stmts)
+        return append_map
+
     def _convert_type_annotation(self, annotation: ast.expr) -> str:
         """Convert Python type annotation to C++ type (for return types and variables)."""
         if isinstance(annotation, ast.Name):
@@ -1305,10 +1572,31 @@ class MGenPythonToCppConverter:
             elif isinstance(value.value, str):
                 return "std::string"
         elif isinstance(value, ast.List):
+            # Infer element type from list literal
+            if value.elts:
+                # Non-empty list - try to infer element type
+                element_types = [self._infer_type_from_value(elt) for elt in value.elts]
+                # If all elements have the same concrete type, use it
+                if element_types and all(t == element_types[0] and t not in ["auto", ""] for t in element_types):
+                    return f"std::vector<{element_types[0]}>"
+            # Empty or mixed types - fall back to auto
             return "auto"
         elif isinstance(value, ast.Dict):
+            # For dict literals, try to infer key/value types
+            if value.keys and value.values:
+                key_types = [self._infer_type_from_value(k) for k in value.keys if k]
+                value_types = [self._infer_type_from_value(v) for v in value.values]
+                # If all keys and values have consistent concrete types, use them
+                if (key_types and all(t == key_types[0] and t not in ["auto", ""] for t in key_types) and
+                    value_types and all(t == value_types[0] and t not in ["auto", ""] for t in value_types)):
+                    return f"std::unordered_map<{key_types[0]}, {value_types[0]}>"
             return "auto"
         elif isinstance(value, ast.Set):
+            # For set literals, try to infer element type
+            if value.elts:
+                element_types = [self._infer_type_from_value(elt) for elt in value.elts]
+                if element_types and all(t == element_types[0] and t not in ["auto", ""] for t in element_types):
+                    return f"std::unordered_set<{element_types[0]}>"
             return "auto"
         elif isinstance(value, ast.Call):
             # Infer type from function calls
