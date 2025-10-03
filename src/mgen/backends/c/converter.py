@@ -1310,22 +1310,26 @@ class MGenPythonToCConverter:
         expr_str = self._convert_expression(node.elt)
 
         # Generate the comprehension code differently based on iteration type
+        # Use GCC statement expression syntax ({ ... }) to allow use in initializers
+        # Note: Last expression in statement expression must end with semicolon
         if loop_var_decl:
             # Container iteration requires extracting the element first
-            comp_code = f"""{{
+            comp_code = f"""({{
     {result_container_type} {temp_var} = {{0}};
     {loop_code} {{
         {loop_var_decl}{condition_code}vec_{self._sanitize_type_name(result_element_type)}_push(&{temp_var}, {expr_str});
     }}
-    {temp_var}}}"""
+    {temp_var};
+}})"""
         else:
             # Range-based iteration is simpler
-            comp_code = f"""{{
+            comp_code = f"""({{
     {result_container_type} {temp_var} = {{0}};
     {loop_code} {{
         {condition_code}vec_{self._sanitize_type_name(result_element_type)}_push(&{temp_var}, {expr_str});
     }}
-    {temp_var}}}"""
+    {temp_var};
+}})"""
 
         return comp_code
 
@@ -1400,13 +1404,14 @@ class MGenPythonToCConverter:
         key_str = self._convert_expression(node.key)
         value_str = self._convert_expression(node.value)
 
-        # Generate the comprehension code
-        comp_code = f"""{{
+        # Generate the comprehension code using GCC statement expression syntax
+        comp_code = f"""({{
     {result_container_type} {temp_var} = {{0}};
     {loop_code} {{
         {condition_code}{result_container_type}_insert(&{temp_var}, {key_str}, {value_str});
     }}
-    {temp_var}}}"""
+    {temp_var};
+}})"""
 
         return comp_code
 
@@ -1479,13 +1484,14 @@ class MGenPythonToCConverter:
         # Convert the expression
         expr_str = self._convert_expression(node.elt)
 
-        # Generate the comprehension code
-        comp_code = f"""{{
+        # Generate the comprehension code using GCC statement expression syntax
+        comp_code = f"""({{
     {result_container_type} {temp_var} = {{0}};
     {loop_code} {{
         {condition_code}{result_container_type}_insert(&{temp_var}, {expr_str});
     }}
-    {temp_var}}}"""
+    {temp_var};
+}})"""
 
         return comp_code
 

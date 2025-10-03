@@ -214,9 +214,13 @@ class BenchmarkRunner:
             if backend == "c":
                 # Compile C code - use absolute paths
                 runtime_files = list(output_dir.glob("mgen_*.c"))
+                # Add STC include path
+                project_root = Path(__file__).parent.parent
+                stc_path = project_root / "src" / "mgen" / "backends" / "c"
                 cmd = [
-                    "gcc", "-Wall", "-Wextra", "-std=c11", "-O2",
+                    "gcc", "-Wall", "-Wextra", "-std=gnu11", "-O2",
                     f"-I{output_dir.absolute()}",
+                    f"-I{stc_path.absolute()}",
                     str(source_file.absolute()),
                     *[str(f.absolute()) for f in runtime_files],
                     "-o", str((output_dir / executable_name).absolute())
