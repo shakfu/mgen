@@ -17,6 +17,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.38] - 2025-10-04
+
+### Added
+
+- **Container Code Generation System** - Revolutionary approach to C container implementation
+  - **Architecture**: Generate clean, type-specific C code directly inline (no external dependencies)
+  - **Philosophy**: Code generators should produce self-contained, complete code (similar to C++ template monomorphization)
+  - **New Module**: `src/mgen/backends/c/container_codegen.py` (~200 lines)
+    - `ContainerCodeGenerator` class - converts runtime libraries into code generation templates
+    - Template loading from runtime library files
+    - `_strip_includes_and_headers()` - removes includes for standalone code
+    - `_remove_error_handling_macros()` - makes code self-contained
+    - `generate_str_int_map()` - generates complete ~220-line hash table implementation
+    - `generate_container()` - dispatcher for future container types
+  - **Design Document**: `docs/design/GENERATED_CONTAINERS.md` (comprehensive architectural analysis)
+    - Problem statement (STC macros vs runtime libraries)
+    - Benefits comparison table (compilation, debugging, portability, etc.)
+    - 4-phase implementation strategy
+    - Migration path and future enhancements
+  - **Dual-Mode Architecture**: Support both runtime libraries and generated code simultaneously
+    - New preference: `container_mode = "runtime" | "generated"` in `CPreferences`
+    - Default: `"runtime"` (backward compatible)
+    - CLI usage: `--prefer container_mode=generated`
+  - **Converter Integration** (`src/mgen/backends/c/converter.py`):
+    - Updated `__init__()` to accept `BackendPreferences` parameter
+    - Initialized `self.container_generator = ContainerCodeGenerator()`
+    - Modified `_convert_module()` to check container mode and branch accordingly
+    - New method: `_generate_inline_containers()` (~60 lines) - generates inline implementations
+    - Updated `_generate_includes()` to skip runtime include in generated mode
+  - **Benefits Validated**:
+    - ✅ Zero external dependencies (single C file output)
+    - ✅ Standard C compilation (plain `gcc -std=c99`)
+    - ✅ Self-contained programs (all code visible in one file)
+    - ✅ Backward compatible (runtime mode still default)
+    - ✅ Production quality (clean, readable generated code)
+  - **Prototype Validation** (`examples/generated_containers/`):
+    - `demo_generated_containers.py` - end-to-end demonstration
+    - Generates 330-line complete C program with inline hash table
+    - Compiles with gcc, executes correctly
+    - README.md with comprehensive documentation
+  - **Testing**: Wordcount benchmark outputs correct result (4) in generated mode
+  - **Quality**: All 741 tests pass (zero regressions)
+
+### Changed
+
+- **C Emitter** (`src/mgen/backends/c/emitter.py`):
+  - Pass preferences to converter: `MGenPythonToCConverter(preferences)`
+  - Enables preference-driven code generation
+
 ## [0.1.37] - 2025-10-04
 
 ### Added
