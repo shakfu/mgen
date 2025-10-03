@@ -58,8 +58,10 @@ class CPreferences(BackendPreferences):
         """Initialize C-specific default preferences."""
         self.language_specific.update(
             {
+                # Container implementation preferences
+                "container_mode": "runtime",  # "runtime" or "generated" - how to implement containers
+                "use_stc_containers": True,  # Use Smart Template Containers (only for runtime mode)
                 # Code generation preferences
-                "use_stc_containers": True,  # Use Smart Template Containers
                 "inline_functions": False,  # Add inline keywords
                 "use_restrict_keywords": False,  # Use restrict pointers
                 "enable_compiler_optimizations": True,

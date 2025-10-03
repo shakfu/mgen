@@ -17,7 +17,7 @@ from typing import Optional
 class ContainerCodeGenerator:
     """Generate type-specific container implementations inline."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize code generator with templates from runtime library."""
         self.runtime_dir = Path(__file__).parent / "runtime"
         self._template_cache: dict[str, str] = {}

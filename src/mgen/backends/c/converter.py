@@ -27,6 +27,8 @@ from ..converter_utils import (
     get_standard_unary_operator,
 )
 from ..errors import TypeMappingError, UnsupportedFeatureError
+from ..preferences import BackendPreferences, CPreferences
+from .container_codegen import ContainerCodeGenerator
 from .containers import CContainerSystem
 from .enhanced_type_inference import EnhancedTypeInferenceEngine, InferredType, TypeConfidence
 from .ext.stc.nested_containers import NestedContainerManager
@@ -35,8 +37,20 @@ from .ext.stc.nested_containers import NestedContainerManager
 class MGenPythonToCConverter:
     """Enhanced Python to C converter with MGen runtime integration."""
 
-    def __init__(self) -> None:
-        """Initialize converter with MGen runtime support."""
+    def __init__(self, preferences: Optional[BackendPreferences] = None) -> None:
+        """Initialize converter with MGen runtime support.
+
+        Args:
+            preferences: Backend preferences for controlling code generation
+        """
+        # Initialize preferences
+        if preferences is None:
+            preferences = CPreferences()
+        self.preferences = preferences
+
+        # Initialize container code generator for generated mode
+        self.container_generator = ContainerCodeGenerator()
+
         self.type_mapping = {
             "int": "int",
             "float": "double",
@@ -103,10 +117,19 @@ class MGenPythonToCConverter:
         parts.extend(self._generate_includes())
         parts.append("")
 
-        # Add STC container declarations if needed
+        # Check container mode preference
+        container_mode = self.preferences.get("container_mode", "runtime")
+
+        # Add container implementation (runtime includes or generated code)
         if self._uses_containers(node) or self.uses_comprehensions or self.container_variables:
-            parts.extend(self._generate_container_declarations())
-            parts.append("")
+            if container_mode == "generated":
+                # Generate inline container implementations
+                parts.extend(self._generate_inline_containers())
+                parts.append("")
+            else:
+                # Default: Use runtime library with STC declarations
+                parts.extend(self._generate_container_declarations())
+                parts.append("")
 
         # Convert functions and classes
         for stmt in node.body:
@@ -228,8 +251,9 @@ class MGenPythonToCConverter:
             if self.container_variables or self._needs_containers():
                 includes.append('#include "mgen_stc_bridge.h"')
 
-            # Check if we need vanilla C string-to-int map
-            if self._uses_str_int_map():
+            # Check if we need vanilla C string-to-int map (only in runtime mode)
+            container_mode = self.preferences.get("container_mode", "runtime")
+            if self._uses_str_int_map() and container_mode == "runtime":
                 includes.append('#include "mgen_str_int_map.h"')
 
         # Note: STC includes are handled in _generate_container_declarations()
@@ -353,6 +377,72 @@ class MGenPythonToCConverter:
                 ])
 
         return declarations
+
+    def _generate_inline_containers(self) -> list[str]:
+        """Generate inline container implementations instead of STC includes.
+
+        This is the prototype implementation that generates complete container
+        code inline, eliminating external dependencies.
+
+        Returns:
+            List of code lines with generated container implementations
+        """
+        code_lines = []
+
+        # Collect all unique C types used (same logic as _generate_container_declarations)
+        c_types_used = set()
+
+        # From inferred types
+        for inferred in self.inferred_types.values():
+            if inferred.c_type.startswith(("vec_", "map_", "set_")):
+                c_types_used.add(inferred.c_type)
+
+        # From variable context
+        for c_type in self.variable_context.values():
+            if c_type.startswith(("vec_", "map_", "set_")):
+                c_types_used.add(c_type)
+
+        # Analyze container types needed from existing variables
+        container_types = set()
+        for var_info in self.container_variables.values():
+            if "element_type" in var_info:
+                container_types.add(var_info["element_type"])
+
+        # Add types for comprehensions
+        if hasattr(self, "uses_comprehensions") and self.uses_comprehensions:
+            container_types.add("int")
+
+        # Add nested container types
+        if self.nested_containers:
+            c_types_used.add("vec_int")
+            c_types_used.add("vec_vec_int")
+
+        # Generate declarations for each generic type (old approach)
+        for element_type in container_types:
+            sanitized = self._sanitize_type_name(element_type)
+            c_types_used.add(f"vec_{sanitized}")
+            c_types_used.add(f"map_{sanitized}_{sanitized}")
+            c_types_used.add(f"set_{sanitized}")
+
+        # Generate inline implementations for containers
+        # For now, only map_str_int is fully implemented
+        generated_containers = set()
+
+        for c_type in sorted(c_types_used):
+            if c_type in generated_containers:
+                continue
+
+            # Only generate map_str_int for now (prototype)
+            if c_type == "map_str_int":
+                generated_code = self.container_generator.generate_container(c_type)
+                if generated_code:
+                    code_lines.append(generated_code)
+                    generated_containers.add(c_type)
+            # TODO: Add vec_int, set_int, map_int_int generation
+            # For other containers, fall back to STC (for now)
+            # Future: Generate all container types inline
+
+        return code_lines
 
     def _convert_function(self, node: ast.FunctionDef) -> str:
         """Convert Python function to C function."""

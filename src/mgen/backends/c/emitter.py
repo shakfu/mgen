@@ -36,8 +36,8 @@ class CEmitter(AbstractEmitter):
         self.runtime_dir = Path(__file__).parent / "runtime"
         self.use_runtime = self.runtime_dir.exists()
 
-        # Initialize sophisticated py2c converter
-        self.py2c_converter = MGenPythonToCConverter()
+        # Initialize sophisticated py2c converter with preferences
+        self.py2c_converter = MGenPythonToCConverter(preferences)
 
         # Enhanced type mapping for C code generation
         self.type_map = {
