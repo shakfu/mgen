@@ -199,9 +199,10 @@ def test_augassign_in_loop(numbers: list) -> int:
 """
         haskell_code = self.converter.convert_code(python_code)
 
-        # Note: In Haskell, this would be implemented differently
-        # due to immutability, but we test the basic conversion
-        assert "total = (total + num)" in haskell_code
+        # In Haskell, accumulation in loops is implemented using foldl
+        # This is the idiomatic functional approach
+        assert "total = foldl" in haskell_code
+        assert "acc + (num)" in haskell_code
 
     def test_augmented_assignment_with_attributes(self):
         """Test augmented assignment on object attributes."""

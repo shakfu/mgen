@@ -56,10 +56,25 @@ class MGenPythonToHaskellConverter:
         """Convert Python function name to Haskell function name (camelCase)."""
         if function_name == "main":
             return "main"
+
+        # Check for Haskell reserved keywords
+        haskell_keywords = {
+            "case", "class", "data", "default", "deriving", "do", "else",
+            "foreign", "if", "import", "in", "infix", "infixl", "infixr",
+            "instance", "let", "module", "newtype", "of", "then", "type",
+            "where", "as", "qualified", "hiding"
+        }
+
         components = function_name.split("_")
         if len(components) == 1:
-            return function_name
-        return components[0] + "".join(word.capitalize() for word in components[1:])
+            base_name = function_name
+        else:
+            base_name = components[0] + "".join(word.capitalize() for word in components[1:])
+
+        # If it's a reserved keyword, append an underscore
+        if base_name.lower() in haskell_keywords:
+            return base_name + "_"
+        return base_name
 
     def _to_haskell_var_name(self, var_name: str) -> str:
         """Convert Python variable name to Haskell variable name (camelCase)."""
@@ -895,36 +910,36 @@ main = printValue "Generated Haskell code executed successfully"'''
         orelse = self._convert_expression(node.orelse)
         return f"(if {test} then {body} else {orelse})"
 
+    def _convert_operator(self, op_node: ast.operator) -> str:
+        """Convert AST operator to Haskell operator string."""
+        if isinstance(op_node, ast.FloorDiv):
+            return "`div`"
+        elif isinstance(op_node, ast.Mod):
+            return "`mod`"
+        elif isinstance(op_node, ast.Pow):
+            return "**"
+        elif isinstance(op_node, ast.BitOr):
+            return ".|."
+        elif isinstance(op_node, ast.BitXor):
+            return "`xor`"
+        elif isinstance(op_node, ast.BitAnd):
+            return ".&."
+        elif isinstance(op_node, ast.LShift):
+            return "`shiftL`"
+        elif isinstance(op_node, ast.RShift):
+            return "`shiftR`"
+        else:
+            # Use standard operator mapping from converter_utils for common operators
+            op_result = get_standard_binary_operator(op_node)
+            if op_result is None:
+                raise UnsupportedFeatureError(f"Unsupported operator: {type(op_node).__name__}")
+            return op_result
+
     def _convert_augmented_assignment(self, node: ast.AugAssign) -> str:
         """Convert Python augmented assignment to Haskell."""
         target = self._convert_expression(node.target)
         value = self._convert_expression(node.value)
-
-        # Handle Haskell-specific operators
-        op: str
-        if isinstance(node.op, ast.FloorDiv):
-            op = "`div`"
-        elif isinstance(node.op, ast.Mod):
-            op = "`mod`"
-        elif isinstance(node.op, ast.Pow):
-            op = "**"
-        elif isinstance(node.op, ast.BitOr):
-            op = ".|."
-        elif isinstance(node.op, ast.BitXor):
-            op = "`xor`"
-        elif isinstance(node.op, ast.BitAnd):
-            op = ".&."
-        elif isinstance(node.op, ast.LShift):
-            op = "`shiftL`"
-        elif isinstance(node.op, ast.RShift):
-            op = "`shiftR`"
-        else:
-            # Use standard operator mapping from converter_utils for common operators
-            op_result = get_standard_binary_operator(node.op)
-            if op_result is None:
-                raise UnsupportedFeatureError(f"Unsupported augmented assignment operator: {type(node.op).__name__}")
-            op = op_result
-
+        op = self._convert_operator(node.op)
         return f"{target} = ({target} {op} {value})"
 
     def _convert_if_statement(self, node: ast.If) -> str:
@@ -962,19 +977,32 @@ main = printValue "Generated Haskell code executed successfully"'''
             var_name = self._to_haskell_var_name(node.target.id)
             iterable = self._convert_expression(node.iter)
 
-            # Check if loop body is a single assignment that updates an outer variable
-            # Pattern: for i in range(n): var = expr(i)  ->  var' = foldl (\_ i -> expr(i)) var range
-            if (self.current_function == "main" and
-                len(node.body) == 1 and
-                isinstance(node.body[0], ast.Assign)):
-                stmt: ast.Assign = node.body[0]
-                if len(stmt.targets) == 1:
-                    target = stmt.targets[0]
-                    if isinstance(target, ast.Name):
-                        updated_var = self._to_haskell_var_name(target.id)
+            # Check if loop body is a single assignment or augmented assignment that updates an outer variable
+            # Pattern: for i in range(n): var = expr(i)  ->  foldM for IO context
+            # Pattern: for i in range(n): var += expr(i)  ->  foldl for pure context
+            if len(node.body) == 1:
+                stmt = node.body[0]
+
+                # Handle regular assignment in main (IO context)
+                if (self.current_function == "main" and isinstance(stmt, ast.Assign)):
+                    if len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
+                        updated_var = self._to_haskell_var_name(stmt.targets[0].id)
                         value_expr = self._convert_expression(stmt.value)
                         # Use foldM to update variable through iterations (shadowing in do notation)
                         return f"{updated_var} <- foldM (\\acc {var_name} -> return ({value_expr})) {updated_var} ({iterable})"
+
+                # Handle augmented assignment (accumulation pattern) - works in both pure and IO
+                elif isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
+                    var_name_target = self._to_haskell_var_name(stmt.target.id)
+                    value_expr = self._convert_expression(stmt.value)
+                    op = self._convert_operator(stmt.op)
+
+                    # In pure context (not main), use foldl for accumulation
+                    if self.current_function != "main":
+                        return f"{var_name_target} = foldl (\\acc {var_name} -> acc {op} ({value_expr})) {var_name_target} ({iterable})"
+                    else:
+                        # In IO context, still use foldM but with accumulator
+                        return f"{var_name_target} <- foldM (\\acc {var_name} -> return (acc {op} ({value_expr}))) {var_name_target} ({iterable})"
 
             body_stmts = []
             for body_stmt in node.body:

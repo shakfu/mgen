@@ -771,36 +771,36 @@ class MGenPythonToOCamlConverter:
         else:
             raise UnsupportedFeatureError("Complex assignment targets not supported")
 
+    def _convert_operator(self, op_node: ast.operator) -> str:
+        """Convert AST operator to OCaml operator string."""
+        if isinstance(op_node, ast.FloorDiv):
+            return "/"  # OCaml doesn't have floor division
+        elif isinstance(op_node, ast.Mod):
+            return "mod"
+        elif isinstance(op_node, ast.Pow):
+            return "**"
+        elif isinstance(op_node, ast.BitOr):
+            return "lor"
+        elif isinstance(op_node, ast.BitXor):
+            return "lxor"
+        elif isinstance(op_node, ast.BitAnd):
+            return "land"
+        elif isinstance(op_node, ast.LShift):
+            return "lsl"
+        elif isinstance(op_node, ast.RShift):
+            return "lsr"
+        else:
+            # Use standard operator mapping from converter_utils for common operators
+            op_result = get_standard_binary_operator(op_node)
+            if op_result is None:
+                raise UnsupportedFeatureError(f"Unsupported operator: {type(op_node).__name__}")
+            return op_result
+
     def _convert_augmented_assignment(self, node: ast.AugAssign) -> str:
         """Convert Python augmented assignment to OCaml."""
         target = self._convert_expression(node.target)
         value = self._convert_expression(node.value)
-
-        # Handle OCaml-specific operators
-        op: str
-        if isinstance(node.op, ast.FloorDiv):
-            op = "/"  # OCaml doesn't have floor division
-        elif isinstance(node.op, ast.Mod):
-            op = "mod"
-        elif isinstance(node.op, ast.Pow):
-            op = "**"
-        elif isinstance(node.op, ast.BitOr):
-            op = "lor"
-        elif isinstance(node.op, ast.BitXor):
-            op = "lxor"
-        elif isinstance(node.op, ast.BitAnd):
-            op = "land"
-        elif isinstance(node.op, ast.LShift):
-            op = "lsl"
-        elif isinstance(node.op, ast.RShift):
-            op = "lsr"
-        else:
-            # Use standard operator mapping from converter_utils for common operators
-            op_result = get_standard_binary_operator(node.op)
-            if op_result is None:
-                raise UnsupportedFeatureError(f"Unsupported augmented assignment operator: {type(node.op).__name__}")
-            op = op_result
-
+        op = self._convert_operator(node.op)
         return f"let {target} = {target} {op} {value} in"
 
     def _convert_expression_statement(self, node: ast.Expr) -> str:
@@ -857,15 +857,26 @@ class MGenPythonToOCamlConverter:
         target = self._to_ocaml_var_name(node.target.id)
         iter_expr = self._convert_expression(node.iter)
 
-        # Check for single assignment pattern: for i in range(n): var = expr
-        if (len(node.body) == 1 and
-            isinstance(node.body[0], ast.Assign) and
-            len(node.body[0].targets) == 1 and
-            isinstance(node.body[0].targets[0], ast.Name)):
-            updated_var = self._to_ocaml_var_name(node.body[0].targets[0].id)
-            value_expr = self._convert_expression(node.body[0].value)
-            # Use fold_left to thread state through iterations
-            return [f"let {updated_var} = List.fold_left (fun _ {target} -> {value_expr}) {updated_var} ({iter_expr}) in"]
+        # Check for single assignment or augmented assignment pattern
+        if len(node.body) == 1:
+            stmt = node.body[0]
+
+            # Handle regular assignment: for i in range(n): var = expr
+            if (isinstance(stmt, ast.Assign) and
+                len(stmt.targets) == 1 and
+                isinstance(stmt.targets[0], ast.Name)):
+                updated_var = self._to_ocaml_var_name(stmt.targets[0].id)
+                value_expr = self._convert_expression(stmt.value)
+                # Use fold_left to thread state through iterations
+                return [f"let {updated_var} = List.fold_left (fun _ {target} -> {value_expr}) {updated_var} ({iter_expr}) in"]
+
+            # Handle augmented assignment: for i in range(n): var += expr
+            elif isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
+                updated_var = self._to_ocaml_var_name(stmt.target.id)
+                value_expr = self._convert_expression(stmt.value)
+                op = self._convert_operator(stmt.op)
+                # Use fold_left for accumulation
+                return [f"let {updated_var} = List.fold_left (fun acc {target} -> acc {op} ({value_expr})) {updated_var} ({iter_expr}) in"]
 
         # General case - convert body to let expressions
         body_lines = []
