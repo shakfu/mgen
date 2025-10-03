@@ -625,6 +625,11 @@ class MGenPythonToGoConverter:
                         statements.append(f"    {target.id} := {value_expr}")
                     else:
                         statements.append(f"    var {target.id} {var_type} = {value_expr}")
+            elif isinstance(target, ast.Subscript):
+                # Handle subscript assignment: container[index] = value
+                container_expr = self._convert_expression(target.value)
+                index_expr = self._convert_expression(target.slice)
+                statements.append(f"    {container_expr}[{index_expr}] = {value_expr}")
 
         return "\n".join(statements)
 
@@ -971,6 +976,19 @@ class MGenPythonToGoConverter:
                 # Return a marker that the statement converter can detect
                 return f"__APPEND__{obj_expr}__ARGS__{args_str}__END__"
 
+            # Handle dict methods - translate to Go map iteration
+            elif method_name == "items":
+                # Python's dict.items() - In Go, we iterate over map directly
+                # For range-based iteration, just return the map itself
+                return obj_expr
+            elif method_name == "values":
+                # Python's dict.values() - need to extract values from map
+                # This would need runtime support, for now use map directly
+                return f"mgen.MapValues({obj_expr})"
+            elif method_name == "keys":
+                # Python's dict.keys() - need to extract keys from map
+                return f"mgen.MapKeys({obj_expr})"
+
             # Regular method call
             args_str = ", ".join(args)
             return f"{obj_expr}.{self._to_go_method_name(method_name)}({args_str})"
@@ -1284,8 +1302,8 @@ class MGenPythonToGoConverter:
                 value_types = [self._infer_type_from_value(v) for v in value.values if v]
                 if key_types and value_types and all(t == key_types[0] for t in key_types) and all(t == value_types[0] for t in value_types):
                     return f"map[{key_types[0]}]{value_types[0]}"
-            # Empty dict - default to map[string]int
-            return "map[string]int"
+            # Empty dict - default to map[int]int (more common than string keys)
+            return "map[int]int"
         elif isinstance(value, ast.ListComp):
             # Infer type from list comprehension element with context
             loop_var_type = self._infer_loop_variable_type(value.generators[0])

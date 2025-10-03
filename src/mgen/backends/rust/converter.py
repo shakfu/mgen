@@ -684,6 +684,16 @@ class MGenPythonToRustConverter:
                 # Handle subscript assignment: container[index] = value
                 container_expr = self._convert_expression(target.value)
                 index_expr = self._convert_expression(target.slice)
+
+                # Special case: Python bool in dict[int] = bool pattern (set simulation)
+                # If value is True/False and container is HashMap<_, i32>, convert to 1/0
+                if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, bool):
+                    if isinstance(target.value, ast.Name):
+                        var_type = self.variable_types.get(target.value.id, "")
+                        if "HashMap" in var_type and "i32>" in var_type:
+                            # HashMap with i32 values - convert bool to int
+                            value_expr = "1" if stmt.value.value else "0"
+
                 statements.append(f"    {container_expr}.insert({index_expr}, {value_expr});")
 
         return "\n".join(statements)
@@ -1224,9 +1234,11 @@ class MGenPythonToRustConverter:
             value_transform = self._convert_expression(value_expr)
 
             # Convert HashMap to Vec of tuples for iteration
-            # container_expr from .items() is "&dict", so we get dict reference
-            # We need to iter() it and collect to Vec
-            vec_expr = f"{container_expr}.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>()"
+            # container_expr from .items() is "&dict", so we have a dict reference
+            # We need to iter() it and collect to Vec (owned)
+            # Remove the & prefix if present, then add proper iteration
+            dict_expr = container_expr[1:] if container_expr.startswith("&") else container_expr
+            vec_expr = f"{dict_expr}.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>()"
 
             if conditions:
                 condition_expr = self._convert_expression(conditions[0])
@@ -1307,11 +1319,27 @@ class MGenPythonToRustConverter:
             target_name = target.id if isinstance(target, ast.Name) else "x"
             transform_expr = self._convert_expression(element_expr)
 
+            # Check if we're iterating over a HashSet - need to convert to Vec for comprehension
+            # Infer the type of the container
+            if isinstance(iter_expr, ast.Name):
+                var_type = self.variable_types.get(iter_expr.id, "")
+                if "HashSet" in var_type:
+                    # Convert HashSet to Vec for iteration
+                    container_expr = f"{container_expr}.iter().cloned().collect::<Vec<_>>()"
+
+            # For identity transforms (|x| x), use pattern matching to avoid reference issues
+            # Check if transform is just the variable name
+            if isinstance(element_expr, ast.Name) and element_expr.id == target_name:
+                # Identity transform - use &pattern to dereference
+                transform_pattern = f"&{target_name}"
+                transform_body = target_name
+                transform_expr = f"|{transform_pattern}| {transform_body}"
+
             if conditions:
                 condition_expr = self._convert_expression(conditions[0])
-                return f"Comprehensions::set_comprehension_with_filter({container_expr}, |{target_name}| {transform_expr}, |{target_name}| {condition_expr})"
+                return f"Comprehensions::set_comprehension_with_filter({container_expr}, {transform_expr}, |{target_name}| {condition_expr})"
             else:
-                return f"Comprehensions::set_comprehension({container_expr}, |{target_name}| {transform_expr})"
+                return f"Comprehensions::set_comprehension({container_expr}, {transform_expr})"
 
     # Helper methods for type inference and mapping
 
@@ -1422,6 +1450,12 @@ class MGenPythonToRustConverter:
                     return "i32"  # Default for abs
                 elif func_name == "min" or func_name == "max":
                     return "i32"  # Default for min/max
+                elif func_name == "set":
+                    # set() constructor with no args -> HashSet<i32> default
+                    return "std::collections::HashSet<i32>"
+                elif func_name == "dict":
+                    # dict() constructor with no args -> HashMap<i32, i32> default
+                    return "std::collections::HashMap<i32, i32>"
             elif isinstance(value.func, ast.Attribute):
                 # Method call - try to infer from method name
                 method_name = value.func.attr
