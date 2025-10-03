@@ -94,9 +94,9 @@ char* mgen_str_replace(const char* str, const char* old_str, const char* new_str
 
 /**
  * Python str.split() equivalent
- * Returns a simple string result for basic testing (simplified implementation)
+ * Returns an array of strings split by delimiter (whitespace if NULL)
  */
-char* mgen_str_split(const char* str, const char* delimiter);
+mgen_string_array_t* mgen_str_split(const char* str, const char* delimiter);
 
 /**
  * Safe string duplication with error handling

@@ -295,32 +295,46 @@ char* mgen_str_replace(const char* str, const char* old_str, const char* new_str
     return result;
 }
 
-char* mgen_str_split(const char* str, const char* delimiter) {
+mgen_string_array_t* mgen_str_split(const char* str, const char* delimiter) {
     if (!str) {
         MGEN_SET_ERROR(MGEN_ERROR_VALUE, "String is NULL");
         return NULL;
     }
 
-    // Simplified implementation - just return the first token for basic testing
-    // In a full implementation, this would return an array of strings
+    mgen_string_array_t* result = mgen_string_array_new();
+    if (!result) return NULL;
+
+    // Make a copy since strtok modifies the string
     char* str_copy = mgen_strdup(str);
-    if (!str_copy) return NULL;
+    if (!str_copy) {
+        mgen_string_array_free(result);
+        return NULL;
+    }
 
     char* token;
+    char* saveptr = NULL;  // For thread-safe strtok_r
+
     if (!delimiter) {
         // Split on whitespace
-        token = strtok(str_copy, " \t\n\r\f\v");
+        token = strtok_r(str_copy, " \t\n\r\f\v", &saveptr);
     } else {
         // Split on delimiter
-        token = strtok(str_copy, delimiter);
+        token = strtok_r(str_copy, delimiter, &saveptr);
     }
 
-    if (token) {
-        char* result = mgen_strdup(token);
-        free(str_copy);
-        return result;
-    } else {
-        free(str_copy);
-        return mgen_strdup("");
+    while (token != NULL) {
+        char* token_copy = mgen_strdup(token);
+        if (token_copy) {
+            mgen_string_array_add(result, token_copy);
+        }
+
+        if (!delimiter) {
+            token = strtok_r(NULL, " \t\n\r\f\v", &saveptr);
+        } else {
+            token = strtok_r(NULL, delimiter, &saveptr);
+        }
     }
+
+    free(str_copy);
+    return result;
 }
