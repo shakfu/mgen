@@ -1,0 +1,217 @@
+"""
+Container Code Generator - Prototype
+
+This module generates type-specific container implementations directly into
+the output C file, eliminating the need for external runtime libraries.
+
+Philosophy: Code generators should produce self-contained, complete code.
+Similar to C++ template monomorphization or Rust generic instantiation.
+
+Status: Prototype - runs in parallel with existing runtime library approach
+"""
+
+from pathlib import Path
+from typing import Optional
+
+
+class ContainerCodeGenerator:
+    """Generate type-specific container implementations inline."""
+
+    def __init__(self):
+        """Initialize code generator with templates from runtime library."""
+        self.runtime_dir = Path(__file__).parent / "runtime"
+        self._template_cache: dict[str, str] = {}
+
+    def _load_template(self, filename: str) -> str:
+        """Load a runtime library file as a code generation template.
+
+        Args:
+            filename: Runtime library filename (e.g., "mgen_str_int_map.c")
+
+        Returns:
+            Template content as string
+        """
+        if filename in self._template_cache:
+            return self._template_cache[filename]
+
+        template_path = self.runtime_dir / filename
+        with open(template_path, encoding="utf-8") as f:
+            content = f.read()
+
+        self._template_cache[filename] = content
+        return content
+
+    def _strip_includes_and_headers(self, code: str) -> str:
+        """Strip #include directives from template code.
+
+        These will be generated separately in the main includes section.
+
+        Args:
+            code: Template code with includes
+
+        Returns:
+            Code with includes removed
+        """
+        lines = code.split("\n")
+        filtered_lines = []
+
+        for line in lines:
+            stripped = line.strip()
+            # Skip include directives
+            if stripped.startswith("#include"):
+                continue
+            filtered_lines.append(line)
+
+        return "\n".join(filtered_lines)
+
+    def _remove_error_handling_macros(self, code: str) -> str:
+        """Remove MGEN_SET_ERROR macro calls for self-contained code.
+
+        For prototype: Replace error macros with simple returns.
+        Future: Generate error handling inline or make it optional.
+
+        Args:
+            code: Code with MGEN_SET_ERROR calls
+
+        Returns:
+            Code with error handling removed
+        """
+        lines = code.split("\n")
+        filtered_lines = []
+
+        for line in lines:
+            stripped = line.strip()
+            # Skip lines with MGEN_SET_ERROR macro
+            if "MGEN_SET_ERROR" in line:
+                continue
+            filtered_lines.append(line)
+
+        return "\n".join(filtered_lines)
+
+    def generate_str_int_map(self) -> str:
+        """Generate complete implementation for string→int hash table.
+
+        This is a prototype that uses the existing runtime library as a template.
+        Future versions will support parameterized generation for any key/value types.
+
+        Returns:
+            Complete C code for string→int map implementation
+        """
+        # Load templates
+        header = self._load_template("mgen_str_int_map.h")
+        implementation = self._load_template("mgen_str_int_map.c")
+
+        # Strip includes from implementation (we'll handle them separately)
+        impl_code = self._strip_includes_and_headers(implementation)
+
+        # Remove error handling macros for self-contained code
+        impl_code = self._remove_error_handling_macros(impl_code)
+
+        # Strip header guards and includes from header
+        header_lines = []
+        in_header_guard = False
+        for line in header.split("\n"):
+            stripped = line.strip()
+
+            # Skip header guards
+            if stripped.startswith("#ifndef") and "_H" in stripped:
+                in_header_guard = True
+                continue
+            if stripped.startswith("#define") and "_H" in stripped:
+                continue
+            if stripped.startswith("#endif") and in_header_guard:
+                in_header_guard = False
+                continue
+
+            # Skip includes, extern C
+            if (stripped.startswith("#include")
+                or stripped.startswith("#ifdef __cplusplus")
+                or stripped.startswith("extern \"C\"")
+                or stripped.startswith("#endif")
+                or stripped == "}"):
+                continue
+
+            header_lines.append(line)
+
+        header_code = "\n".join(header_lines)
+
+        # Combine into generated implementation
+        sections = [
+            "// ========== Generated Container: str_int_map ==========",
+            "// String → int hash table implementation",
+            "// Generated inline for this program (no external dependencies)",
+            "",
+            "// Type definitions and API",
+            header_code.strip(),
+            "",
+            "// Implementation",
+            impl_code.strip(),
+            "",
+            "// ========== End of Generated Container ==========",
+            "",
+        ]
+
+        return "\n".join(sections)
+
+    def generate_container(self, container_type: str) -> Optional[str]:
+        """Generate code for a specific container type.
+
+        Args:
+            container_type: Container type identifier (e.g., "map_str_int")
+
+        Returns:
+            Generated C code, or None if type not supported
+        """
+        if container_type == "map_str_int":
+            return self.generate_str_int_map()
+
+        # Future: Add more container types
+        # elif container_type == "vec_int":
+        #     return self.generate_vec_int()
+        # elif container_type == "map_int_int":
+        #     return self.generate_map_int_int()
+
+        return None
+
+    def get_required_includes(self, container_type: str) -> list[str]:
+        """Get required includes for a container type.
+
+        Args:
+            container_type: Container type identifier
+
+        Returns:
+            List of required #include directives
+        """
+        # str_int_map needs: stdlib.h (malloc/free), string.h (strcmp/strdup)
+        # These are already in standard includes, but we track them for completeness
+        if container_type == "map_str_int":
+            return ["<stdlib.h>", "<string.h>", "<stdbool.h>"]
+
+        return []
+
+
+# Example usage and testing
+if __name__ == "__main__":
+    """Test the container code generator."""
+
+    generator = ContainerCodeGenerator()
+
+    # Generate str_int_map implementation
+    print("=" * 80)
+    print("Testing Container Code Generator - Prototype")
+    print("=" * 80)
+    print()
+
+    code = generator.generate_str_int_map()
+
+    # Print first 50 lines to verify
+    lines = code.split("\n")
+    for i, line in enumerate(lines[:50], 1):
+        print(f"{i:3}: {line}")
+
+    print(f"\n... ({len(lines) - 50} more lines)")
+    print()
+    print(f"Total lines generated: {len(lines)}")
+    print(f"Total characters: {len(code)}")
+    print()
+    print("✅ Code generation successful!")
