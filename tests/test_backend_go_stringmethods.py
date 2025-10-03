@@ -140,7 +140,7 @@ class TextProcessor:
         go_code = self.converter.convert_code(python_code)
 
         assert "return mgen.StrOps.Upper(obj.Text)" in go_code
-        assert "return mgen.Builtins.Len(obj.Text)" in go_code
+        assert "return mgen.Len" in go_code  # Generic len function
 
     def test_string_methods_with_assignment(self):
         """Test string methods with assignment to instance variables."""

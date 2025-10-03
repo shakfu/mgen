@@ -30,6 +30,8 @@ class MGenPythonToGoConverter:
         self.struct_info: dict[str, dict[str, Any]] = {}  # Track struct definitions for classes
         self.current_function: Optional[str] = None  # Track current function context
         self.declared_vars: set[str] = set()  # Track declared variables in current function
+        self.function_return_types: dict[str, str] = {}  # Track function return types
+        self.variable_types: dict[str, str] = {}  # Track variable types in current function scope
 
     def _to_camel_case(self, snake_str: str) -> str:
         """Convert snake_case to CamelCase."""
@@ -69,6 +71,19 @@ class MGenPythonToGoConverter:
                 struct_def = self._convert_class(item)
                 parts.append(struct_def)
                 parts.append("")
+
+        # First pass: collect function return types
+        for item in node.body:
+            if isinstance(item, ast.FunctionDef):
+                # Extract return type without converting the whole function
+                if item.name == "main":
+                    self.function_return_types[item.name] = ""
+                elif item.returns:
+                    mapped_type = self._map_type_annotation(item.returns)
+                    self.function_return_types[item.name] = mapped_type if mapped_type else ""
+                else:
+                    # Default to int if no annotation
+                    self.function_return_types[item.name] = "int"
 
         # Convert functions
         functions = []
@@ -433,17 +448,37 @@ class MGenPythonToGoConverter:
                 func_name = expr.func.id
                 args = [self._convert_method_expression(arg, class_name) for arg in expr.args]
 
-                # Handle built-in functions with method context
+                # Handle built-in functions with generics
                 if func_name == "len":
-                    return f"mgen.Builtins.Len({args[0]})"
+                    arg_type = self._infer_type_from_value(expr.args[0])
+                    if arg_type.startswith("[]"):
+                        elem_type = arg_type[2:]
+                        return f"mgen.Len[{elem_type}]({args[0]})"
+                    elif arg_type.startswith("map["):
+                        return f"mgen.LenMap({args[0]})"
+                    elif arg_type == "string":
+                        return f"mgen.LenString({args[0]})"
+                    else:
+                        # Default to generic slice
+                        return f"mgen.Len({args[0]})"
                 elif func_name == "abs":
-                    return f"mgen.Builtins.Abs({args[0]})"
+                    arg_type = self._infer_type_from_value(expr.args[0])
+                    if arg_type == "float64" or arg_type == "float32":
+                        return f"mgen.AbsFloat({args[0]})"
+                    else:
+                        return f"mgen.AbsInt({args[0]})"
                 elif func_name == "min":
-                    return f"mgen.Builtins.Min({args[0]})"
+                    arg_type = self._infer_type_from_value(expr.args[0])
+                    elem_type = arg_type[2:] if arg_type.startswith("[]") else "int"
+                    return f"mgen.Min[{elem_type}]({args[0]})"
                 elif func_name == "max":
-                    return f"mgen.Builtins.Max({args[0]})"
+                    arg_type = self._infer_type_from_value(expr.args[0])
+                    elem_type = arg_type[2:] if arg_type.startswith("[]") else "int"
+                    return f"mgen.Max[{elem_type}]({args[0]})"
                 elif func_name == "sum":
-                    return f"mgen.Builtins.Sum({args[0]})"
+                    arg_type = self._infer_type_from_value(expr.args[0])
+                    elem_type = arg_type[2:] if arg_type.startswith("[]") else "int"
+                    return f"mgen.Sum[{elem_type}]({args[0]})"
                 elif func_name == "bool":
                     return f"mgen.ToBool({args[0]})"
                 elif func_name == "int":
@@ -519,9 +554,12 @@ class MGenPythonToGoConverter:
         # Convert function body
         self.current_function = node.name
         self.declared_vars = set()  # Reset for new function
-        # Add parameters to declared variables
+        self.variable_types = {}  # Reset variable type tracking for new function
+        # Add parameters to declared variables and their types
         for arg in node.args.args:
             self.declared_vars.add(arg.arg)
+            param_type = self._infer_parameter_type(arg, node)
+            self.variable_types[arg.arg] = param_type
         body = self._convert_statements(node.body)
         self.current_function = None
 
@@ -580,8 +618,10 @@ class MGenPythonToGoConverter:
                     # First declaration of variable
                     self.declared_vars.add(target.id)
                     var_type = self._infer_type_from_value(stmt.value)
-                    # Use := for constructor calls and interface{} for cleaner code
-                    if var_type == "interface{}" or self._is_constructor_call(stmt.value):
+                    # Track the variable type
+                    self.variable_types[target.id] = var_type
+                    # Use := for constructor calls, function calls, and interface{} for cleaner code
+                    if var_type == "interface{}" or self._is_constructor_call(stmt.value) or isinstance(stmt.value, ast.Call):
                         statements.append(f"    {target.id} := {value_expr}")
                     else:
                         statements.append(f"    var {target.id} {var_type} = {value_expr}")
@@ -590,21 +630,29 @@ class MGenPythonToGoConverter:
 
     def _convert_annotated_assignment(self, stmt: ast.AnnAssign) -> str:
         """Convert annotated assignment."""
-        var_type = self._map_type_annotation(stmt.annotation)
-
         if stmt.value:
             value_expr = self._convert_expression(stmt.value)
+            # With generics, use inferred type for both declaration and tracking
+            var_type = self._infer_type_from_value(stmt.value)
+        else:
+            value_expr = None
+            # No value, use annotation
+            var_type = self._map_type_annotation(stmt.annotation)
+
+        if stmt.value:
             target_id = stmt.target.id if isinstance(stmt.target, ast.Name) else str(stmt.target)
-            # Track this variable as declared
+            # Track this variable as declared with the inferred type
             if isinstance(stmt.target, ast.Name):
                 self.declared_vars.add(stmt.target.id)
+                self.variable_types[stmt.target.id] = var_type
             return f"    var {target_id} {var_type} = {value_expr}"
         else:
             default_value = self._get_default_value(var_type)
             target_id = stmt.target.id if isinstance(stmt.target, ast.Name) else str(stmt.target)
-            # Track this variable as declared
+            # Track this variable as declared and its type
             if isinstance(stmt.target, ast.Name):
                 self.declared_vars.add(stmt.target.id)
+                self.variable_types[stmt.target.id] = var_type
             return f"    var {target_id} {var_type} = {default_value}"
 
     def _convert_aug_assignment(self, stmt: ast.AugAssign) -> str:
@@ -836,17 +884,37 @@ class MGenPythonToGoConverter:
                 args_str = ", ".join(args)
                 return f"mgen.Print({args_str})"
             elif func_name == "len":
-                return f"mgen.Builtins.Len({args[0]})"
+                arg_type = self._infer_type_from_value(expr.args[0])
+                if arg_type.startswith("[]"):
+                    elem_type = arg_type[2:]
+                    return f"mgen.Len[{elem_type}]({args[0]})"
+                elif arg_type.startswith("map["):
+                    return f"mgen.LenMap({args[0]})"
+                elif arg_type == "string":
+                    return f"mgen.LenString({args[0]})"
+                else:
+                    return f"mgen.Len({args[0]})"
             elif func_name == "abs":
-                return f"mgen.Builtins.Abs({args[0]})"
+                arg_type = self._infer_type_from_value(expr.args[0])
+                if arg_type == "float64" or arg_type == "float32":
+                    return f"mgen.AbsFloat({args[0]})"
+                else:
+                    return f"mgen.AbsInt({args[0]})"
             elif func_name == "min":
-                return f"mgen.Builtins.Min({args[0]})"
+                arg_type = self._infer_type_from_value(expr.args[0])
+                elem_type = arg_type[2:] if arg_type.startswith("[]") else "int"
+                return f"mgen.Min[{elem_type}]({args[0]})"
             elif func_name == "max":
-                return f"mgen.Builtins.Max({args[0]})"
+                arg_type = self._infer_type_from_value(expr.args[0])
+                elem_type = arg_type[2:] if arg_type.startswith("[]") else "int"
+                return f"mgen.Max[{elem_type}]({args[0]})"
             elif func_name == "sum":
-                return f"mgen.Builtins.Sum({args[0]})"
+                arg_type = self._infer_type_from_value(expr.args[0])
+                elem_type = arg_type[2:] if arg_type.startswith("[]") else "int"
+                return f"mgen.Sum[{elem_type}]({args[0]})"
             elif func_name == "bool":
-                return f"mgen.Builtins.BoolValue({args[0]})"
+                # BoolValue still needs to use interface{} since it handles many types
+                return f"mgen.ToBool({args[0]})"
             elif func_name == "str":
                 return f"mgen.ToStr({args[0]})"
             elif func_name == "range":
@@ -1000,59 +1068,66 @@ class MGenPythonToGoConverter:
         return f"map[interface{{}}]bool{{{{{elements_str}}}}}"
 
     def _convert_list_comprehension(self, expr: ast.ListComp) -> str:
-        """Convert list comprehensions."""
+        """Convert list comprehensions using Go 1.18+ generics."""
         # Extract comprehension components
         element_expr = expr.elt
         target = expr.generators[0].target
         iter_expr = expr.generators[0].iter
         conditions = expr.generators[0].ifs
 
+        # Infer result type from element expression with loop variable context
+        loop_var_types = self._infer_loop_variable_type(expr.generators[0])
+        result_type = self._infer_comprehension_element_type(element_expr, loop_var_types)
+
         if isinstance(iter_expr, ast.Call) and isinstance(iter_expr.func, ast.Name) and iter_expr.func.id == "range":
             # Range-based comprehension
             range_args = [self._convert_expression(arg) for arg in iter_expr.args]
             range_call = f"mgen.NewRange({', '.join(range_args)})"
 
-            # Create transform function
+            # Create transform function with proper types
             target_name = target.id if isinstance(target, ast.Name) else "x"
             transform_expr = self._convert_expression(element_expr)
-            transform_lambda = (
-                f"func(item interface{{}}) interface{{}} {{ {target_name} := item.(int); return {transform_expr} }}"
-            )
+            transform_lambda = f"func({target_name} int) {result_type} {{ return {transform_expr} }}"
 
             if conditions:
                 # With condition
                 condition_expr = self._convert_expression(conditions[0])
-                condition_lambda = (
-                    f"func(item interface{{}}) bool {{ {target_name} := item.(int); return {condition_expr} }}"
-                )
-                return f"mgen.Comprehensions.ListComprehensionWithFilter({range_call}, {transform_lambda}, {condition_lambda})"
+                condition_lambda = f"func({target_name} int) bool {{ return {condition_expr} }}"
+                return f"mgen.ListComprehensionFromRangeWithFilter[{result_type}]({range_call}, {transform_lambda}, {condition_lambda})"
             else:
                 # No condition
-                return f"mgen.Comprehensions.ListComprehension({range_call}, {transform_lambda})"
+                return f"mgen.ListComprehensionFromRange[{result_type}]({range_call}, {transform_lambda})"
         else:
-            # Container iteration
+            # Container iteration - need to infer source type
+            source_type = self._infer_type_from_value(iter_expr)
+            # Extract element type from slice type (e.g., []int -> int)
+            element_type = source_type[2:] if source_type.startswith("[]") else "interface{}"
+
             container_expr = self._convert_expression(iter_expr)
             target_name = target.id if isinstance(target, ast.Name) else "x"
             transform_expr = self._convert_expression(element_expr)
-            transform_lambda = (
-                f"func(item interface{{}}) interface{{}} {{ {target_name} := item; return {transform_expr} }}"
-            )
+            transform_lambda = f"func({target_name} {element_type}) {result_type} {{ return {transform_expr} }}"
 
             if conditions:
                 condition_expr = self._convert_expression(conditions[0])
-                condition_lambda = f"func(item interface{{}}) bool {{ {target_name} := item; return {condition_expr} }}"
-                return f"mgen.Comprehensions.ListComprehensionWithFilter({container_expr}, {transform_lambda}, {condition_lambda})"
+                condition_lambda = f"func({target_name} {element_type}) bool {{ return {condition_expr} }}"
+                return f"mgen.ListComprehensionWithFilter[{element_type}, {result_type}]({container_expr}, {transform_lambda}, {condition_lambda})"
             else:
-                return f"mgen.Comprehensions.ListComprehension({container_expr}, {transform_lambda})"
+                return f"mgen.ListComprehension[{element_type}, {result_type}]({container_expr}, {transform_lambda})"
 
     def _convert_dict_comprehension(self, expr: ast.DictComp) -> str:
-        """Convert dictionary comprehensions."""
+        """Convert dictionary comprehensions using Go 1.18+ generics."""
         # Extract comprehension components
         key_expr = expr.key
         value_expr = expr.value
         target = expr.generators[0].target
         iter_expr = expr.generators[0].iter
 
+        # Infer key and value types with loop variable context
+        loop_var_types = self._infer_loop_variable_type(expr.generators[0])
+        key_type = self._infer_comprehension_element_type(key_expr, loop_var_types)
+        value_type = self._infer_comprehension_element_type(value_expr, loop_var_types)
+
         if isinstance(iter_expr, ast.Call) and isinstance(iter_expr.func, ast.Name) and iter_expr.func.id == "range":
             range_args = [self._convert_expression(arg) for arg in iter_expr.args]
             range_call = f"mgen.NewRange({', '.join(range_args)})"
@@ -1060,44 +1135,50 @@ class MGenPythonToGoConverter:
 
             key_transform = self._convert_expression(key_expr)
             value_transform = self._convert_expression(value_expr)
-            transform_lambda = f"func(item interface{{}}) (interface{{}}, interface{{}}) {{ {target_name} := item.(int); return {key_transform}, {value_transform} }}"
+            transform_lambda = f"func({target_name} int) ({key_type}, {value_type}) {{ return {key_transform}, {value_transform} }}"
 
-            return f"mgen.Comprehensions.DictComprehension({range_call}, {transform_lambda})"
+            return f"mgen.DictComprehensionFromRange[{key_type}, {value_type}]({range_call}, {transform_lambda})"
         else:
+            source_type = self._infer_type_from_value(iter_expr)
+            element_type = source_type[2:] if source_type.startswith("[]") else "interface{}"
+
             container_expr = self._convert_expression(iter_expr)
             target_name = target.id if isinstance(target, ast.Name) else "x"
             key_transform = self._convert_expression(key_expr)
             value_transform = self._convert_expression(value_expr)
-            transform_lambda = f"func(item interface{{}}) (interface{{}}, interface{{}}) {{ {target_name} := item; return {key_transform}, {value_transform} }}"
+            transform_lambda = f"func({target_name} {element_type}) ({key_type}, {value_type}) {{ return {key_transform}, {value_transform} }}"
 
-            return f"mgen.Comprehensions.DictComprehension({container_expr}, {transform_lambda})"
+            return f"mgen.DictComprehension[{element_type}, {key_type}, {value_type}]({container_expr}, {transform_lambda})"
 
     def _convert_set_comprehension(self, expr: ast.SetComp) -> str:
-        """Convert set comprehensions."""
+        """Convert set comprehensions using Go 1.18+ generics."""
         # Extract comprehension components
         element_expr = expr.elt
         target = expr.generators[0].target
         iter_expr = expr.generators[0].iter
 
+        # Infer element type for the set with loop variable context
+        loop_var_types = self._infer_loop_variable_type(expr.generators[0])
+        element_type = self._infer_comprehension_element_type(element_expr, loop_var_types)
+
         if isinstance(iter_expr, ast.Call) and isinstance(iter_expr.func, ast.Name) and iter_expr.func.id == "range":
             range_args = [self._convert_expression(arg) for arg in iter_expr.args]
             range_call = f"mgen.NewRange({', '.join(range_args)})"
             target_name = target.id if isinstance(target, ast.Name) else "x"
             transform_expr = self._convert_expression(element_expr)
-            transform_lambda = (
-                f"func(item interface{{}}) interface{{}} {{ {target_name} := item.(int); return {transform_expr} }}"
-            )
+            transform_lambda = f"func({target_name} int) {element_type} {{ return {transform_expr} }}"
 
-            return f"mgen.Comprehensions.SetComprehension({range_call}, {transform_lambda})"
+            return f"mgen.SetComprehensionFromRange[{element_type}]({range_call}, {transform_lambda})"
         else:
+            source_type = self._infer_type_from_value(iter_expr)
+            source_element_type = source_type[2:] if source_type.startswith("[]") else "interface{}"
+
             container_expr = self._convert_expression(iter_expr)
             target_name = target.id if isinstance(target, ast.Name) else "x"
             transform_expr = self._convert_expression(element_expr)
-            transform_lambda = (
-                f"func(item interface{{}}) interface{{}} {{ {target_name} := item; return {transform_expr} }}"
-            )
+            transform_lambda = f"func({target_name} {source_element_type}) {element_type} {{ return {transform_expr} }}"
 
-            return f"mgen.Comprehensions.SetComprehension({container_expr}, {transform_lambda})"
+            return f"mgen.SetComprehension[{source_element_type}, {element_type}]({container_expr}, {transform_lambda})"
 
     def _convert_subscript(self, expr: ast.Subscript) -> str:
         """Convert subscript operation to Go array/map access."""
@@ -1150,6 +1231,10 @@ class MGenPythonToGoConverter:
 
     def _infer_type_from_value(self, value: ast.expr) -> str:
         """Infer Go type from Python value."""
+        # Check if this is a variable reference with known type
+        if isinstance(value, ast.Name) and value.id in self.variable_types:
+            return self.variable_types[value.id]
+
         if isinstance(value, ast.Constant):
             if isinstance(value.value, bool):  # Check bool first since bool is subclass of int
                 return "bool"
@@ -1159,30 +1244,89 @@ class MGenPythonToGoConverter:
                 return "float64"
             elif isinstance(value.value, str):
                 return "string"
-        elif isinstance(value, ast.Call) and isinstance(value.func, ast.Name):
-            if value.func.id in self.struct_info:
-                return value.func.id
-            # Handle built-in function calls
-            elif value.func.id == "sum":
-                # sum() returns int by default
-                return "int"
+        elif isinstance(value, ast.Call):
+            if isinstance(value.func, ast.Name):
+                func_name = value.func.id
+                # Check if it's a user-defined function with known return type
+                if func_name in self.function_return_types:
+                    return self.function_return_types[func_name]
+                elif func_name in self.struct_info:
+                    return func_name
+                # Handle built-in function calls
+                elif func_name == "sum":
+                    # sum() returns int by default
+                    return "int"
+            elif isinstance(value.func, ast.Attribute):
+                # Method call - infer return type based on method name
+                method_name = value.func.attr
+                if method_name in ("upper", "lower", "strip", "replace", "join"):
+                    return "string"
+                elif method_name in ("split",):
+                    return "[]string"
+                elif method_name in ("find",):
+                    return "int"
+                # For other methods, try to infer from the object type
+                # Default to interface{} if we can't determine
+                return "interface{}"
+        elif isinstance(value, ast.List):
+            # Handle list literals
+            if value.elts:
+                # Infer from elements
+                element_types = [self._infer_type_from_value(elt) for elt in value.elts]
+                if element_types and all(t == element_types[0] for t in element_types):
+                    return f"[]{element_types[0]}"
+            # Empty list - default to []int
+            return "[]int"
+        elif isinstance(value, ast.Dict):
+            # Handle dict literals
+            if value.keys and value.values:
+                key_types = [self._infer_type_from_value(k) for k in value.keys if k]
+                value_types = [self._infer_type_from_value(v) for v in value.values if v]
+                if key_types and value_types and all(t == key_types[0] for t in key_types) and all(t == value_types[0] for t in value_types):
+                    return f"map[{key_types[0]}]{value_types[0]}"
+            # Empty dict - default to map[string]int
+            return "map[string]int"
         elif isinstance(value, ast.ListComp):
-            # Infer type from list comprehension element
-            element_type = self._infer_comprehension_element_type(value.elt)
+            # Infer type from list comprehension element with context
+            loop_var_type = self._infer_loop_variable_type(value.generators[0])
+            element_type = self._infer_comprehension_element_type(value.elt, loop_var_type)
             return f"[]{element_type}"
         elif isinstance(value, ast.DictComp):
-            # Infer type from dict comprehension key and value
-            key_type = self._infer_comprehension_element_type(value.key)
-            value_type = self._infer_comprehension_element_type(value.value)
+            # Infer type from dict comprehension key and value with context
+            loop_var_type = self._infer_loop_variable_type(value.generators[0])
+            key_type = self._infer_comprehension_element_type(value.key, loop_var_type)
+            value_type = self._infer_comprehension_element_type(value.value, loop_var_type)
             return f"map[{key_type}]{value_type}"
         elif isinstance(value, ast.SetComp):
-            # Infer type from set comprehension element
-            element_type = self._infer_comprehension_element_type(value.elt)
+            # Infer type from set comprehension element with context
+            loop_var_type = self._infer_loop_variable_type(value.generators[0])
+            element_type = self._infer_comprehension_element_type(value.elt, loop_var_type)
             return f"map[{element_type}]bool"
 
         return "interface{}"
 
-    def _infer_comprehension_element_type(self, expr: ast.expr) -> str:
+    def _infer_loop_variable_type(self, generator: ast.comprehension) -> dict[str, str]:
+        """Infer the type of the loop variable in a comprehension."""
+        target = generator.target
+        iter_expr = generator.iter
+
+        loop_var_types = {}
+        if isinstance(target, ast.Name):
+            # Infer type from iterator
+            if isinstance(iter_expr, ast.Call) and isinstance(iter_expr.func, ast.Name) and iter_expr.func.id == "range":
+                loop_var_types[target.id] = "int"
+            else:
+                # Iterating over a container
+                iter_type = self._infer_type_from_value(iter_expr)
+                # Extract element type from slice
+                if iter_type.startswith("[]"):
+                    element_type = iter_type[2:]
+                    loop_var_types[target.id] = element_type
+                else:
+                    loop_var_types[target.id] = "interface{}"
+        return loop_var_types
+
+    def _infer_comprehension_element_type(self, expr: ast.expr, loop_var_types: dict[str, str]) -> str:
         """Infer the type of elements produced by a comprehension expression."""
         if isinstance(expr, ast.Constant):
             if isinstance(expr.value, bool):
@@ -1194,13 +1338,18 @@ class MGenPythonToGoConverter:
             elif isinstance(expr.value, str):
                 return "string"
         elif isinstance(expr, ast.Name):
-            # If it's a simple variable reference, we need more context
+            # Check if it's a loop variable with known type
+            if expr.id in loop_var_types:
+                return loop_var_types[expr.id]
+            # Check if it's a regular variable
+            if expr.id in self.variable_types:
+                return self.variable_types[expr.id]
             # Default to int for range-based comprehensions
             return "int"
         elif isinstance(expr, ast.BinOp):
             # For binary operations, try to infer from operands
-            left_type = self._infer_comprehension_element_type(expr.left)
-            right_type = self._infer_comprehension_element_type(expr.right)
+            left_type = self._infer_comprehension_element_type(expr.left, loop_var_types)
+            right_type = self._infer_comprehension_element_type(expr.right, loop_var_types)
             # If both are the same type, use that
             if left_type == right_type:
                 return left_type

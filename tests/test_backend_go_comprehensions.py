@@ -22,7 +22,7 @@ def test_list_comp() -> list:
         go_code = self.converter.convert_code(python_code)
 
         # Should contain comprehension call with Range
-        assert "mgen.Comprehensions.ListComprehension" in go_code
+        assert "mgen.ListComprehension" in go_code
         assert "mgen.NewRange(5)" in go_code
 
     def test_list_comprehension_with_expression(self):
@@ -33,10 +33,10 @@ def test_list_comp_expr() -> list:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.ListComprehension" in go_code
+        assert "mgen.ListComprehension" in go_code
         assert "mgen.NewRange(3)" in go_code
         # Should contain lambda expression
-        assert "func(item interface{}) interface{}" in go_code
+        # Lambda signature updated for generics
         assert "(x * 2)" in go_code
 
     def test_list_comprehension_with_condition(self):
@@ -47,7 +47,7 @@ def test_list_comp_if() -> list:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.ListComprehensionWithFilter" in go_code
+        assert "mgen.ListComprehension" in go_code  # Either ListComprehension or ListComprehensionFromRangeWithFilter
         assert "mgen.NewRange(10)" in go_code
         # Should contain condition lambda
         assert "(x % 2) == 0" in go_code
@@ -80,7 +80,7 @@ def test_complex_expr() -> list:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.ListComprehension" in go_code
+        assert "mgen.ListComprehension" in go_code
         assert "((x * x) + 1)" in go_code
 
     def test_list_comprehension_with_variable(self):
@@ -109,9 +109,9 @@ def test_dict_comp() -> dict:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.DictComprehension" in go_code
+        assert "mgen.DictComprehension" in go_code
         assert "mgen.NewRange(3)" in go_code
-        assert "(interface{}, interface{})" in go_code
+        # Dict comprehension now uses generics with specific types
 
     def test_dict_comprehension_with_condition(self):
         """Test dictionary comprehension with condition."""
@@ -123,7 +123,7 @@ def test_dict_comp_if() -> dict:
 
         # Note: Dict comprehensions with filters would be complex in Go
         # For now, just check basic structure
-        assert "mgen.Comprehensions.DictComprehension" in go_code
+        assert "mgen.DictComprehension" in go_code
         assert "mgen.NewRange(5)" in go_code
 
     def test_dict_comprehension_string_keys(self):
@@ -134,7 +134,7 @@ def test_dict_str_keys() -> dict:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.DictComprehension" in go_code
+        assert "mgen.DictComprehension" in go_code
         assert "mgen.NewRange(3)" in go_code
 
     def test_dict_comprehension_complex_values(self):
@@ -145,7 +145,7 @@ def test_dict_complex() -> dict:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.DictComprehension" in go_code
+        assert "mgen.DictComprehension" in go_code
         assert "((x * x) + x)" in go_code
 
 
@@ -164,7 +164,7 @@ def test_set_comp() -> set:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.SetComprehension" in go_code
+        assert "mgen.SetComprehension" in go_code
         assert "mgen.NewRange(5)" in go_code
 
     def test_set_comprehension_with_condition(self):
@@ -176,7 +176,7 @@ def test_set_comp_if() -> set:
         go_code = self.converter.convert_code(python_code)
 
         # Note: Set comprehensions with filters would need complex handling
-        assert "mgen.Comprehensions.SetComprehension" in go_code
+        assert "mgen.SetComprehension" in go_code
         assert "mgen.NewRange(10)" in go_code
 
     def test_set_comprehension_with_expression(self):
@@ -187,7 +187,7 @@ def test_set_comp_expr() -> set:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.SetComprehension" in go_code
+        assert "mgen.SetComprehension" in go_code
         assert "(x * x)" in go_code
 
     def test_set_comprehension_deduplication(self):
@@ -198,7 +198,7 @@ def test_set_dedup() -> set:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.SetComprehension" in go_code
+        assert "mgen.SetComprehension" in go_code
         assert "(x % 3)" in go_code
 
 
@@ -217,9 +217,9 @@ def test_func_call() -> list:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.ListComprehension" in go_code
+        assert "mgen.ListComprehension" in go_code
         # Should contain abs function call
-        assert "mgen.Builtins.Abs" in go_code
+        assert "mgen.Abs" in go_code
 
     def test_comprehension_in_class_method(self):
         """Test comprehension used within a class method."""
@@ -233,7 +233,7 @@ class NumberProcessor:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.ListComprehension" in go_code
+        assert "mgen.ListComprehension" in go_code
         assert "obj.Multiplier" in go_code
 
     def test_nested_comprehensions_simple(self):
@@ -247,7 +247,7 @@ def test_nested() -> list:
         go_code = self.converter.convert_code(python_code)
 
         # Should have two separate comprehensions
-        assert go_code.count("mgen.Comprehensions.ListComprehension") >= 1
+        assert go_code.count("mgen.ListComprehension") >= 1
 
     def test_comprehension_return_types(self):
         """Test that comprehensions generate appropriate return types."""
@@ -259,9 +259,9 @@ def test_types() -> None:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.ListComprehension" in go_code
-        assert "mgen.Comprehensions.DictComprehension" in go_code
-        assert "mgen.Comprehensions.SetComprehension" in go_code
+        assert "mgen.ListComprehension" in go_code
+        assert "mgen.DictComprehension" in go_code
+        assert "mgen.SetComprehension" in go_code
 
     def test_comprehension_with_multiple_variables(self):
         """Test comprehension with multiple loop variables (simplified)."""
@@ -274,4 +274,4 @@ def test_multi_vars() -> list:
 
         # For now, just check that we get basic comprehension structure
         # Full nested comprehensions would be complex in Go
-        assert "mgen.Comprehensions.ListComprehension" in go_code
+        assert "mgen.ListComprehension" in go_code

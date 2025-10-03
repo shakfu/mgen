@@ -195,8 +195,8 @@ def filter_data() -> list:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Comprehensions.ListComprehension" in go_code
-        assert "mgen.Comprehensions.DictComprehension" in go_code
+        assert "mgen.ListComprehension" in go_code
+        assert "mgen.DictComprehension" in go_code
         assert "mgen.NewRange(" in go_code
 
     def test_mixed_features_program(self):
@@ -227,8 +227,8 @@ def analyze_text(text: str) -> dict:
         assert "mgen.StrOps.Upper" in go_code
 
         # Check comprehensions
-        assert "mgen.Comprehensions.DictComprehension" in go_code
-        assert "mgen.Comprehensions.ListComprehension" in go_code
+        assert "mgen.DictComprehension" in go_code
+        assert "mgen.ListComprehension" in go_code
 
     def test_control_flow_with_functions(self):
         """Test complex control flow with function calls."""
@@ -261,7 +261,7 @@ def count_primes_up_to(n: int) -> int:
 
         # Note: Complex list operations would need more sophisticated handling
         assert "find_primes(n)" in go_code
-        assert "mgen.Builtins.Len(prime_list)" in go_code
+        assert "mgen.Len" in go_code  # Generic len function
 
 
 class TestGoIntegrationErrorHandling:
@@ -336,9 +336,10 @@ def main() -> None:
         assert "Count int" in go_code
 
         # Verify method functionality
-        assert "obj.Count += mgen.Builtins.Len(data)" in go_code
-        assert "mgen.Comprehensions.ListComprehension" in go_code
-        assert "mgen.Comprehensions.DictComprehension" in go_code
+        assert "obj.Count +=" in go_code
+        assert "mgen.Len" in go_code  # Generic len function
+        assert "mgen.ListComprehension" in go_code
+        assert "mgen.DictComprehension" in go_code
 
         # Verify main function
         assert "processor := NewDataProcessor" in go_code

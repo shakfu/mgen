@@ -1,13 +1,32 @@
 // Package mgen provides runtime support for MGen-generated Go code
 // This package uses only the Go standard library to provide Python-like operations
+// Requires Go 1.18+ for generics support
 package mgen
 
 import (
 	"fmt"
 	"math"
-	"reflect"
 	"strings"
 )
+
+// Comparable is a constraint for comparable types
+type Comparable interface {
+	comparable
+}
+
+// Ordered is a constraint for ordered types
+type Ordered interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+		~float32 | ~float64 | ~string
+}
+
+// Numeric is a constraint for numeric types
+type Numeric interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+		~float32 | ~float64
+}
 
 // StringOps provides Python-like string operations
 type StringOps struct{}
@@ -56,53 +75,41 @@ func (s StringOps) SplitSep(str, sep string) []string {
 // Global StringOps instance
 var StrOps = StringOps{}
 
-// BuiltinOps provides Python-like built-in functions
-type BuiltinOps struct{}
+// Generic built-in functions
 
-// Abs returns absolute value for various numeric types
-func (b BuiltinOps) Abs(x interface{}) interface{} {
-	switch v := x.(type) {
-	case int:
-		if v < 0 {
-			return -v
-		}
-		return v
-	case int64:
-		if v < 0 {
-			return -v
-		}
-		return v
-	case float64:
-		return math.Abs(v)
-	case float32:
-		return float32(math.Abs(float64(v)))
-	default:
-		panic(fmt.Sprintf("abs() not supported for type %T", x))
+// Abs returns absolute value for numeric types
+func AbsInt(x int) int {
+	if x < 0 {
+		return -x
 	}
+	return x
 }
 
-// Len returns length of various container types
-func (b BuiltinOps) Len(x interface{}) int {
-	v := reflect.ValueOf(x)
-	switch v.Kind() {
-	case reflect.Slice, reflect.Array, reflect.Map, reflect.String:
-		return v.Len()
-	default:
-		panic(fmt.Sprintf("len() not supported for type %T", x))
-	}
+func AbsFloat(x float64) float64 {
+	return math.Abs(x)
+}
+
+// Len functions for different container types
+func Len[T any](x []T) int {
+	return len(x)
+}
+
+func LenMap[K comparable, V any](x map[K]V) int {
+	return len(x)
+}
+
+func LenString(x string) int {
+	return len(x)
 }
 
 // Min returns minimum value from slice
-func (b BuiltinOps) Min(slice interface{}) interface{} {
-	v := reflect.ValueOf(slice)
-	if v.Kind() != reflect.Slice || v.Len() == 0 {
+func Min[T Ordered](slice []T) T {
+	if len(slice) == 0 {
 		panic("min() requires non-empty slice")
 	}
-
-	min := v.Index(0).Interface()
-	for i := 1; i < v.Len(); i++ {
-		item := v.Index(i).Interface()
-		if compareValues(item, min) < 0 {
+	min := slice[0]
+	for _, item := range slice[1:] {
+		if item < min {
 			min = item
 		}
 	}
@@ -110,16 +117,13 @@ func (b BuiltinOps) Min(slice interface{}) interface{} {
 }
 
 // Max returns maximum value from slice
-func (b BuiltinOps) Max(slice interface{}) interface{} {
-	v := reflect.ValueOf(slice)
-	if v.Kind() != reflect.Slice || v.Len() == 0 {
+func Max[T Ordered](slice []T) T {
+	if len(slice) == 0 {
 		panic("max() requires non-empty slice")
 	}
-
-	max := v.Index(0).Interface()
-	for i := 1; i < v.Len(); i++ {
-		item := v.Index(i).Interface()
-		if compareValues(item, max) > 0 {
+	max := slice[0]
+	for _, item := range slice[1:] {
+		if item > max {
 			max = item
 		}
 	}
@@ -127,59 +131,16 @@ func (b BuiltinOps) Max(slice interface{}) interface{} {
 }
 
 // Sum returns sum of numeric slice
-func (b BuiltinOps) Sum(slice interface{}) interface{} {
-	v := reflect.ValueOf(slice)
-	if v.Kind() != reflect.Slice {
-		panic("sum() requires slice")
+func Sum[T Numeric](slice []T) T {
+	var total T
+	for _, v := range slice {
+		total += v
 	}
-
-	if v.Len() == 0 {
-		return 0
-	}
-
-	first := v.Index(0).Interface()
-	switch first.(type) {
-	case int:
-		total := 0
-		for i := 0; i < v.Len(); i++ {
-			total += v.Index(i).Interface().(int)
-		}
-		return total
-	case float64:
-		total := 0.0
-		for i := 0; i < v.Len(); i++ {
-			total += v.Index(i).Interface().(float64)
-		}
-		return total
-	default:
-		panic(fmt.Sprintf("sum() not supported for type %T", first))
-	}
+	return total
 }
 
-// BoolValue converts various types to boolean following Python rules
-func (b BuiltinOps) BoolValue(x interface{}) bool {
-	if x == nil {
-		return false
-	}
-
-	v := reflect.ValueOf(x)
-	switch v.Kind() {
-	case reflect.Bool:
-		return v.Bool()
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return v.Int() != 0
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return v.Uint() != 0
-	case reflect.Float32, reflect.Float64:
-		return v.Float() != 0.0
-	case reflect.String:
-		return v.String() != ""
-	case reflect.Slice, reflect.Array, reflect.Map:
-		return v.Len() > 0
-	default:
-		return true
-	}
-}
+// Legacy BuiltinOps struct for backwards compatibility
+type BuiltinOps struct{}
 
 // Global BuiltinOps instance
 var Builtins = BuiltinOps{}
@@ -241,142 +202,93 @@ func (r Range) ForEach(fn func(int)) {
 	}
 }
 
-// ComprehensionOps provides comprehension-like operations using Go functional patterns
-type ComprehensionOps struct{}
+// Generic comprehension functions
 
 // ListComprehension creates slice by applying transform function to each element
-func (c ComprehensionOps) ListComprehension(source interface{}, transform func(interface{}) interface{}) []interface{} {
-	result := []interface{}{}
-
-	if r, ok := source.(Range); ok {
-		r.ForEach(func(i int) {
-			result = append(result, transform(i))
-		})
-		return result
+func ListComprehension[T any, R any](source []T, transform func(T) R) []R {
+	result := make([]R, 0, len(source))
+	for _, item := range source {
+		result = append(result, transform(item))
 	}
+	return result
+}
 
-	v := reflect.ValueOf(source)
-	if v.Kind() == reflect.Slice {
-		for i := 0; i < v.Len(); i++ {
-			item := v.Index(i).Interface()
+// ListComprehensionFromRange creates slice from a Range
+func ListComprehensionFromRange[R any](source Range, transform func(int) R) []R {
+	result := []R{}
+	source.ForEach(func(i int) {
+		result = append(result, transform(i))
+	})
+	return result
+}
+
+// ListComprehensionWithFilter creates slice with filtering
+func ListComprehensionWithFilter[T any, R any](source []T, transform func(T) R, filter func(T) bool) []R {
+	result := []R{}
+	for _, item := range source {
+		if filter(item) {
 			result = append(result, transform(item))
 		}
 	}
 	return result
 }
 
-// ListComprehensionWithFilter creates slice with filtering
-func (c ComprehensionOps) ListComprehensionWithFilter(source interface{}, transform func(interface{}) interface{}, filter func(interface{}) bool) []interface{} {
-	result := []interface{}{}
-
-	if r, ok := source.(Range); ok {
-		r.ForEach(func(i int) {
-			if filter(i) {
-				result = append(result, transform(i))
-			}
-		})
-		return result
-	}
-
-	v := reflect.ValueOf(source)
-	if v.Kind() == reflect.Slice {
-		for i := 0; i < v.Len(); i++ {
-			item := v.Index(i).Interface()
-			if filter(item) {
-				result = append(result, transform(item))
-			}
+// ListComprehensionFromRangeWithFilter creates filtered slice from a Range
+func ListComprehensionFromRangeWithFilter[R any](source Range, transform func(int) R, filter func(int) bool) []R {
+	result := []R{}
+	source.ForEach(func(i int) {
+		if filter(i) {
+			result = append(result, transform(i))
 		}
-	}
+	})
 	return result
 }
 
 // DictComprehension creates map by applying transform function
-func (c ComprehensionOps) DictComprehension(source interface{}, transform func(interface{}) (interface{}, interface{})) map[interface{}]interface{} {
-	result := make(map[interface{}]interface{})
-
-	if r, ok := source.(Range); ok {
-		r.ForEach(func(i int) {
-			k, v := transform(i)
-			result[k] = v
-		})
-		return result
+func DictComprehension[T any, K comparable, V any](source []T, transform func(T) (K, V)) map[K]V {
+	result := make(map[K]V)
+	for _, item := range source {
+		k, v := transform(item)
+		result[k] = v
 	}
+	return result
+}
 
-	v := reflect.ValueOf(source)
-	if v.Kind() == reflect.Slice {
-		for i := 0; i < v.Len(); i++ {
-			item := v.Index(i).Interface()
-			k, val := transform(item)
-			result[k] = val
-		}
-	}
+// DictComprehensionFromRange creates map from a Range
+func DictComprehensionFromRange[K comparable, V any](source Range, transform func(int) (K, V)) map[K]V {
+	result := make(map[K]V)
+	source.ForEach(func(i int) {
+		k, v := transform(i)
+		result[k] = v
+	})
 	return result
 }
 
 // SetComprehension creates map[T]bool set by applying transform function
-func (c ComprehensionOps) SetComprehension(source interface{}, transform func(interface{}) interface{}) map[interface{}]bool {
-	result := make(map[interface{}]bool)
-
-	if r, ok := source.(Range); ok {
-		r.ForEach(func(i int) {
-			result[transform(i)] = true
-		})
-		return result
-	}
-
-	v := reflect.ValueOf(source)
-	if v.Kind() == reflect.Slice {
-		for i := 0; i < v.Len(); i++ {
-			item := v.Index(i).Interface()
-			result[transform(item)] = true
-		}
+func SetComprehension[T any, K comparable](source []T, transform func(T) K) map[K]bool {
+	result := make(map[K]bool)
+	for _, item := range source {
+		result[transform(item)] = true
 	}
 	return result
 }
+
+// SetComprehensionFromRange creates set from a Range
+func SetComprehensionFromRange[K comparable](source Range, transform func(int) K) map[K]bool {
+	result := make(map[K]bool)
+	source.ForEach(func(i int) {
+		result[transform(i)] = true
+	})
+	return result
+}
+
+// Legacy ComprehensionOps struct for backwards compatibility
+type ComprehensionOps struct{}
 
 // Global ComprehensionOps instance
 var Comprehensions = ComprehensionOps{}
 
 // Helper functions
-
-// compareValues compares two values for ordering
-func compareValues(a, b interface{}) int {
-	va := reflect.ValueOf(a)
-	vb := reflect.ValueOf(b)
-
-	if va.Type() != vb.Type() {
-		panic("cannot compare different types")
-	}
-
-	switch va.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		ai, bi := va.Int(), vb.Int()
-		if ai < bi {
-			return -1
-		} else if ai > bi {
-			return 1
-		}
-		return 0
-	case reflect.Float32, reflect.Float64:
-		af, bf := va.Float(), vb.Float()
-		if af < bf {
-			return -1
-		} else if af > bf {
-			return 1
-		}
-		return 0
-	case reflect.String:
-		as, bs := va.String(), vb.String()
-		if as < bs {
-			return -1
-		} else if as > bs {
-			return 1
-		}
-		return 0
-	default:
-		panic(fmt.Sprintf("comparison not supported for type %T", a))
-	}
-}
 
 // ToStr converts various types to string (Python str() equivalent)
 func ToStr(x interface{}) string {

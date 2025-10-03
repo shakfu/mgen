@@ -255,7 +255,7 @@ def test_len(items: list) -> int:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "return mgen.Builtins.Len(items)" in go_code
+        assert "return mgen.Len[interface{}](items)" in go_code
 
     def test_abs_function(self):
         """Test abs() function conversion."""
@@ -265,7 +265,7 @@ def test_abs(x: int) -> int:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "return mgen.Builtins.Abs(x)" in go_code
+        assert "return mgen.AbsInt(x)" in go_code
 
     def test_range_function(self):
         """Test range() function conversion."""
@@ -287,5 +287,5 @@ def test_min_max(items: list) -> int:
 """
         go_code = self.converter.convert_code(python_code)
 
-        assert "mgen.Builtins.Min(items)" in go_code
-        assert "mgen.Builtins.Max(items)" in go_code
+        assert "mgen.Min[interface{}](items)" in go_code
+        assert "mgen.Max[interface{}](items)" in go_code
