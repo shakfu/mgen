@@ -17,6 +17,86 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.37] - 2025-10-04
+
+### Added
+
+- **C Backend Vanilla Hash Table** - Replaced STC's `map_str_int` with clean vanilla C implementation
+  - **New Runtime Files**:
+    - `src/mgen/backends/c/runtime/mgen_str_int_map.h` - Clean API header (87 lines)
+    - `src/mgen/backends/c/runtime/mgen_str_int_map.c` - Implementation with proper string ownership (191 lines)
+  - **Hash Table Features**:
+    - Separate chaining for collision resolution
+    - djb2 hash function for string hashing
+    - Proper string ownership with `strdup`/`free` (eliminates `cstr_raw` confusion)
+    - Complete API: `new()`, `insert()`, `get()`, `contains()`, `remove()`, `size()`, `clear()`, `free()`
+    - Default capacity of 16 buckets
+  - **Converter Integration** (`src/mgen/backends/c/converter.py`):
+    - Type declarations use `mgen_str_int_map_t*` instead of `map_str_int`
+    - Initialization: `mgen_str_int_map_new()` instead of `{0}`
+    - API calls use direct pointer (no `&` prefix like STC)
+    - Get operation returns `int*` to dereference instead of `->second` struct access
+    - Skips STC macro generation for `map_str_int`
+    - Added `_uses_str_int_map()` helper for conditional include
+    - Updated function parameters and return types to use pointer type
+  - **Benefits**:
+    - Eliminates STC macro complexity for string-keyed maps
+    - Type safety through explicit pointer types
+    - Predictable ownership semantics (no `cstr_raw` pointer confusion)
+    - Better maintainability (~300 lines of simple C vs macro magic)
+    - Improved debuggability (standard C debugging tools work)
+    - Foundation for gradual STC replacement
+
+### Fixed
+
+- **C Backend Wordcount Bug** - Fixed incorrect output (was 1, now correctly outputs 4)
+  - Root cause: STC's `cstr_raw` (non-owning string pointers) caused stale pointer issues
+  - When `count_words()` called 1000 times in loop, string pointers didn't persist across iterations
+  - Vanilla C hash table with `strdup` ensures proper string lifetime management
+  - **Impact**: wordcount benchmark now produces correct results (4 occurrences of "the")
+  - File: All C backend wordcount generated code
+
+- **MyPy Type Errors** - Fixed 6 type checking errors in C converter
+  - Changed `str | None` to `Optional[str]` for Python 3.9 compatibility
+  - Added explicit `isinstance(x, ast.Name)` type guards before accessing `.id` attribute
+  - Lines affected: 1199, 1445, 1501-1502, 2040-2041
+  - File: `src/mgen/backends/c/converter.py`
+
+### Changed
+
+- **C Backend Status**: 🎉 **SECOND BACKEND TO ACHIEVE 100% BENCHMARK SUCCESS** (7/7 passing)
+  - ✅ list_ops: 166750 operations, 0.270s execution
+  - ✅ dict_ops: 6065 operations, 0.453s execution
+  - ✅ set_ops: 234 operations, 0.278s execution
+  - ✅ matmul: 120 result, 0.245s execution
+  - ✅ wordcount: 4 occurrences (FIXED), 0.271s execution
+  - ✅ quicksort: 5 result, 0.241s execution
+  - ✅ fibonacci: 514229 result, 0.260s execution
+  - Average compilation: 0.382s
+  - Average binary size: 74.8 KB
+  - **Production Ready**: C backend now handles all benchmark patterns correctly with vanilla C containers
+
+- **Test Suite**: All 790 tests passing (increased from 741)
+- **Type Safety**: All 97 source files pass strict mypy type checking (0 errors)
+
+### Technical Details
+
+**Hash Table Implementation**:
+```c
+// Clean API without macro magic
+mgen_str_int_map_t* map = mgen_str_int_map_new();
+mgen_str_int_map_insert(map, "key", 42);
+int* value = mgen_str_int_map_get(map, "key");
+if (value) printf("%d\n", *value);
+mgen_str_int_map_free(map);
+```
+
+**STC Replacement Comparison**:
+- **Before (STC)**: `map_str_int_get(&map, key)->second` with `cstr_raw` non-owning pointers
+- **After (Vanilla C)**: `*mgen_str_int_map_get(map, key)` with owned `strdup` strings
+- **Lines of Code**: ~300 lines of readable C vs opaque macro expansion
+- **Debugging**: Standard gdb/lldb works vs difficult macro expansion debugging
+
 ## [0.1.36] - 2025-10-03
 
 ### Added

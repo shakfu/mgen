@@ -1,6 +1,6 @@
 # MGen Production Readiness Roadmap
 
-**Status**: v0.1.36 - 🎉 **C++ Backend Production Complete!**
+**Status**: v0.1.37 - 🎉 **TWO BACKENDS PRODUCTION COMPLETE!**
 **Goal**: Make all backends production-ready
 **Strategy**: Depth over breadth - polish existing rather than add new
 
@@ -8,33 +8,36 @@
 
 ## Executive Summary
 
-MGen has achieved a **major milestone**: The C++ backend is the **FIRST BACKEND** to achieve 100% benchmark success (7/7 passing) with advanced type inference, nested container support, and production-ready code generation quality.
+MGen has achieved a **major milestone**: **TWO BACKENDS** (C++ and C) now achieve 100% benchmark success (14/14 passing combined) with production-ready code generation quality.
 
 **Completed**:
 - ✅ Phase 1 - Compilation Verification (24/24 tests passing)
 - ✅ Phase 2 - Benchmark Framework (7 benchmarks, automated runner, report generation)
 - ✅ **Phase 2 - C++ Backend Complete** (7/7 benchmarks passing, 100% success rate) 🎉
+- ✅ **Phase 2 - C Backend Complete** (7/7 benchmarks passing, 100% success rate) 🎉
 
 **Current Status by Backend**:
 - 🎉 **C++**: 7/7 (100%) - **PRODUCTION READY**
+- 🎉 **C**: 7/7 (100%) - **PRODUCTION READY** (vanilla C hash table, STC replacement in progress)
 - Rust: 4/7 (57%)
 - Go: 2/7 (29%)
-- C: 2/7 (29%)
 - Haskell: 1/7 (14%)
 - OCaml: 1/7 (14%)
-- **Overall**: 16/42 (38.1%) - improved from 6/42 (14.3%)
+- **Overall**: 22/42 (52.4%) - improved from 16/42 (38.1%)
 
 **In Progress**:
-- 🔄 Phase 2 - Remaining Backend Quality (apply C++ learnings to other backends)
+- 🔄 Phase 2 - Remaining Backend Quality (apply C++/C learnings to other backends)
+- 🔄 **STC Library Gradual Replacement** - Replace STC with vanilla C (map_str_int ✅, vec_int/set_int/map_int_int pending)
 
-The next phases focus on replicating C++ success across all backends:
+The next phases focus on replicating C++/C success across all backends:
 
 1. ✅ **Compilation Verification** - All backends compile and execute correctly (COMPLETED v0.1.32)
 2. ✅ **C++ Backend Polish** - Advanced type inference, 100% benchmarks (COMPLETED v0.1.36)
-3. 🔄 **Replicate Success** - Apply C++ type inference patterns to Rust, Go, C, Haskell, OCaml
-4. **Real-World Examples** - Demonstrate practical use cases
-5. **Developer Experience** - Better errors, docs, and tooling
-6. **Integration** - Seamless build system integration
+3. ✅ **C Backend Polish** - Vanilla C containers, 100% benchmarks (COMPLETED v0.1.37)
+4. 🔄 **Replicate Success** - Apply type inference patterns to Rust, Go, Haskell, OCaml
+5. **Real-World Examples** - Demonstrate practical use cases
+6. **Developer Experience** - Better errors, docs, and tooling
+7. **Integration** - Seamless build system integration
 
 ---
 
@@ -229,7 +232,7 @@ Fixed 7 critical code generation bugs identified through benchmark failures:
 **Impact**:
 - Benchmark success rate improved from 9.5% (4/42) to 14.3% (6/42)
 - C++: 3/7 benchmarks passing (fibonacci, wordcount, list_ops)
-- C: 1/7 benchmarks passing (fibonacci)
+- C: 1/7 benchmarks passing (fibonacci) - **Now 7/7 in v0.1.37**
 - Rust: 1/7 benchmarks passing (fibonacci)
 - Go: 1/7 benchmarks passing (fibonacci)
 
@@ -279,6 +282,61 @@ Fixed 7 critical code generation bugs identified through benchmark failures:
 - Handles complex patterns: nested containers, string-keyed dicts, matrix operations
 - Serves as reference implementation for other backends
 - 790/790 unit tests passing with zero regressions
+
+#### 2.2.7 C Backend Completion ✅
+**Status**: COMPLETED (v0.1.37)
+**Priority**: HIGH
+**Effort**: 1 day
+
+🎉 **Second backend to achieve 100% benchmark success!**
+
+**Vanilla C Hash Table Implementation**:
+- **STC Replacement for String Maps**: Replaced STC's macro-based `map_str_int` with clean vanilla C implementation
+  - New runtime files: `mgen_str_int_map.h` (87 lines), `mgen_str_int_map.c` (191 lines)
+  - Separate chaining collision resolution with djb2 hash function
+  - Proper string ownership using `strdup`/`free` (fixes STC `cstr_raw` non-owning pointer issues)
+  - Complete API: `new()`, `insert()`, `get()`, `contains()`, `remove()`, `size()`, `clear()`, `free()`
+- **Converter Integration**: Updated to use vanilla C API throughout
+  - Type declarations: `mgen_str_int_map_t*` pointer type instead of STC struct
+  - Initialization: `mgen_str_int_map_new()` instead of `{0}`
+  - Operations: Direct pointer usage (no `&` prefix like STC)
+  - Get operation: Returns `int*` to dereference instead of `->second` struct access
+- **Fixed Wordcount Bug**: Correct output (4 occurrences) instead of 1
+  - Root cause: STC `cstr_raw` non-owning pointers caused stale references in loop iterations
+  - Solution: Vanilla C hash table with proper string lifetime management
+
+**Benchmark Results** (All 7 passing):
+- ✅ list_ops: 166,750 operations, 0.270s execution
+- ✅ dict_ops: 6,065 operations, 0.453s execution
+- ✅ set_ops: 234 operations, 0.278s execution
+- ✅ matmul: Matrix multiplication, 0.245s execution
+- ✅ wordcount: String processing (FIXED), 0.271s execution
+- ✅ quicksort: Array sorting, 0.241s execution
+- ✅ fibonacci: Recursion, 0.260s execution
+
+**Performance Metrics**:
+- Average compilation time: 0.382s
+- Average execution time: 0.288s
+- Average binary size: 74.8 KB
+- Average LOC: 77.7 lines
+
+**Benefits**:
+- Eliminates STC macro complexity for string-keyed maps (~300 lines of readable C vs macro expansion)
+- Type safety through explicit pointer types (no more `cstr_raw` confusion)
+- Better maintainability and debuggability (standard C debugging tools work)
+- Foundation for gradual STC replacement (next: `vec_int`, `set_int`, `map_int_int`)
+
+**Impact**:
+- C backend is **production-ready** for real-world use
+- Successfully replaced first STC container type with vanilla C
+- 790/790 unit tests passing with zero regressions
+- Demonstrates feasibility of complete STC removal
+
+**Next Steps** (STC Gradual Replacement):
+- Replace `vec_int` with vanilla C dynamic array
+- Replace `set_int` with vanilla C hash set
+- Replace `map_int_int` with vanilla C hash table for int keys
+- Complete removal of STC dependency
 
 #### 2.3 Optimization Opportunities
 **Priority**: MEDIUM
