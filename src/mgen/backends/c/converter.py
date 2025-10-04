@@ -427,12 +427,17 @@ class MGenPythonToCConverter:
         # Generate inline implementations for containers
         generated_containers = set()
 
+        # Generate vec_int first if needed (vec_vec_int depends on it)
+        if "vec_vec_int" in c_types_used and "vec_int" not in c_types_used:
+            c_types_used.add("vec_int")
+
         for c_type in sorted(c_types_used):
             if c_type in generated_containers:
                 continue
 
             # Generate supported container types
-            if c_type in ["map_str_int", "vec_int", "set_int", "map_int_int"]:
+            # Note: vec_int must be generated before vec_vec_int (dependency)
+            if c_type in ["map_str_int", "vec_int", "set_int", "map_int_int", "vec_vec_int", "vec_cstr"]:
                 generated_code = self.container_generator.generate_container(c_type)
                 if generated_code:
                     code_lines.append(generated_code)

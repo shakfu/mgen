@@ -339,11 +339,135 @@ class ContainerCodeGenerator:
 
         return "\n".join(sections)
 
+    def generate_vec_vec_int(self) -> str:
+        """Generate complete implementation for 2D integer arrays (vector of vectors).
+
+        Returns:
+            Complete C code for vec_vec_int implementation
+        """
+        # Load templates
+        header = self._load_template("mgen_vec_vec_int.h")
+        implementation = self._load_template("mgen_vec_vec_int.c")
+
+        # Strip includes from implementation
+        impl_code = self._strip_includes_and_headers(implementation)
+
+        # Remove error handling macros for self-contained code
+        impl_code = self._remove_error_handling_macros(impl_code)
+
+        # Strip header guards and includes from header
+        header_lines = []
+        in_header_guard = False
+        for line in header.split("\n"):
+            stripped = line.strip()
+
+            # Skip header guards
+            if stripped.startswith("#ifndef") and "_H" in stripped:
+                in_header_guard = True
+                continue
+            if stripped.startswith("#define") and "_H" in stripped:
+                continue
+            if stripped.startswith("#endif") and in_header_guard:
+                in_header_guard = False
+                continue
+
+            # Skip includes, extern C
+            if (stripped.startswith("#include")
+                or stripped.startswith("#ifdef __cplusplus")
+                or stripped.startswith("extern \"C\"")
+                or stripped.startswith("#endif")
+                or stripped == "}"):
+                continue
+
+            header_lines.append(line)
+
+        header_code = "\n".join(header_lines)
+
+        # Combine into generated implementation
+        sections = [
+            "// ========== Generated Container: vec_vec_int ==========",
+            "// 2D integer array (vector of vectors) implementation",
+            "// Generated inline for this program (no external dependencies)",
+            "",
+            "// Type definitions and API",
+            header_code.strip(),
+            "",
+            "// Implementation",
+            impl_code.strip(),
+            "",
+            "// ========== End of Generated Container ==========",
+            "",
+        ]
+
+        return "\n".join(sections)
+
+    def generate_vec_cstr(self) -> str:
+        """Generate complete implementation for string arrays (vector of C strings).
+
+        Returns:
+            Complete C code for vec_cstr implementation
+        """
+        # Load templates
+        header = self._load_template("mgen_vec_cstr.h")
+        implementation = self._load_template("mgen_vec_cstr.c")
+
+        # Strip includes from implementation
+        impl_code = self._strip_includes_and_headers(implementation)
+
+        # Remove error handling macros for self-contained code
+        impl_code = self._remove_error_handling_macros(impl_code)
+
+        # Strip header guards and includes from header
+        header_lines = []
+        in_header_guard = False
+        for line in header.split("\n"):
+            stripped = line.strip()
+
+            # Skip header guards
+            if stripped.startswith("#ifndef") and "_H" in stripped:
+                in_header_guard = True
+                continue
+            if stripped.startswith("#define") and "_H" in stripped:
+                continue
+            if stripped.startswith("#endif") and in_header_guard:
+                in_header_guard = False
+                continue
+
+            # Skip includes, extern C
+            if (stripped.startswith("#include")
+                or stripped.startswith("#ifdef __cplusplus")
+                or stripped.startswith("extern \"C\"")
+                or stripped.startswith("#endif")
+                or stripped == "}"):
+                continue
+
+            header_lines.append(line)
+
+        header_code = "\n".join(header_lines)
+
+        # Combine into generated implementation
+        sections = [
+            "// ========== Generated Container: vec_cstr ==========",
+            "// String array (vector of C strings) implementation",
+            "// Generated inline for this program (no external dependencies)",
+            "",
+            "// Type definitions and API",
+            header_code.strip(),
+            "",
+            "// Implementation",
+            impl_code.strip(),
+            "",
+            "// ========== End of Generated Container ==========",
+            "",
+        ]
+
+        return "\n".join(sections)
+
     def generate_container(self, container_type: str) -> Optional[str]:
         """Generate code for a specific container type.
 
         Args:
-            container_type: Container type identifier (e.g., "map_str_int", "vec_int", "set_int", "map_int_int")
+            container_type: Container type identifier (e.g., "map_str_int", "vec_int", "set_int", "map_int_int", "vec_vec_int", "vec_cstr")
 
         Returns:
             Generated C code, or None if type not supported
@@ -356,6 +480,10 @@ class ContainerCodeGenerator:
             return self.generate_set_int()
         elif container_type == "map_int_int":
             return self.generate_map_int_int()
+        elif container_type == "vec_vec_int":
+            return self.generate_vec_vec_int()
+        elif container_type == "vec_cstr":
+            return self.generate_vec_cstr()
 
         return None
 
@@ -372,10 +500,12 @@ class ContainerCodeGenerator:
         # vec_int needs: stdlib.h (malloc/free), stdbool.h (bool)
         # set_int needs: stdlib.h (malloc/free), stdbool.h (bool)
         # map_int_int needs: stdlib.h (malloc/free), stdbool.h (bool)
+        # vec_vec_int needs: stdlib.h (malloc/free), stdbool.h (bool)
+        # vec_cstr needs: stdlib.h (malloc/free), string.h (strdup), stdbool.h (bool)
         # These are already in standard includes, but we track them for completeness
-        if container_type == "map_str_int":
+        if container_type in ["map_str_int", "vec_cstr"]:
             return ["<stdlib.h>", "<string.h>", "<stdbool.h>"]
-        elif container_type in ["vec_int", "set_int", "map_int_int"]:
+        elif container_type in ["vec_int", "set_int", "map_int_int", "vec_vec_int"]:
             return ["<stdlib.h>", "<stdbool.h>"]
 
         return []

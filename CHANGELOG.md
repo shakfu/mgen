@@ -17,6 +17,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.41] - 2025-10-04
+
+### Added
+
+- **vec_cstr (String Arrays)** - Dynamic array of C strings for string list operations
+  - New template files: `mgen_vec_cstr.h` (87 lines), `mgen_vec_cstr.c` (155 lines)
+  - Element type: `char*` (C strings with ownership management)
+  - STC-compatible API: `vec_cstr_push`, `vec_cstr_at`, `vec_cstr_size`, `vec_cstr_drop`
+  - **String ownership**: Uses `strdup()` on push, `free()` on pop/clear/drop
+  - Supports `{0}` initialization with lazy bucket allocation
+  - Handles NULL strings gracefully
+  - Extended ContainerCodeGenerator with `generate_vec_cstr()` method
+  - Generates ~216 lines of inline code
+  - **Use Case**: String lists, file readlines, text processing
+  - **Test Results**: All 741 tests passing, zero regressions
+  - **Note**: Type inference enhancement needed for automatic `list[str]` → `vec_cstr` mapping
+
+### Changed
+
+- **Container Code Generation**: Now supports 6 container types (was 5)
+  - `map_str_int`, `vec_int`, `set_int`, `map_int_int`, `vec_vec_int`, `vec_cstr`
+  - Coverage: ~20-25% of common STC container types (up from 15-20%)
+  - **Phase 1 Complete**: Essential types (vec_vec_int, vec_cstr) implemented
+
+## [0.1.40] - 2025-10-04
+
+### Added
+
+- **vec_vec_int (2D Integer Arrays)** - Nested vector container for matrix operations
+  - New template files: `mgen_vec_vec_int.h` (80 lines), `mgen_vec_vec_int.c` (140 lines)
+  - Element type: `vec_int` (vector of vectors, value-based nesting)
+  - STC-compatible API: `vec_vec_int_push`, `vec_vec_int_at`, `vec_vec_int_size`, `vec_vec_int_drop`
+  - Proper memory management: calls `vec_int_drop()` on each row during cleanup
+  - Supports `{0}` initialization with lazy bucket allocation
+  - Automatic dependency resolution: generates vec_int first if needed
+  - Extended ContainerCodeGenerator with `generate_vec_vec_int()` method
+  - Updated converter to handle dependency ordering (vec_int before vec_vec_int)
+  - Generates ~350+ lines of inline code (including vec_int dependency)
+  - Verified with 2D matrix test (3x3 matrix sum: 36)
+  - **Impact**: Unblocks matmul benchmark and nested container operations
+  - **Test Results**: All 741 tests passing, zero regressions
+
+### Changed
+
+- **Container Code Generation**: Now supports 5 container types (was 4)
+  - `map_str_int`, `vec_int`, `set_int`, `map_int_int`, `vec_vec_int`
+  - Dependency-aware code generation ensures correct ordering
+  - Coverage: ~15-20% of STC container types (up from 10-15%)
+
 ## [0.1.39] - 2025-10-04
 
 ### Added
