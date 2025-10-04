@@ -1824,10 +1824,18 @@ class MGenPythonToRustConverter:
                     # Found the variable declaration with type annotation
                     base_type = self._map_type_annotation(stmt.annotation)
 
+                    # If there's a value, prefer its type over the annotation for function calls
+                    # This handles: result: list = create_matrix() -> use create_matrix's return type
+                    if stmt.value and isinstance(stmt.value, ast.Call):
+                        # Function call - try to get actual return type
+                        value_type = self._infer_type_from_value(stmt.value)
+                        # Only use value type if it's more specific than annotation
+                        if value_type and "Box<dyn" not in value_type:
+                            return value_type
+
                     # If it's an empty dict or list LITERAL with a generic type annotation,
                     # we need to infer the actual type from usage
                     # This handles cases like: word_counts: dict = {}
-                    # But NOT: result: list = some_function()  (that's a function call, not an empty literal)
                     if stmt.value:
                         # Only check empty LITERALS, not function calls or other expressions
                         if isinstance(stmt.value, ast.Dict) and len(stmt.value.keys) == 0:
@@ -1997,15 +2005,26 @@ class MGenPythonToRustConverter:
                         if element_type:
                             return f"Vec<{element_type}>"
                     elif inferred_type:
-                        # For dict/list types, check if we need deeper inference
-                        if inferred_type == "std::collections::HashMap<i32, i32>":
-                            # Try to get more specific type from usage
+                        # For dict/list types with generic or default types, try deeper inference
+                        if "Box<dyn" in inferred_type:
+                            # Generic type (Box<dyn Any>) - try to infer actual type from usage
+                            if "HashMap" in inferred_type:
+                                dict_types = self._infer_dict_types_from_usage(var_name, func)
+                                if dict_types:
+                                    key_type, value_type = dict_types
+                                    return f"std::collections::HashMap<{key_type}, {value_type}>"
+                            elif "Vec<" in inferred_type:
+                                element_type = self._infer_list_element_type_from_appends(var_name, func)
+                                if element_type:
+                                    return f"Vec<{element_type}>"
+                        elif inferred_type == "std::collections::HashMap<i32, i32>":
+                            # Default int dict - try to get more specific type from usage
                             dict_types = self._infer_dict_types_from_usage(var_name, func)
                             if dict_types:
                                 key_type, value_type = dict_types
                                 return f"std::collections::HashMap<{key_type}, {value_type}>"
                         elif inferred_type == "Vec<i32>":
-                            # Try to get more specific element type
+                            # Default int vec - try to get more specific element type
                             element_type = self._infer_list_element_type_from_appends(var_name, func)
                             if element_type:
                                 return f"Vec<{element_type}>"
