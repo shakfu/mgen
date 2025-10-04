@@ -1,0 +1,86 @@
+/**
+ * Simple hash map for {{K_SUFFIX}}→{{V_SUFFIX}} mappings
+ * Clean, type-safe implementation for code generation
+ */
+
+#ifndef MGEN_MAP_{{KV_SUFFIX}}_H
+#define MGEN_MAP_{{KV_SUFFIX}}_H
+
+#include <stddef.h>
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Hash map entry structure
+typedef struct {
+    {{K}} key;
+    {{V}} value;
+    size_t hash;
+    bool occupied;
+} map_{{KV_SUFFIX}}_entry;
+
+// Hash map structure
+typedef struct {
+    map_{{KV_SUFFIX}}_entry* buckets;
+    size_t size;           // Number of entries
+    size_t capacity;       // Number of buckets
+} map_{{KV_SUFFIX}};
+
+/**
+ * Create a new {{K_SUFFIX}}→{{V_SUFFIX}} map
+ * Supports {0} initialization with lazy bucket allocation
+ */
+map_{{KV_SUFFIX}} map_{{KV_SUFFIX}}_init(void);
+
+/**
+ * Insert or update a key-value pair
+ */
+void map_{{KV_SUFFIX}}_insert(map_{{KV_SUFFIX}}* map, {{#K_IS_POINTER}}const {{/K_IS_POINTER}}{{K}} key, {{#V_IS_POINTER}}const {{/V_IS_POINTER}}{{V}} value);
+
+/**
+ * Get value for a key (returns pointer to value or NULL if not found)
+ */
+{{V}}* map_{{KV_SUFFIX}}_get(map_{{KV_SUFFIX}}* map, {{#K_IS_POINTER}}const {{/K_IS_POINTER}}{{K}} key);
+
+/**
+ * Check if key exists in map
+ */
+bool map_{{KV_SUFFIX}}_contains(map_{{KV_SUFFIX}}* map, {{#K_IS_POINTER}}const {{/K_IS_POINTER}}{{K}} key);
+
+/**
+ * Get number of entries
+ */
+size_t map_{{KV_SUFFIX}}_size(const map_{{KV_SUFFIX}}* map);
+
+/**
+ * Remove a key-value pair
+ */
+void map_{{KV_SUFFIX}}_erase(map_{{KV_SUFFIX}}* map, {{#K_IS_POINTER}}const {{/K_IS_POINTER}}{{K}} key);
+
+/**
+ * Clear all entries (keep capacity)
+ */
+void map_{{KV_SUFFIX}}_clear(map_{{KV_SUFFIX}}* map);
+
+/**
+ * Free all memory
+ */
+void map_{{KV_SUFFIX}}_drop(map_{{KV_SUFFIX}}* map);
+
+/**
+ * Check if map is empty
+ */
+bool map_{{KV_SUFFIX}}_empty(const map_{{KV_SUFFIX}}* map);
+
+/**
+ * Reserve capacity
+ */
+void map_{{KV_SUFFIX}}_reserve(map_{{KV_SUFFIX}}* map, size_t new_capacity);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // MGEN_MAP_{{KV_SUFFIX}}_H

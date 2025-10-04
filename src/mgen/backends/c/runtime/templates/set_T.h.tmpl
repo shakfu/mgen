@@ -1,0 +1,82 @@
+/**
+ * Simple hash set for {{T_SUFFIX}}
+ * Clean, type-safe implementation for code generation
+ */
+
+#ifndef MGEN_SET_{{T_SUFFIX}}_H
+#define MGEN_SET_{{T_SUFFIX}}_H
+
+#include <stddef.h>
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Hash set entry structure
+typedef struct {
+    {{T}} value;
+    size_t hash;
+    bool occupied;
+} set_{{T_SUFFIX}}_entry;
+
+// Hash set structure
+typedef struct {
+    set_{{T_SUFFIX}}_entry* buckets;
+    size_t size;           // Number of entries
+    size_t capacity;       // Number of buckets
+} set_{{T_SUFFIX}};
+
+/**
+ * Create a new {{T_SUFFIX}} set
+ * Supports {0} initialization with lazy bucket allocation
+ */
+set_{{T_SUFFIX}} set_{{T_SUFFIX}}_init(void);
+
+/**
+ * Insert a {{T_SUFFIX}} value into the set
+ * Returns true if inserted (new), false if already present
+ */
+bool set_{{T_SUFFIX}}_insert(set_{{T_SUFFIX}}* set, {{#T_IS_POINTER}}const {{/T_IS_POINTER}}{{T}} value);
+
+/**
+ * Check if value is in the set
+ */
+bool set_{{T_SUFFIX}}_contains(const set_{{T_SUFFIX}}* set, {{#T_IS_POINTER}}const {{/T_IS_POINTER}}{{T}} value);
+
+/**
+ * Remove a value from the set
+ * Returns true if removed, false if not found
+ */
+bool set_{{T_SUFFIX}}_erase(set_{{T_SUFFIX}}* set, {{#T_IS_POINTER}}const {{/T_IS_POINTER}}{{T}} value);
+
+/**
+ * Get number of entries
+ */
+size_t set_{{T_SUFFIX}}_size(const set_{{T_SUFFIX}}* set);
+
+/**
+ * Check if set is empty
+ */
+bool set_{{T_SUFFIX}}_empty(const set_{{T_SUFFIX}}* set);
+
+/**
+ * Clear all entries (keep capacity)
+ */
+void set_{{T_SUFFIX}}_clear(set_{{T_SUFFIX}}* set);
+
+/**
+ * Free all memory
+ */
+void set_{{T_SUFFIX}}_drop(set_{{T_SUFFIX}}* set);
+
+/**
+ * Reserve capacity
+ */
+void set_{{T_SUFFIX}}_reserve(set_{{T_SUFFIX}}* set, size_t new_capacity);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // MGEN_SET_{{T_SUFFIX}}_H

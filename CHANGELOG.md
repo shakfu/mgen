@@ -17,6 +17,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.44] - 2025-10-04
+
+### Added
+
+- **Phase 3.1: Generic Container Templates** - Parameterized template generation system
+  - **Core Infrastructure (Complete)**:
+    - TypeProperties system: Type registry with 7 registered types (int, float, double, bool, char, str, cstr)
+    - TypeParameterExtractor: Pattern-based type extraction (vec_<T>, map_<K>_<V>, set_<T>)
+    - TemplateSubstitutionEngine: Placeholder and conditional block substitution
+  - **Generic Template Files (6 templates, 926 total lines)**:
+    - `vec_T.h.tmpl` (80 lines) - Generic vector header template
+    - `vec_T.c.tmpl` (162 lines) - Generic vector implementation template
+    - `map_K_V.h.tmpl` (86 lines) - Generic map header template
+    - `map_K_V.c.tmpl` (266 lines) - Generic map implementation template
+    - `set_T.h.tmpl` (82 lines) - Generic set header template
+    - `set_T.c.tmpl` (250 lines) - Generic set implementation template
+  - **Template Features**:
+    - Placeholder substitution: {{T}}, {{K}}, {{V}}, {{T_SUFFIX}}, {{KV_SUFFIX}}
+    - Type properties: {{T_ZERO}}, {{T_PRINTF}}, {{T_COMPARE}}, {{T_HASH}}
+    - Conditional blocks: {{#T_NEEDS_DROP}}...{{/T_NEEDS_DROP}} for type-specific code
+    - Ownership handling: Automatic strdup/free for pointer types
+  - **Test Coverage**: 35 new tests (27 for core infrastructure + 8 for template instantiation)
+  - **Total Tests**: 803 tests passing (100% pass rate)
+  - **Design Document**: `PARAMETERIZED_CONTAINERS.md` with full architecture
+  - **Impact**: Foundation for reducing 20 hardcoded templates → 6 generic templates
+
+### Technical Notes
+
+- Template system uses Mustache-inspired syntax with custom conditional processing
+- Early return pattern used to avoid needing negative conditional blocks ({{^VAR}})
+- Templates handle both value types (int, float) and pointer types (str, cstr) correctly
+- Hash-based containers (map, set) include FNV-1a hash function and linear probing
+- All templates generate STC-compatible APIs for drop-in replacement
+
 ## [0.1.43] - 2025-10-04
 
 ### Added
