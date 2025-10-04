@@ -13,6 +13,9 @@ Status: Prototype - runs in parallel with existing runtime library approach
 from pathlib import Path
 from typing import Optional
 
+from .template_substitution import TemplateSubstitutionEngine
+from .type_parameter_extractor import TypeParameterExtractor
+
 
 class ContainerCodeGenerator:
     """Generate type-specific container implementations inline."""
@@ -20,7 +23,12 @@ class ContainerCodeGenerator:
     def __init__(self) -> None:
         """Initialize code generator with templates from runtime library."""
         self.runtime_dir = Path(__file__).parent / "runtime"
+        self.template_dir = self.runtime_dir / "templates"
         self._template_cache: dict[str, str] = {}
+
+        # Initialize template system
+        self.extractor = TypeParameterExtractor()
+        self.substitution_engine = TemplateSubstitutionEngine()
 
     def _load_template(self, filename: str) -> str:
         """Load a runtime library file as a code generation template.
@@ -39,6 +47,26 @@ class ContainerCodeGenerator:
             content = f.read()
 
         self._template_cache[filename] = content
+        return content
+
+    def _load_generic_template(self, filename: str) -> str:
+        """Load a generic template file from templates directory.
+
+        Args:
+            filename: Template filename (e.g., "vec_T.h.tmpl")
+
+        Returns:
+            Template content as string
+        """
+        cache_key = f"tmpl_{filename}"
+        if cache_key in self._template_cache:
+            return self._template_cache[cache_key]
+
+        template_path = self.template_dir / filename
+        with open(template_path, encoding="utf-8") as f:
+            content = f.read()
+
+        self._template_cache[cache_key] = content
         return content
 
     def _strip_includes_and_headers(self, code: str) -> str:
@@ -87,6 +115,103 @@ class ContainerCodeGenerator:
             filtered_lines.append(line)
 
         return "\n".join(filtered_lines)
+
+    def generate_from_template(self, container_type: str) -> Optional[str]:
+        """Generate container code from generic parameterized templates.
+
+        This is the new parameterized approach that replaces hardcoded methods.
+        Uses the template system to generate any container type from generic templates.
+
+        Args:
+            container_type: Container type identifier (e.g., "vec_int", "map_str_int")
+
+        Returns:
+            Generated C code, or None if type cannot be extracted
+        """
+        # Extract type parameters from container type
+        info = self.extractor.extract(container_type)
+        if not info:
+            return None
+
+        # Determine which template to use based on container family
+        if info.family == "vec":
+            header_template_name = "vec_T.h.tmpl"
+            impl_template_name = "vec_T.c.tmpl"
+        elif info.family == "map":
+            header_template_name = "map_K_V.h.tmpl"
+            impl_template_name = "map_K_V.c.tmpl"
+        elif info.family == "set":
+            header_template_name = "set_T.h.tmpl"
+            impl_template_name = "set_T.c.tmpl"
+        elif info.family == "vec_vec":
+            # Nested vectors not yet supported by templates
+            return None
+        else:
+            return None
+
+        # Load generic templates
+        header_template = self._load_generic_template(header_template_name)
+        impl_template = self._load_generic_template(impl_template_name)
+
+        # Substitute placeholders with actual types
+        header_code = self.substitution_engine.substitute_from_container_info(
+            header_template, info
+        )
+        impl_code = self.substitution_engine.substitute_from_container_info(
+            impl_template, info
+        )
+
+        # Strip includes from implementation
+        impl_code = self._strip_includes_and_headers(impl_code)
+
+        # Remove error handling macros for self-contained code
+        impl_code = self._remove_error_handling_macros(impl_code)
+
+        # Strip header guards and includes from header
+        header_lines = []
+        in_header_guard = False
+        for line in header_code.split("\n"):
+            stripped = line.strip()
+
+            # Skip header guards
+            if stripped.startswith("#ifndef") and "_H" in stripped:
+                in_header_guard = True
+                continue
+            if stripped.startswith("#define") and "_H" in stripped:
+                continue
+            if stripped.startswith("#endif") and in_header_guard:
+                in_header_guard = False
+                continue
+
+            # Skip includes, extern C
+            if (stripped.startswith("#include")
+                or stripped.startswith("#ifdef __cplusplus")
+                or stripped.startswith("extern \"C\"")
+                or stripped.startswith("#endif")
+                or stripped == "}"):
+                continue
+
+            header_lines.append(line)
+
+        header_code = "\n".join(header_lines)
+
+        # Combine into generated implementation
+        sections = [
+            f"// ========== Generated Container: {container_type} ==========",
+            f"// {info.family} container generated from parameterized template",
+            "// Generated inline for this program (no external dependencies)",
+            "",
+            "// Type definitions and API",
+            header_code.strip(),
+            "",
+            "// Implementation",
+            impl_code.strip(),
+            "",
+            f"// ========== End of Generated Container: {container_type} ==========",
+            "",
+        ]
+
+        return "\n".join(sections)
 
     def generate_str_int_map(self) -> str:
         """Generate complete implementation for string→int hash table.
@@ -698,12 +823,21 @@ class ContainerCodeGenerator:
     def generate_container(self, container_type: str) -> Optional[str]:
         """Generate code for a specific container type.
 
+        Uses the new parameterized template system when possible.
+        Falls back to hardcoded methods for types not yet supported by templates.
+
         Args:
             container_type: Container type identifier
 
         Returns:
             Generated C code, or None if type not supported
         """
+        # Try template-based generation first (new approach)
+        template_code = self.generate_from_template(container_type)
+        if template_code is not None:
+            return template_code
+
+        # Fall back to hardcoded methods for types not yet supported by templates
         if container_type == "map_str_int":
             return self.generate_str_int_map()
         elif container_type == "vec_int":

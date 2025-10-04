@@ -17,6 +17,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.45] - 2025-10-04
+
+### Added
+
+- **Phase 3.2: Template System Integration** - ContainerCodeGenerator now uses parameterized templates
+  - **New Method**: `generate_from_template(container_type)` - Universal container generation
+  - **Template Loading**: `_load_generic_template()` for loading .tmpl files
+  - **Hybrid Approach**: Try template-based generation first, fall back to hardcoded methods
+  - **Supported Types via Templates**:
+    - Vectors: vec_int, vec_float, vec_double, vec_str, vec_cstr
+    - Maps: map_str_int, map_int_int, map_str_str
+    - Sets: set_int, set_str
+  - **Not Yet Supported**: vec_vec_int (nested vectors require special handling)
+  - **Test Coverage**: 15 new tests for template-based code generation
+  - **Total Tests**: 818 tests passing (100% pass rate)
+
+### Changed
+
+- **ContainerCodeGenerator**: Modified `generate_container()` to prefer template-based generation
+  - Template approach reduces code duplication (6 templates replace 10 hardcoded methods)
+  - Maintains backward compatibility with fallback to hardcoded methods
+  - Generated code identical in functionality, cleaner generation process
+
+### Technical Notes
+
+- Template system successfully integrated with existing infrastructure
+- Zero regressions - all existing tests continue to pass
+- Generated code has includes, header guards, and error macros stripped (same as before)
+- Type parameter extraction and substitution happen automatically based on container type name
+- Future: Can deprecate and remove hardcoded methods once all types supported by templates
+
 ## [0.1.44] - 2025-10-04
 
 ### Added
