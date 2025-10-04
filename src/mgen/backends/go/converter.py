@@ -608,6 +608,31 @@ class MGenPythonToGoConverter:
             self.declared_vars.add(arg.arg)
 
         body = self._convert_statements(node.body)
+
+        # Detect unused variables and mark them with _ = variable
+        unused_vars = self._detect_unused_variables(node.body)
+        if unused_vars:
+            # Add _ = var statements at the end of the function body before return
+            unused_statements = []
+            for var in sorted(unused_vars):  # Sort for consistent output
+                unused_statements.append(f"    _ = {var}")
+
+            # Insert unused variable markers at the end, before any return statement
+            if unused_statements:
+                # Find the last non-return statement position
+                body_lines = body.rstrip().split('\n')
+                insert_pos = len(body_lines)
+
+                # Find the last return statement
+                for i in range(len(body_lines) - 1, -1, -1):
+                    if 'return' in body_lines[i]:
+                        insert_pos = i
+                        break
+
+                # Insert the unused markers
+                body_lines[insert_pos:insert_pos] = unused_statements
+                body = '\n'.join(body_lines) + '\n'
+
         self.current_function = None
         self.nested_vars = set()  # Clear
         self.append_map = {}
@@ -701,6 +726,78 @@ class MGenPythonToGoConverter:
             check_stmt(stmt)
 
         return append_map
+
+    def _detect_unused_variables(self, stmts: list[ast.stmt]) -> set[str]:
+        """Detect variables that are declared but never used."""
+        declared: set[str] = set()
+        used: set[str] = set()
+
+        def collect_declared(stmt: ast.stmt) -> None:
+            """Collect variable declarations."""
+            if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                declared.add(stmt.target.id)
+            elif isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name):
+                        declared.add(target.id)
+            elif isinstance(stmt, (ast.For, ast.While)):
+                for s in stmt.body:
+                    collect_declared(s)
+                if hasattr(stmt, 'orelse'):
+                    for s in stmt.orelse:
+                        collect_declared(s)
+            elif isinstance(stmt, ast.If):
+                for s in stmt.body:
+                    collect_declared(s)
+                for s in stmt.orelse:
+                    collect_declared(s)
+
+        def collect_used(node: ast.AST) -> None:
+            """Collect variable uses (but not in assignment targets)."""
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                used.add(node.id)
+            elif isinstance(node, ast.expr):
+                for child in ast.walk(node):
+                    if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load):
+                        used.add(child.id)
+
+        def traverse_stmt(stmt: ast.stmt) -> None:
+            """Traverse statements to find uses."""
+            if isinstance(stmt, ast.Assign):
+                # Check the value being assigned (RHS)
+                collect_used(stmt.value)
+            elif isinstance(stmt, ast.AnnAssign):
+                if stmt.value:
+                    collect_used(stmt.value)
+            elif isinstance(stmt, ast.Expr):
+                collect_used(stmt.value)
+            elif isinstance(stmt, ast.Return):
+                if stmt.value:
+                    collect_used(stmt.value)
+            elif isinstance(stmt, ast.If):
+                collect_used(stmt.test)
+                for s in stmt.body:
+                    traverse_stmt(s)
+                for s in stmt.orelse:
+                    traverse_stmt(s)
+            elif isinstance(stmt, (ast.For, ast.While)):
+                if hasattr(stmt, 'iter'):
+                    collect_used(stmt.iter)
+                if hasattr(stmt, 'test'):
+                    collect_used(stmt.test)
+                for s in stmt.body:
+                    traverse_stmt(s)
+                if hasattr(stmt, 'orelse'):
+                    for s in stmt.orelse:
+                        traverse_stmt(s)
+
+        # Collect declarations and uses
+        for stmt in stmts:
+            collect_declared(stmt)
+            traverse_stmt(stmt)
+
+        # Return variables that are declared but never used
+        return declared - used
 
     def _analyze_map_key_types(self, stmts: list[ast.stmt]) -> set[str]:
         """Detect maps that are accessed with string keys."""
