@@ -1,630 +1,73 @@
 # MGen Production Readiness Roadmap
 
-**Status**: v0.1.47 - 🎉 **RUST BACKEND PRODUCTION READY! 3/6 Backends at 100%**
-**Goal**: Make all backends production-ready
-**Strategy**: Depth over breadth - polish existing rather than add new
+**Status**: v0.1.47 - 🎉 **4/6 Backends Production-Ready (67%)**
+**Goal**: Achieve 100% benchmark success across all backends
+**Strategy**: Depth over breadth - complete existing backends before adding features
 
 ---
 
-## Executive Summary
+## Current Status
 
-MGen has achieved **major milestone**: **THREE BACKENDS** (C++, C, and Rust) achieve 100% benchmark success, representing **50% of all backends** at production-ready status.
+**Overall Progress**:
+- **821 tests** passing (100%)
+- **35/42 benchmarks** passing (83%)
+- **4/6 backends** production-ready (C++, C, Rust, Go)
+- **2/6 backends** in progress (Haskell, OCaml)
 
-**Completed**:
-- ✅ Phase 1 - Compilation Verification (24/24 tests passing)
-- ✅ Phase 2 - Benchmark Framework (7 benchmarks, automated runner, report generation)
-- ✅ **Phase 2 - C++ Backend Complete** (7/7 benchmarks passing, 100% success rate) 🎉
-- ✅ **Phase 2 - C Backend Complete** (7/7 benchmarks passing, 100% success rate) 🎉
-- ✅ **Phase 2 - Rust Backend Complete** (7/7 benchmarks passing, 100% success rate) 🎉
-- ✅ **Phase 2 - Parameterized Template System** (6 generic templates, unlimited type combinations) 🎉
-- ✅ **Phase 3 - Real-World Examples** (5 complete applications across 4 categories) 🎉
-
-**Current Status by Backend**:
-- 🎉 **C++**: 7/7 (100%) - **PRODUCTION READY** - Advanced type inference, STL optimizations
-- 🎉 **C**: 7/7 (100%) - **PRODUCTION READY** - Parameterized templates, STC container system
-- 🎉 **Rust**: 7/7 (100%) - **PRODUCTION READY** - Ownership-aware generation, idiomatic types
-- Go: 0/7 (0%) - Type inference improvements needed
-- Haskell: 0/7 (0%) - Functional paradigm translation needed
-- OCaml: 0/7 (0%) - Functional paradigm translation needed
-- **Overall**: 21/42 benchmarks passing (50%), 818/818 tests passing (100%)
-
-**In Progress**:
-- 🔄 Phase 4 - Developer Experience (error messages, debugging support)
-- 🔄 Phase 5 - Documentation & Community (user docs, API reference)
-
-The next phases focus on replicating C++/C success across all backends:
-
-1. ✅ **Compilation Verification** - All backends compile and execute correctly (COMPLETED v0.1.32)
-2. ✅ **C++ Backend Polish** - Advanced type inference, 100% benchmarks (COMPLETED v0.1.36)
-3. ✅ **C Backend Polish** - Vanilla C containers, 100% benchmarks (COMPLETED v0.1.37)
-4. 🔄 **Replicate Success** - Apply type inference patterns to Rust, Go, Haskell, OCaml
-5. **Real-World Examples** - Demonstrate practical use cases
-6. **Developer Experience** - Better errors, docs, and tooling
-7. **Integration** - Seamless build system integration
+**Backend Status**:
+- 🎉 **C++**: 7/7 (100%) - **PRODUCTION READY**
+- 🎉 **C**: 7/7 (100%) - **PRODUCTION READY**
+- 🎉 **Rust**: 7/7 (100%) - **PRODUCTION READY**
+- 🎉 **Go**: 7/7 (100%) - **PRODUCTION READY**
+- 🔄 **Haskell**: 6/7 (86%) - Missing quicksort
+- 🔄 **OCaml**: 1/7 (14%) - 6 benchmarks failing
 
 ---
 
-## Phase 1: Compilation Verification System ✅ COMPLETED (v0.1.32)
+## Immediate Priorities
 
-### Goal
-Verify that generated code from all backends compiles and executes correctly.
+### 1. Complete Haskell Backend (HIGH)
+**Goal**: 7/7 benchmarks passing
 
-### Completed State
-- ✅ **C Backend**: Full compilation support with Makefile generation
-- ✅ **C++ Backend**: Compilation support with runtime header copying
-- ✅ **Go Backend**: Full compilation with go.mod generation
-- ✅ **Rust Backend**: Full compilation with proper main signatures
-- ✅ **Haskell Backend**: Full compilation with qualified names and do notation
-- ✅ **OCaml Backend**: Full compilation via opam with type-aware code generation
-- ✅ **Automated Verification**: 24/24 compilation tests passing (100%)
-- ✅ **Test Suite**: All 741 tests passing with zero failures
+**Remaining Work**:
+- Fix quicksort benchmark compilation failure
+- Likely issue: List manipulation or type inference
 
-### Completed Tasks
+**Estimated Effort**: 1-2 days
 
-#### 1.1 Build Compilation Test Suite ✅
-**Status**: COMPLETED
-**Completed**: v0.1.32
+### 2. Complete OCaml Backend (HIGH)
+**Goal**: 7/7 benchmarks passing
 
-Created comprehensive compilation test suite in `tests/test_compilation.py`:
-- Automated compilation tests for all 6 backends
-- Output verification (stdout comparison)
-- Return code checking (0 for success)
-- Compilation error reporting with detailed diagnostics
-- 24/24 tests passing (100%)
+**Remaining Work**:
+- Fix 6 failing benchmarks (list_ops, dict_ops, set_ops, matmul, wordcount, quicksort)
+- Improve type inference for functional paradigm
+- Fix code generation for list/dict/set operations
 
-**Test Coverage**:
-- C: simple_math, string_ops, comprehensions, classes (4 tests)
-- C++: simple_math, string_ops, comprehensions, classes (4 tests)
-- Rust: simple_math, string_ops, comprehensions, classes (4 tests)
-- Go: simple_math, string_ops, comprehensions, classes (4 tests)
-- Haskell: simple_math, string_ops, comprehensions, classes (4 tests)
-- OCaml: simple_math, string_ops, comprehensions, classes (4 tests)
-
-#### 1.2 Runtime Library Verification ✅
-**Status**: COMPLETED
-**Completed**: v0.1.24-v0.1.32
-
-All backend runtime libraries verified and working:
-- ✅ String operations: upper, lower, strip, find, replace, split
-- ✅ Container operations: list, dict, set comprehensions with filtering
-- ✅ Math operations: abs, min, max, sum, len
-- ✅ Built-in functions: print, range, enumerate
-- ✅ Type conversions: automatic and explicit
-
-**Runtime Library Status**:
-- C: 72KB + 756KB STC library (v0.1.27)
-- C++: 9KB header-only runtime (v0.1.21)
-- Rust: 304-line pure std library runtime (v0.1.22)
-- Go: 413-line pure std library runtime (v0.1.23)
-- Haskell: 214-line pure std library runtime (v0.1.24)
-- OCaml: 216-line pure std library runtime (v0.1.24)
-
-#### 1.3 Build System Integration ✅
-**Status**: COMPLETED
-**Completed**: v0.1.32
-
-**C/C++**:
-- ✅ Makefile generation working (v0.1.1)
-- ✅ Runtime header copying (v0.1.32)
-
-**Rust**:
-- ✅ Cargo.toml integration (v0.1.22)
-- ✅ Runtime module copying (v0.1.32)
-- ✅ Proper main signatures (v0.1.32)
-
-**Go**:
-- ✅ Auto-generated go.mod files (v0.1.32)
-- ✅ Module import path handling (v0.1.32)
-- ✅ Fixed module structure (v0.1.32)
-
-**Haskell**:
-- ✅ ghc compilation support (v0.1.24)
-- ✅ Runtime copying (v0.1.32)
-- ✅ Qualified names to avoid shadowing (v0.1.32)
-
-**OCaml**:
-- ✅ opam integration (v0.1.32)
-- ✅ Type-aware code generation (v0.1.32)
-- ✅ Runtime library compilation (v0.1.32)
-
-**Future Enhancements** (not required for Phase 1):
-- CMake support for C/C++ cross-platform builds
-- Rust workspace support for multi-file projects
-- Haskell Cabal/Stack file generation
-- OCaml Dune build system integration
-
----
-
-## Phase 2: Performance Benchmarking Framework
-
-### Goal
-Measure, compare, and optimize backend performance.
-
-### Current State (v0.1.47)
-- ✅ Benchmark framework complete (v0.1.34)
-- ✅ 7 performance benchmarks created (algorithms + data structures)
-- ✅ Automated benchmark runner and report generation
-- ✅ Cross-backend comparisons with metrics (compilation time, execution time, binary size, LOC)
-- ✅ **C++ Backend Complete** - 7/7 benchmarks passing (100%) with advanced type inference (v0.1.36)
-- ✅ **C Backend Complete** - 7/7 benchmarks passing (100%) with parameterized templates (v0.1.37-v0.1.43)
-- ✅ **Rust Backend Complete** - 7/7 benchmarks passing (100%) with ownership-aware generation (v0.1.47)
-- 🎉 **50% of backends production-ready** (21/42 total benchmarks passing)
-- ❌ Performance optimization not yet started
-- 🔄 Go, Haskell, OCaml backend improvements ongoing
-
-### Tasks
-
-#### 2.1 Benchmark Suite Design ✅
-**Status**: COMPLETED (v0.1.34)
-**Priority**: HIGH
-**Effort**: 4-5 days
-
-Created `benchmarks/` directory with:
-
-```
-benchmarks/
-├── algorithms/          # Algorithm implementations
-│   ├── fibonacci.py    # Recursive algorithms
-│   ├── quicksort.py    # Array manipulation
-│   ├── matmul.py       # Numeric computation
-│   └── wordcount.py    # String/dict operations
-├── data_structures/     # Container performance
-│   ├── list_ops.py
-│   ├── dict_ops.py
-│   └── set_ops.py
-└── real_world/         # Practical scenarios
-    ├── json_parser.py
-    ├── web_scraper.py
-    └── data_analyzer.py
-```
-
-**Metrics to Track**:
-- Execution time (wall clock)
-- Memory usage (RSS/heap)
-- Binary size
-- Compilation time
-- Lines of generated code
-
-#### 2.2 Automated Benchmark Runner ✅
-**Status**: COMPLETED (v0.1.34)
-**Priority**: HIGH
-**Effort**: 2-3 days
-
-Created `scripts/benchmark.py`:
-```python
-def benchmark_all_backends(test_file: str):
-    """Run benchmark across all backends and compare."""
-    results = {}
-
-    for backend in ['c', 'cpp', 'rust', 'go', 'haskell', 'ocaml']:
-        # Generate code
-        # Compile
-        # Run with timing
-        # Collect metrics
-        results[backend] = metrics
-
-    # Generate comparison report
-    create_report(results)
-```
-
-**Deliverables**:
-- Automated benchmark runner
-- HTML/Markdown report generation
-- Performance regression detection
-- CI/CD integration
-
-#### 2.2.5 Code Generation Quality Improvements ✅
-**Status**: COMPLETED (v0.1.35)
-**Priority**: HIGH
-**Effort**: 2-3 days
-
-Fixed 7 critical code generation bugs identified through benchmark failures:
-
-**C++ Backend**:
-- Fixed type-check error in dict literal conversion (Optional[expr] handling)
-- Convert docstrings to comments to avoid compiler warnings
-- Map Python's `append()` to C++'s `push_back()` for vectors
-
-**Go Backend**:
-- Fixed append operation semantics (`list = append(list, x)` pattern)
-- Track declared variables to prevent variable shadowing with `:=`
-
-**Haskell Backend**:
-- Implemented `in` and `not in` operators using `Data.Map.member`
-
-**OCaml Backend**:
-- Implemented `in` and `not in` operators using `List.mem_assoc`
-
-**Impact**:
-- Benchmark success rate improved from 9.5% (4/42) to 14.3% (6/42)
-- C++: 3/7 benchmarks passing (fibonacci, wordcount, list_ops)
-- C: 1/7 benchmarks passing (fibonacci) - **Now 7/7 in v0.1.37**
-- Rust: 1/7 benchmarks passing (fibonacci)
-- Go: 1/7 benchmarks passing (fibonacci)
-
-**Deliverables**:
-- ✅ Type safety improvements across all backends
-- ✅ More idiomatic generated code
-- ✅ Reduced compiler warnings
-- ✅ Better language-native patterns
-
-#### 2.2.6 C++ Backend Completion ✅
-**Status**: COMPLETED (v0.1.36)
-**Priority**: HIGH
-**Effort**: 1 day
-
-🎉 **First backend to achieve 100% benchmark success!**
-
-**Advanced Type Inference System Implemented**:
-- **Nested Container Detection**: Multi-pass analysis to infer `vector<vector<int>>` from usage patterns
-  - `_analyze_append_operations()`: Detects `matrix.append(row)` patterns
-  - `_analyze_nested_subscripts()`: Detects `a[i][j]` 2D array access
-  - Pre-pass type computation before code generation
-- **String-Keyed Dictionary Inference**: Automatically detects string keys in dictionaries
-  - Analyzes `dict["key"]` subscript operations
-  - Detects `dict.count("key")` method calls
-  - Generates correct `unordered_map<string, int>` instead of `<int, int>`
-- **Smart Variable Scoping**: Fixed variable shadowing issues
-  - Prevents redeclaration of existing variables in inner scopes
-  - Generates correct reassignments vs new declarations
-
-**Benchmark Results** (All 7 passing):
-- ✅ list_ops: 166,750 operations, 0.246s execution
-- ✅ dict_ops: 6,065 operations, 0.254s execution
-- ✅ set_ops: 234 operations, 0.243s execution
-- ✅ matmul: Matrix multiplication, 0.278s execution
-- ✅ wordcount: String processing, 0.244s execution
-- ✅ quicksort: Array sorting, 0.144s execution
-- ✅ fibonacci: Recursion, 0.242s execution
-
-**Performance Metrics**:
-- Average compilation time: 0.422s
-- Average execution time: 0.236s
-- Average binary size: 36.1 KB
-- Average LOC: 49 lines
-
-**Impact**:
-- C++ backend is **production-ready** for real-world use
-- Handles complex patterns: nested containers, string-keyed dicts, matrix operations
-- Serves as reference implementation for other backends
-- 790/790 unit tests passing with zero regressions
-
-#### 2.2.7 C Backend Completion ✅
-**Status**: COMPLETED (v0.1.37)
-**Priority**: HIGH
-**Effort**: 1 day
-
-🎉 **Second backend to achieve 100% benchmark success!**
-
-**Vanilla C Hash Table Implementation**:
-- **STC Replacement for String Maps**: Replaced STC's macro-based `map_str_int` with clean vanilla C implementation
-  - New runtime files: `mgen_str_int_map.h` (87 lines), `mgen_str_int_map.c` (191 lines)
-  - Separate chaining collision resolution with djb2 hash function
-  - Proper string ownership using `strdup`/`free` (fixes STC `cstr_raw` non-owning pointer issues)
-  - Complete API: `new()`, `insert()`, `get()`, `contains()`, `remove()`, `size()`, `clear()`, `free()`
-- **Converter Integration**: Updated to use vanilla C API throughout
-  - Type declarations: `mgen_str_int_map_t*` pointer type instead of STC struct
-  - Initialization: `mgen_str_int_map_new()` instead of `{0}`
-  - Operations: Direct pointer usage (no `&` prefix like STC)
-  - Get operation: Returns `int*` to dereference instead of `->second` struct access
-- **Fixed Wordcount Bug**: Correct output (4 occurrences) instead of 1
-  - Root cause: STC `cstr_raw` non-owning pointers caused stale references in loop iterations
-  - Solution: Vanilla C hash table with proper string lifetime management
-
-**Benchmark Results** (All 7 passing):
-- ✅ list_ops: 166,750 operations, 0.270s execution
-- ✅ dict_ops: 6,065 operations, 0.453s execution
-- ✅ set_ops: 234 operations, 0.278s execution
-- ✅ matmul: Matrix multiplication, 0.245s execution
-- ✅ wordcount: String processing (FIXED), 0.271s execution
-- ✅ quicksort: Array sorting, 0.241s execution
-- ✅ fibonacci: Recursion, 0.260s execution
-
-**Performance Metrics**:
-- Average compilation time: 0.382s
-- Average execution time: 0.288s
-- Average binary size: 74.8 KB
-- Average LOC: 77.7 lines
-
-**Benefits**:
-- Eliminates STC macro complexity for string-keyed maps (~300 lines of readable C vs macro expansion)
-- Type safety through explicit pointer types (no more `cstr_raw` confusion)
-- Better maintainability and debuggability (standard C debugging tools work)
-- Foundation for gradual STC replacement (next: `vec_int`, `set_int`, `map_int_int`)
-
-**Impact**:
-- C backend is **production-ready** for real-world use
-- Successfully replaced first STC container type with vanilla C
-- 790/790 unit tests passing with zero regressions
-- Demonstrates feasibility of complete STC removal
-
-**Next Steps** (STC Gradual Replacement - Superseded by Parameterized Template System):
-- ~~Replace `vec_int` with vanilla C dynamic array~~
-- ~~Replace `set_int` with vanilla C hash set~~
-- ~~Replace `map_int_int` with vanilla C hash table for int keys~~
-- ✅ **COMPLETED**: Implemented parameterized template generation system instead (v0.1.44-v0.1.45)
-
-#### 2.2.7.5 Rust Backend Completion ✅
-**Status**: COMPLETED (v0.1.47)
-**Priority**: HIGH
-**Effort**: 1 day
-
-🎉 **Third backend to achieve 100% benchmark success!**
-
-**Advanced Dictionary Type Inference**:
-- **Function Call Reassignment Detection**: Detects `result = count_words(text)` pattern and extracts HashMap types
-  - Analyzes function return types to determine dict key/value types
-  - Handles reassignment from function calls in `_infer_dict_types_from_usage()`
-  - Extracts types from `HashMap<K, V>` return signatures using regex parsing
-- **Pre-Analysis Function Context**: Sets `current_function_node` temporarily during type inference
-  - Enables AST-based type inference during return type analysis phase
-  - Fixes issue where variable types weren't available during pre-analysis
-  - Allows complete type information for dict subscript assignments
-- **Multi-Candidate Collection**: Gathers ALL subscript assignment candidates
-  - Prefers specific types (String) over defaults (i32)
-  - Handles cases where variable types evolve during analysis
-  - **Impact**: Fixes wordcount benchmark (`HashMap<String, i32>` instead of `HashMap<i32, i32>`)
-
-**Ownership-Aware Code Generation**:
-- **Dereferenced HashMap Access**: Changed `.get()` to return dereferenced values
-  - Pattern: `*result.get(&key).unwrap_or(&0)` instead of `result.get(&key).unwrap_or(&0)`
-  - Eliminates type mismatch between `&i32` and `i32`
-  - Allows direct assignment without additional dereferencing
-- **Automatic Key Cloning**: Detects when key is used in value expression
-  - Pattern: `dict[key] = dict[key] + 1` → `dict.insert(key.clone(), *dict.get(&key).unwrap_or(&0) + 1)`
-  - Avoids E0382 move/borrow errors when key is moved and then borrowed
-  - **Impact**: Eliminates ownership conflicts in dictionary update patterns
-
-**String Parameter Handling**:
-- **Collections-Only Immutability Analysis**: Refined to Vec, HashMap, HashSet only
-  - Reverted `&String` parameter generation (caused type mismatches)
-  - String parameters now owned by default to avoid lifetime issues
-- **Strategic String Cloning**: Added `.clone()` for read-only String parameters in loops
-  - Detects read-only String parameters passed to functions
-  - Automatically inserts `.clone()` to prevent move errors in iteration
-  - **Impact**: Wordcount works in loops, all string tests pass
-
-**Benchmark Results** (All 7 passing):
-- ✅ fibonacci: Recursion, output: 514229
-- ✅ quicksort: Array sorting, output: 5
-- ✅ matmul: 2D matrix operations (Vec<Vec<i32>>), output: 120
-- ✅ wordcount: String/HashMap processing (HashMap<String, i32>), output: 4
-- ✅ list_ops: Vec<i32> comprehensions, output: 166750
-- ✅ dict_ops: HashMap<i32, i32> operations, output: 6065
-- ✅ set_ops: HashSet<i32> operations, output: 3398
-
-**Technical Improvements** (src/mgen/backends/rust/converter.py):
-- Lines 1889-1909: Enhanced `_infer_dict_types_from_usage()` with function call detection
-- Lines 1901-1905: Temporary function context for pre-analysis type inference
-- Lines 2001-2031: Generic Box<dyn> type handling in return type inference
-- Line 1129: Dereferenced HashMap subscript access
-- Lines 799-804: Automatic key cloning for HashMap insert operations
-- Lines 606-615: Collections-only immutability analysis
-- Lines 1247-1262: Strategic String cloning in function call arguments
-
-**Impact**:
-- Rust backend is **production-ready** for real-world use
-- Ownership-aware generation produces idiomatic, safe Rust code
-- Advanced type inference eliminates generic Box<dyn Any> fallbacks
-- Handles complex patterns: dictionaries, 2D arrays, string processing
-- 818/818 unit tests passing with zero regressions
-
-**Production-Ready Backends**: 3/6 (50%)
-- C++, C, and Rust all at 100% benchmark success
-- 21/42 total benchmarks passing across all backends
-
-#### 2.2.8 Parameterized Template System ✅
-**Status**: COMPLETED (v0.1.44-v0.1.45)
-**Priority**: HIGH
-**Effort**: 3-4 days (completed faster than expected)
-
-🎉 **Achieved full parameterized container code generation!**
-
-**Core Infrastructure (v0.1.44)**:
-- **Type Properties Registry** (type_properties.py, 175 lines)
-  - Metadata system for 7 registered types (int, float, double, bool, char, str, cstr)
-  - Properties: c_type, suffix, is_pointer, needs_drop, needs_copy, printf_fmt, zero_value, compare_op, hash_fn
-- **Type Parameter Extractor** (type_parameter_extractor.py, 179 lines)
-  - Pattern extraction for vec_<T>, map_<K>_<V>, set_<T>, vec_vec_<T>
-  - Returns ContainerTypeInfo with family, type_params, properties
-- **Template Substitution Engine** (template_substitution.py, 240 lines)
-  - Mustache-inspired placeholder substitution ({{T}}, {{K}}, {{V}})
-  - Conditional blocks ({{#T_NEEDS_DROP}}...{{/T_NEEDS_DROP}})
-  - Type-specific code generation
-- **Generic Templates** (6 files, 926 lines)
-  - vec_T.{h,c}.tmpl - Generic vector template
-  - map_K_V.{h,c}.tmpl - Generic map template
-  - set_T.{h,c}.tmpl - Generic set template
-
-**Integration (v0.1.45)**:
-- **ContainerCodeGenerator Enhancement**:
-  - New method: `generate_from_template(container_type)` - Universal container generation
-  - Hybrid approach: Try template-based generation first, fall back to hardcoded methods
-  - Supported types via templates: 9/10 container types
-    - Vectors: vec_int, vec_float, vec_double, vec_str, vec_cstr
-    - Maps: map_str_int, map_int_int, map_str_str
-    - Sets: set_int, set_str
-  - Not yet supported: vec_vec_int (nested vectors require special handling)
-
-**Impact**:
-- **Code Reduction**: 6 generic templates replace 10+ hardcoded container implementations (~500 lines eliminated)
-- **Unlimited Type Combinations**: Can generate any combination of supported base types
-- **Full STC Independence**: Complete control over container implementations
-- **Maintainability**: Single source of truth for container code generation
-- **Test Coverage**: 50 new tests (35 for infrastructure, 15 for integration)
-- **Total Tests**: 867/867 passing with zero regressions
-
-**Benefits**:
-- Eliminates need for hardcoded container methods for each type combination
-- Automatic ownership handling (strdup/free for strings, direct assignment for primitives)
-- Consistent API across all container types
-- Foundation for future type system enhancements
-
-#### 2.3 Optimization Opportunities
-**Priority**: MEDIUM
-**Effort**: Ongoing
-
-Based on benchmark results:
-- Identify slow backends for specific operations
-- Profile bottlenecks in generated code
-- Implement backend-specific optimizations
-- Document performance characteristics
-
-**Deliverables**:
-- Performance documentation per backend
-- Optimization guidelines
-- Backend selection guide (when to use which)
-
----
-
-## Phase 3: Real-World Example Projects ✅ COMPLETED (v0.1.46)
-
-### Goal
-Demonstrate practical value with complete, working examples.
-
-### Current State
-- ✅ Translation tests (basic feature verification)
-- ✅ **5 complete application examples** (CLI tools, data processing, algorithms, games)
-- ✅ **Comprehensive documentation** (examples/README.md)
-- ⏭️ Use case documentation (pending)
-
-### Tasks
-
-#### 3.1 Example Project Library ✅
-**Status**: COMPLETED (v0.1.46)
-**Priority**: HIGH
-**Effort**: 2 days (completed)
-
-Created `examples/` with 5 real applications across 4 categories:
-
-**Example 1: CLI Tool** (`examples/cli_tools/wordcount.py`)
-- Word frequency counter demonstrating:
-  - String processing (split, lower, strip)
-  - Dictionary operations for frequency counting
-  - Practical text analysis
-- ✅ Verified working on all 6 backends
-
-**Example 2: Data Processing** (`examples/data_processing/csv_stats.py`)
-- CSV statistics calculator demonstrating:
-  - Data parsing and numerical computations
-  - List operations and aggregations
-  - Statistical analysis (min, max, sum, count)
-- ✅ Verified working on all 6 backends
-
-**Example 3: Data Pipeline** (`examples/data_processing/data_pipeline.py`)
-- Multi-stage ETL pipeline demonstrating:
-  - Extract, Transform, Load pattern
-  - Function composition
-  - Multi-stage data processing
-- ✅ Verified working on all 6 backends
-
-**Example 4: Algorithm** (`examples/algorithms/merge_sort.py`)
-- Merge sort implementation demonstrating:
-  - Recursive algorithms
-  - List manipulation
-  - Divide-and-conquer strategy
-- ✅ Verified working on all 6 backends
-
-**Example 5: Game Logic** (`examples/games/number_guess.py`)
-- Number guessing game demonstrating:
-  - Game logic and state management
-  - Conditional flow
-  - User interaction simulation
-- ✅ Verified working on all 6 backends
-
-**Directory Structure**:
-```
-examples/
-├── README.md              # Comprehensive guide
-├── cli_tools/
-│   └── wordcount.py      # Word frequency counter
-├── data_processing/
-│   ├── csv_stats.py      # CSV statistics
-│   └── data_pipeline.py  # ETL pipeline
-├── algorithms/
-│   └── merge_sort.py     # Sorting algorithm
-└── games/
-    └── number_guess.py   # Interactive game
-```
-
-#### 3.2 Example Documentation ✅
-**Status**: COMPLETED (v0.1.46)
-**Priority**: HIGH
-**Effort**: 1 day (completed)
-
-Created comprehensive `examples/README.md`:
-- README explaining each example and its use case
-- Cross-backend compatibility verification
-- Build and run instructions for all backends
-- Performance comparison guidance
-- Example feature matrix
-
-**Deliverables**:
-- ✅ 5 complete example projects
-- ✅ Documentation with usage instructions
-- ✅ Backend compatibility verified
-- ⏭️ "Getting Started" tutorial (planned for Phase 5)
-
-#### 3.3 Use Case Documentation
-**Status**: PENDING
-**Priority**: MEDIUM
-**Effort**: 2-3 days
-
-Document when/why to use MGen:
-- **Python → C**: Embedding Python logic in C applications
-- **Python → Rust**: Safe, fast systems programming
-- **Python → Go**: Cloud services, microservices
-- **Python → Haskell**: Functional, type-safe transformations
-- **Algorithm prototyping**: Python dev → production in compiled language
-
-**Deliverables** (Planned for Phase 5):
-- Use case guide (docs/USE_CASES.md)
-- Decision tree for backend selection
-- Integration patterns documentation
+**Estimated Effort**: 3-5 days
 
 ---
 
 ## Phase 4: Developer Experience Enhancement
 
-### Goal
-Make MGen easy and pleasant to use.
-
-### Current State
-- ✅ Good error messages in frontend (type inference)
-- ⚠️  Backend errors can be cryptic
-- ❌ No debugging support
-- ❌ Limited IDE integration
-
-### Tasks
-
-#### 4.1 Error Message Improvements
-**Priority**: HIGH
+### 4.1 Error Message Improvements (MEDIUM)
 **Effort**: 3-4 days
 
-**Current Issues**:
-```python
-# Bad: "Type error in line 5"
-# Good: "Cannot infer type for variable 'x' at line 5:12
-#       Add type annotation: x: int = ..."
-```
-
-**Improvements Needed**:
+**Goals**:
 - Source line/column in all errors
-- Helpful suggestions for fixes
-- Link to documentation for error codes
+- Helpful fix suggestions
 - Colored output for better readability
+- Link to documentation for error codes
 
 **Deliverables**:
 - Enhanced error formatting
 - Error code documentation
 - Quick fix suggestions
 
-#### 4.2 Debugging Support
-**Priority**: MEDIUM
+### 4.2 Debugging Support (MEDIUM)
 **Effort**: 4-5 days
 
-**Features**:
-- Generate source maps (Python line → Generated line mapping)
+**Goals**:
+- Source maps (Python line → Generated line mapping)
 - Debug symbol generation (-g flag support)
 - Integration with gdb/lldb for C/C++/Rust
 - Stack trace mapping back to Python source
@@ -634,27 +77,10 @@ Make MGen easy and pleasant to use.
 - Debug mode flag
 - Debugging guide documentation
 
-#### 4.3 IDE Integration
-**Priority**: LOW
-**Effort**: 5-7 days
-
-**Features**:
-- VSCode extension for MGen
-- Syntax highlighting for errors
-- Inline type annotations
-- "Generate code" command
-- Preview generated code
-
-**Deliverables**:
-- VSCode extension (marketplace)
-- PyCharm plugin (optional)
-- Editor integration guide
-
-#### 4.4 CLI Improvements
-**Priority**: MEDIUM
+### 4.3 CLI Improvements (LOW)
 **Effort**: 2-3 days
 
-**Enhancements**:
+**Goals**:
 - Progress bars for compilation
 - Verbose mode with detailed logging
 - Dry-run mode (show what would be generated)
@@ -666,26 +92,29 @@ Make MGen easy and pleasant to use.
 - Interactive mode for configuration
 - Shell completion (bash/zsh)
 
+### 4.4 IDE Integration (LOW)
+**Effort**: 5-7 days
+
+**Goals**:
+- VSCode extension for MGen
+- Syntax highlighting for errors
+- Inline type annotations
+- "Generate code" command
+- Preview generated code
+
+**Deliverables**:
+- VSCode extension (marketplace)
+- PyCharm plugin (optional)
+- Editor integration guide
+
 ---
 
 ## Phase 5: Documentation & Community
 
-### Goal
-Comprehensive documentation for users and contributors.
-
-### Current State
-- ✅ CLAUDE.md (developer guide) - excellent
-- ✅ CHANGELOG.md - well maintained
-- ❌ User documentation lacking
-- ❌ No API reference docs
-
-### Tasks
-
-#### 5.1 User Documentation
-**Priority**: HIGH
+### 5.1 User Documentation (HIGH)
 **Effort**: 5-7 days
 
-Create `docs/` structure:
+**Structure**:
 ```
 docs/
 ├── getting-started/
@@ -716,12 +145,11 @@ docs/
 - Tutorial for beginners
 - Advanced topics for power users
 
-#### 5.2 API Reference
-**Priority**: MEDIUM
+### 5.2 API Reference (MEDIUM)
 **Effort**: 3-4 days
 
-**Auto-generate from docstrings**:
-- Use Sphinx or MkDocs
+**Goals**:
+- Auto-generate from docstrings (Sphinx or MkDocs)
 - Document all public APIs
 - Include code examples
 - Cross-reference related functions
@@ -731,8 +159,26 @@ docs/
 - Auto-generated reference docs
 - Regular updates with releases
 
-#### 5.3 Contributing Guide
-**Priority**: MEDIUM
+### 5.3 Use Case Documentation (MEDIUM)
+**Effort**: 2-3 days
+
+**Goals**:
+- Document when/why to use MGen
+- Backend selection guide
+- Integration patterns
+
+**Use Cases**:
+- **Python → C**: Embedding Python logic in C applications
+- **Python → Rust**: Safe, fast systems programming
+- **Python → Go**: Cloud services, microservices
+- **Python → Haskell**: Functional, type-safe transformations
+
+**Deliverables**:
+- Use case guide (docs/USE_CASES.md)
+- Decision tree for backend selection
+- Integration patterns documentation
+
+### 5.4 Contributing Guide (MEDIUM)
 **Effort**: 2-3 days
 
 **Contents**:
@@ -749,128 +195,109 @@ docs/
 
 ---
 
+## Phase 6: Performance Optimization (Future)
+
+### 6.1 Benchmark Expansion
+**Goals**:
+- Expand from 7 to 20+ benchmarks
+- Cover more real-world scenarios
+- Add memory-intensive workloads
+- Add I/O-heavy benchmarks
+
+### 6.2 Backend-Specific Optimizations
+**Goals**:
+- Profile and optimize generated code
+- Reduce binary sizes where possible
+- Improve compilation times
+- Optimize runtime library performance
+
+### 6.3 Performance Documentation
+**Goals**:
+- Document performance characteristics per backend
+- Create optimization guidelines
+- Backend selection guide (when to use which)
+
+---
+
 ## Success Metrics
 
-### Compilation Verification ✅ COMPLETED (v0.1.32)
-- [x] 100% of test suite compiles across all backends (867/867 tests, 24/24 compilation tests)
-- [x] Automated compilation tests in CI (tests/test_compilation.py)
-- [x] <5% compilation error rate on real code (0% on test suite)
+### Backend Completion
+- [ ] Haskell: 7/7 benchmarks passing
+- [ ] OCaml: 7/7 benchmarks passing
+- [ ] All 6 backends: 100% benchmark success (42/42)
 
-### Performance ✅ MOSTLY COMPLETED
-- [x] Benchmark framework infrastructure (v0.1.34)
-- [x] Benchmark suite with 7 scenarios (v0.1.34)
-- [x] Automated benchmark runner (v0.1.34)
-- [x] Code generation quality improvements (v0.1.35)
-- [x] C++ Backend: 100% benchmark success (7/7 passing) (v0.1.36)
-- [x] C Backend: 100% benchmark success (7/7 passing) (v0.1.37)
-- [x] Parameterized template system (v0.1.44-v0.1.45)
-- [ ] Expand benchmark suite to 20+ scenarios (optional)
-- [ ] Performance documentation for each backend
-- [ ] Performance optimization for other backends (Rust, Go, Haskell, OCaml)
-
-### Examples & Documentation
-- [x] 5 complete example projects (v0.1.46)
-- [x] Example documentation (examples/README.md) (v0.1.46)
-- [ ] 5+ additional example projects (optional)
-- [ ] Comprehensive user documentation
+### Documentation
+- [ ] Complete user documentation
 - [ ] API reference auto-generated
+- [ ] Use case guide published
+- [ ] Contributing guide complete
 
 ### Developer Experience
 - [ ] Error messages with source locations
 - [ ] Debugging support for compiled code
 - [ ] IDE integration (at least VSCode)
+- [ ] Enhanced CLI with progress indicators
 
 ### Community
-- [ ] GitHub stars: >100 (currently ~10)
-- [ ] Contributors: >5 (currently 1)
+- [ ] GitHub stars: >100
+- [ ] Contributors: >5
 - [ ] Production users: >3 organizations
 
 ---
 
 ## Timeline
 
-### Month 1: Compilation & Verification
-- Week 1-2: Compilation test suite
-- Week 3: Runtime library verification
-- Week 4: Build system integration
+### Short Term (1-2 weeks)
+- Complete Haskell backend (7/7)
+- Complete OCaml backend (7/7)
+- **Milestone**: 100% benchmark success across all backends
 
-### Month 2: Performance & Examples
-- Week 1-2: Benchmark framework
-- Week 3-4: Example projects (5-10)
+### Medium Term (1-2 months)
+- Error message improvements
+- User documentation
+- Use case guide
+- Getting started tutorial
 
-### Month 3: Polish & Documentation
-- Week 1-2: Error messages & debugging
-- Week 3-4: User documentation
-
-### Month 4: Community & Launch
-- Week 1-2: IDE integration
-- Week 3: Final polish
-- Week 4: v1.0 release preparation
+### Long Term (3-6 months)
+- Debugging support
+- IDE integration (VSCode)
+- API reference documentation
+- Community building
 
 ---
 
-## Next Steps
+## Quick Wins
 
-**Phase 1 Completed!** ✅ (v0.1.32)
-All 6 backends now compile and execute correctly with 100% test pass rate.
+1. **Fix Haskell quicksort** - Single benchmark away from 100%
+2. **Add Getting Started tutorial** - Using existing examples
+3. **Create backend selection guide** - Help users choose the right backend
+4. **Document performance characteristics** - Compilation time, execution speed, binary size
 
-**Phase 2 Benchmark Framework Completed!** ✅ (v0.1.34)
-Infrastructure complete with 7 benchmarks, automated runner, and report generation.
+---
 
-**Phase 2 Code Quality Improvements Completed!** ✅ (v0.1.35-v0.1.37)
-- Fixed 7 critical bugs (v0.1.35)
-- C++ Backend: 100% benchmark success (v0.1.36)
-- C Backend: 100% benchmark success (v0.1.37)
+## Long-Term Vision
 
-**Phase 2 Parameterized Template System Completed!** ✅ (v0.1.44-v0.1.45)
-- Core infrastructure with 3-component system (v0.1.44)
-- Full integration with ContainerCodeGenerator (v0.1.45)
-- 6 generic templates replace 10+ hardcoded implementations
+### v1.0 Release Criteria
+- [ ] All 6 backends at 100% benchmark success
+- [ ] Comprehensive user documentation
+- [ ] Error messages with source locations
+- [ ] At least 3 production users
+- [ ] 100+ GitHub stars
 
-**Phase 3 Real-World Examples Completed!** ✅ (v0.1.46)
-- 5 complete example applications across 4 categories
-- Cross-backend compatibility verified
-- Comprehensive documentation
+### Post-v1.0 Enhancements
+- Exception handling (try/except)
+- Context managers (with statement)
+- Generator/yield support
+- Python extensions generation (C/C++/Rust)
+- IDE integration (LSP)
+- Additional target languages (if requested)
 
-**Current Status (v0.1.46)**:
-- ✅ 867/867 tests passing (100%)
-- ✅ 2/6 backends production-ready (C++, C)
-- ✅ Parameterized template system complete
-- ✅ Real-world examples demonstrating practical value
-- 🔄 4 backends with type inference improvements ongoing
+---
 
-**Immediate Actions (Phase 4: Developer Experience)**:
-1. **Error Message Improvements** (HIGH priority)
-   - Add source line/column to all errors
-   - Provide helpful fix suggestions
-   - Colored output for better readability
-   - Error code documentation
+## Notes
 
-2. **Type Inference Enhancements** (MEDIUM priority)
-   - Apply C++/C patterns to Rust backend
-   - Apply C++/C patterns to Go backend
-   - Functional paradigm improvements for Haskell/OCaml
+**Strategic Focus**: Complete all 6 existing backends to production quality before adding new features or languages. Quality and reliability over quantity.
 
-**Phase 5 Preparation (Documentation & Community)**:
-1. **User Documentation** (HIGH priority)
-   - Getting started guide
-   - Tutorial content
-   - Backend-specific documentation
-   - Best practices guide
+**Immediate Goal**: Achieve 42/42 benchmarks passing (100% success rate across all backends).
 
-2. **API Reference** (MEDIUM priority)
-   - Auto-generated from docstrings (Sphinx/MkDocs)
-   - Hosted documentation site
-   - Code examples throughout
-
-**Quick Wins**:
-- Improve error messages with source locations (immediate UX improvement)
-- Add "Getting Started" tutorial using existing examples
-- Create backend selection guide
-- Document performance characteristics
-
-**Long-term Investment**:
-- Achieve 100% benchmark success across all backends
-- Full user documentation suite
-- IDE integration (VSCode extension)
-- Community building (GitHub engagement)
+**Community Goal**: Build user base and gather feedback before v1.0 release.

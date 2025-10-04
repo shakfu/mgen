@@ -16,7 +16,7 @@ MGen extends the CGen (Python-to-C) project into a comprehensive multi-language 
 - **Type-Safe Generation**: Leverages Python type annotations for accurate and safe code translation
 - **Runtime Libraries**: Enhanced C backend with 50KB+ runtime libraries providing Python-like semantics
 - **CLI Interface**: Simple command-line tool with preference customization for conversion and building
-- **Production-Ready**: 255 passing tests ensuring translation accuracy and code quality
+- **Production-Ready**: 821 passing tests ensuring translation accuracy and code quality
 
 ## Supported Languages
 
@@ -576,9 +576,9 @@ mgen clean
 ### Running Tests
 
 ```bash
-make test           # Run all 255 tests
+make test           # Run all 821 tests
 make lint           # Run code linting with ruff
-make type-check     # Run type checking with pyright
+make type-check     # Run type checking with mypy
 ```
 
 ### Test Organization
@@ -666,14 +666,10 @@ All backends support core Python features with varying levels of sophistication:
 
 MGen maintains comprehensive test coverage ensuring translation accuracy:
 
-- **255 total tests** across all components and backends
-- **C Backend**: 191 tests covering OOP, comprehensions, string methods, runtime libraries
-- **C++ Backend**: 104 tests with STL integration and modern C++ features
-- **Rust Backend**: 176 tests with ownership patterns and memory safety
-- **Go Backend**: 95 tests with Go idioms and standard library
-- **Haskell Backend**: 93 tests with functional programming and type safety
-- **OCaml Backend**: 25 tests with functional programming and pattern matching
-- All tests passing with zero regressions
+- **821 total tests** across all components and backends
+- Comprehensive backend coverage testing all major Python features
+- Test categories: basics, OOP, comprehensions, string methods, augmented assignment, control flow, integration
+- All tests passing with zero regressions (100%)
 
 ## Development Roadmap
 
@@ -686,9 +682,10 @@ MGen maintains comprehensive test coverage ensuring translation accuracy:
 - Advanced Python language features: comprehensions, string methods, augmented assignment
 - Complete STC library integration (864KB Smart Template Container library)
 - Architecture consolidation with unified C backend module
-- Professional test organization with 255 tests in focused, single-responsibility files
+- Professional test organization with 821 tests in focused, single-responsibility files
 - Universal preference system with language-specific customization
 - Production-ready code generation with clean, efficient output
+- 4 production-ready backends (C++, C, Rust, Go) with 100% benchmark success
 
 ### Future Development
 

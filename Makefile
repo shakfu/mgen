@@ -5,7 +5,7 @@ BENCHMARK_RESULTS_DIR := build/benchmark_results
 .PHONY: help install test test-unit test-integration test-translation \
 		test-py2c test-benchmark test-build clean lint format type-check \
 		build docs benchmark benchmark-algorithms benchmark-data-structures \
-		benchmark-report benchmark-clean
+		benchmark-report benchmark-clean check
 
 # Default target
 help:
@@ -81,6 +81,10 @@ test-benchmark:
 
 test-coverage:
 	uv run pytest --cov=src/mgen --cov-report=html --cov-report=term-missing tests/
+
+# quickcheck
+
+check: test type-check benchmark
 
 # Code quality
 lint:
