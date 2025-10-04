@@ -168,7 +168,7 @@ class ContainerCodeGenerator:
         impl_code = self._remove_error_handling_macros(impl_code)
 
         # Strip header guards and includes from header
-        header_lines = []
+        clean_lines = []
         in_header_guard = False
         for line in header_code.split("\n"):
             stripped = line.strip()
@@ -191,9 +191,9 @@ class ContainerCodeGenerator:
                 or stripped == "}"):
                 continue
 
-            header_lines.append(line)
+            clean_lines.append(line)
 
-        header_code = "\n".join(header_lines)
+        clean_code = "\n".join(clean_lines)
 
         # Combine into generated implementation
         sections = [
@@ -201,8 +201,7 @@ class ContainerCodeGenerator:
             f"// {info.family} container generated from parameterized template",
             "// Generated inline for this program (no external dependencies)",
             "",
-            "// Type definitions and API",
-            header_code.strip(),
+            clean_code.strip(),
             "",
             "// Implementation",
             impl_code.strip(),
@@ -222,20 +221,19 @@ class ContainerCodeGenerator:
         Returns:
             Complete C code for string→int map implementation
         """
-        # Load templates
+        # Load single-header template (contains both interface and implementation)
         header = self._load_template("mgen_str_int_map.h")
-        implementation = self._load_template("mgen_str_int_map.c")
 
-        # Strip includes from implementation (we'll handle them separately)
-        impl_code = self._strip_includes_and_headers(implementation)
+        # Strip includes (we'll handle them separately)
+        code = self._strip_includes_and_headers(header)
 
         # Remove error handling macros for self-contained code
-        impl_code = self._remove_error_handling_macros(impl_code)
+        code = self._remove_error_handling_macros(code)
 
-        # Strip header guards and includes from header
-        header_lines = []
+        # Strip header guards and extern C wrappers
+        clean_lines = []
         in_header_guard = False
-        for line in header.split("\n"):
+        for line in code.split("\n"):
             stripped = line.strip()
 
             # Skip header guards
@@ -248,29 +246,24 @@ class ContainerCodeGenerator:
                 in_header_guard = False
                 continue
 
-            # Skip includes, extern C
-            if (stripped.startswith("#include")
-                or stripped.startswith("#ifdef __cplusplus")
+            # Skip extern C wrappers
+            if (stripped.startswith("#ifdef __cplusplus")
                 or stripped.startswith("extern \"C\"")
-                or stripped.startswith("#endif")
-                or stripped == "}"):
+                or (stripped.startswith("#endif") and not in_header_guard)
+                or (stripped == "}" and not in_header_guard)):
                 continue
 
-            header_lines.append(line)
+            clean_lines.append(line)
 
-        header_code = "\n".join(header_lines)
+        clean_code = "\n".join(clean_lines)
 
-        # Combine into generated implementation
+        # Return generated container with header comment
         sections = [
             "// ========== Generated Container: str_int_map ==========",
             "// String → int hash table implementation",
             "// Generated inline for this program (no external dependencies)",
             "",
-            "// Type definitions and API",
-            header_code.strip(),
-            "",
-            "// Implementation",
-            impl_code.strip(),
+            clean_code.strip(),
             "",
             "// ========== End of Generated Container ==========",
             "",
@@ -284,20 +277,19 @@ class ContainerCodeGenerator:
         Returns:
             Complete C code for integer vector implementation
         """
-        # Load templates
+        # Load single-header template (contains both interface and implementation)
         header = self._load_template("mgen_vec_int.h")
-        implementation = self._load_template("mgen_vec_int.c")
 
-        # Strip includes from implementation
-        impl_code = self._strip_includes_and_headers(implementation)
+        # Strip includes (we'll handle them separately)
+        code = self._strip_includes_and_headers(header)
 
         # Remove error handling macros for self-contained code
-        impl_code = self._remove_error_handling_macros(impl_code)
+        code = self._remove_error_handling_macros(code)
 
         # Strip header guards and includes from header
-        header_lines = []
+        clean_lines = []
         in_header_guard = False
-        for line in header.split("\n"):
+        for line in code.split("\n"):
             stripped = line.strip()
 
             # Skip header guards
@@ -318,9 +310,9 @@ class ContainerCodeGenerator:
                 or stripped == "}"):
                 continue
 
-            header_lines.append(line)
+            clean_lines.append(line)
 
-        header_code = "\n".join(header_lines)
+        clean_code = "\n".join(clean_lines)
 
         # Combine into generated implementation
         sections = [
@@ -328,11 +320,7 @@ class ContainerCodeGenerator:
             "// Integer vector (dynamic array) implementation",
             "// Generated inline for this program (no external dependencies)",
             "",
-            "// Type definitions and API",
-            header_code.strip(),
-            "",
-            "// Implementation",
-            impl_code.strip(),
+            clean_code.strip(),
             "",
             "// ========== End of Generated Container ==========",
             "",
@@ -346,20 +334,19 @@ class ContainerCodeGenerator:
         Returns:
             Complete C code for integer hash set implementation
         """
-        # Load templates
+        # Load single-header template (contains both interface and implementation)
         header = self._load_template("mgen_set_int.h")
-        implementation = self._load_template("mgen_set_int.c")
 
-        # Strip includes from implementation
-        impl_code = self._strip_includes_and_headers(implementation)
+        # Strip includes (we'll handle them separately)
+        code = self._strip_includes_and_headers(header)
 
         # Remove error handling macros for self-contained code
-        impl_code = self._remove_error_handling_macros(impl_code)
+        code = self._remove_error_handling_macros(code)
 
         # Strip header guards and includes from header
-        header_lines = []
+        clean_lines = []
         in_header_guard = False
-        for line in header.split("\n"):
+        for line in code.split("\n"):
             stripped = line.strip()
 
             # Skip header guards
@@ -380,9 +367,9 @@ class ContainerCodeGenerator:
                 or stripped == "}"):
                 continue
 
-            header_lines.append(line)
+            clean_lines.append(line)
 
-        header_code = "\n".join(header_lines)
+        clean_code = "\n".join(clean_lines)
 
         # Combine into generated implementation
         sections = [
@@ -390,11 +377,7 @@ class ContainerCodeGenerator:
             "// Integer hash set implementation",
             "// Generated inline for this program (no external dependencies)",
             "",
-            "// Type definitions and API",
-            header_code.strip(),
-            "",
-            "// Implementation",
-            impl_code.strip(),
+            clean_code.strip(),
             "",
             "// ========== End of Generated Container ==========",
             "",
@@ -408,20 +391,19 @@ class ContainerCodeGenerator:
         Returns:
             Complete C code for int→int map implementation
         """
-        # Load templates
+        # Load single-header template (contains both interface and implementation)
         header = self._load_template("mgen_map_int_int.h")
-        implementation = self._load_template("mgen_map_int_int.c")
 
-        # Strip includes from implementation
-        impl_code = self._strip_includes_and_headers(implementation)
+        # Strip includes (we'll handle them separately)
+        code = self._strip_includes_and_headers(header)
 
         # Remove error handling macros for self-contained code
-        impl_code = self._remove_error_handling_macros(impl_code)
+        code = self._remove_error_handling_macros(code)
 
         # Strip header guards and includes from header
-        header_lines = []
+        clean_lines = []
         in_header_guard = False
-        for line in header.split("\n"):
+        for line in code.split("\n"):
             stripped = line.strip()
 
             # Skip header guards
@@ -442,9 +424,9 @@ class ContainerCodeGenerator:
                 or stripped == "}"):
                 continue
 
-            header_lines.append(line)
+            clean_lines.append(line)
 
-        header_code = "\n".join(header_lines)
+        clean_code = "\n".join(clean_lines)
 
         # Combine into generated implementation
         sections = [
@@ -452,11 +434,7 @@ class ContainerCodeGenerator:
             "// Integer → Integer hash map implementation",
             "// Generated inline for this program (no external dependencies)",
             "",
-            "// Type definitions and API",
-            header_code.strip(),
-            "",
-            "// Implementation",
-            impl_code.strip(),
+            clean_code.strip(),
             "",
             "// ========== End of Generated Container ==========",
             "",
@@ -470,20 +448,19 @@ class ContainerCodeGenerator:
         Returns:
             Complete C code for vec_vec_int implementation
         """
-        # Load templates
+        # Load single-header template (contains both interface and implementation)
         header = self._load_template("mgen_vec_vec_int.h")
-        implementation = self._load_template("mgen_vec_vec_int.c")
 
-        # Strip includes from implementation
-        impl_code = self._strip_includes_and_headers(implementation)
+        # Strip includes (we'll handle them separately)
+        code = self._strip_includes_and_headers(header)
 
         # Remove error handling macros for self-contained code
-        impl_code = self._remove_error_handling_macros(impl_code)
+        code = self._remove_error_handling_macros(code)
 
         # Strip header guards and includes from header
-        header_lines = []
+        clean_lines = []
         in_header_guard = False
-        for line in header.split("\n"):
+        for line in code.split("\n"):
             stripped = line.strip()
 
             # Skip header guards
@@ -504,9 +481,9 @@ class ContainerCodeGenerator:
                 or stripped == "}"):
                 continue
 
-            header_lines.append(line)
+            clean_lines.append(line)
 
-        header_code = "\n".join(header_lines)
+        clean_code = "\n".join(clean_lines)
 
         # Combine into generated implementation
         sections = [
@@ -514,11 +491,7 @@ class ContainerCodeGenerator:
             "// 2D integer array (vector of vectors) implementation",
             "// Generated inline for this program (no external dependencies)",
             "",
-            "// Type definitions and API",
-            header_code.strip(),
-            "",
-            "// Implementation",
-            impl_code.strip(),
+            clean_code.strip(),
             "",
             "// ========== End of Generated Container ==========",
             "",
@@ -532,20 +505,19 @@ class ContainerCodeGenerator:
         Returns:
             Complete C code for vec_cstr implementation
         """
-        # Load templates
+        # Load single-header template (contains both interface and implementation)
         header = self._load_template("mgen_vec_cstr.h")
-        implementation = self._load_template("mgen_vec_cstr.c")
 
-        # Strip includes from implementation
-        impl_code = self._strip_includes_and_headers(implementation)
+        # Strip includes (we'll handle them separately)
+        code = self._strip_includes_and_headers(header)
 
         # Remove error handling macros for self-contained code
-        impl_code = self._remove_error_handling_macros(impl_code)
+        code = self._remove_error_handling_macros(code)
 
         # Strip header guards and includes from header
-        header_lines = []
+        clean_lines = []
         in_header_guard = False
-        for line in header.split("\n"):
+        for line in code.split("\n"):
             stripped = line.strip()
 
             # Skip header guards
@@ -566,9 +538,9 @@ class ContainerCodeGenerator:
                 or stripped == "}"):
                 continue
 
-            header_lines.append(line)
+            clean_lines.append(line)
 
-        header_code = "\n".join(header_lines)
+        clean_code = "\n".join(clean_lines)
 
         # Combine into generated implementation
         sections = [
@@ -576,11 +548,7 @@ class ContainerCodeGenerator:
             "// String array (vector of C strings) implementation",
             "// Generated inline for this program (no external dependencies)",
             "",
-            "// Type definitions and API",
-            header_code.strip(),
-            "",
-            "// Implementation",
-            impl_code.strip(),
+            clean_code.strip(),
             "",
             "// ========== End of Generated Container ==========",
             "",
@@ -594,20 +562,19 @@ class ContainerCodeGenerator:
         Returns:
             Complete C code for vec_float implementation
         """
-        # Load templates
+        # Load single-header template (contains both interface and implementation)
         header = self._load_template("mgen_vec_float.h")
-        implementation = self._load_template("mgen_vec_float.c")
 
-        # Strip includes from implementation
-        impl_code = self._strip_includes_and_headers(implementation)
+        # Strip includes (we'll handle them separately)
+        code = self._strip_includes_and_headers(header)
 
         # Remove error handling macros for self-contained code
-        impl_code = self._remove_error_handling_macros(impl_code)
+        code = self._remove_error_handling_macros(code)
 
         # Strip header guards and includes from header
-        header_lines = []
+        clean_lines = []
         in_header_guard = False
-        for line in header.split("\n"):
+        for line in code.split("\n"):
             stripped = line.strip()
 
             if stripped.startswith("#ifndef") and "_H" in stripped:
@@ -626,20 +593,16 @@ class ContainerCodeGenerator:
                 or stripped == "}"):
                 continue
 
-            header_lines.append(line)
+            clean_lines.append(line)
 
-        header_code = "\n".join(header_lines)
+        clean_code = "\n".join(clean_lines)
 
         sections = [
             "// ========== Generated Container: vec_float ==========",
             "// Float vector (dynamic array) implementation",
             "// Generated inline for this program (no external dependencies)",
             "",
-            "// Type definitions and API",
-            header_code.strip(),
-            "",
-            "// Implementation",
-            impl_code.strip(),
+            clean_code.strip(),
             "",
             "// ========== End of Generated Container ==========",
             "",
@@ -653,20 +616,19 @@ class ContainerCodeGenerator:
         Returns:
             Complete C code for vec_double implementation
         """
-        # Load templates
+        # Load single-header template (contains both interface and implementation)
         header = self._load_template("mgen_vec_double.h")
-        implementation = self._load_template("mgen_vec_double.c")
 
-        # Strip includes from implementation
-        impl_code = self._strip_includes_and_headers(implementation)
+        # Strip includes (we'll handle them separately)
+        code = self._strip_includes_and_headers(header)
 
         # Remove error handling macros for self-contained code
-        impl_code = self._remove_error_handling_macros(impl_code)
+        code = self._remove_error_handling_macros(code)
 
         # Strip header guards and includes from header
-        header_lines = []
+        clean_lines = []
         in_header_guard = False
-        for line in header.split("\n"):
+        for line in code.split("\n"):
             stripped = line.strip()
 
             if stripped.startswith("#ifndef") and "_H" in stripped:
@@ -685,20 +647,16 @@ class ContainerCodeGenerator:
                 or stripped == "}"):
                 continue
 
-            header_lines.append(line)
+            clean_lines.append(line)
 
-        header_code = "\n".join(header_lines)
+        clean_code = "\n".join(clean_lines)
 
         sections = [
             "// ========== Generated Container: vec_double ==========",
             "// Double vector (dynamic array) implementation",
             "// Generated inline for this program (no external dependencies)",
             "",
-            "// Type definitions and API",
-            header_code.strip(),
-            "",
-            "// Implementation",
-            impl_code.strip(),
+            clean_code.strip(),
             "",
             "// ========== End of Generated Container ==========",
             "",
@@ -712,20 +670,19 @@ class ContainerCodeGenerator:
         Returns:
             Generated C code for string→string hash map
         """
-        # Load templates
+        # Load single-header template (contains both interface and implementation)
         header = self._load_template("mgen_map_str_str.h")
-        implementation = self._load_template("mgen_map_str_str.c")
 
-        # Strip includes from implementation
-        impl_code = self._strip_includes_and_headers(implementation)
+        # Strip includes (we'll handle them separately)
+        code = self._strip_includes_and_headers(header)
 
-        # Remove error handling macros (will be defined in main code)
-        impl_code = self._remove_error_handling_macros(impl_code)
+        # Remove error handling macros for self-contained code
+        code = self._remove_error_handling_macros(code)
 
         # Strip header guards and includes from header
-        header_lines = []
+        clean_lines = []
         in_header_guard = False
-        for line in header.split('\n'):
+        for line in code.split('\n'):
             stripped = line.strip()
 
             # Skip header guards
@@ -746,17 +703,13 @@ class ContainerCodeGenerator:
             if stripped == '}':  # Closing brace for extern C
                 continue
 
-            header_lines.append(line)
+            clean_lines.append(line)
 
-        header_code = '\n'.join(header_lines)
+        clean_code = '\n'.join(clean_lines)
 
         sections = [
             "// ========== Generated Container: map_str_str ==========",
-            "// Type definitions and API",
-            header_code.strip(),
-            "",
-            "// Implementation",
-            impl_code.strip(),
+            clean_code.strip(),
             "// ========== End of Generated Container ==========",
             "",
         ]
@@ -769,20 +722,19 @@ class ContainerCodeGenerator:
         Returns:
             Generated C code for string hash set
         """
-        # Load templates
+        # Load single-header template (contains both interface and implementation)
         header = self._load_template("mgen_set_str.h")
-        implementation = self._load_template("mgen_set_str.c")
 
-        # Strip includes from implementation
-        impl_code = self._strip_includes_and_headers(implementation)
+        # Strip includes (we'll handle them separately)
+        code = self._strip_includes_and_headers(header)
 
-        # Remove error handling macros (will be defined in main code)
-        impl_code = self._remove_error_handling_macros(impl_code)
+        # Remove error handling macros for self-contained code
+        code = self._remove_error_handling_macros(code)
 
         # Strip header guards and includes from header
-        header_lines = []
+        clean_lines = []
         in_header_guard = False
-        for line in header.split('\n'):
+        for line in code.split('\n'):
             stripped = line.strip()
 
             # Skip header guards
@@ -803,17 +755,13 @@ class ContainerCodeGenerator:
             if stripped == '}':  # Closing brace for extern C
                 continue
 
-            header_lines.append(line)
+            clean_lines.append(line)
 
-        header_code = '\n'.join(header_lines)
+        clean_code = '\n'.join(clean_lines)
 
         sections = [
             "// ========== Generated Container: set_str ==========",
-            "// Type definitions and API",
-            header_code.strip(),
-            "",
-            "// Implementation",
-            impl_code.strip(),
+            clean_code.strip(),
             "// ========== End of Generated Container ==========",
             "",
         ]

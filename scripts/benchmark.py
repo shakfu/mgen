@@ -212,17 +212,27 @@ class BenchmarkRunner:
         """
         try:
             if backend == "c":
-                # Compile C code - use absolute paths
-                runtime_files = list(output_dir.glob("mgen_*.c"))
-                # Add STC include path
+                # Compile C code - single-header containers but need runtime .c files
+                # Containers are header-only, but other runtime files still have .c implementations
                 project_root = Path(__file__).parent.parent
-                stc_path = project_root / "src" / "mgen" / "backends" / "c"
+                runtime_path = project_root / "src" / "mgen" / "backends" / "c" / "runtime"
+                c_backend_path = project_root / "src" / "mgen" / "backends" / "c"
+
+                # Find non-container runtime .c files (containers are header-only now)
+                runtime_c_files = [
+                    f for f in runtime_path.glob("*.c")
+                    if not f.name.startswith("mgen_vec_") and
+                       not f.name.startswith("mgen_set_") and
+                       not f.name.startswith("mgen_map_")
+                ]
+
                 cmd = [
                     "gcc", "-Wall", "-Wextra", "-std=gnu11", "-O2",
                     f"-I{output_dir.absolute()}",
-                    f"-I{stc_path.absolute()}",
+                    f"-I{runtime_path.absolute()}",
+                    f"-I{c_backend_path.absolute()}",
                     str(source_file.absolute()),
-                    *[str(f.absolute()) for f in runtime_files],
+                    *[str(f.absolute()) for f in runtime_c_files],
                     "-o", str((output_dir / executable_name).absolute())
                 ]
                 result = subprocess.run(cmd, capture_output=True, text=True)
