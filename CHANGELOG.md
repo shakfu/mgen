@@ -17,6 +17,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.43] - 2025-10-04
+
+### Added
+
+- **set_str (String Hash Sets)** - Hash set for string storage with deduplication
+  - New template files: `mgen_set_str.h` (85 lines), `mgen_set_str.c` (269 lines)
+  - Element type: `char*` (strings with ownership management)
+  - STC-compatible API: `set_str_insert`, `set_str_contains`, `set_str_erase`, `set_str_size`, `set_str_drop`
+  - **Implementation**: Open addressing with linear probing, FNV-1a hash function
+  - **String ownership**: Uses `strdup()` on insert, `free()` on erase/drop
+  - Supports `{0}` initialization with lazy bucket allocation
+  - Load factor: 0.75 with automatic rehashing (2x growth)
+  - Extended ContainerCodeGenerator with `generate_set_str()` method
+  - Updated converter.py to include set_str in supported types
+  - Generates ~7,917 characters of inline code
+  - **Use Case**: Unique string collections, tag systems, vocabulary tracking
+  - **Test Results**: All 741 tests passing, zero regressions
+
+### Changed
+
+- **Container Code Generation**: Now supports 10 container types (was 8)
+  - `map_str_int`, `vec_int`, `set_int`, `map_int_int`, `vec_vec_int`, `vec_cstr`, `vec_float`, `vec_double`, `map_str_str`, `set_str`
+  - Coverage: ~30-35% of common STC container types (up from 25-30%)
+  - **Phase 3 Complete**: String containers (map_str_str, set_str) implemented
+
 ## [0.1.42] - 2025-10-04
 
 ### Added
