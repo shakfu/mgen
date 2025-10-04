@@ -17,6 +17,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.42] - 2025-10-04
+
+### Added
+
+- **vec_float and vec_double (Floating-Point Arrays)** - Dynamic arrays for float and double values
+  - New template files: `mgen_vec_float.h` (75 lines), `mgen_vec_float.c` (120 lines)
+  - New template files: `mgen_vec_double.h` (75 lines), `mgen_vec_double.c` (120 lines)
+  - Element types: `float` and `double` (value-based, IEEE 754 floating-point)
+  - STC-compatible API: `vec_float_push`, `vec_float_at`, `vec_float_size`, `vec_float_drop` (same for vec_double)
+  - Supports `{0}` initialization with automatic capacity growth
+  - Default capacity: 8 elements, growth factor: 2x
+  - Extended ContainerCodeGenerator with `generate_vec_float()` and `generate_vec_double()` methods
+  - Updated converter.py to include vec_float and vec_double in supported types
+  - Generates ~195 lines of inline code per type
+  - **Use Case**: Numerical computing, scientific calculations, graphics, data processing
+  - **Test Results**: All 741 tests passing, zero regressions
+  - **Note**: Type inference enhancement needed for automatic `list[float]` → `vec_float` mapping
+
+### Changed
+
+- **Container Code Generation**: Now supports 8 container types (was 6)
+  - `map_str_int`, `vec_int`, `set_int`, `map_int_int`, `vec_vec_int`, `vec_cstr`, `vec_float`, `vec_double`
+  - Coverage: ~25-30% of common STC container types (up from 20-25%)
+  - **Phase 2 Complete**: Common types (vec_float, vec_double) implemented
+
 ## [0.1.41] - 2025-10-04
 
 ### Added

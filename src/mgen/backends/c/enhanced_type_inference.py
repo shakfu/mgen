@@ -500,7 +500,17 @@ class EnhancedTypeInferenceEngine:
             # For now, default to vec_int (will be refined later)
             return "vec_int"
         elif python_type.startswith(("dict[", "Dict[")):
-            return "map_str_int"  # Default
+            # Parse dict[key_type, value_type] to get specific map type
+            import re
+            match = re.match(r"[Dd]ict\[([^,]+),\s*([^\]]+)\]", python_type)
+            if match:
+                key_type = match.group(1).strip()
+                val_type = match.group(2).strip()
+                # Map Python types to C type suffixes
+                key_suffix = "str" if key_type == "str" else "int"
+                val_suffix = "str" if val_type == "str" else "int"
+                return f"map_{key_suffix}_{val_suffix}"
+            return "map_str_int"  # Default fallback
         elif python_type.startswith(("set[", "Set[")):
             return "set_int"  # Default
         elif python_type in ["list"]:
