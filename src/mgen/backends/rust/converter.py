@@ -709,6 +709,8 @@ class MGenPythonToRustConverter:
             value_expr = self._get_default_value(var_type)
 
         if isinstance(stmt.target, ast.Name):
+            # Track the variable as declared to prevent redeclaration
+            self.declared_vars.add(stmt.target.id)
             # Track the variable type for later reference
             self.variable_types[stmt.target.id] = var_type
             # Local variable with type annotation
