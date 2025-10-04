@@ -47,8 +47,9 @@ class MGenPythonToHaskellConverter:
         if function_name == "main":
             return "main"
 
-        # Check for Haskell reserved keywords
+        # Check for Haskell reserved keywords and built-in functions to avoid shadowing
         haskell_keywords = {
+            # Reserved keywords
             "case",
             "class",
             "data",
@@ -74,6 +75,11 @@ class MGenPythonToHaskellConverter:
             "as",
             "qualified",
             "hiding",
+            # Built-in functions to avoid shadowing
+            "words",  # String splitting function used by text.split()
+            "lines",  # String splitting by newlines
+            "unwords",  # Join words with spaces
+            "unlines",  # Join lines with newlines
         }
 
         components = function_name.split("_")
@@ -889,6 +895,10 @@ main = printValue "Generated Haskell code executed successfully"'''
             elif method_name == "split":
                 if args:
                     return f"(MGenRuntime.split {obj} {args[0]})"
+                else:
+                    # Python's split() with no args splits on whitespace
+                    # Haskell's words function does the same
+                    return f"(words {obj})"
             else:
                 # Regular method call - convert to function call
                 haskell_method_name = self._to_haskell_function_name(method_name)
@@ -1158,6 +1168,56 @@ main = printValue "Generated Haskell code executed successfully"'''
                     else:
                         # In IO context, still use foldM but with accumulator
                         return f"{var_name_target} <- foldM (\\acc {var_name} -> return (acc {op} ({value_expr}))) {var_name_target} ({iterable})"
+
+            # Detect word count pattern: for item in list: transform, then update dict
+            if (len(node.body) == 2 and
+                isinstance(node.body[0], (ast.Assign, ast.AnnAssign)) and
+                isinstance(node.body[1], ast.If)):
+
+                # Extract transformation variable and expression
+                transform_stmt = node.body[0]
+                if isinstance(transform_stmt, ast.Assign):
+                    if len(transform_stmt.targets) == 1 and isinstance(transform_stmt.targets[0], ast.Name):
+                        key_var = self._to_haskell_var_name(transform_stmt.targets[0].id)
+                        key_expr = self._convert_expression(transform_stmt.value)
+                    else:
+                        key_var = None
+                elif isinstance(transform_stmt, ast.AnnAssign):
+                    if isinstance(transform_stmt.target, ast.Name):
+                        key_var = self._to_haskell_var_name(transform_stmt.target.id)
+                        if transform_stmt.value:
+                            key_expr = self._convert_expression(transform_stmt.value)
+                        else:
+                            key_expr = "undefined"
+                    else:
+                        key_var = None
+                else:
+                    key_var = None
+
+                # Check if the if-statement updates a dictionary
+                if_stmt = node.body[1]
+                dict_var = None
+
+                # Pattern: if key in dict: dict[key] = dict[key] + 1 else: dict[key] = 1
+                if (isinstance(if_stmt.test, ast.Compare) and
+                    len(if_stmt.test.ops) == 1 and isinstance(if_stmt.test.ops[0], ast.In) and
+                    len(if_stmt.body) == 1 and isinstance(if_stmt.body[0], ast.Assign) and
+                    len(if_stmt.orelse) == 1 and isinstance(if_stmt.orelse[0], ast.Assign)):
+
+                    then_stmt = if_stmt.body[0]
+                    else_stmt = if_stmt.orelse[0]
+
+                    # Extract dictionary variable from the assignments
+                    if (isinstance(then_stmt.targets[0], ast.Subscript) and
+                        isinstance(then_stmt.targets[0].value, ast.Name)):
+                        dict_var = self._to_haskell_var_name(then_stmt.targets[0].value.id)
+
+                    # Generate fold for word count pattern
+                    if dict_var and key_var and self.current_function != "main":
+                        # Pure context - use foldl with Map operations
+                        # Use Map.empty as initial accumulator (assuming dict was initialized to empty)
+                        return (f"{dict_var} = foldl (\\acc {var_name} -> let {key_var} = {key_expr} in "
+                                f"Map.insertWith (+) {key_var} 1 acc) Map.empty ({iterable})")
 
             body_stmts = []
             for body_stmt in node.body:
