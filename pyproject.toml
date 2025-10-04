@@ -1,6 +1,6 @@
 [project]
 name = "mgen"
-version = "0.1.45"
+version = "0.1.46"
 authors = [
     {name = "MGen Contributors", email = "noreply@example.com"},
 ]
