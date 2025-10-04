@@ -17,6 +17,97 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.48] - 2025-10-04
+
+**📦 Single-Header Container Libraries**
+
+This release refactors all C backend container libraries from dual-file (.h + .c) format to industry-standard single-header libraries, following the stb-library pattern. This simplifies the template system, improves maintainability, and makes MGen's generated code more portable and debuggable.
+
+### Changed
+
+- **Container Library Architecture** - Converted all 10 C backend containers to single-header format
+  - **Files Converted**: mgen_vec_int, mgen_vec_float, mgen_vec_double, mgen_vec_cstr, mgen_vec_vec_int, mgen_set_int, mgen_set_str, mgen_map_int_int, mgen_map_str_int, mgen_map_str_str
+  - **Pattern**: All functions marked `static` or `static inline` for internal linkage
+  - **Style**: Adopted stb-library conventions with clear separation of declarations and implementations
+  - **Benefits**:
+    - Simpler template-based code generation (single file to load)
+    - No multi-translation-unit concerns
+    - Industry-standard pattern familiar to C developers
+    - Better debugging experience (all code in one place)
+    - Improved portability (no linking issues)
+
+- **ContainerCodeGenerator** - Updated for single-header architecture
+  - All `generate_*()` methods now load single `.h` file instead of `.h` + `.c` pair
+  - Simplified template loading logic (removed dual-file handling)
+  - Template-based generation includes complete implementation section
+  - Eliminated ~50% of container loading code
+
+- **Benchmark Pipeline** - Updated compilation for header-only containers
+  - Added runtime and STC include paths
+  - Filtered container files from compilation (now header-only)
+  - Only compile non-container runtime .c files
+  - Maintains backward compatibility for existing runtime files
+
+### Fixed
+
+- **Function Ordering** - mgen_str_int_map.h function declaration order
+  - Moved `mgen_str_int_map_new_with_capacity()` before `mgen_str_int_map_new()` to fix forward declaration issue
+  - Prevents compilation errors in single-header format
+
+### Verified
+
+- [x] All 818 unit tests passing (100%)
+- [x] All 7 C backend benchmarks passing (100%)
+  - fibonacci: ✓ 514229
+  - quicksort: ✓ 5
+  - matmul: ✓ 120
+  - wordcount: ✓ 4
+  - list_ops: ✓ 166750
+  - dict_ops: ✓ 6065
+  - set_ops: ✓ 234
+- [x] Zero regressions in template-based container generation
+- [x] Benchmark compilation with header-only runtime
+
+### Statistics
+
+- **Conversion Scope**: 10 containers (20 files → 10 single-header files)
+- **Code Reduction**: ~50% fewer files in container runtime
+- **C Backend Performance**:
+  - Avg compilation time: 0.384s
+  - Avg execution time: 0.393s
+  - Avg binary size: 65.6KB
+  - Lines of code: 78
+
+### Technical Details
+
+**Single-Header Pattern** (all containers):
+```c
+// Declarations
+typedef struct { ... } container_t;
+static container_t* container_new(void);
+
+// Implementation
+static container_t* container_new(void) {
+    // ... implementation
+}
+```
+
+**ContainerCodeGenerator Changes** (src/mgen/backends/c/container_codegen.py):
+- Before: Load `.h` + `.c`, merge, strip headers
+- After: Load single `.h`, strip headers once
+- Template generation: Include implementation section for parameterized types
+
+**Benchmark Compilation** (scripts/benchmark.py):
+```python
+# Find non-container runtime .c files (containers are header-only)
+runtime_c_files = [
+    f for f in runtime_path.glob("*.c")
+    if not f.name.startswith("mgen_vec_") and
+       not f.name.startswith("mgen_set_") and
+       not f.name.startswith("mgen_map_")
+]
+```
+
 ## [0.1.47] - 2025-10-04
 
 **🎉 Rust Backend Production Ready - 7/7 Benchmarks Passing**
