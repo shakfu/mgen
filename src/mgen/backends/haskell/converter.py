@@ -464,20 +464,112 @@ main = printValue "Generated Haskell code executed successfully"'''
                 body = f"if {condition} then {then_value} else {else_value}"
         else:
             # Normal conversion path
-            body_stmts = []
-            for stmt in filtered_body:
+            body_stmts: list[Optional[str]] = []
+            var_init_values: dict[str, str] = {}  # Track variable initialization values
+
+            for i, stmt in enumerate(filtered_body):
                 converted_stmt = self._convert_statement(stmt)
                 if converted_stmt:
+                    # Track variable initializations for later optimization
+                    if isinstance(stmt, (ast.Assign, ast.AnnAssign)):
+                        if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1:
+                            target = stmt.targets[0]
+                        elif isinstance(stmt, ast.AnnAssign):
+                            target = stmt.target
+                        else:
+                            target = None
+
+                        if target and isinstance(target, ast.Name):
+                            var_name = self._to_haskell_var_name(target.id)
+                            # Get init value, handling Optional[expr]
+                            init_value: Optional[str] = None
+                            if isinstance(stmt, ast.Assign) and stmt.value:
+                                init_value = self._convert_expression(stmt.value)
+                            elif isinstance(stmt, ast.AnnAssign) and stmt.value:
+                                init_value = self._convert_expression(stmt.value)
+                            if init_value:
+                                var_init_values[var_name] = init_value
+
                     body_stmts.append(converted_stmt)
 
+            # Remove duplicate bindings - keep only the last binding for each variable
+            # Haskell doesn't allow redefining variables in let blocks
+            seen_vars: dict[str, list[int]] = {}  # var_name -> list of indices
+            for i, stmt_str in enumerate(body_stmts):
+                # Extract variable name from binding (format: "var = ...")
+                # Skip if it's not a simple binding (e.g., contains 'if', 'then', operators like <=)
+                if (stmt_str and "=" in stmt_str and not stmt_str.startswith("--") and
+                    "if" not in stmt_str and "then" not in stmt_str and
+                    "<=" not in stmt_str and ">=" not in stmt_str and "==" not in stmt_str and "/=" not in stmt_str):
+                    parts = stmt_str.split("=", 1)
+                    if len(parts) == 2:
+                        var_name = parts[0].strip()
+                        # Only process if var_name is a valid identifier (not an expression)
+                        if var_name and var_name.replace('_', '').isalnum():
+                            if var_name not in seen_vars:
+                                seen_vars[var_name] = []
+                            seen_vars[var_name].append(i)
+
+            # For variables with multiple bindings, replace self-references with previous values
+            import re
+            var_values: dict[str, str] = {}  # var_name -> current value expression
+            for var_name, indices in seen_vars.items():
+                if len(indices) > 1:
+                    # Process in order, accumulating the value
+                    accumulated_value = var_init_values.get(var_name, var_name)
+
+                    for i, idx in enumerate(indices):
+                        stmt_str = body_stmts[idx]
+                        if stmt_str and "=" in stmt_str:
+                            parts = stmt_str.split("=", 1)
+                            value_expr = parts[1].strip()
+
+                            # Replace self-references with accumulated value
+                            pattern = rf'\b{re.escape(var_name)}\b'
+                            # Escape backslashes in replacement to prevent interpreting \a, \b, etc. as escape sequences
+                            safe_replacement = accumulated_value.replace('\\', r'\\')
+                            value_expr = re.sub(pattern, safe_replacement, value_expr)
+
+                            # Replace variable references in folds with init values
+                            for v, init_val in var_init_values.items():
+                                if v != var_name and f") {v} (" in value_expr:
+                                    value_expr = value_expr.replace(f") {v} (", f") {init_val} (")
+
+                            # Update accumulated value for next iteration
+                            accumulated_value = value_expr
+
+                            # Mark all but last for removal
+                            if i < len(indices) - 1:
+                                body_stmts[idx] = None
+                            else:
+                                # Update last binding with final accumulated value
+                                body_stmts[idx] = f"{var_name} = {value_expr}"
+                else:
+                    # Single binding - replace init values in folds
+                    idx = indices[0]
+                    stmt_str = body_stmts[idx]
+                    if stmt_str and "=" in stmt_str:
+                        parts = stmt_str.split("=", 1)
+                        value_expr = parts[1].strip()
+                        for v, init_val in var_init_values.items():
+                            if f") {v} (" in value_expr:
+                                value_expr = value_expr.replace(f") {v} (", f") {init_val} (")
+                        body_stmts[idx] = f"{parts[0].strip()} = {value_expr}"
+
+            # Filter out removed statements
+            final_stmts = []
+            for stmt_str in body_stmts:
+                if stmt_str is not None:
+                    final_stmts.append(stmt_str)
+
             # Handle return statements and function body
-            if not body_stmts:
+            if not final_stmts:
                 body = "undefined"
-            elif len(body_stmts) == 1:
-                body = body_stmts[0]
+            elif len(final_stmts) == 1:
+                body = final_stmts[0]
             else:
                 # Multiple statements - use let expressions
-                body = "let\n    " + "\n    ".join(body_stmts[:-1]) + "\n  in " + body_stmts[-1]
+                body = "let\n    " + "\n    ".join(final_stmts[:-1]) + "\n  in " + final_stmts[-1]
 
         param_names = [param[0] for param in params]
         if param_names:
@@ -866,6 +958,9 @@ main = printValue "Generated Haskell code executed successfully"'''
                 return f"[{expr} | {target} <- {iterable}]"
         else:
             # Use runtime library functions (default for consistency)
+            # Add parentheses if iterable is a function call (contains spaces)
+            if " " in iterable and not iterable.startswith("("):
+                iterable = f"({iterable})"
             if gen.ifs:
                 conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
                 condition = " && ".join(conditions)
@@ -900,6 +995,9 @@ main = printValue "Generated Haskell code executed successfully"'''
                 return f"Map.fromList [({key_expr}, {value_expr}) | {target} <- {iterable}]"
         else:
             # Use runtime library functions (default for consistency)
+            # Add parentheses if iterable is a function call (contains spaces)
+            if " " in iterable and not iterable.startswith("("):
+                iterable = f"({iterable})"
             if gen.ifs:
                 conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
                 condition = " && ".join(conditions)
@@ -933,6 +1031,9 @@ main = printValue "Generated Haskell code executed successfully"'''
                 return f"Set.fromList [{expr} | {target} <- {iterable}]"
         else:
             # Use runtime library functions (default for consistency)
+            # Add parentheses if iterable is a function call (contains spaces)
+            if " " in iterable and not iterable.startswith("("):
+                iterable = f"({iterable})"
             if gen.ifs:
                 conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
                 condition = " && ".join(conditions)
@@ -1020,6 +1121,23 @@ main = printValue "Generated Haskell code executed successfully"'''
             if len(node.body) == 1:
                 stmt = node.body[0]
 
+                # Handle list.append(x) pattern: for i in iter: list.append(expr)
+                # Convert to: list = foldl (\acc i -> acc ++ [expr]) list iter
+                if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
+                    call = stmt.value
+                    if (isinstance(call.func, ast.Attribute) and
+                        call.func.attr == "append" and
+                        isinstance(call.func.value, ast.Name) and
+                        len(call.args) == 1):
+                        list_var = self._to_haskell_var_name(call.func.value.id)
+                        append_expr = self._convert_expression(call.args[0])
+                        # In pure context, use foldl to accumulate list
+                        if self.current_function != "main":
+                            return f"{list_var} = foldl (\\acc {var_name} -> acc ++ [{append_expr}]) {list_var} ({iterable})"
+                        else:
+                            # In IO context, use foldM
+                            return f"{list_var} <- foldM (\\acc {var_name} -> return (acc ++ [{append_expr}])) {list_var} ({iterable})"
+
                 # Handle regular assignment in main (IO context)
                 if self.current_function == "main" and isinstance(stmt, ast.Assign):
                     if len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
@@ -1049,8 +1167,13 @@ main = printValue "Generated Haskell code executed successfully"'''
 
             body = " >> ".join(body_stmts) if body_stmts else "()"
 
-            # Use mapM_ for side effects
-            return f"mapM_ (\\{var_name} -> {body}) {iterable}"
+            # Use mapM_ for side effects - only in IO context (main function)
+            if self.current_function == "main":
+                return f"mapM_ (\\{var_name} -> {body}) {iterable}"
+            else:
+                # In pure context, can't use mapM_ - need to handle differently
+                # For now, skip side-effect-only loops in pure functions
+                return f"-- for loop with side effects (not converted in pure function)"
         else:
             raise UnsupportedFeatureError("Complex for loop targets not supported")
 

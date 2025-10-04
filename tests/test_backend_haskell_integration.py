@@ -336,5 +336,5 @@ def reduce_example(numbers: list) -> int:
         # Verify filtered comprehensions (filter-like)
         assert "listComprehensionWithFilter numbers" in haskell_code
 
-        # Verify basic structure
-        assert "if (n <= 1) then n else" in haskell_code
+        # Verify basic structure - early return pattern optimization
+        assert "if (n <= 1) then n else" in haskell_code or "fibonacci n = if" in haskell_code

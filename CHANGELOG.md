@@ -17,7 +17,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
-## [0.1.49] - 2025-10-04
+## [0.1.50] - 2025-10-04
+
+- Milestone version: 4 out 6 backends have 100% generation/compilaiton scores on their respective translation of the benchmark examples.
+
+## [0.1.49]
 
 **🎉 Go Backend: 100% Benchmark Success Rate**
 
