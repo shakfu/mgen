@@ -604,6 +604,7 @@ class MGenPythonToRustConverter:
             param_type = self._infer_parameter_type(arg, node)
 
             # Rust-specific reference type selection based on mutability
+            # Apply to collections only (Vec, HashMap, HashSet)
             if param_type.startswith("Vec<") or param_type.startswith("std::collections::HashMap<") or param_type.startswith("std::collections::HashSet<"):
                 if arg.arg in mut_params:
                     # Mutable reference for parameters that are modified
@@ -794,7 +795,14 @@ class MGenPythonToRustConverter:
                         statements.append(f"    {container_expr}[{index_expr} as usize] = {value_expr};")
                     else:
                         # HashMap/HashSet: use insert method
-                        statements.append(f"    {container_expr}.insert({index_expr}, {value_expr});")
+                        # If the key is used in the value expression, we need to clone it
+                        # because insert takes ownership of the key
+                        if index_expr in value_expr and not index_expr.startswith('"'):
+                            # Clone the key to avoid move/borrow conflict
+                            statements.append(f"    {container_expr}.insert({index_expr}.clone(), {value_expr});")
+                        else:
+                            # Normal insert without cloning
+                            statements.append(f"    {container_expr}.insert({index_expr}, {value_expr});")
 
         return "\n".join(statements)
 
@@ -1124,8 +1132,9 @@ class MGenPythonToRustConverter:
 
             # Check if it's a HashMap type
             if var_type and "HashMap" in var_type:
-                # Use HashMap .get() method
-                return f"{value}.get(&{slice_expr}).unwrap_or(&0)"
+                # Use HashMap .get() method and dereference to get the value
+                # Rust will auto-borrow if a reference is needed
+                return f"*{value}.get(&{slice_expr}).unwrap_or(&0)"
             else:
                 # For Vec types, use direct indexing
                 return f"{value}[{slice_expr} as usize]"
@@ -1236,6 +1245,7 @@ class MGenPythonToRustConverter:
                                     mutability = func_mutability[param_name]
 
                                     # Determine if we need to pass by reference
+                                    # Apply to collections only (Vec, HashMap, HashSet)
                                     if var_type.startswith("Vec<") or var_type.startswith("std::collections::"):
                                         if mutability == MutabilityClass.MUTABLE:
                                             modified_args.append(f"&mut {arg}")
@@ -1244,6 +1254,10 @@ class MGenPythonToRustConverter:
                                         else:
                                             # UNKNOWN or already a reference - pass as is
                                             modified_args.append(arg)
+                                    elif var_type == "String" and mutability in (MutabilityClass.READ_ONLY, MutabilityClass.IMMUTABLE):
+                                        # For read-only String parameters, clone to avoid move issues in loops
+                                        # This is needed because we can't use &String without breaking literals/method calls
+                                        modified_args.append(f"{arg}.clone()")
                                     else:
                                         modified_args.append(arg)
                                 else:
@@ -1886,16 +1900,54 @@ class MGenPythonToRustConverter:
         Returns:
             Tuple of (key_type, value_type) or None if cannot determine
         """
-        # First check for subscript assignments: dict[key] = value
+        # First check for reassignments from function calls
+        # Pattern: result = count_words(text)
+        for stmt in ast.walk(func):
+            if isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name) and target.id == var_name:
+                        if isinstance(stmt.value, ast.Call):
+                            # Reassignment from function call - infer from return type
+                            saved_func_node = self.current_function_node
+                            self.current_function_node = func
+                            func_type = self._infer_type_from_value(stmt.value)
+                            self.current_function_node = saved_func_node
+
+                            if func_type and "HashMap" in func_type:
+                                # Extract key and value types from HashMap<K, V>
+                                import re
+                                match = re.search(r'HashMap<(.+),\s*(.+)>', func_type)
+                                if match:
+                                    key_type = match.group(1).strip()
+                                    value_type = match.group(2).strip()
+                                    return (key_type, value_type)
+
+        # Collect ALL subscript assignments to find the most specific types
+        # This handles cases where variable types aren't known yet when first encountered
+        candidates = []
         for stmt in ast.walk(func):
             if isinstance(stmt, ast.Assign):
                 for target in stmt.targets:
                     if isinstance(target, ast.Subscript):
                         if isinstance(target.value, ast.Name) and target.value.id == var_name:
                             # Found: dict[key] = value
+                            # Use the function context for type inference during pre-analysis
+                            saved_func_node = self.current_function_node
+                            self.current_function_node = func
                             key_type = self._infer_type_from_value(target.slice)
                             value_type = self._infer_type_from_value(stmt.value)
-                            return (key_type, value_type)
+                            self.current_function_node = saved_func_node
+
+                            candidates.append((key_type, value_type))
+
+        # Prefer non-i32 types (more specific than default)
+        for key_type, value_type in candidates:
+            if key_type != "i32" or value_type != "i32":
+                return (key_type, value_type)
+
+        # Fallback to first candidate if all are i32
+        if candidates:
+            return candidates[0]
 
         # Check for .insert() method calls (though Python dicts don't have insert, check anyway)
         # Check for other operations that reveal types
