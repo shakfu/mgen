@@ -17,6 +17,82 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.47] - 2025-10-04
+
+**🎉 Rust Backend Production Ready - 7/7 Benchmarks Passing**
+
+This release achieves 100% benchmark success rate for the Rust backend, marking it as the third backend to reach production-ready status. Through advanced dictionary type inference, ownership-aware code generation, and strategic cloning for read-only parameters, all 7 performance benchmarks now compile and execute correctly.
+
+### Fixed
+
+- **Dictionary Type Inference** - Enhanced `_infer_dict_types_from_usage()` for comprehensive type detection
+  - **Function Call Reassignments**: Detects `result = count_words(text)` pattern and extracts HashMap types from function return types
+  - **Function Context During Pre-Analysis**: Sets `current_function_node` temporarily to enable AST-based type inference during return type analysis
+  - **Multi-Candidate Collection**: Gathers ALL subscript assignment candidates and prefers specific types (String) over defaults (i32)
+  - **Impact**: Fixes wordcount benchmark (`HashMap<String, i32>` instead of `HashMap<i32, i32>`)
+
+- **HashMap Operations** - Ownership-aware code generation
+  - **Dereferenced Access**: Changed `.get()` to return dereferenced values (`*result.get(...).unwrap_or(&0)`)
+  - **Automatic Key Cloning**: Detects when key is used in value expression and inserts `.clone()` to avoid move/borrow conflicts
+  - **Pattern**: `dict[key] = dict[key] + 1` → `dict.insert(key.clone(), *dict.get(&key).unwrap_or(&0) + 1)`
+  - **Impact**: Eliminates E0382 move/borrow errors in dictionary update patterns
+
+- **String Parameter Handling** - Balanced approach for String arguments
+  - **Reverted &String Parameters**: Removed immutable reference generation for String parameters (collections-only now)
+  - **Automatic Cloning**: Added `.clone()` insertion for read-only String parameters passed to functions in loops
+  - **Rationale**: Avoids compilation errors with literals/method calls while preventing move issues in iteration
+  - **Impact**: All string operations tests pass, wordcount works in loops
+
+### Changed
+
+- **Immutability Analysis Application** - Refined to collections only (Vec, HashMap, HashSet)
+  - String type no longer gets automatic `&String` parameter generation
+  - Prevents type mismatches with `"literal".to_string()` and method call results
+  - Maintains idiomatic Rust for large data structures
+
+### Verified
+
+- [x] All 7 Rust benchmarks passing (100% success rate)
+  - fibonacci: Recursive computation ✓
+  - quicksort: Mutable reference array sorting ✓
+  - matmul: 2D vector operations ✓
+  - wordcount: HashMap<String, i32> type inference ✓
+  - list_ops: Vec<i32> comprehensions ✓
+  - dict_ops: HashMap<i32, i32> operations ✓
+  - set_ops: HashSet<i32> operations ✓
+- [x] All 818 unit tests passing (100%)
+- [x] Zero type errors across 101 source files (mypy strict mode)
+- [x] Rust now matches C++ and C backend success rates
+
+### Statistics
+
+- **Rust Backend Success Rate**: 7/7 (100%) - **PRODUCTION READY** 🎉
+- **Total Benchmarks Passing**: 21/42 (50%)
+  - C++: 7/7 (100%)
+  - C: 7/7 (100%)
+  - Rust: 7/7 (100%)
+  - Go: 0/7 (0%)
+  - Haskell: 0/7 (0%)
+  - OCaml: 0/7 (0%)
+- **Production-Ready Backends**: 3/6 (C++, C, Rust)
+- **Total Tests**: 818/818 passing (100%)
+
+### Technical Details
+
+**Type Inference Enhancements** (converter.py):
+- Lines 1889-1909: Function call reassignment detection in `_infer_dict_types_from_usage()`
+- Lines 1901-1905: Temporary function context setting for pre-analysis type inference
+- Lines 2001-2031: Generic Box<dyn> type handling in return type inference
+
+**Ownership Management** (converter.py):
+- Line 1129: Dereferenced HashMap access (`*value.get(...).unwrap_or(&0)`)
+- Lines 799-804: Automatic key cloning for insert operations
+- Lines 1257-1260: Read-only String parameter cloning in function calls
+
+**Parameter Handling** (converter.py):
+- Lines 606-615: Collections-only immutability analysis (Vec, HashMap, HashSet)
+- Lines 1247-1262: Collection references and String cloning in function call arguments
+
 ## [0.1.46] - 2025-10-04
 
 **✨ Real-World Example Applications**

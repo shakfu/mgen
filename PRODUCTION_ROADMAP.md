@@ -1,6 +1,6 @@
 # MGen Production Readiness Roadmap
 
-**Status**: v0.1.46 - 🎉 **PHASE 3 COMPLETE! Real-World Examples Added**
+**Status**: v0.1.47 - 🎉 **RUST BACKEND PRODUCTION READY! 3/6 Backends at 100%**
 **Goal**: Make all backends production-ready
 **Strategy**: Depth over breadth - polish existing rather than add new
 
@@ -8,24 +8,25 @@
 
 ## Executive Summary
 
-MGen has achieved **multiple major milestones**: **TWO BACKENDS** (C++ and C) achieve 100% benchmark success, **parameterized template system** complete, and **comprehensive example applications** demonstrating practical value.
+MGen has achieved **major milestone**: **THREE BACKENDS** (C++, C, and Rust) achieve 100% benchmark success, representing **50% of all backends** at production-ready status.
 
 **Completed**:
 - ✅ Phase 1 - Compilation Verification (24/24 tests passing)
 - ✅ Phase 2 - Benchmark Framework (7 benchmarks, automated runner, report generation)
 - ✅ **Phase 2 - C++ Backend Complete** (7/7 benchmarks passing, 100% success rate) 🎉
 - ✅ **Phase 2 - C Backend Complete** (7/7 benchmarks passing, 100% success rate) 🎉
+- ✅ **Phase 2 - Rust Backend Complete** (7/7 benchmarks passing, 100% success rate) 🎉
 - ✅ **Phase 2 - Parameterized Template System** (6 generic templates, unlimited type combinations) 🎉
 - ✅ **Phase 3 - Real-World Examples** (5 complete applications across 4 categories) 🎉
 
 **Current Status by Backend**:
-- 🎉 **C++**: 7/7 (100%) - **PRODUCTION READY**
-- 🎉 **C**: 7/7 (100%) - **PRODUCTION READY** (parameterized templates, STC replacement complete for string maps)
-- Rust: Type inference improvements ongoing
-- Go: Type inference improvements ongoing
-- Haskell: Functional paradigm translation ongoing
-- OCaml: Functional paradigm translation ongoing
-- **Overall**: 867/867 tests passing (100%)
+- 🎉 **C++**: 7/7 (100%) - **PRODUCTION READY** - Advanced type inference, STL optimizations
+- 🎉 **C**: 7/7 (100%) - **PRODUCTION READY** - Parameterized templates, STC container system
+- 🎉 **Rust**: 7/7 (100%) - **PRODUCTION READY** - Ownership-aware generation, idiomatic types
+- Go: 0/7 (0%) - Type inference improvements needed
+- Haskell: 0/7 (0%) - Functional paradigm translation needed
+- OCaml: 0/7 (0%) - Functional paradigm translation needed
+- **Overall**: 21/42 benchmarks passing (50%), 818/818 tests passing (100%)
 
 **In Progress**:
 - 🔄 Phase 4 - Developer Experience (error messages, debugging support)
@@ -139,14 +140,17 @@ All backend runtime libraries verified and working:
 ### Goal
 Measure, compare, and optimize backend performance.
 
-### Current State (v0.1.36)
+### Current State (v0.1.47)
 - ✅ Benchmark framework complete (v0.1.34)
 - ✅ 7 performance benchmarks created (algorithms + data structures)
 - ✅ Automated benchmark runner and report generation
 - ✅ Cross-backend comparisons with metrics (compilation time, execution time, binary size, LOC)
-- ✅ **C++ Backend Complete** - 7/7 benchmarks passing (100%) with advanced type inference
-- 🔄 Code generation quality improvements ongoing for other backends (16/42 total benchmarks passing)
+- ✅ **C++ Backend Complete** - 7/7 benchmarks passing (100%) with advanced type inference (v0.1.36)
+- ✅ **C Backend Complete** - 7/7 benchmarks passing (100%) with parameterized templates (v0.1.37-v0.1.43)
+- ✅ **Rust Backend Complete** - 7/7 benchmarks passing (100%) with ownership-aware generation (v0.1.47)
+- 🎉 **50% of backends production-ready** (21/42 total benchmarks passing)
 - ❌ Performance optimization not yet started
+- 🔄 Go, Haskell, OCaml backend improvements ongoing
 
 ### Tasks
 
@@ -339,6 +343,75 @@ Fixed 7 critical code generation bugs identified through benchmark failures:
 - ~~Replace `set_int` with vanilla C hash set~~
 - ~~Replace `map_int_int` with vanilla C hash table for int keys~~
 - ✅ **COMPLETED**: Implemented parameterized template generation system instead (v0.1.44-v0.1.45)
+
+#### 2.2.7.5 Rust Backend Completion ✅
+**Status**: COMPLETED (v0.1.47)
+**Priority**: HIGH
+**Effort**: 1 day
+
+🎉 **Third backend to achieve 100% benchmark success!**
+
+**Advanced Dictionary Type Inference**:
+- **Function Call Reassignment Detection**: Detects `result = count_words(text)` pattern and extracts HashMap types
+  - Analyzes function return types to determine dict key/value types
+  - Handles reassignment from function calls in `_infer_dict_types_from_usage()`
+  - Extracts types from `HashMap<K, V>` return signatures using regex parsing
+- **Pre-Analysis Function Context**: Sets `current_function_node` temporarily during type inference
+  - Enables AST-based type inference during return type analysis phase
+  - Fixes issue where variable types weren't available during pre-analysis
+  - Allows complete type information for dict subscript assignments
+- **Multi-Candidate Collection**: Gathers ALL subscript assignment candidates
+  - Prefers specific types (String) over defaults (i32)
+  - Handles cases where variable types evolve during analysis
+  - **Impact**: Fixes wordcount benchmark (`HashMap<String, i32>` instead of `HashMap<i32, i32>`)
+
+**Ownership-Aware Code Generation**:
+- **Dereferenced HashMap Access**: Changed `.get()` to return dereferenced values
+  - Pattern: `*result.get(&key).unwrap_or(&0)` instead of `result.get(&key).unwrap_or(&0)`
+  - Eliminates type mismatch between `&i32` and `i32`
+  - Allows direct assignment without additional dereferencing
+- **Automatic Key Cloning**: Detects when key is used in value expression
+  - Pattern: `dict[key] = dict[key] + 1` → `dict.insert(key.clone(), *dict.get(&key).unwrap_or(&0) + 1)`
+  - Avoids E0382 move/borrow errors when key is moved and then borrowed
+  - **Impact**: Eliminates ownership conflicts in dictionary update patterns
+
+**String Parameter Handling**:
+- **Collections-Only Immutability Analysis**: Refined to Vec, HashMap, HashSet only
+  - Reverted `&String` parameter generation (caused type mismatches)
+  - String parameters now owned by default to avoid lifetime issues
+- **Strategic String Cloning**: Added `.clone()` for read-only String parameters in loops
+  - Detects read-only String parameters passed to functions
+  - Automatically inserts `.clone()` to prevent move errors in iteration
+  - **Impact**: Wordcount works in loops, all string tests pass
+
+**Benchmark Results** (All 7 passing):
+- ✅ fibonacci: Recursion, output: 514229
+- ✅ quicksort: Array sorting, output: 5
+- ✅ matmul: 2D matrix operations (Vec<Vec<i32>>), output: 120
+- ✅ wordcount: String/HashMap processing (HashMap<String, i32>), output: 4
+- ✅ list_ops: Vec<i32> comprehensions, output: 166750
+- ✅ dict_ops: HashMap<i32, i32> operations, output: 6065
+- ✅ set_ops: HashSet<i32> operations, output: 3398
+
+**Technical Improvements** (src/mgen/backends/rust/converter.py):
+- Lines 1889-1909: Enhanced `_infer_dict_types_from_usage()` with function call detection
+- Lines 1901-1905: Temporary function context for pre-analysis type inference
+- Lines 2001-2031: Generic Box<dyn> type handling in return type inference
+- Line 1129: Dereferenced HashMap subscript access
+- Lines 799-804: Automatic key cloning for HashMap insert operations
+- Lines 606-615: Collections-only immutability analysis
+- Lines 1247-1262: Strategic String cloning in function call arguments
+
+**Impact**:
+- Rust backend is **production-ready** for real-world use
+- Ownership-aware generation produces idiomatic, safe Rust code
+- Advanced type inference eliminates generic Box<dyn Any> fallbacks
+- Handles complex patterns: dictionaries, 2D arrays, string processing
+- 818/818 unit tests passing with zero regressions
+
+**Production-Ready Backends**: 3/6 (50%)
+- C++, C, and Rust all at 100% benchmark success
+- 21/42 total benchmarks passing across all backends
 
 #### 2.2.8 Parameterized Template System ✅
 **Status**: COMPLETED (v0.1.44-v0.1.45)
