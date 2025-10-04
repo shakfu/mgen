@@ -362,11 +362,48 @@ main = printValue "Generated Haskell code executed successfully"'''
             self.current_function = "main"
             self.declared_vars = set()
 
+            # Pre-scan to detect variables that are initialized then conditionally reassigned
+            # Pattern: var = init_value; if cond: var = other_value
+            skip_initial_bindings = set()
+            for i, stmt in enumerate(node.body):
+                if isinstance(stmt, (ast.Assign, ast.AnnAssign)):
+                    # Check if this is followed by an if-statement that reassigns the same variable
+                    if i + 1 < len(node.body):
+                        next_stmt = node.body[i + 1]
+                        if isinstance(next_stmt, ast.If):
+                            # Check if if-body has single assignment to same variable
+                            if (len(next_stmt.body) == 1 and
+                                isinstance(next_stmt.body[0], ast.Assign) and
+                                not next_stmt.orelse):
+
+                                # Get variable names
+                                init_var = None
+                                if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1:
+                                    if isinstance(stmt.targets[0], ast.Name):
+                                        init_var = stmt.targets[0].id
+                                elif isinstance(stmt, ast.AnnAssign):
+                                    if isinstance(stmt.target, ast.Name):
+                                        init_var = stmt.target.id
+
+                                if_var = None
+                                if_assign = next_stmt.body[0]
+                                if isinstance(if_assign, ast.Assign) and len(if_assign.targets) == 1:
+                                    if isinstance(if_assign.targets[0], ast.Name):
+                                        if_var = if_assign.targets[0].id
+
+                                # If same variable, skip the initial binding
+                                if init_var and if_var and init_var == if_var:
+                                    skip_initial_bindings.add(i)
+
             do_lines = []
 
-            for stmt in node.body:
+            for idx, stmt in enumerate(node.body):
                 if isinstance(stmt, ast.Return):
                     # Ignore return statements in main (Haskell main returns void)
+                    continue
+
+                # Skip initial bindings that are overridden by conditional assignments
+                if idx in skip_initial_bindings:
                     continue
 
                 # Skip docstrings (expression statements with string constants)
@@ -385,6 +422,14 @@ main = printValue "Generated Haskell code executed successfully"'''
                 if isinstance(stmt, (ast.Assign, ast.AnnAssign)):
                     # It's a let binding
                     do_lines.append(f"  let {converted_stmt}")
+                elif isinstance(stmt, ast.If):
+                    # Check if the if-statement generates a binding (var = if ... then ... else ...)
+                    if "=" in converted_stmt and not converted_stmt.startswith("if "):
+                        # It's a binding generated from conditional assignment
+                        do_lines.append(f"  let {converted_stmt}")
+                    else:
+                        # Regular if-statement
+                        do_lines.append(f"  {converted_stmt}")
                 else:
                     # It's an IO action or other statement
                     do_lines.append(f"  {converted_stmt}")
@@ -412,12 +457,25 @@ main = printValue "Generated Haskell code executed successfully"'''
             param_type = "a"  # Default generic type
             if arg.annotation:
                 param_type = self._convert_type_annotation(arg.annotation)
+                # If parameter is annotated as list, check if it's used as 2D list
+                if param_type == "[a]":
+                    if self._param_used_as_2d_list(node, arg.arg):
+                        param_type = "[[Int]]"
             params.append((param_name, param_type))
 
         # Determine return type
         return_type = "a"  # Default generic type
         if node.returns:
             return_type = self._convert_type_annotation(node.returns)
+            # If return type is dict, try to infer value type from function body
+            if return_type == "Dict String a":
+                inferred_value_type = self._infer_dict_value_type(node)
+                if inferred_value_type:
+                    return_type = f"Dict String {inferred_value_type}"
+            # If return type is list, check if it's a 2D list
+            elif return_type == "[a]":
+                if self._returns_2d_list(node):
+                    return_type = "[[Int]]"
         elif node.name == "main":
             return_type = "IO ()"
 
@@ -767,11 +825,11 @@ main = printValue "Generated Haskell code executed successfully"'''
                 # Haskell uses /= for inequality
                 return f"({left} /= {right})"
             elif isinstance(op, ast.In):
-                # Use Data.Map.member for maps (assuming right is a map)
-                return f"(Data.Map.member {left} {right})"
+                # Use Map.member for maps (assuming right is a map)
+                return f"(Map.member {left} {right})"
             elif isinstance(op, ast.NotIn):
-                # Use not . Data.Map.member for maps
-                return f"(not (Data.Map.member {left} {right}))"
+                # Use not . Map.member for maps
+                return f"(not (Map.member {left} {right}))"
 
             # Use standard comparison operator mapping from converter_utils
             haskell_op = get_standard_comparison_operator(op)
@@ -849,6 +907,21 @@ main = printValue "Generated Haskell code executed successfully"'''
                     return f"rangeList (range3 {args[0]} {args[1]} {args[2]})"
                 else:
                     return "rangeList (range 0)"  # Fallback for invalid range args
+            elif func_name == "set":
+                # Python's set() creates empty set
+                if args:
+                    # set(iterable) - convert iterable to set
+                    return f"Set.fromList {args[0]}"
+                else:
+                    # set() - empty set
+                    return "Set.empty"
+            elif func_name == "dict":
+                # Python's dict() creates empty dict
+                if args:
+                    raise UnsupportedFeatureError("dict(iterable) not yet supported")
+                else:
+                    # dict() - empty dict
+                    return "Map.empty"
             else:
                 # Check if it's a class constructor call
                 camel_func_name = self._to_camel_case(func_name)
@@ -899,6 +972,13 @@ main = printValue "Generated Haskell code executed successfully"'''
                     # Python's split() with no args splits on whitespace
                     # Haskell's words function does the same
                     return f"(words {obj})"
+            # Handle dict methods
+            elif method_name == "items":
+                return f"(items {obj})"
+            elif method_name == "values":
+                return f"(values {obj})"
+            elif method_name == "keys":
+                return f"(keys {obj})"
             else:
                 # Regular method call - convert to function call
                 haskell_method_name = self._to_haskell_function_name(method_name)
@@ -918,9 +998,13 @@ main = printValue "Generated Haskell code executed successfully"'''
         obj = self._convert_expression(node.value)
         index = self._convert_expression(node.slice)
 
-        # For lists: obj !! index
+        # Heuristic: if index is a string literal, it's likely a dict access
         # For maps: obj Map.! index
-        return f"({obj} !! {index})"  # Assuming list access for now
+        # For lists: obj !! index
+        if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+            return f"({obj} Map.! {index})"
+        else:
+            return f"({obj} !! {index})"
 
     def _convert_list_literal(self, node: ast.List) -> str:
         """Convert Python list literal to Haskell list."""
@@ -935,11 +1019,17 @@ main = printValue "Generated Haskell code executed successfully"'''
             value_expr = self._convert_expression(value) if value is not None else "undefined"
             pairs.append(f"({key_expr}, {value_expr})")
 
+        # Use Map.empty for empty dicts to avoid type ambiguity
+        if not pairs:
+            return "Map.empty"
         return f"Map.fromList [{', '.join(pairs)}]"
 
     def _convert_set_literal(self, node: ast.Set) -> str:
         """Convert Python set literal to Haskell Set."""
         elements = [self._convert_expression(elt) for elt in node.elts]
+        # Use Set.empty for empty sets to avoid type ambiguity
+        if not elements:
+            return "Set.empty"
         return f"Set.fromList [{', '.join(elements)}]"
 
     def _convert_list_comprehension(self, node: ast.ListComp) -> str:
@@ -992,7 +1082,21 @@ main = printValue "Generated Haskell code executed successfully"'''
             raise UnsupportedFeatureError("Multiple generators in comprehensions not supported")
 
         gen = node.generators[0]
-        target = self._to_haskell_var_name(gen.target.id) if isinstance(gen.target, ast.Name) else "x"
+
+        # Handle tuple unpacking in target: (k, v) in items()
+        if isinstance(gen.target, ast.Tuple):
+            # Tuple target - create pattern for each element
+            tuple_vars = [self._to_haskell_var_name(elt.id) if isinstance(elt, ast.Name) else "x"
+                          for elt in gen.target.elts]
+            target = f"({', '.join(tuple_vars)})"
+            target_pattern = target  # For pattern matching
+        elif isinstance(gen.target, ast.Name):
+            target = self._to_haskell_var_name(gen.target.id)
+            target_pattern = target
+        else:
+            target = "x"
+            target_pattern = "x"
+
         iterable = self._convert_expression(gen.iter)
 
         if use_native:
@@ -1011,9 +1115,9 @@ main = printValue "Generated Haskell code executed successfully"'''
             if gen.ifs:
                 conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
                 condition = " && ".join(conditions)
-                return f"dictComprehensionWithFilter {iterable} (\\{target} -> {condition}) (\\{target} -> {key_expr}) (\\{target} -> {value_expr})"
+                return f"dictComprehensionWithFilter {iterable} (\\{target_pattern} -> {condition}) (\\{target_pattern} -> {key_expr}) (\\{target_pattern} -> {value_expr})"
             else:
-                return f"dictComprehension {iterable} (\\{target} -> {key_expr}) (\\{target} -> {value_expr})"
+                return f"dictComprehension {iterable} (\\{target_pattern} -> {key_expr}) (\\{target_pattern} -> {value_expr})"
 
     def _convert_set_comprehension(self, node: ast.SetComp) -> str:
         """Convert Python set comprehension to Haskell."""
@@ -1044,6 +1148,16 @@ main = printValue "Generated Haskell code executed successfully"'''
             # Add parentheses if iterable is a function call (contains spaces)
             if " " in iterable and not iterable.startswith("("):
                 iterable = f"({iterable})"
+
+            # If iterating over a set, convert to list first
+            # Heuristic: check if iterable looks like a Set expression
+            if "setComprehension" in iterable or "Set." in iterable or isinstance(gen.iter, ast.Name):
+                # Wrap in Set.toList for safety - it's a no-op if already a list
+                # Actually, we need to be more careful - only wrap if we know it's a Set
+                # For now, check if the iterable expression suggests it's a Set
+                if "setComprehension" in iterable:
+                    iterable = f"(Set.toList {iterable})"
+
             if gen.ifs:
                 conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
                 condition = " && ".join(conditions)
@@ -1094,6 +1208,24 @@ main = printValue "Generated Haskell code executed successfully"'''
         """Convert Python if statement to Haskell."""
         condition = self._convert_expression(node.test)
 
+        # Special case: if cond: var = expr (no else) in main function
+        # Convert to: let var = if cond then expr else initial_value
+        if (self.current_function == "main" and
+            len(node.body) == 1 and
+            isinstance(node.body[0], ast.Assign) and
+            not node.orelse):
+
+            assign_stmt = node.body[0]
+            if len(assign_stmt.targets) == 1 and isinstance(assign_stmt.targets[0], ast.Name):
+                var_name = self._to_haskell_var_name(assign_stmt.targets[0].id)
+                then_expr = self._convert_expression(assign_stmt.value)
+
+                # Default else value
+                else_value = "0"  # Default for numeric types
+
+                # Return as let binding with conditional expression
+                return f"{var_name} = if {condition} then {then_expr} else {else_value}"
+
         then_stmts = []
         for stmt in node.body:
             converted = self._convert_statement(stmt)
@@ -1124,6 +1256,139 @@ main = printValue "Generated Haskell code executed successfully"'''
         if isinstance(node.target, ast.Name):
             var_name = self._to_haskell_var_name(node.target.id)
             iterable = self._convert_expression(node.iter)
+
+            # Detect nested loop pattern for building 2D lists
+            # Pattern: for i in range(rows):
+            #              row = []
+            #              for j in range(cols):
+            #                  row.append(value)
+            #              matrix.append(row)
+            if (len(node.body) == 3 and
+                isinstance(node.body[0], (ast.Assign, ast.AnnAssign)) and
+                isinstance(node.body[1], ast.For) and
+                isinstance(node.body[2], ast.Expr)):
+
+                # Check if first statement initializes empty list
+                init_stmt = node.body[0]
+                inner_loop = node.body[1]
+                outer_append = node.body[2]
+
+                # Extract row variable name
+                row_var = None
+                if isinstance(init_stmt, ast.Assign):
+                    if (len(init_stmt.targets) == 1 and
+                        isinstance(init_stmt.targets[0], ast.Name) and
+                        isinstance(init_stmt.value, ast.List) and
+                        len(init_stmt.value.elts) == 0):
+                        row_var = init_stmt.targets[0].id
+                elif isinstance(init_stmt, ast.AnnAssign):
+                    if (isinstance(init_stmt.target, ast.Name) and
+                        isinstance(init_stmt.value, ast.List) and
+                        len(init_stmt.value.elts) == 0):
+                        row_var = init_stmt.target.id
+
+                # Check if inner loop appends to row
+                if (row_var and
+                    isinstance(inner_loop, ast.For) and
+                    len(inner_loop.body) == 1 and
+                    isinstance(inner_loop.body[0], ast.Expr) and
+                    isinstance(inner_loop.body[0].value, ast.Call)):
+
+                    inner_call = inner_loop.body[0].value
+                    if (isinstance(inner_call.func, ast.Attribute) and
+                        inner_call.func.attr == "append" and
+                        isinstance(inner_call.func.value, ast.Name) and
+                        inner_call.func.value.id == row_var and
+                        len(inner_call.args) == 1):
+
+                        # Check if outer append adds row to matrix
+                        if (isinstance(outer_append.value, ast.Call) and
+                            isinstance(outer_append.value.func, ast.Attribute) and
+                            outer_append.value.func.attr == "append" and
+                            isinstance(outer_append.value.func.value, ast.Name) and
+                            len(outer_append.value.args) == 1 and
+                            isinstance(outer_append.value.args[0], ast.Name) and
+                            outer_append.value.args[0].id == row_var):
+
+                            # Extract all components
+                            matrix_var = self._to_haskell_var_name(outer_append.value.func.value.id)
+                            inner_var = self._to_haskell_var_name(inner_loop.target.id) if isinstance(inner_loop.target, ast.Name) else "j"
+                            inner_iterable = self._convert_expression(inner_loop.iter)
+                            append_expr = self._convert_expression(inner_call.args[0])
+
+                            # Generate nested list comprehension
+                            # matrix = [[value | j <- range] | i <- range]
+                            if self.current_function != "main":
+                                return f"{matrix_var} = [[{append_expr} | {inner_var} <- {inner_iterable}] | {var_name} <- {iterable}]"
+                            else:
+                                # In IO context, we still need to use foldM, but we can simplify
+                                return f"{matrix_var} <- foldM (\\acc {var_name} -> return (acc ++ [[{append_expr} | {inner_var} <- {inner_iterable}]])) {matrix_var} ({iterable})"
+
+            # Detect triple-nested loop pattern for matrix multiplication
+            # Pattern: for i in range(size):
+            #              for j in range(size):
+            #                  sum_val = 0
+            #                  for k in range(size):
+            #                      sum_val += expr
+            #                  result[i][j] = sum_val
+            if (len(node.body) == 1 and
+                isinstance(node.body[0], ast.For)):
+
+                j_loop = node.body[0]
+                if (isinstance(j_loop.target, ast.Name) and
+                    len(j_loop.body) == 3 and
+                    isinstance(j_loop.body[0], (ast.Assign, ast.AnnAssign)) and
+                    isinstance(j_loop.body[1], ast.For) and
+                    isinstance(j_loop.body[2], ast.Assign)):
+
+                    sum_init = j_loop.body[0]
+                    k_loop = j_loop.body[1]
+                    result_assign = j_loop.body[2]
+
+                    # Check if sum_val is initialized to 0
+                    sum_var = None
+                    if isinstance(sum_init, ast.Assign):
+                        if (len(sum_init.targets) == 1 and
+                            isinstance(sum_init.targets[0], ast.Name) and
+                            isinstance(sum_init.value, ast.Constant) and
+                            sum_init.value.value == 0):
+                            sum_var = sum_init.targets[0].id
+                    elif isinstance(sum_init, ast.AnnAssign):
+                        if (isinstance(sum_init.target, ast.Name) and
+                            isinstance(sum_init.value, ast.Constant) and
+                            sum_init.value.value == 0):
+                            sum_var = sum_init.target.id
+
+                    # Check if k_loop accumulates into sum_var
+                    if (sum_var and
+                        isinstance(k_loop.target, ast.Name) and
+                        len(k_loop.body) == 1 and
+                        isinstance(k_loop.body[0], ast.AugAssign) and
+                        isinstance(k_loop.body[0].target, ast.Name) and
+                        k_loop.body[0].target.id == sum_var):
+
+                        # Check if result[i][j] = sum_val
+                        if (isinstance(result_assign.targets[0], ast.Subscript) and
+                            isinstance(result_assign.targets[0].value, ast.Subscript) and
+                            isinstance(result_assign.targets[0].value.value, ast.Name) and
+                            isinstance(result_assign.value, ast.Name) and
+                            result_assign.value.id == sum_var):
+
+                            # Extract all variables
+                            j_var = self._to_haskell_var_name(j_loop.target.id)
+                            k_var = self._to_haskell_var_name(k_loop.target.id)
+                            j_iterable = self._convert_expression(j_loop.iter)
+                            k_iterable = self._convert_expression(k_loop.iter)
+                            accum_expr = self._convert_expression(k_loop.body[0].value)
+                            result_var = self._to_haskell_var_name(result_assign.targets[0].value.value.id)
+
+                            # Generate triple-nested comprehension with sum
+                            # result = [[sum [expr | k <- range] | j <- range] | i <- range]
+                            if self.current_function != "main":
+                                return f"{result_var} = [[sum' [{accum_expr} | {k_var} <- {k_iterable}] | {j_var} <- {j_iterable}] | {var_name} <- {iterable}]"
+                            else:
+                                # In IO context, generate using foldM
+                                return f"{result_var} <- foldM (\\acc {var_name} -> return (acc ++ [[sum' [{accum_expr} | {k_var} <- {k_iterable}] | {j_var} <- {j_iterable}]])) {result_var} ({iterable})"
 
             # Check if loop body is a single assignment or augmented assignment that updates an outer variable
             # Pattern: for i in range(n): var = expr(i)  ->  foldM for IO context
@@ -1250,6 +1515,108 @@ main = printValue "Generated Haskell code executed successfully"'''
             return str(node.value)
         else:
             return "a"  # Default generic type
+
+    def _param_used_as_2d_list(self, func_node: ast.FunctionDef, param_name: str) -> bool:
+        """Check if a parameter is used as a 2D list (nested subscript access)."""
+        # Look for patterns like param[i][j]
+        for node in ast.walk(func_node):
+            if isinstance(node, ast.Subscript):
+                # Check if this is a nested subscript: param[i][j]
+                if isinstance(node.value, ast.Subscript):
+                    # Check if the innermost subscript is accessing the parameter
+                    if isinstance(node.value.value, ast.Name) and node.value.value.id == param_name:
+                        return True
+        return False
+
+    def _returns_2d_list(self, func_node: ast.FunctionDef) -> bool:
+        """Check if function returns a 2D list (nested list comprehension or nested loops)."""
+        # Look for return statements that return nested list comprehensions
+        for stmt in ast.walk(func_node):
+            if isinstance(stmt, ast.Return) and stmt.value:
+                # Check if return value is a list comprehension
+                if isinstance(stmt.value, ast.ListComp):
+                    # Check if the comprehension expression is another list comprehension
+                    if isinstance(stmt.value.elt, ast.ListComp):
+                        return True
+                # Check if return value is a variable that was assigned a nested list comp
+                elif isinstance(stmt.value, ast.Name):
+                    var_name = stmt.value.id
+                    # Look for assignments to this variable with nested list comps
+                    for assign_stmt in ast.walk(func_node):
+                        if isinstance(assign_stmt, (ast.Assign, ast.AnnAssign)):
+                            if isinstance(assign_stmt, ast.Assign):
+                                if (len(assign_stmt.targets) == 1 and
+                                    isinstance(assign_stmt.targets[0], ast.Name) and
+                                    assign_stmt.targets[0].id == var_name):
+                                    if isinstance(assign_stmt.value, ast.ListComp):
+                                        if isinstance(assign_stmt.value.elt, ast.ListComp):
+                                            return True
+                            elif isinstance(assign_stmt, ast.AnnAssign):
+                                if (isinstance(assign_stmt.target, ast.Name) and
+                                    assign_stmt.target.id == var_name and
+                                    assign_stmt.value):
+                                    if isinstance(assign_stmt.value, ast.ListComp):
+                                        if isinstance(assign_stmt.value.elt, ast.ListComp):
+                                            return True
+
+            # Also check for nested loop patterns that build 2D lists
+            # Pattern: for i in range: row = []; for j in range: row.append(...); matrix.append(row)
+            if isinstance(stmt, ast.For):
+                if len(stmt.body) == 3:
+                    if (isinstance(stmt.body[0], (ast.Assign, ast.AnnAssign)) and
+                        isinstance(stmt.body[1], ast.For) and
+                        isinstance(stmt.body[2], ast.Expr)):
+                        # This is a 2D list building pattern
+                        return True
+                # Also check for triple-nested loop pattern (matrix multiplication)
+                # Pattern: for i: for j: sum_val = 0; for k: sum_val += ...; result[i][j] = sum_val
+                if len(stmt.body) == 1 and isinstance(stmt.body[0], ast.For):
+                    j_loop = stmt.body[0]
+                    if len(j_loop.body) == 3:
+                        if (isinstance(j_loop.body[0], (ast.Assign, ast.AnnAssign)) and
+                            isinstance(j_loop.body[1], ast.For) and
+                            isinstance(j_loop.body[2], ast.Assign)):
+                            # This is a triple-nested loop building a 2D result
+                            return True
+
+        return False
+
+    def _infer_dict_value_type(self, func_node: ast.FunctionDef) -> Optional[str]:
+        """Infer dictionary value type from function body operations."""
+        # Look for patterns that indicate value type:
+        # 1. dict[key] = int_literal -> Int
+        # 2. dict[key] = dict[key] + 1 -> Int
+        # 3. Map.insertWith (+) key 1 -> Int (numeric operations)
+
+        for stmt in ast.walk(func_node):
+            # Pattern: dict[key] = 1 or dict[key] = dict[key] + 1
+            if isinstance(stmt, ast.Assign):
+                if len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Subscript):
+                    # Check if value is an int literal
+                    if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, int):
+                        return "Int"
+                    # Check if value is a binary operation with int
+                    if isinstance(stmt.value, ast.BinOp):
+                        if isinstance(stmt.value.right, ast.Constant) and isinstance(stmt.value.right.value, int):
+                            return "Int"
+
+            # Pattern: if key in dict: dict[key] = dict[key] + 1 else: dict[key] = 1
+            if isinstance(stmt, ast.If):
+                # Check the then branch for dict[key] = ... + int
+                for then_stmt in stmt.body:
+                    if isinstance(then_stmt, ast.Assign) and len(then_stmt.targets) == 1:
+                        if isinstance(then_stmt.targets[0], ast.Subscript):
+                            if isinstance(then_stmt.value, ast.BinOp):
+                                if isinstance(then_stmt.value.right, ast.Constant) and isinstance(then_stmt.value.right.value, int):
+                                    return "Int"
+                # Check the else branch
+                for else_stmt in stmt.orelse:
+                    if isinstance(else_stmt, ast.Assign) and len(else_stmt.targets) == 1:
+                        if isinstance(else_stmt.targets[0], ast.Subscript):
+                            if isinstance(else_stmt.value, ast.Constant) and isinstance(else_stmt.value.value, int):
+                                return "Int"
+
+        return None
 
     def _infer_type_from_node(self, node: ast.expr) -> str:
         """Infer Haskell type from Python expression node."""

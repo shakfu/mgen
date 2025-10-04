@@ -22,7 +22,7 @@ module MGenRuntime
     , upper, lower, strip, find, replace, split
       -- * Built-in Functions
     , Builtins(..)
-    , abs', bool', len', min', max', sum'
+    , abs', bool', Len(..), min', max', sum'
       -- * Range and Iteration
     , Range(..)
     , range, range2, range3, rangeList
@@ -35,6 +35,8 @@ module MGenRuntime
     , toString, printValue
       -- * Container Types
     , Dict, Set
+      -- * Dictionary Operations
+    , items, values, keys
     ) where
 
 import qualified Data.Char as Char
@@ -101,9 +103,18 @@ abs' x = if x < 0 then -x else x
 bool' :: (Eq a, Num a) => a -> Bool
 bool' x = x /= 0
 
--- | Length function (Python's len())
-len' :: [a] -> Int
-len' = length
+-- | Length function (Python's len()) - works for lists, maps, and sets
+class Len a where
+    len' :: a -> Int
+
+instance Len [a] where
+    len' = length
+
+instance Len (Map k v) where
+    len' = Map.size
+
+instance Len (Set a) where
+    len' = Set.size
 
 -- | Minimum function (Python's min())
 min' :: (Ord a) => [a] -> a
@@ -165,14 +176,24 @@ dictComprehensionWithFilter :: (Ord k) => [a] -> (a -> Bool) -> (a -> k) -> (a -
 dictComprehensionWithFilter iterable predicate keyFunc valueFunc =
     Map.fromList [(keyFunc item, valueFunc item) | item <- iterable, predicate item]
 
+-- | Helper type class for converting to list (for comprehensions)
+class ToListCompat t where
+    toListCompat :: t a -> [a]
+
+instance ToListCompat [] where
+    toListCompat = id
+
+instance ToListCompat Set where
+    toListCompat = Set.toList
+
 -- | Set comprehension (Python's {expr for item in iterable})
-setComprehension :: (Ord b) => [a] -> (a -> b) -> Set b
-setComprehension iterable transform = Set.fromList (map transform iterable)
+setComprehension :: (ToListCompat t, Ord b) => t a -> (a -> b) -> Set b
+setComprehension iterable transform = Set.fromList (map transform (toListCompat iterable))
 
 -- | Set comprehension with filter
-setComprehensionWithFilter :: (Ord b) => [a] -> (a -> Bool) -> (a -> b) -> Set b
+setComprehensionWithFilter :: (ToListCompat t, Ord b) => t a -> (a -> Bool) -> (a -> b) -> Set b
 setComprehensionWithFilter iterable predicate transform =
-    Set.fromList [transform item | item <- iterable, predicate item]
+    Set.fromList [transform item | item <- toListCompat iterable, predicate item]
 
 
 -- | Utility function for converting values to strings (Python's str())
@@ -212,3 +233,18 @@ instance (ToString a) => ToString (Set a) where
 -- | Print function (Python's print())
 printValue :: (ToString a) => a -> IO ()
 printValue x = putStrLn (toString x)
+
+
+-- | Dictionary Operations
+
+-- | Get key-value pairs from dictionary (Python's dict.items())
+items :: Dict k v -> [(k, v)]
+items = Map.toList
+
+-- | Get values from dictionary (Python's dict.values())
+values :: Dict k v -> [v]
+values = Map.elems
+
+-- | Get keys from dictionary (Python's dict.keys())
+keys :: Dict k v -> [k]
+keys = Map.keys
