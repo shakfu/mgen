@@ -264,6 +264,42 @@ func DictComprehensionFromRange[K comparable, V any](source Range, transform fun
 	return result
 }
 
+// KV represents a key-value pair
+type KV[K comparable, V any] struct {
+	Key   K
+	Value V
+}
+
+// MapItems converts a map to a slice of key-value pairs
+func MapItems[K comparable, V any](m map[K]V) []KV[K, V] {
+	result := make([]KV[K, V], 0, len(m))
+	for k, v := range m {
+		result = append(result, KV[K, V]{Key: k, Value: v})
+	}
+	return result
+}
+
+// MapValues returns a slice of all values from a map
+func MapValues[K comparable, V any](m map[K]V) []V {
+	result := make([]V, 0, len(m))
+	for _, v := range m {
+		result = append(result, v)
+	}
+	return result
+}
+
+// DictComprehensionWithFilter creates map with filtering
+func DictComprehensionWithFilter[T any, K comparable, V any](source []T, transform func(T) (K, V), filter func(T) bool) map[K]V {
+	result := make(map[K]V)
+	for _, item := range source {
+		if filter(item) {
+			k, v := transform(item)
+			result[k] = v
+		}
+	}
+	return result
+}
+
 // SetComprehension creates map[T]bool set by applying transform function
 func SetComprehension[T any, K comparable](source []T, transform func(T) K) map[K]bool {
 	result := make(map[K]bool)
@@ -279,6 +315,26 @@ func SetComprehensionFromRange[K comparable](source Range, transform func(int) K
 	source.ForEach(func(i int) {
 		result[transform(i)] = true
 	})
+	return result
+}
+
+// SetComprehensionFromSet creates a new set by applying transform to elements of an existing set
+func SetComprehensionFromSet[T comparable, K comparable](source map[T]bool, transform func(T) K) map[K]bool {
+	result := make(map[K]bool)
+	for key := range source {
+		result[transform(key)] = true
+	}
+	return result
+}
+
+// SetComprehensionFromSetWithFilter creates a new set by applying transform to filtered elements
+func SetComprehensionFromSetWithFilter[T comparable, K comparable](source map[T]bool, filter func(T) bool, transform func(T) K) map[K]bool {
+	result := make(map[K]bool)
+	for key := range source {
+		if filter(key) {
+			result[transform(key)] = true
+		}
+	}
 	return result
 }
 

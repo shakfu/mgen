@@ -526,10 +526,19 @@ class MGenPythonToGoConverter:
 
     def _convert_function(self, node: ast.FunctionDef) -> str:
         """Convert Python function to Go function."""
+        # Pre-pass: Analyze nested subscripts to detect 2D arrays
+        nested_vars = self._analyze_nested_subscripts(node.body)
+        append_map = self._analyze_append_operations(node.body)
+
         # Build parameter list
         params = []
         for arg in node.args.args:
             param_type = self._infer_parameter_type(arg, node)
+
+            # If parameter is used with nested subscripting and is bare slice, make it 2D
+            if arg.arg in nested_vars and param_type == "[]int":
+                param_type = "[][]int"
+
             params.append(f"{arg.arg} {param_type}")
 
         params_str = ", ".join(params)
@@ -540,6 +549,14 @@ class MGenPythonToGoConverter:
         if node.name != "main":
             if node.returns:
                 mapped_type = self._map_type_annotation(node.returns)
+                # Check if return type should be nested based on usage
+                if mapped_type == "[]int":
+                    # Check if any variable in body that could be returned is nested
+                    for stmt in node.body:
+                        if isinstance(stmt, ast.Return) and stmt.value and isinstance(stmt.value, ast.Name):
+                            if stmt.value.id in nested_vars or stmt.value.id in append_map:
+                                mapped_type = "[][]int"
+                                break
                 if mapped_type:  # Only add space if type is not empty
                     return_type = " " + mapped_type
             else:
@@ -555,15 +572,288 @@ class MGenPythonToGoConverter:
         self.current_function = node.name
         self.declared_vars = set()  # Reset for new function
         self.variable_types = {}  # Reset variable type tracking for new function
-        # Add parameters to declared variables and their types
+        self.nested_vars = nested_vars  # Store for use in type inference
+        self.append_map = append_map
+
+        # Add parameters to variable types first
+        for arg in node.args.args:
+            param_type = self._infer_parameter_type(arg, node)
+            # Apply nested upgrade to parameter types
+            if arg.arg in nested_vars and param_type == "[]int":
+                param_type = "[][]int"
+            self.variable_types[arg.arg] = param_type
+
+        # Pre-pass: infer all variable types including nested container upgrades
+        self._pre_infer_variable_types(node.body)
+
+        # After pre-pass, check if return type needs upgrade based on inferred variable types
+        if return_type and ("map[int]" in return_type or "[]int" == return_type.strip()):
+            for stmt in node.body:
+                if isinstance(stmt, ast.Return) and stmt.value and isinstance(stmt.value, ast.Name):
+                    returned_var = stmt.value.id
+                    if returned_var in self.variable_types:
+                        var_type = self.variable_types[returned_var]
+                        # Upgrade return type if variable was upgraded
+                        if var_type != return_type.strip():
+                            return_type = " " + var_type
+                            func_signature = f"func {node.name}({params_str}){return_type}"
+                            break
+
+        # Update function_return_types with the final return type
+        if node.name != "main" and return_type:
+            self.function_return_types[node.name] = return_type.strip()
+
+        # Add parameters to declared variables
         for arg in node.args.args:
             self.declared_vars.add(arg.arg)
-            param_type = self._infer_parameter_type(arg, node)
-            self.variable_types[arg.arg] = param_type
+
         body = self._convert_statements(node.body)
         self.current_function = None
+        self.nested_vars = set()  # Clear
+        self.append_map = {}
 
         return func_signature + " {\n" + body + "\n}"
+
+    def _analyze_nested_subscripts(self, stmts: list[ast.stmt]) -> set[str]:
+        """Detect variables used with nested subscripts like a[i][j]."""
+        nested_vars: set[str] = set()
+
+        def check_expr(expr: ast.expr) -> None:
+            # Check for nested subscript: outer[index1][index2]
+            if isinstance(expr, ast.Subscript):
+                # Check if the value being subscripted is itself a subscript
+                if isinstance(expr.value, ast.Subscript):
+                    # Get the base variable name
+                    base = expr.value.value
+                    if isinstance(base, ast.Name):
+                        nested_vars.add(base.id)
+                # Recursively check the subscripted value
+                check_expr(expr.value)
+                if not isinstance(expr.slice, ast.Slice):
+                    check_expr(expr.slice)
+            elif isinstance(expr, ast.BinOp):
+                check_expr(expr.left)
+                check_expr(expr.right)
+            elif isinstance(expr, ast.Call):
+                for arg in expr.args:
+                    check_expr(arg)
+            elif isinstance(expr, ast.Compare):
+                check_expr(expr.left)
+                for comp in expr.comparators:
+                    check_expr(comp)
+
+        def check_stmt(stmt: ast.stmt) -> None:
+            if isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    check_expr(target)
+                check_expr(stmt.value)
+            elif isinstance(stmt, ast.AnnAssign):
+                if stmt.value:
+                    check_expr(stmt.value)
+            elif isinstance(stmt, ast.AugAssign):
+                check_expr(stmt.target)
+                check_expr(stmt.value)
+            elif isinstance(stmt, ast.Expr):
+                check_expr(stmt.value)
+            elif isinstance(stmt, (ast.For, ast.While)):
+                for s in stmt.body:
+                    check_stmt(s)
+                if hasattr(stmt, 'orelse'):
+                    for s in stmt.orelse:
+                        check_stmt(s)
+            elif isinstance(stmt, ast.If):
+                check_expr(stmt.test)
+                for s in stmt.body:
+                    check_stmt(s)
+                for s in stmt.orelse:
+                    check_stmt(s)
+            elif isinstance(stmt, ast.Return) and stmt.value:
+                check_expr(stmt.value)
+
+        for stmt in stmts:
+            check_stmt(stmt)
+
+        return nested_vars
+
+    def _analyze_append_operations(self, stmts: list[ast.stmt]) -> dict[str, str]:
+        """Analyze append operations to detect when vectors are appended to vectors."""
+        append_map: dict[str, str] = {}
+
+        def check_stmt(stmt: ast.stmt) -> None:
+            if isinstance(stmt, ast.Expr):
+                if isinstance(stmt.value, ast.Call):
+                    if isinstance(stmt.value.func, ast.Attribute) and stmt.value.func.attr == "append":
+                        if isinstance(stmt.value.func.value, ast.Name) and stmt.value.args:
+                            container_name = stmt.value.func.value.id
+                            if isinstance(stmt.value.args[0], ast.Name):
+                                appended_var = stmt.value.args[0].id
+                                append_map[container_name] = appended_var
+            elif isinstance(stmt, (ast.For, ast.While)):
+                for s in stmt.body:
+                    check_stmt(s)
+            elif isinstance(stmt, ast.If):
+                for s in stmt.body:
+                    check_stmt(s)
+                for s in stmt.orelse:
+                    check_stmt(s)
+
+        for stmt in stmts:
+            check_stmt(stmt)
+
+        return append_map
+
+    def _analyze_map_key_types(self, stmts: list[ast.stmt]) -> set[str]:
+        """Detect maps that are accessed with string keys."""
+        string_keyed_maps: set[str] = set()
+
+        def check_expr(expr: ast.expr) -> None:
+            if isinstance(expr, ast.Subscript):
+                # Check if the subscripted value is a map and the key is a string
+                if isinstance(expr.value, ast.Name):
+                    map_name = expr.value.id
+                    # Check if key is a string literal or string variable
+                    if isinstance(expr.slice, ast.Constant) and isinstance(expr.slice.value, str):
+                        string_keyed_maps.add(map_name)
+                    elif isinstance(expr.slice, ast.Name):
+                        # Check if the key variable is a string
+                        if expr.slice.id in self.variable_types and self.variable_types[expr.slice.id] == "string":
+                            string_keyed_maps.add(map_name)
+                # Recursively check
+                check_expr(expr.value)
+                if not isinstance(expr.slice, ast.Slice):
+                    check_expr(expr.slice)
+            elif isinstance(expr, ast.BinOp):
+                check_expr(expr.left)
+                check_expr(expr.right)
+            elif isinstance(expr, ast.Call):
+                if isinstance(expr.func, ast.Attribute):
+                    check_expr(expr.func.value)
+                for arg in expr.args:
+                    check_expr(arg)
+            elif isinstance(expr, ast.Compare):
+                check_expr(expr.left)
+                for comp in expr.comparators:
+                    check_expr(comp)
+
+        def check_stmt(stmt: ast.stmt) -> None:
+            if isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    check_expr(target)
+                check_expr(stmt.value)
+            elif isinstance(stmt, ast.AnnAssign):
+                if stmt.value:
+                    check_expr(stmt.value)
+            elif isinstance(stmt, ast.Expr):
+                check_expr(stmt.value)
+            elif isinstance(stmt, (ast.For, ast.While)):
+                for s in stmt.body:
+                    check_stmt(s)
+                if hasattr(stmt, 'orelse'):
+                    for s in stmt.orelse:
+                        check_stmt(s)
+            elif isinstance(stmt, ast.If):
+                check_expr(stmt.test)
+                for s in stmt.body:
+                    check_stmt(s)
+                for s in stmt.orelse:
+                    check_stmt(s)
+            elif isinstance(stmt, ast.Return) and stmt.value:
+                check_expr(stmt.value)
+
+        for stmt in stmts:
+            check_stmt(stmt)
+
+        return string_keyed_maps
+
+    def _analyze_map_value_types(self, stmts: list[ast.stmt]) -> dict[str, str]:
+        """Detect map value types from subscript assignments."""
+        map_value_types: dict[str, str] = {}
+
+        def check_stmt(stmt: ast.stmt) -> None:
+            if isinstance(stmt, ast.Assign):
+                # Check for subscript assignment like map[key] = value
+                for target in stmt.targets:
+                    if isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name):
+                        map_name = target.value.id
+                        # Infer value type from assigned value
+                        value_type = self._infer_type_from_value(stmt.value)
+                        if map_name not in map_value_types:
+                            map_value_types[map_name] = value_type
+            elif isinstance(stmt, (ast.For, ast.While)):
+                for s in stmt.body:
+                    check_stmt(s)
+                if hasattr(stmt, 'orelse'):
+                    for s in stmt.orelse:
+                        check_stmt(s)
+            elif isinstance(stmt, ast.If):
+                for s in stmt.body:
+                    check_stmt(s)
+                for s in stmt.orelse:
+                    check_stmt(s)
+
+        for stmt in stmts:
+            check_stmt(stmt)
+
+        return map_value_types
+
+    def _pre_infer_variable_types(self, stmts: list[ast.stmt]) -> None:
+        """Pre-pass to infer all variable types before code generation."""
+        # First pass: collect base types from annotations and initializations
+        def collect_types(stmts: list[ast.stmt]) -> None:
+            for stmt in stmts:
+                if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                    var_name = stmt.target.id
+                    var_type = self._map_type_annotation(stmt.annotation)
+                    if var_name not in self.variable_types:  # Don't override parameters
+                        self.variable_types[var_name] = var_type
+                elif isinstance(stmt, ast.Assign):
+                    for target in stmt.targets:
+                        if isinstance(target, ast.Name) and target.id not in self.variable_types:
+                            var_type = self._infer_type_from_value(stmt.value)
+                            self.variable_types[target.id] = var_type
+                elif isinstance(stmt, (ast.For, ast.While)):
+                    collect_types(stmt.body)
+                    if hasattr(stmt, 'orelse'):
+                        collect_types(stmt.orelse)
+                elif isinstance(stmt, ast.If):
+                    collect_types(stmt.body)
+                    collect_types(stmt.orelse)
+
+        collect_types(stmts)
+
+        # Second pass: upgrade types based on append operations
+        for container_name, appended_var in self.append_map.items():
+            if appended_var in self.variable_types and container_name in self.variable_types:
+                appended_type = self.variable_types[appended_var]
+                if appended_type.startswith("[]"):
+                    self.variable_types[container_name] = f"[]{appended_type}"
+
+        # Third pass: upgrade types based on nested subscript usage
+        for var_name in self.nested_vars:
+            if var_name in self.variable_types and self.variable_types[var_name] == "[]int":
+                self.variable_types[var_name] = "[][]int"
+
+        # Fourth pass: detect string-keyed maps
+        string_keyed_maps = self._analyze_map_key_types(stmts)
+        for var_name in string_keyed_maps:
+            if var_name in self.variable_types:
+                current_type = self.variable_types[var_name]
+                # Upgrade map[int]int to map[string]int, map[int]bool to map[string]bool
+                if current_type == "map[int]int":
+                    self.variable_types[var_name] = "map[string]int"
+                elif current_type == "map[int]bool":
+                    self.variable_types[var_name] = "map[string]bool"
+
+        # Fifth pass: detect map value types from subscript assignments
+        map_value_types = self._analyze_map_value_types(stmts)
+        for var_name, value_type in map_value_types.items():
+            if var_name in self.variable_types:
+                current_type = self.variable_types[var_name]
+                # Only upgrade if the new value type is more specific (not interface{})
+                if value_type != "interface{}" and current_type.startswith("map[") and current_type.endswith("]int"):
+                    # Extract key type and update value type
+                    key_part = current_type[4:-4]  # Remove "map[" and "]int"
+                    self.variable_types[var_name] = f"map[{key_part}]{value_type}"
 
     def _convert_statements(self, statements: list[ast.stmt]) -> str:
         """Convert a list of statements."""
@@ -617,14 +907,38 @@ class MGenPythonToGoConverter:
                 else:
                     # First declaration of variable
                     self.declared_vars.add(target.id)
-                    var_type = self._infer_type_from_value(stmt.value)
-                    # Track the variable type
-                    self.variable_types[target.id] = var_type
-                    # Use := for constructor calls, function calls, and interface{} for cleaner code
-                    if var_type == "interface{}" or self._is_constructor_call(stmt.value) or isinstance(stmt.value, ast.Call):
+
+                    # For function calls, always use := to let Go infer the correct type
+                    if isinstance(stmt.value, ast.Call):
+                        # Update variable_types if we have a pre-computed type
+                        if target.id in self.variable_types:
+                            # Already pre-computed, just use :=
+                            pass
+                        elif isinstance(stmt.value.func, ast.Name) and stmt.value.func.id in self.function_return_types:
+                            # Get return type from function
+                            self.variable_types[target.id] = self.function_return_types[stmt.value.func.id]
                         statements.append(f"    {target.id} := {value_expr}")
                     else:
-                        statements.append(f"    var {target.id} {var_type} = {value_expr}")
+                        # Use pre-computed type if available, otherwise infer
+                        if target.id in self.variable_types:
+                            var_type = self.variable_types[target.id]
+                        else:
+                            var_type = self._infer_type_from_value(stmt.value)
+                            # Check if this variable should be nested based on usage analysis
+                            if hasattr(self, 'nested_vars') and target.id in self.nested_vars and var_type == "[]int":
+                                var_type = "[][]int"
+                            # Check if this variable has a vector appended to it
+                            if hasattr(self, 'append_map') and target.id in self.append_map:
+                                appended_var = self.append_map[target.id]
+                                if appended_var in self.variable_types and self.variable_types[appended_var].startswith("[]"):
+                                    var_type = f"[]{self.variable_types[appended_var]}"
+                            self.variable_types[target.id] = var_type
+
+                        # Use := for constructor calls and interface{} for cleaner code
+                        if var_type == "interface{}" or self._is_constructor_call(stmt.value):
+                            statements.append(f"    {target.id} := {value_expr}")
+                        else:
+                            statements.append(f"    var {target.id} {var_type} = {value_expr}")
             elif isinstance(target, ast.Subscript):
                 # Handle subscript assignment: container[index] = value
                 container_expr = self._convert_expression(target.value)
@@ -635,11 +949,49 @@ class MGenPythonToGoConverter:
 
     def _convert_annotated_assignment(self, stmt: ast.AnnAssign) -> str:
         """Convert annotated assignment."""
-        # Always use annotation if present - Python annotations are explicit type declarations
-        var_type = self._map_type_annotation(stmt.annotation)
+        # Use pre-computed type if available, otherwise map from annotation
+        if isinstance(stmt.target, ast.Name) and stmt.target.id in self.variable_types:
+            var_type = self.variable_types[stmt.target.id]
+        else:
+            # Always use annotation if present - Python annotations are explicit type declarations
+            var_type = self._map_type_annotation(stmt.annotation)
+
+            # Check if this variable should be nested based on usage analysis
+            if isinstance(stmt.target, ast.Name):
+                if hasattr(self, 'nested_vars') and stmt.target.id in self.nested_vars and var_type == "[]int":
+                    var_type = "[][]int"
+                # Check if this variable has a vector appended to it
+                if hasattr(self, 'append_map') and stmt.target.id in self.append_map:
+                    appended_var = self.append_map[stmt.target.id]
+                    if appended_var in self.variable_types and self.variable_types[appended_var].startswith("[]"):
+                        var_type = f"[]{self.variable_types[appended_var]}"
 
         if stmt.value:
-            value_expr = self._convert_expression(stmt.value)
+            # For empty dict, use the upgraded type
+            if isinstance(stmt.value, ast.Dict) and not stmt.value.keys:
+                value_expr = f"make({var_type})"
+            # For function calls, use := to let Go infer the type correctly (except make())
+            elif isinstance(stmt.value, ast.Call):
+                # Special case: make() should use the annotated/upgraded type
+                if isinstance(stmt.value.func, ast.Name) and stmt.value.func.id == "make":
+                    # Use the upgraded type for make()
+                    value_expr = f"make({var_type})"
+                else:
+                    value_expr = self._convert_expression(stmt.value)
+                    target_id = stmt.target.id if isinstance(stmt.target, ast.Name) else str(stmt.target)
+                    if isinstance(stmt.target, ast.Name):
+                        self.declared_vars.add(stmt.target.id)
+                        # Update variable_types with the correct return type
+                        if isinstance(stmt.value.func, ast.Name) and stmt.value.func.id in self.function_return_types:
+                            self.variable_types[stmt.target.id] = self.function_return_types[stmt.value.func.id]
+                        else:
+                            self.variable_types[stmt.target.id] = var_type
+                    return f"    {target_id} := {value_expr}"
+            # For empty lists, use the correct type
+            elif isinstance(stmt.value, ast.List) and not stmt.value.elts:
+                value_expr = f"{var_type}{{}}"
+            else:
+                value_expr = self._convert_expression(stmt.value)
         else:
             value_expr = None
 
@@ -1012,12 +1364,12 @@ class MGenPythonToGoConverter:
             element_type = element_types[0]
             elements = [self._convert_expression(elt) for elt in expr.elts]
             elements_str = ", ".join(elements)
-            return f"[]{element_type}{{{{{elements_str}}}}}"
+            return f"[]{element_type}{{{elements_str}}}"
         else:
             # Mixed types or interface{}, use interface{}
             elements = [self._convert_expression(elt) for elt in expr.elts]
             elements_str = ", ".join(elements)
-            return f"[]interface{{{{{elements_str}}}}}"
+            return f"[]interface{{{elements_str}}}"
 
     def _convert_dict_literal(self, expr: ast.Dict) -> str:
         """Convert dict literal to Go map literal."""
@@ -1175,7 +1527,12 @@ class MGenPythonToGoConverter:
                 conditions = expr.generators[0].ifs
                 if conditions:
                     condition_expr = self._convert_expression(conditions[0])
-                    filter_lambda = f"func(kv mgen.KV[{key_type}, {value_type}]) bool {{ {key_var}, {value_var} := kv.Key, kv.Value; return {condition_expr} }}"
+                    # Detect which variables are used in the condition
+                    key_used = key_var in condition_expr
+                    value_used = value_var in condition_expr
+                    key_assign = key_var if key_used else "_"
+                    value_assign = value_var if value_used else "_"
+                    filter_lambda = f"func(kv mgen.KV[{key_type}, {value_type}]) bool {{ {key_assign}, {value_assign} := kv.Key, kv.Value; return {condition_expr} }}"
                     return f"mgen.DictComprehensionWithFilter[mgen.KV[{key_type}, {value_type}], {key_type}, {value_type}]({container_expr}, {transform_lambda}, {filter_lambda})"
                 else:
                     return f"mgen.DictComprehension[mgen.KV[{key_type}, {value_type}], {key_type}, {value_type}]({container_expr}, {transform_lambda})"
@@ -1213,14 +1570,34 @@ class MGenPythonToGoConverter:
             return f"mgen.SetComprehensionFromRange[{element_type}]({range_call}, {transform_lambda})"
         else:
             source_type = self._infer_type_from_value(iter_expr)
-            source_element_type = source_type[2:] if source_type.startswith("[]") else "interface{}"
-
             container_expr = self._convert_expression(iter_expr)
             target_name = target.id if isinstance(target, ast.Name) else "x"
             transform_expr = self._convert_expression(element_expr)
-            transform_lambda = f"func({target_name} {source_element_type}) {element_type} {{ return {transform_expr} }}"
 
-            return f"mgen.SetComprehension[{source_element_type}, {element_type}]({container_expr}, {transform_lambda})"
+            # Extract element type from source (handle both slices and sets)
+            if source_type.startswith("[]"):
+                # Slice type: []int → int
+                source_element_type = source_type[2:]
+                transform_lambda = f"func({target_name} {source_element_type}) {element_type} {{ return {transform_expr} }}"
+                return f"mgen.SetComprehension[{source_element_type}, {element_type}]({container_expr}, {transform_lambda})"
+            elif source_type.startswith("map[") and source_type.endswith("]bool"):
+                # Set type: map[int]bool → int - use SetComprehensionFromSet
+                source_element_type = source_type[4:-5]  # Remove "map[" prefix and "]bool" suffix
+                transform_lambda = f"func({target_name} {source_element_type}) {element_type} {{ return {transform_expr} }}"
+
+                # Check if there's a filter condition
+                if expr.generators[0].ifs:
+                    # Has filter - use SetComprehensionFromSetWithFilter
+                    filter_conditions = " && ".join([self._convert_expression(if_expr) for if_expr in expr.generators[0].ifs])
+                    filter_lambda = f"func({target_name} {source_element_type}) bool {{ return {filter_conditions} }}"
+                    return f"mgen.SetComprehensionFromSetWithFilter[{source_element_type}, {element_type}]({container_expr}, {filter_lambda}, {transform_lambda})"
+                else:
+                    # No filter - use SetComprehensionFromSet
+                    return f"mgen.SetComprehensionFromSet[{source_element_type}, {element_type}]({container_expr}, {transform_lambda})"
+            else:
+                source_element_type = "interface{}"
+                transform_lambda = f"func({target_name} {source_element_type}) {element_type} {{ return {transform_expr} }}"
+                return f"mgen.SetComprehension[{source_element_type}, {element_type}]({container_expr}, {transform_lambda})"
 
     def _convert_subscript(self, expr: ast.Subscript) -> str:
         """Convert subscript operation to Go array/map access."""
@@ -1360,9 +1737,14 @@ class MGenPythonToGoConverter:
             else:
                 # Iterating over a container
                 iter_type = self._infer_type_from_value(iter_expr)
-                # Extract element type from slice
+                # Extract element type from slice or set
                 if iter_type.startswith("[]"):
+                    # Slice type: []int → int
                     element_type = iter_type[2:]
+                    loop_var_types[target.id] = element_type
+                elif iter_type.startswith("map[") and iter_type.endswith("]bool"):
+                    # Set type: map[int]bool → int
+                    element_type = iter_type[4:-5]
                     loop_var_types[target.id] = element_type
                 else:
                     loop_var_types[target.id] = "interface{}"
