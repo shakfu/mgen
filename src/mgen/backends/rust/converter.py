@@ -3,6 +3,7 @@
 import ast
 from typing import Any, Optional
 
+from ...analysis.immutability import ImmutabilityAnalyzer, MutabilityClass
 from ..converter_utils import (
     get_augmented_assignment_operator,
     get_standard_binary_operator,
@@ -29,9 +30,13 @@ class MGenPythonToRustConverter:
         }
         self.struct_info: dict[str, dict[str, Any]] = {}  # Track struct definitions for classes
         self.current_function: Optional[str] = None  # Track current function context
+        self.current_function_node: Optional[ast.FunctionDef] = None  # Track current function AST node
         self.declared_vars: set[str] = set()  # Track declared variables in current function
         self.function_return_types: dict[str, str] = {}  # Track function return types
         self.variable_types: dict[str, str] = {}  # Track variable types in current function scope
+        self.function_mut_params: dict[str, set[str]] = {}  # Track mutable parameters for each function
+        self.immutability_analyzer = ImmutabilityAnalyzer()  # Backend-agnostic immutability analysis
+        self.mutability_info: dict[str, dict[str, MutabilityClass]] = {}  # Immutability analysis results
 
     def _to_snake_case(self, camel_str: str) -> str:
         """Convert CamelCase to snake_case."""
@@ -48,6 +53,10 @@ class MGenPythonToRustConverter:
         """Convert Python code to Rust."""
         try:
             tree = ast.parse(python_code)
+
+            # Run immutability analysis on the module (backend-agnostic)
+            self.mutability_info = self.immutability_analyzer.analyze_module(tree)
+
             return self._convert_module(tree)
         except UnsupportedFeatureError:
             # Re-raise UnsupportedFeatureError without wrapping
@@ -564,10 +573,46 @@ class MGenPythonToRustConverter:
 
     def _convert_function(self, node: ast.FunctionDef) -> str:
         """Convert Python function to Rust function."""
+        # Get immutability analysis results for this function (backend-agnostic)
+        mutability_info = self.mutability_info.get(node.name, {})
+
+        # Track which parameters need mutable references (Rust-specific interpretation)
+        mut_params = set()
+        readonly_params = set()
+
+        for arg in node.args.args:
+            mutability = mutability_info.get(arg.arg, MutabilityClass.UNKNOWN)
+
+            # Rust-specific interpretation of mutability analysis:
+            if mutability == MutabilityClass.MUTABLE:
+                mut_params.add(arg.arg)
+            elif mutability in (MutabilityClass.IMMUTABLE, MutabilityClass.READ_ONLY):
+                readonly_params.add(arg.arg)
+            elif mutability == MutabilityClass.UNKNOWN:
+                # Fall back to old behavior: check if actually mutated
+                if self._parameter_is_mutated(arg.arg, node):
+                    mut_params.add(arg.arg)
+                else:
+                    # If unknown and not mutated, treat as read-only
+                    readonly_params.add(arg.arg)
+
+        self.function_mut_params[node.name] = mut_params
+
         # Build parameter list
         params = []
         for arg in node.args.args:
             param_type = self._infer_parameter_type(arg, node)
+
+            # Rust-specific reference type selection based on mutability
+            if param_type.startswith("Vec<") or param_type.startswith("std::collections::HashMap<") or param_type.startswith("std::collections::HashSet<"):
+                if arg.arg in mut_params:
+                    # Mutable reference for parameters that are modified
+                    param_type = f"&mut {param_type}"
+                elif arg.arg in readonly_params:
+                    # Immutable reference for read-only parameters
+                    param_type = f"&{param_type}"
+                # else: take ownership (fallback for UNKNOWN with no usage)
+
             params.append(f"{arg.arg}: {param_type}")
 
         params_str = ", ".join(params)
@@ -579,6 +624,23 @@ class MGenPythonToRustConverter:
             actual_return_type = "()"
         elif node.returns:
             mapped_type = self._map_type_annotation(node.returns)
+
+            # If we got a generic fallback type, try to infer the actual type from return statements
+            # Check for Box<dyn Any> or default container types (HashMap<i32, i32>, Vec<i32>, etc.)
+            needs_inference = (
+                "Box<dyn" in mapped_type
+                or mapped_type == "std::collections::HashMap<i32, i32>"
+                or mapped_type == "std::collections::HashMap<String, i32>"
+                or mapped_type == "Vec<i32>"
+                or mapped_type == "std::collections::HashSet<i32>"
+            )
+            if needs_inference:
+                # Analyze the function body to get the actual return type
+                # This is a pre-analysis pass before we convert statements
+                inferred_from_return = self._infer_return_type_from_statements(node)
+                if inferred_from_return and inferred_from_return != mapped_type:
+                    mapped_type = inferred_from_return
+
             actual_return_type = mapped_type if mapped_type else "()"
             if mapped_type and mapped_type != "()":
                 return_type = f" -> {mapped_type}"
@@ -601,15 +663,27 @@ class MGenPythonToRustConverter:
 
         # Convert function body
         self.current_function = node.name
+        self.current_function_node = node  # Store AST node for analysis
         self.declared_vars = set()  # Reset for new function
         self.variable_types = {}  # Reset variable type tracking for new function
         # Add parameters to declared variables and their types
         for arg in node.args.args:
             self.declared_vars.add(arg.arg)
             param_type = self._infer_parameter_type(arg, node)
-            self.variable_types[arg.arg] = param_type
+
+            # Store the parameter type with appropriate reference qualifier
+            if param_type.startswith("Vec<") or param_type.startswith("std::collections::HashMap<") or param_type.startswith("std::collections::HashSet<"):
+                if arg.arg in mut_params:
+                    self.variable_types[arg.arg] = f"&mut {param_type}"
+                elif arg.arg in readonly_params:
+                    self.variable_types[arg.arg] = f"&{param_type}"
+                else:
+                    self.variable_types[arg.arg] = param_type
+            else:
+                self.variable_types[arg.arg] = param_type
         body = self._convert_statements(node.body)
         self.current_function = None
+        self.current_function_node = None
 
         return f"{func_signature} {{\n{body}\n}}"
 
@@ -666,6 +740,12 @@ class MGenPythonToRustConverter:
             if isinstance(target, ast.Name):
                 if target.id in self.declared_vars:
                     # Variable already declared, use assignment
+                    # Update type if the new value has a more specific type
+                    new_type = self._infer_type_from_value(stmt.value)
+                    old_type = self.variable_types.get(target.id, "")
+                    # If old type was Vec<i32> (default for empty list) and new type is more specific, update it
+                    if old_type == "Vec<i32>" and new_type != "Vec<i32>" and new_type.startswith("Vec<"):
+                        self.variable_types[target.id] = new_type
                     statements.append(f"    {target.id} = {value_expr};")
                 else:
                     # First declaration of variable
@@ -682,19 +762,39 @@ class MGenPythonToRustConverter:
                         statements.append(f"    let mut {target.id} = {value_expr};")
             elif isinstance(target, ast.Subscript):
                 # Handle subscript assignment: container[index] = value
-                container_expr = self._convert_expression(target.value)
-                index_expr = self._convert_expression(target.slice)
 
-                # Special case: Python bool in dict[int] = bool pattern (set simulation)
-                # If value is True/False and container is HashMap<_, i32>, convert to 1/0
-                if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, bool):
+                # Check if this is a nested subscript (2D array): container[i][j] = value
+                if isinstance(target.value, ast.Subscript):
+                    # Nested subscript - use direct indexing for both levels
+                    # target.value.value is the base container, target.value.slice is first index, target.slice is second index
+                    base_container = self._convert_expression(target.value.value)
+                    first_index = self._convert_expression(target.value.slice)
+                    second_index = self._convert_expression(target.slice)
+                    statements.append(f"    {base_container}[{first_index} as usize][{second_index} as usize] = {value_expr};")
+                else:
+                    # Single subscript
+                    container_expr = self._convert_expression(target.value)
+                    index_expr = self._convert_expression(target.slice)
+
+                    # Determine container type to use correct assignment syntax
+                    container_type = ""
                     if isinstance(target.value, ast.Name):
-                        var_type = self.variable_types.get(target.value.id, "")
-                        if "HashMap" in var_type and "i32>" in var_type:
+                        container_type = self.variable_types.get(target.value.id, "")
+
+                    # Special case: Python bool in dict[int] = bool pattern (set simulation)
+                    # If value is True/False and container is HashMap<_, i32>, convert to 1/0
+                    if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, bool):
+                        if "HashMap" in container_type and "i32>" in container_type:
                             # HashMap with i32 values - convert bool to int
                             value_expr = "1" if stmt.value.value else "0"
 
-                statements.append(f"    {container_expr}.insert({index_expr}, {value_expr});")
+                    # Choose appropriate assignment syntax based on container type
+                    if "Vec<" in container_type:
+                        # Vector: use direct indexing with as usize cast
+                        statements.append(f"    {container_expr}[{index_expr} as usize] = {value_expr};")
+                    else:
+                        # HashMap/HashSet: use insert method
+                        statements.append(f"    {container_expr}.insert({index_expr}, {value_expr});")
 
         return "\n".join(statements)
 
@@ -704,6 +804,25 @@ class MGenPythonToRustConverter:
             value_expr = self._convert_expression(stmt.value)
             # Infer type from value if possible, otherwise use annotation
             var_type = self._infer_type_from_value(stmt.value)
+
+            # Special case: If we inferred Vec<i32> from an empty list but annotation is 'list',
+            # check if we're in a function and analyze usage to detect nested lists
+            if var_type == "Vec<i32>" and isinstance(stmt.value, ast.List) and not stmt.value.elts:
+                if isinstance(stmt.target, ast.Name) and self.current_function_node:
+                    # We have an empty list - analyze what's appended to it
+                    element_type = self._infer_list_element_type_from_appends(stmt.target.id, self.current_function_node)
+                    if element_type:
+                        var_type = f"Vec<{element_type}>"
+
+            # Special case: If we inferred HashMap<i32, i32> from an empty dict but annotation is 'dict',
+            # check if we're in a function and analyze usage to detect key/value types
+            if var_type == "std::collections::HashMap<i32, i32>" and isinstance(stmt.value, ast.Dict) and not stmt.value.keys:
+                if isinstance(stmt.target, ast.Name) and self.current_function_node:
+                    # We have an empty dict - analyze how it's used
+                    dict_types = self._infer_dict_types_from_usage(stmt.target.id, self.current_function_node)
+                    if dict_types:
+                        key_type, value_type = dict_types
+                        var_type = f"std::collections::HashMap<{key_type}, {value_type}>"
         else:
             var_type = self._map_type_annotation(stmt.annotation)
             value_expr = self._get_default_value(var_type)
@@ -1098,7 +1217,43 @@ class MGenPythonToRustConverter:
                     args_str = ", ".join(args)
                     return f"{func_name}::new({args_str})"
                 else:
-                    args_str = ", ".join(args)
+                    # Check if this function has parameters that expect references
+                    if func_name in self.mutability_info:
+                        func_mutability = self.mutability_info[func_name]
+                        modified_args = []
+
+                        for i, arg in enumerate(args):
+                            arg_expr = expr.args[i]
+
+                            # Only modify arguments that are simple variables
+                            if isinstance(arg_expr, ast.Name):
+                                var_type = self.variable_types.get(arg_expr.id, "")
+                                param_names = list(func_mutability.keys())
+
+                                # Check if this parameter position has mutability info
+                                if i < len(param_names):
+                                    param_name = param_names[i]
+                                    mutability = func_mutability[param_name]
+
+                                    # Determine if we need to pass by reference
+                                    if var_type.startswith("Vec<") or var_type.startswith("std::collections::"):
+                                        if mutability == MutabilityClass.MUTABLE:
+                                            modified_args.append(f"&mut {arg}")
+                                        elif mutability in (MutabilityClass.READ_ONLY, MutabilityClass.IMMUTABLE):
+                                            modified_args.append(f"&{arg}")
+                                        else:
+                                            # UNKNOWN or already a reference - pass as is
+                                            modified_args.append(arg)
+                                    else:
+                                        modified_args.append(arg)
+                                else:
+                                    modified_args.append(arg)
+                            else:
+                                modified_args.append(arg)
+
+                        args_str = ", ".join(modified_args)
+                    else:
+                        args_str = ", ".join(args)
                     return f"{func_name}({args_str})"
 
         elif isinstance(expr.func, ast.Attribute):
@@ -1383,8 +1538,14 @@ class MGenPythonToRustConverter:
     def _infer_type_from_value(self, value: ast.expr) -> str:
         """Infer Rust type from Python value."""
         # Check if this is a variable reference with known type
-        if isinstance(value, ast.Name) and value.id in self.variable_types:
-            return self.variable_types[value.id]
+        if isinstance(value, ast.Name):
+            if value.id in self.variable_types:
+                return self.variable_types[value.id]
+            # If not in variable_types, try to infer from AST
+            if self.current_function_node:
+                inferred = self._infer_variable_type_from_ast(value.id, self.current_function_node)
+                if inferred:
+                    return inferred
 
         if isinstance(value, ast.Constant):
             if isinstance(value.value, bool):  # Check bool first since bool is subclass of int
@@ -1465,6 +1626,39 @@ class MGenPythonToRustConverter:
                     return "String"
                 elif method_name == "find":
                     return "i32"  # Returns index
+                elif method_name == "split":
+                    return "Vec<String>"  # Returns list of strings
+        elif isinstance(value, ast.BinOp):
+            # Infer type from binary operation
+            # For arithmetic ops, try to infer from left operand
+            left_type = self._infer_type_from_value(value.left)
+            right_type = self._infer_type_from_value(value.right)
+            # If both are same type, return that type
+            if left_type == right_type:
+                return left_type
+            # If one is float, result is float
+            if left_type == "f64" or right_type == "f64":
+                return "f64"
+            # Default to i32 for mixed int operations
+            return "i32"
+        elif isinstance(value, ast.Subscript):
+            # dict[key] or list[index] - try to infer element/value type
+            # Only infer if the container type is already known (to avoid circular dependencies)
+            if isinstance(value.value, ast.Name):
+                container_name = value.value.id
+                if container_name in self.variable_types:
+                    container_type = self.variable_types[container_name]
+                    # Extract element type from Vec<T> or HashMap<K, V>
+                    if container_type.startswith("Vec<"):
+                        return container_type[4:-1]  # Extract T from Vec<T>
+                    elif container_type.startswith("std::collections::HashMap<"):
+                        # Extract V from HashMap<K, V>
+                        inner = container_type[26:-1]  # Remove "std::collections::HashMap<" and ">"
+                        parts = inner.split(", ", 1)
+                        if len(parts) == 2:
+                            return parts[1]  # Return value type
+            # Default to i32 - we can't infer from an unknown container
+            return "i32"
 
         return "i32"
 
@@ -1513,8 +1707,312 @@ class MGenPythonToRustConverter:
     def _infer_parameter_type(self, arg: ast.arg, func: ast.FunctionDef) -> str:
         """Infer parameter type from annotation or context."""
         if arg.annotation:
-            return self._map_type_annotation(arg.annotation)
+            base_type = self._map_type_annotation(arg.annotation)
+
+            # If base type is a generic container (Box<dyn Any>), try to infer element type from usage
+            if "Box<dyn" in base_type:
+                # Analyze function body to infer actual element type
+                element_type = self._infer_container_element_type(arg.arg, func)
+                if element_type:
+                    if base_type.startswith("Vec<"):
+                        return f"Vec<{element_type}>"
+                    elif base_type.startswith("std::collections::HashMap<"):
+                        return f"std::collections::HashMap<String, {element_type}>"
+                    elif base_type.startswith("std::collections::HashSet<"):
+                        return f"std::collections::HashSet<{element_type}>"
+
+            return base_type
         return "i32"
+
+    def _infer_container_element_type(self, param_name: str, func: ast.FunctionDef) -> Optional[str]:
+        """Infer container element type by analyzing how the parameter is used in function body.
+
+        Args:
+            param_name: Name of the parameter to analyze
+            func: Function definition containing the parameter usage
+
+        Returns:
+            Inferred element type or None if cannot determine
+        """
+        # First check for nested subscripts (2D arrays): param[i][j]
+        for stmt in ast.walk(func):
+            # Look for nested subscript: param[i][j] used in expressions
+            if isinstance(stmt, ast.Subscript):
+                if isinstance(stmt.value, ast.Subscript):
+                    # We have a nested subscript
+                    if isinstance(stmt.value.value, ast.Name) and stmt.value.value.id == param_name:
+                        # This is param[i][j] - param is a 2D container
+                        # The outer subscript returns the element type, which we can infer from context
+                        # For now, assume it's used with int operations (most common case)
+                        return "Vec<i32>"  # This means param is Vec<Vec<i32>>
+
+        # Look for annotated assignments like: element: int = container[index]
+        for stmt in ast.walk(func):
+            if isinstance(stmt, ast.AnnAssign) and stmt.value:
+                if isinstance(stmt.value, ast.Subscript):
+                    if isinstance(stmt.value.value, ast.Name) and stmt.value.value.id == param_name:
+                        # Found: element_var: type = param[index]
+                        return self._map_type_annotation(stmt.annotation)
+
+            # Look for regular assignments with subscripts: element = container[index]
+            # where element has a prior type annotation
+            if isinstance(stmt, ast.Assign):
+                if stmt.value and isinstance(stmt.value, ast.Subscript):
+                    if isinstance(stmt.value.value, ast.Name) and stmt.value.value.id == param_name:
+                        # Found: element_var = param[index]
+                        # Check if we can infer type from the target variable
+                        if isinstance(stmt.targets[0], ast.Name):
+                            target_id = stmt.targets[0].id
+                            # Scan earlier in function for type annotation of this variable
+                            for earlier_stmt in func.body:
+                                if isinstance(earlier_stmt, ast.AnnAssign):
+                                    if isinstance(earlier_stmt.target, ast.Name) and earlier_stmt.target.id == target_id:
+                                        return self._map_type_annotation(earlier_stmt.annotation)
+                                if earlier_stmt == stmt:
+                                    break
+
+        return None
+
+    def _parameter_is_mutated(self, param_name: str, func: ast.FunctionDef) -> bool:
+        """Check if a parameter is mutated (modified) in the function body.
+
+        Args:
+            param_name: Name of the parameter to check
+            func: Function definition to analyze
+
+        Returns:
+            True if parameter is mutated, False otherwise
+        """
+        for stmt in ast.walk(func):
+            # Check for subscript assignment: param[i] = value
+            if isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    if isinstance(target, ast.Subscript):
+                        if isinstance(target.value, ast.Name) and target.value.id == param_name:
+                            return True
+
+            # Check for augmented assignment: param[i] += value
+            if isinstance(stmt, ast.AugAssign):
+                if isinstance(stmt.target, ast.Subscript):
+                    if isinstance(stmt.target.value, ast.Name) and stmt.target.value.id == param_name:
+                        return True
+
+            # Check for mutating method calls: param.append(value), param.insert(...), etc.
+            if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
+                if isinstance(stmt.value.func, ast.Attribute):
+                    if isinstance(stmt.value.func.value, ast.Name) and stmt.value.func.value.id == param_name:
+                        mutating_methods = {"append", "insert", "remove", "pop", "clear", "extend", "sort", "reverse"}
+                        if stmt.value.func.attr in mutating_methods:
+                            return True
+
+        return False
+
+    def _infer_variable_type_from_ast(self, var_name: str, func: ast.FunctionDef) -> Optional[str]:
+        """Infer a variable's type by searching the function AST for its declaration.
+
+        Args:
+            var_name: Name of the variable to find
+            func: Function definition to search
+
+        Returns:
+            Inferred type or None if cannot determine
+        """
+        # Search for annotated assignments: var: type = value
+        for stmt in ast.walk(func):
+            if isinstance(stmt, ast.AnnAssign):
+                if isinstance(stmt.target, ast.Name) and stmt.target.id == var_name:
+                    # Found the variable declaration with type annotation
+                    base_type = self._map_type_annotation(stmt.annotation)
+
+                    # If it's an empty dict or list LITERAL with a generic type annotation,
+                    # we need to infer the actual type from usage
+                    # This handles cases like: word_counts: dict = {}
+                    # But NOT: result: list = some_function()  (that's a function call, not an empty literal)
+                    if stmt.value:
+                        # Only check empty LITERALS, not function calls or other expressions
+                        if isinstance(stmt.value, ast.Dict) and len(stmt.value.keys) == 0:
+                            # Empty dict literal - check if it has a generic type
+                            if ("std::collections::HashMap<" in base_type
+                                and ("Box<dyn" in base_type or base_type.endswith("<i32, i32>"))):
+                                # Generic or default dict type - infer from usage
+                                return None  # Signal caller to do deeper inference
+                        elif isinstance(stmt.value, ast.List) and len(stmt.value.elts) == 0:
+                            # Empty list literal - check if it has a generic type
+                            if base_type == "Vec<i32>" or "Box<dyn" in base_type:
+                                # Generic or default list type - infer from usage
+                                return None  # Signal caller to do deeper inference
+
+                    return base_type
+
+            # Also check regular assignments: var = value
+            elif isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name) and target.id == var_name:
+                        # Found assignment - try to infer from value
+                        # Use a simplified inference to avoid recursion
+                        if isinstance(stmt.value, ast.Constant):
+                            if isinstance(stmt.value.value, str):
+                                return "String"
+                            elif isinstance(stmt.value.value, int):
+                                return "i32"
+                            elif isinstance(stmt.value.value, float):
+                                return "f64"
+                            elif isinstance(stmt.value.value, bool):
+                                return "bool"
+                        elif isinstance(stmt.value, ast.Call):
+                            # Check if it's a string method call
+                            if isinstance(stmt.value.func, ast.Attribute):
+                                method_name = stmt.value.func.attr
+                                if method_name in ["upper", "lower", "strip", "replace", "lstrip", "rstrip"]:
+                                    return "String"
+
+        return None
+
+    def _infer_dict_types_from_usage(self, var_name: str, func: ast.FunctionDef) -> Optional[tuple[str, str]]:
+        """Infer dict key and value types by analyzing usage patterns.
+
+        Args:
+            var_name: Name of the dict variable
+            func: Function definition to analyze
+
+        Returns:
+            Tuple of (key_type, value_type) or None if cannot determine
+        """
+        # First check for subscript assignments: dict[key] = value
+        for stmt in ast.walk(func):
+            if isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    if isinstance(target, ast.Subscript):
+                        if isinstance(target.value, ast.Name) and target.value.id == var_name:
+                            # Found: dict[key] = value
+                            key_type = self._infer_type_from_value(target.slice)
+                            value_type = self._infer_type_from_value(stmt.value)
+                            return (key_type, value_type)
+
+        # Check for .insert() method calls (though Python dicts don't have insert, check anyway)
+        # Check for other operations that reveal types
+        for stmt in ast.walk(func):
+            # Check for 'in' operator: if key in dict
+            if isinstance(stmt, ast.Compare):
+                if isinstance(stmt.left, ast.Name):
+                    for comparator in stmt.comparators:
+                        if isinstance(comparator, ast.Name) and comparator.id == var_name:
+                            # Found: key in dict
+                            key_type = self._infer_type_from_value(stmt.left)
+                            # Value type unknown from this pattern
+                            return (key_type, "i32")
+
+        return None
+
+    def _infer_list_element_type_from_appends(self, var_name: str, func: ast.FunctionDef) -> Optional[str]:
+        """Infer list element type by analyzing what's appended to the list or assigned to it.
+
+        Args:
+            var_name: Name of the list variable
+            func: Function definition to analyze
+
+        Returns:
+            Inferred element type or None if cannot determine
+        """
+        # First check for assignments: var = some_value
+        for stmt in ast.walk(func):
+            if isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name) and target.id == var_name:
+                        # Found assignment to this variable - infer type from the value
+                        assigned_type = self._infer_type_from_value(stmt.value)
+                        # If it's a Vec type, extract and return the element type
+                        if assigned_type.startswith("Vec<") and assigned_type.endswith(">"):
+                            element_type = assigned_type[4:-1]  # Extract T from Vec<T>
+                            return element_type
+                        return assigned_type
+
+        # If no assignment found, look for append calls
+        for stmt in ast.walk(func):
+            # Look for list.append(value) calls
+            if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
+                if isinstance(stmt.value.func, ast.Attribute):
+                    if (isinstance(stmt.value.func.value, ast.Name) and
+                        stmt.value.func.value.id == var_name and
+                        stmt.value.func.attr == "append" and
+                        stmt.value.args):
+                        # Found an append - analyze the argument
+                        append_arg = stmt.value.args[0]
+
+                        # If appending a constant, infer type from the constant
+                        if isinstance(append_arg, ast.Constant):
+                            return self._infer_type_from_value(append_arg)
+
+                        # If appending a variable, infer its type
+                        if isinstance(append_arg, ast.Name):
+                            appended_var_name = append_arg.id
+                            # Look for the declaration of this variable (search all descendants, not just func.body)
+                            for earlier_stmt in ast.walk(func):
+                                if isinstance(earlier_stmt, ast.AnnAssign):
+                                    if isinstance(earlier_stmt.target, ast.Name) and earlier_stmt.target.id == appended_var_name:
+                                        # Found the declaration - infer its type
+                                        if earlier_stmt.value:
+                                            # If it has a value, infer from the value
+                                            inferred_type = self._infer_type_from_value(earlier_stmt.value)
+                                            # If it's an empty list, recursively infer its element type
+                                            if inferred_type == "Vec<i32>" and isinstance(earlier_stmt.value, ast.List) and not earlier_stmt.value.elts:
+                                                # Recursively check what's appended to this list
+                                                nested_element_type = self._infer_list_element_type_from_appends(appended_var_name, func)
+                                                if nested_element_type:
+                                                    return f"Vec<{nested_element_type}>"
+                                                else:
+                                                    return "Vec<i32>"
+                                            return inferred_type
+                                        else:
+                                            # No value, use annotation
+                                            return self._map_type_annotation(earlier_stmt.annotation)
+                                        # Found the declaration, stop searching
+                                        break
+
+        return None
+
+    def _infer_return_type_from_statements(self, func: ast.FunctionDef) -> Optional[str]:
+        """Infer return type by analyzing return statements in function body.
+
+        This is a pre-analysis pass that infers types before statement conversion.
+        """
+        for stmt in ast.walk(func):
+            if isinstance(stmt, ast.Return) and stmt.value:
+                # Found return statement - analyze what's being returned
+                if isinstance(stmt.value, ast.Name):
+                    # Returning a variable - try to infer its type from AST
+                    var_name = stmt.value.id
+                    # Use the AST-based type inference we created
+                    inferred_type = self._infer_variable_type_from_ast(var_name, func)
+
+                    # If inference returned None, it means we need deeper analysis (empty dict/list)
+                    if inferred_type is None:
+                        # Try dict type inference
+                        dict_types = self._infer_dict_types_from_usage(var_name, func)
+                        if dict_types:
+                            key_type, value_type = dict_types
+                            return f"std::collections::HashMap<{key_type}, {value_type}>"
+                        # Try list type inference
+                        element_type = self._infer_list_element_type_from_appends(var_name, func)
+                        if element_type:
+                            return f"Vec<{element_type}>"
+                    elif inferred_type:
+                        # For dict/list types, check if we need deeper inference
+                        if inferred_type == "std::collections::HashMap<i32, i32>":
+                            # Try to get more specific type from usage
+                            dict_types = self._infer_dict_types_from_usage(var_name, func)
+                            if dict_types:
+                                key_type, value_type = dict_types
+                                return f"std::collections::HashMap<{key_type}, {value_type}>"
+                        elif inferred_type == "Vec<i32>":
+                            # Try to get more specific element type
+                            element_type = self._infer_list_element_type_from_appends(var_name, func)
+                            if element_type:
+                                return f"Vec<{element_type}>"
+                        return inferred_type
+                # If we can't infer from variable, try inferring from the expression directly
+                return self._infer_type_from_value(stmt.value)
+        return None
 
     def _infer_return_type(self, func: ast.FunctionDef) -> str:
         """Infer return type from function body."""

@@ -368,7 +368,8 @@ def process_numbers(numbers: list[int]) -> int:
 """
         rust_code = self.converter.convert_code(python_code)
 
-        assert "fn process_numbers(numbers: Vec<i32>) -> i32" in rust_code
+        # Immutability analysis detects read-only parameter, generates immutable reference
+        assert "fn process_numbers(numbers: &Vec<i32>) -> i32" in rust_code
         assert "let mut total: i32 = 0;" in rust_code
 
     def test_subscripted_dict_type(self):
@@ -379,7 +380,8 @@ def lookup_score(scores: dict[str, int], name: str) -> int:
 """
         rust_code = self.converter.convert_code(python_code)
 
-        assert "fn lookup_score(scores: std::collections::HashMap<String, i32>, name: String) -> i32" in rust_code
+        # Immutability analysis detects read-only parameter, generates immutable reference
+        assert "fn lookup_score(scores: &std::collections::HashMap<String, i32>, name: String) -> i32" in rust_code
 
     def test_subscripted_set_type(self):
         """Test subscripted set type annotation (Python 3.9+)."""
@@ -389,7 +391,8 @@ def has_duplicates(unique_values: set[int]) -> bool:
 """
         rust_code = self.converter.convert_code(python_code)
 
-        assert "fn has_duplicates(unique_values: std::collections::HashSet<i32>) -> bool" in rust_code
+        # Immutability analysis detects read-only parameter, generates immutable reference
+        assert "fn has_duplicates(unique_values: &std::collections::HashSet<i32>) -> bool" in rust_code
 
     def test_list_literal_with_annotation(self):
         """Test list literal type inference with annotation."""
