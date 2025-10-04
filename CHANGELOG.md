@@ -17,6 +17,81 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.51] - 2025-10-04
+
+**🎯 Haskell Backend: Advanced Functional Patterns & Array Mutation Detection**
+
+This release improves the Haskell backend from 5/7 (71%) to 6/7 (85.7%) benchmark success through sophisticated nested loop pattern detection, 2D list type inference, generalized array mutation detection, and full slice notation support.
+
+### Added
+
+- **Nested Loop Pattern Detection** - Convert imperative nested loops to functional comprehensions
+  - Double-nested loop pattern: `for i: row=[]; for j: row.append(x); matrix.append(row)` → `[[value | j <- range] | i <- range]`
+  - Triple-nested loop pattern: Matrix multiplication `for i: for j: sum=0; for k: sum+=expr; result[i][j]=sum` → `[[sum' [expr | k <- range] | j <- range] | i <- range]`
+  - Automatic detection via AST analysis (lines 1252-1317 in converter.py)
+
+- **2D List Type Inference** - Intelligent detection of nested list types
+  - `_param_used_as_2d_list()` - Detects `arr[i][j]` patterns in parameters (lines 1518-1528)
+  - `_returns_2d_list()` - Detects nested list returns from loops and comprehensions (lines 1530-1581)
+  - Automatic `[[Int]]` type signatures for matrix operations
+  - Function parameters and return types correctly inferred
+
+- **Slice Notation Support** - Full Python slice syntax translation
+  - `arr[1:]` → `drop 1 arr`
+  - `arr[:n]` → `take n arr`
+  - `arr[i:j]` → `take (j-i) (drop i arr)`
+  - Integrated into subscript conversion (lines 1032-1045)
+
+- **Generalized Array Mutation Detection** - Language-agnostic constraint system
+  - `_mutates_array_parameter()` - Detects ANY array parameter mutation via subscript assignment (lines 356-372)
+  - Only applies to purely functional languages (Haskell-specific, not in C/C++/Rust/Go)
+  - Clear error messages with functional alternatives
+  - Example: `"Function 'quicksort' mutates array parameter(s): arr. In-place array mutations cannot be directly translated to pure Haskell (which lacks mutable arrays in its standard library). Consider rewriting the algorithm in functional style (e.g., for sorting, use filter-based quicksort: qsort (p:xs) = qsort [x|x<-xs,x<p] ++ [p] ++ qsort [x|x<-xs,x>=p])"`
+
+- **Comprehensive Test Coverage** - 3 new functional quicksort tests
+  - `test_functional_quicksort` - Verifies slice-based quicksort works
+  - `test_functional_quicksort_with_main` - Complete program translation
+  - `test_imperative_quicksort_raises_error` - Validates mutation detection
+
+### Fixed
+
+- **matmul Benchmark** - Now compiles and executes correctly (output: 120)
+  - Triple-nested loop → nested comprehension with `sum'`
+  - Correct `[[Int]]` type signatures for all matrix functions
+  - Pattern: `createMatrix :: Int -> Int -> Int -> [[Int]]`
+
+- **Type Safety** - Mypy error in triple-nested loop detection
+  - Added type check for `result_assign.targets[0].value.value` before accessing `.id` (line 1373)
+
+### Changed
+
+- **Enhanced Type Inference** - Multi-pass approach for nested containers
+  - Parameter analysis: Scans function body for `param[i][j]` patterns
+  - Return analysis: Checks for nested list construction loops
+  - Type upgrade: `[a]` → `[[Int]]` when patterns detected
+
+### Benchmark Results
+
+- **Haskell**: 6/7 (85.7%) - up from 5/7 (71%)
+  - ✅ fibonacci (514229)
+  - ✅ list_ops (166750)
+  - ✅ wordcount (4)
+  - ✅ dict_ops (2340)
+  - ✅ set_ops (34)
+  - ✅ **matmul (120)** ← NEWLY FIXED
+  - ❌ quicksort (Generation error - requires array mutations, incompatible with pure Haskell)
+
+- **Performance**: 0.507s avg compile, 0.285s avg execute, 20.2MB avg binary
+- **Tests**: 870/870 passing (100%) - includes 96 Haskell-specific tests
+- **Type Safety**: All 102 source files pass strict mypy
+
+### Technical Notes
+
+- Nested loop patterns use pure list comprehensions, avoiding imperative mutations
+- Matrix operations generate idiomatic Haskell with `sum'`, `take`, `drop`
+- Mutation detection is language-specific - only Haskell enforces pure functional constraints
+- Slice support enables functional algorithms (e.g., `arr[1:]` for tail recursion)
+
 ## [0.1.50] - 2025-10-04
 
 - Milestone version: 4 out 6 backends have 100% generation/compilaiton scores on their respective translation of the benchmark examples.

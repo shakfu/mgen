@@ -353,9 +353,41 @@ main = printValue "Generated Haskell code executed successfully"'''
 
         return f"{signature}\n{implementation}"
 
+    def _mutates_array_parameter(self, node: ast.FunctionDef) -> tuple[bool, set[str]]:
+        """Detect if function mutates array parameters via subscript assignment.
+        Returns (is_mutating, set_of_mutated_param_names)."""
+        param_names = {arg.arg for arg in node.args.args}
+        mutated_params = set()
+
+        for stmt in ast.walk(node):
+            # Look for arr[i] = value where arr is a parameter
+            if isinstance(stmt, ast.Assign):
+                if len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Subscript):
+                    # Check if the subscripted object is a parameter
+                    if isinstance(stmt.targets[0].value, ast.Name):
+                        var_name = stmt.targets[0].value.id
+                        if var_name in param_names:
+                            mutated_params.add(var_name)
+
+        return len(mutated_params) > 0, mutated_params
+
     def _convert_function(self, node: ast.FunctionDef) -> str:
         """Convert Python function to Haskell."""
         func_name = self._to_haskell_function_name(node.name)
+
+        # Check if function mutates array parameters (Haskell-specific constraint)
+        # This check is only relevant for purely functional languages without mutable data structures
+        is_mutating, mutated_params = self._mutates_array_parameter(node)
+        if is_mutating and node.name != "main":
+            # Raise an error explaining the limitation for pure functional languages
+            params_list = ', '.join(sorted(mutated_params))
+            raise UnsupportedFeatureError(
+                f"Function '{node.name}' mutates array parameter(s): {params_list}. "
+                f"In-place array mutations cannot be directly translated to pure Haskell "
+                f"(which lacks mutable arrays in its standard library). "
+                f"Consider rewriting the algorithm in functional style (e.g., for sorting, "
+                f"use filter-based quicksort: qsort (p:xs) = qsort [x|x<-xs,x<p] ++ [p] ++ qsort [x|x<-xs,x>=p])"
+            )
 
         # Handle main function specially
         if node.name == "main":
@@ -996,6 +1028,22 @@ main = printValue "Generated Haskell code executed successfully"'''
     def _convert_subscript(self, node: ast.Subscript) -> str:
         """Convert Python subscript to Haskell list/map access."""
         obj = self._convert_expression(node.value)
+
+        # Handle slice notation: arr[start:end]
+        if isinstance(node.slice, ast.Slice):
+            lower = self._convert_expression(node.slice.lower) if node.slice.lower else "0"
+            upper = self._convert_expression(node.slice.upper) if node.slice.upper else f"(len' {obj})"
+
+            # arr[1:] -> drop 1 arr
+            if node.slice.lower and not node.slice.upper:
+                return f"(drop {lower} {obj})"
+            # arr[:n] -> take n arr
+            elif node.slice.upper and not node.slice.lower:
+                return f"(take {upper} {obj})"
+            # arr[i:j] -> take (j-i) (drop i arr)
+            else:
+                return f"(take ({upper} - {lower}) (drop {lower} {obj}))"
+
         index = self._convert_expression(node.slice)
 
         # Heuristic: if index is a string literal, it's likely a dict access
