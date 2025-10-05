@@ -143,26 +143,23 @@ class MGenPythonToOCamlConverter:
         - Augmented assignment: x += 1
         - Subscript assignment in loops: arr[i] = value
         - Append calls in loops: data.append(x)
+        - Conditional assignment: if cond: x = value (inside if statements)
         """
         mutable = set()
         for child in ast.walk(node):
             # Augmented assignment
             if isinstance(child, ast.AugAssign) and isinstance(child.target, ast.Name):
                 mutable.add(child.target.id)
-            # For loops with mutations
+            # For loops with mutations - use _has_mutations helper to recursively check
             elif isinstance(child, ast.For):
-                # Check what's mutated in the loop body
-                for stmt in child.body:
-                    # Subscript assignment
+                mutable.update(self._has_mutations(child.body))
+            # If statements with regular assignments (conditional mutations)
+            elif isinstance(child, ast.If):
+                for stmt in ast.walk(child):
                     if isinstance(stmt, ast.Assign):
                         for target in stmt.targets:
-                            if isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name):
-                                mutable.add(target.value.id)
-                    # Append method call
-                    elif isinstance(stmt, ast.Expr):
-                        if isinstance(stmt.value, ast.Call) and isinstance(stmt.value.func, ast.Attribute):
-                            if stmt.value.func.attr == "append" and isinstance(stmt.value.func.value, ast.Name):
-                                mutable.add(stmt.value.func.value.id)
+                            if isinstance(target, ast.Name):
+                                mutable.add(target.id)
         return mutable
 
     def _convert_regular_function(self, node: ast.FunctionDef, params: list[tuple], return_type: str) -> list[str]:
@@ -171,6 +168,10 @@ class MGenPythonToOCamlConverter:
 
         # Find mutable variables for this function
         self.mutable_vars = self._find_mutable_variables(node)
+
+        # Exclude function parameters from mutable vars (they're passed normally, not as refs)
+        param_names = {name for name, _ in params}
+        self.mutable_vars = self.mutable_vars - param_names
 
         # Check if function is recursive
         is_recursive = self._is_recursive_function(node, node.name)
@@ -629,23 +630,36 @@ class MGenPythonToOCamlConverter:
 
         # Special handling for len() - detect if argument is an array
         if func_name == "len":
-            is_array = False
-            # Check if argument is a variable with known type
+            # Default to len' (works for lists, dicts, sets)
+            # Only use len_array when we're certain it's a Python list (→ OCaml array)
+            use_array_len = False
+
             if isinstance(args[0], ast.Name):
                 var_name = self._to_ocaml_var_name(args[0].id)
                 var_type = self.variables.get(var_name, "")
-                # Only use len_array if we're certain it's a Python list (not dict/set)
-                # Dicts have tuple pattern " * ", sets have "set", both use len'
-                if var_type and ("dict" in var_type or " * " in var_type or "set" in var_type):
-                    is_array = False
-                # Python lists (annotated as "list") become OCaml arrays
-                elif var_type and ("list" in var_type or "array" in var_type or var_type.endswith("[]")):
-                    is_array = True
-                # Unknown type: default to len' (safer, works for both lists and dicts/sets)
-                else:
-                    is_array = False
 
-            if is_array:
+                # Explicitly check for Python list type
+                # Now we store Python type names, so checks are straightforward
+                if var_type:
+                    # Python list becomes OCaml array
+                    if var_type == "list":
+                        use_array_len = True
+                    # Sets and dicts use regular OCaml lists
+                    elif var_type == "set" or var_type == "dict":
+                        use_array_len = False
+                    # Tuple/dict association lists (OCaml type strings)
+                    elif " * " in var_type:
+                        use_array_len = False
+                    # Array type annotations
+                    elif "array" in var_type or var_type.endswith("[]"):
+                        use_array_len = True
+                    # For safety: unknown types use len' (works for both)
+                    else:
+                        use_array_len = False
+
+            # The arg might have been converted with dereferencing (!)
+            # Check if it starts with ! and adjust the function accordingly
+            if use_array_len:
                 return f"len_array {arg}"
             else:
                 return f"len' {arg}"
@@ -893,7 +907,11 @@ class MGenPythonToOCamlConverter:
 
         if isinstance(target, ast.Name):
             var_name = self._to_ocaml_var_name(target.id)
-            return f"let {var_name} = {value} in"
+            # Check if this is a mutable variable (ref) - use := instead of let
+            if target.id in self.mutable_vars:
+                return f"{var_name} := {value}"
+            else:
+                return f"let {var_name} = {value} in"
         elif isinstance(target, ast.Subscript):
             # Handle subscript assignment: container[index] = value
             index = self._convert_expression(target.slice)
@@ -930,8 +948,8 @@ class MGenPythonToOCamlConverter:
             else:
                 # Array assignment
                 if is_ref:
-                    # Use ref assignment for mutable arrays
-                    return f"{base_var_name} := {base_var_name}; !{base_var_name}.({index}) <- {value}"
+                    # For array refs, just modify the element (no need to reassign the ref)
+                    return f"let _ = !{base_var_name}.({index}) <- {value} in"
                 else:
                     container = self._convert_expression(target.value)
                     return f"let _ = {container}.({index}) <- {value} in"
@@ -955,9 +973,15 @@ class MGenPythonToOCamlConverter:
             var_name = self._to_ocaml_var_name(target.id)
 
             # Track variable type for type-aware code generation
+            # Store the Python type name (not OCaml type) for accurate type checking
             if node.annotation:
-                type_name = self._get_type_annotation(node.annotation)
-                self.variables[var_name] = type_name
+                if isinstance(node.annotation, ast.Name):
+                    # Store the original Python type name
+                    self.variables[var_name] = node.annotation.id
+                else:
+                    # For complex annotations, use the converted OCaml type
+                    type_name = self._get_type_annotation(node.annotation)
+                    self.variables[var_name] = type_name
 
             # Check if this variable is mutable (will be mutated later)
             if target.id in self.mutable_vars:
@@ -1000,8 +1024,8 @@ class MGenPythonToOCamlConverter:
             else:
                 # Array assignment
                 if is_ref:
-                    # Use ref assignment for mutable arrays
-                    return f"{base_var_name} := {base_var_name}; !{base_var_name}.({index}) <- {value}"
+                    # For array refs, just modify the element (no need to reassign the ref)
+                    return f"let _ = !{base_var_name}.({index}) <- {value} in"
                 else:
                     container = self._convert_expression(target.value)
                     return f"let _ = {container}.({index}) <- {value} in"
