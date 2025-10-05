@@ -17,6 +17,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.54] - 2025-10-05
+
+**Architecture Analysis: Complexity Reduction Roadmap**
+
+This release adds comprehensive analysis of code complexity and refactoring opportunities using design patterns.
+
+### Added
+
+- **Refactoring Analysis Document** (`REFACTORING_ANALYSIS.md`)
+  - Analyzed 58 functions with McCabe complexity >15
+  - Identified visitor and strategy pattern opportunities
+  - Detailed roadmap for 75% complexity reduction in top functions
+  - 7-day implementation plan with risk assessment
+  - Expected benefits: improved maintainability, testability, extensibility
+
+- **Code Complexity Assessment**
+  - Top complex functions identified: `_convert_function` (69), `translate_container_operation` (66), `_infer_type_from_value` (45)
+  - Visitor pattern recommended for statement/expression conversion (12 functions)
+  - Strategy pattern recommended for container operations and type inference (8 functions)
+  - Proven patterns already successful in `static_ir.py` IRVisitor implementation
+
+### Analysis Results
+
+- **Visitor Pattern Candidates**: 12 functions (statement/expression conversion)
+  - `_convert_function` (Haskell): 69 → ~20 complexity
+  - `_convert_statement` (multiple backends): 25-35 → ~10
+  - Statement converters (if/for/while): 15-40 → ~12
+
+- **Strategy Pattern Candidates**: 8 functions (container ops, type inference)
+  - `translate_container_operation`: 66 → ~10 complexity
+  - `_infer_type_from_value`: 33-45 → ~8
+  - `_convert_for_statement`: 40 → ~12
+
 ## [0.1.53] - 2025-10-05
 
 **Code Quality & Documentation: Production-Ready Standards**
