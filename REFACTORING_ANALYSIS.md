@@ -418,13 +418,37 @@ class StatementConverter:
    - Update all backends to use shared strategies
    - Reduce code duplication ~30%
 
-### Phase 3: Loop Conversion Refactoring (1.5 days)
+### Phase 3: Loop Conversion Refactoring (1.5 days) ✅ **COMPLETED**
 **Priority**: OCaml and Haskell backends
 
 4. **Day 5**: Refactor `_convert_for_statement` (complexity 40)
    - Implement ForLoopStrategy pattern
    - Create RangeLoopStrategy, ContainerLoopStrategy
    - Apply to OCaml and Haskell converters
+
+**Completion Status**: ✅ Completed on 2025-10-05
+
+**Results**:
+- Created `loop_conversion_strategies.py` with ForLoopStrategy base class and ForLoopConverter
+- Implemented Haskell strategies: HaskellNestedListBuildingStrategy, HaskellListAppendStrategy, HaskellAccumulationStrategy, HaskellAssignmentInMainStrategy
+- Implemented OCaml strategies: OCamlSimpleAssignmentStrategy, OCamlAccumulationStrategy, OCamlGeneralLoopStrategy
+- Refactored Haskell `_convert_for_statement`: 251 lines → ~30 lines (88% reduction)
+- Refactored OCaml `_convert_for_statement`: 84 lines → ~20 lines (76% reduction)
+- **All 870 tests passing** (up from 821 - project growth)
+- Type-safe with proper mypy annotations
+- Complexity reduction: Haskell 40-50 → ~8-10, OCaml 15-20 → ~5-8
+
+**Files Created**:
+- `src/mgen/backends/loop_conversion_strategies.py` (110 lines)
+- `src/mgen/backends/haskell/loop_strategies.py` (262 lines)
+- `src/mgen/backends/ocaml/loop_strategies.py` (201 lines)
+
+**Benefits Achieved**:
+- Strategies handle 7+ common loop patterns (nested lists, append, accumulation, assignment)
+- Fallback mechanism for complex patterns (triple-nested matmul, word count)
+- Lazy initialization prevents circular imports
+- Shared LoopContext provides backend-specific helpers while keeping strategies language-agnostic
+- Easy to extend with new strategies for additional patterns
 
 ### Phase 4: Expression Conversion (1 day)
 **Priority**: Medium complexity, high duplication

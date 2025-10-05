@@ -305,8 +305,11 @@ class MGenPythonToCppConverter:
         # Third pass: detect nested subscripting and upgrade vector<int> to vector<vector<int>>
         nested_vars = self._analyze_nested_subscripts(stmts)
         for var_name in nested_vars:
-            if var_name in initial_types and initial_types[var_name] == "std::vector<int>":
-                initial_types[var_name] = "std::vector<std::vector<int>>"
+            if var_name in initial_types:
+                current_type = initial_types[var_name]
+                # Upgrade both vector<int> and auto to nested vectors
+                if current_type == "std::vector<int>" or current_type == "auto":
+                    initial_types[var_name] = "std::vector<std::vector<int>>"
 
         # Fourth pass: detect string-keyed dict usage
         string_keyed_dicts = self._analyze_dict_key_types(stmts)
@@ -1580,9 +1583,19 @@ class MGenPythonToCppConverter:
             python_type: Python type name (e.g., "int", "str", "list")
 
         Returns:
-            C++ type name (e.g., "int", "std::string", "std::vector")
+            C++ type name (e.g., "int", "std::string", "std::vector<int>")
         """
-        return self.type_mapping.get(python_type, "auto")
+        mapped = self.type_mapping.get(python_type, "auto")
+
+        # If we get an incomplete container type, add default template arguments
+        if mapped == "std::vector":
+            return "std::vector<int>"
+        elif mapped == "std::unordered_map":
+            return "std::unordered_map<int, int>"
+        elif mapped == "std::unordered_set":
+            return "std::unordered_set<int>"
+
+        return mapped
 
     def _infer_type_from_value(self, value: ast.expr) -> str:
         """Infer C++ type from Python value using Strategy pattern.

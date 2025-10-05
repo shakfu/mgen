@@ -1,15 +1,19 @@
 """Enhanced Haskell code emitter for MGen with comprehensive Python language support."""
 
 import ast
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from ..converter_utils import (
     get_standard_binary_operator,
     get_standard_comparison_operator,
 )
 from ..errors import TypeMappingError, UnsupportedFeatureError
+from ..loop_conversion_strategies import LoopContext
 from ..preferences import BackendPreferences
 from .function_converter import convert_function_with_visitor
+
+if TYPE_CHECKING:
+    from ..loop_conversion_strategies import ForLoopConverter
 
 
 class MGenPythonToHaskellConverter:
@@ -34,6 +38,16 @@ class MGenPythonToHaskellConverter:
         self.current_function: Optional[str] = None  # Track current function context
         self.declared_vars: set[str] = set()  # Track declared variables in current function
         self.needed_imports: set[str] = set()  # Track which imports are needed
+        self._loop_converter: Optional["ForLoopConverter"] = None  # Lazy-initialized loop converter
+
+    @property
+    def loop_converter(self) -> "ForLoopConverter":
+        """Lazily initialize and return the loop converter."""
+        if self._loop_converter is None:
+            from .loop_strategies import create_haskell_loop_converter
+
+            self._loop_converter = create_haskell_loop_converter()
+        return self._loop_converter
 
     def _to_camel_case(self, snake_str: str) -> str:
         """Convert snake_case to CamelCase."""
@@ -999,77 +1013,40 @@ main = printValue "Generated Haskell code executed successfully"'''
         raise UnsupportedFeatureError("While loops not directly supported in Haskell")
 
     def _convert_for_statement(self, node: ast.For) -> str:
-        """Convert Python for loop to Haskell."""
+        """Convert Python for loop to Haskell using Strategy pattern.
+
+        Before refactoring: ~251 lines, complexity ~40-50
+        After refactoring: ~20 lines for common cases, fallback for complex patterns
+
+        Uses loop conversion strategies for common patterns:
+        - Nested list building (2D lists)
+        - Simple list.append()
+        - Accumulation (augmented assignment)
+        - Assignment in main (IO)
+        """
+        # Try strategy-based conversion first
+        context = LoopContext(converter=self, current_function=self.current_function)
+        result = self.loop_converter.convert(node, context)
+        if result is not None:
+            return result
+
+        # Fallback to original complex logic for patterns not yet covered by strategies
+        # (Triple-nested matrix multiplication, word count pattern, etc.)
+        return self._convert_for_statement_fallback(node)
+
+    def _convert_for_statement_fallback(self, node: ast.For) -> str:
+        """Fallback for-loop conversion for complex patterns not yet in strategies.
+
+        This method contains the original complex logic for patterns like:
+        - Triple-nested matrix multiplication
+        - Word count pattern (transform + dict update)
+        - Other complex nested patterns
+
+        Over time, these can be extracted into additional strategies.
+        """
         if isinstance(node.target, ast.Name):
             var_name = self._to_haskell_var_name(node.target.id)
             iterable = self._convert_expression(node.iter)
-
-            # Detect nested loop pattern for building 2D lists
-            # Pattern: for i in range(rows):
-            #              row = []
-            #              for j in range(cols):
-            #                  row.append(value)
-            #              matrix.append(row)
-            if (len(node.body) == 3 and
-                isinstance(node.body[0], (ast.Assign, ast.AnnAssign)) and
-                isinstance(node.body[1], ast.For) and
-                isinstance(node.body[2], ast.Expr)):
-
-                # Check if first statement initializes empty list
-                init_stmt = node.body[0]
-                inner_loop = node.body[1]
-                outer_append = node.body[2]
-
-                # Extract row variable name
-                row_var = None
-                if isinstance(init_stmt, ast.Assign):
-                    if (len(init_stmt.targets) == 1 and
-                        isinstance(init_stmt.targets[0], ast.Name) and
-                        isinstance(init_stmt.value, ast.List) and
-                        len(init_stmt.value.elts) == 0):
-                        row_var = init_stmt.targets[0].id
-                elif isinstance(init_stmt, ast.AnnAssign):
-                    if (isinstance(init_stmt.target, ast.Name) and
-                        isinstance(init_stmt.value, ast.List) and
-                        len(init_stmt.value.elts) == 0):
-                        row_var = init_stmt.target.id
-
-                # Check if inner loop appends to row
-                if (row_var and
-                    isinstance(inner_loop, ast.For) and
-                    len(inner_loop.body) == 1 and
-                    isinstance(inner_loop.body[0], ast.Expr) and
-                    isinstance(inner_loop.body[0].value, ast.Call)):
-
-                    inner_call = inner_loop.body[0].value
-                    if (isinstance(inner_call.func, ast.Attribute) and
-                        inner_call.func.attr == "append" and
-                        isinstance(inner_call.func.value, ast.Name) and
-                        inner_call.func.value.id == row_var and
-                        len(inner_call.args) == 1):
-
-                        # Check if outer append adds row to matrix
-                        if (isinstance(outer_append.value, ast.Call) and
-                            isinstance(outer_append.value.func, ast.Attribute) and
-                            outer_append.value.func.attr == "append" and
-                            isinstance(outer_append.value.func.value, ast.Name) and
-                            len(outer_append.value.args) == 1 and
-                            isinstance(outer_append.value.args[0], ast.Name) and
-                            outer_append.value.args[0].id == row_var):
-
-                            # Extract all components
-                            matrix_var = self._to_haskell_var_name(outer_append.value.func.value.id)
-                            inner_var = self._to_haskell_var_name(inner_loop.target.id) if isinstance(inner_loop.target, ast.Name) else "j"
-                            inner_iterable = self._convert_expression(inner_loop.iter)
-                            append_expr = self._convert_expression(inner_call.args[0])
-
-                            # Generate nested list comprehension
-                            # matrix = [[value | j <- range] | i <- range]
-                            if self.current_function != "main":
-                                return f"{matrix_var} = [[{append_expr} | {inner_var} <- {inner_iterable}] | {var_name} <- {iterable}]"
-                            else:
-                                # In IO context, we still need to use foldM, but we can simplify
-                                return f"{matrix_var} <- foldM (\\acc {var_name} -> return (acc ++ [[{append_expr} | {inner_var} <- {inner_iterable}]])) {matrix_var} ({iterable})"
 
             # Detect triple-nested loop pattern for matrix multiplication
             # Pattern: for i in range(size):
@@ -1136,50 +1113,6 @@ main = printValue "Generated Haskell code executed successfully"'''
                             else:
                                 # In IO context, generate using foldM
                                 return f"{result_var} <- foldM (\\acc {var_name} -> return (acc ++ [[sum' [{accum_expr} | {k_var} <- {k_iterable}] | {j_var} <- {j_iterable}]])) {result_var} ({iterable})"
-
-            # Check if loop body is a single assignment or augmented assignment that updates an outer variable
-            # Pattern: for i in range(n): var = expr(i)  ->  foldM for IO context
-            # Pattern: for i in range(n): var += expr(i)  ->  foldl for pure context
-            if len(node.body) == 1:
-                stmt = node.body[0]
-
-                # Handle list.append(x) pattern: for i in iter: list.append(expr)
-                # Convert to: list = foldl (\acc i -> acc ++ [expr]) list iter
-                if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
-                    call = stmt.value
-                    if (isinstance(call.func, ast.Attribute) and
-                        call.func.attr == "append" and
-                        isinstance(call.func.value, ast.Name) and
-                        len(call.args) == 1):
-                        list_var = self._to_haskell_var_name(call.func.value.id)
-                        append_expr = self._convert_expression(call.args[0])
-                        # In pure context, use foldl to accumulate list
-                        if self.current_function != "main":
-                            return f"{list_var} = foldl (\\acc {var_name} -> acc ++ [{append_expr}]) {list_var} ({iterable})"
-                        else:
-                            # In IO context, use foldM
-                            return f"{list_var} <- foldM (\\acc {var_name} -> return (acc ++ [{append_expr}])) {list_var} ({iterable})"
-
-                # Handle regular assignment in main (IO context)
-                if self.current_function == "main" and isinstance(stmt, ast.Assign):
-                    if len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
-                        updated_var = self._to_haskell_var_name(stmt.targets[0].id)
-                        value_expr = self._convert_expression(stmt.value)
-                        # Use foldM to update variable through iterations (shadowing in do notation)
-                        return f"{updated_var} <- foldM (\\acc {var_name} -> return ({value_expr})) {updated_var} ({iterable})"
-
-                # Handle augmented assignment (accumulation pattern) - works in both pure and IO
-                elif isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
-                    var_name_target = self._to_haskell_var_name(stmt.target.id)
-                    value_expr = self._convert_expression(stmt.value)
-                    op = self._convert_operator(stmt.op)
-
-                    # In pure context (not main), use foldl for accumulation
-                    if self.current_function != "main":
-                        return f"{var_name_target} = foldl (\\acc {var_name} -> acc {op} ({value_expr})) {var_name_target} ({iterable})"
-                    else:
-                        # In IO context, still use foldM but with accumulator
-                        return f"{var_name_target} <- foldM (\\acc {var_name} -> return (acc {op} ({value_expr}))) {var_name_target} ({iterable})"
 
             # Detect word count pattern: for item in list: transform, then update dict
             if (len(node.body) == 2 and

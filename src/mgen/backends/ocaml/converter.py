@@ -1,14 +1,18 @@
 """Enhanced OCaml code emitter for MGen with comprehensive Python language support."""
 
 import ast
-from typing import Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from ..converter_utils import (
     get_standard_binary_operator,
     get_standard_comparison_operator,
 )
 from ..errors import UnsupportedFeatureError
+from ..loop_conversion_strategies import LoopContext
 from ..preferences import BackendPreferences
+
+if TYPE_CHECKING:
+    from ..loop_conversion_strategies import ForLoopConverter
 
 
 class MGenPythonToOCamlConverter:
@@ -35,6 +39,9 @@ class MGenPythonToOCamlConverter:
         self.variables: dict[str, str] = {}
         self.current_class: Optional[str] = None
         self.mutable_vars: set[str] = set()  # Variables that need to be refs
+
+        # Lazy-initialized loop converter
+        self._loop_converter: Optional["ForLoopConverter"] = None
 
     def convert_code(self, python_code: str) -> str:
         """Convert Python source code to OCaml."""
@@ -1199,89 +1206,50 @@ class MGenPythonToOCamlConverter:
                 mutated.update(self._has_mutations(stmt.orelse))
         return mutated
 
+    @property
+    def loop_converter(self) -> "ForLoopConverter":
+        """Lazily initialize and return the loop converter."""
+        if self._loop_converter is None:
+            from .loop_strategies import create_ocaml_loop_converter
+            self._loop_converter = create_ocaml_loop_converter()
+        return self._loop_converter
+
     def _convert_for_statement(self, node: ast.For) -> list[str]:
-        """Convert for statement to OCaml."""
+        """Convert Python for loop to OCaml using Strategy pattern.
+
+        Before refactoring: ~84 lines, complexity ~15-20
+        After refactoring: ~10 lines for delegation, fallback for edge cases
+
+        Uses loop conversion strategies for common patterns:
+        - Simple assignment (no mutations)
+        - Accumulation (single mutation with augmented assignment)
+        - General loop (List.iter for complex cases)
+        """
+        # Try strategy-based conversion first
+        context = LoopContext(converter=self)
+        result = self.loop_converter.convert(node, context)
+        if result is not None:
+            return [result]
+
+        # Fallback for edge cases not covered by strategies
+        return self._convert_for_statement_fallback(node)
+
+    def _convert_for_statement_fallback(self, node: ast.For) -> list[str]:
+        """Fallback for-loop conversion for edge cases not yet in strategies.
+
+        This method handles complex patterns that don't fit the standard strategies.
+        Since OCamlGeneralLoopStrategy is a catch-all, this should rarely be called.
+        """
+        # Complex for loop targets not supported
         if not isinstance(node.target, ast.Name):
             return ["(* Complex for loop target not supported *)"]
 
-        target = self._to_ocaml_var_name(node.target.id)
-        iter_expr = self._convert_expression(node.iter)
-
-        # Check if any variables are mutated in the loop body
-        mutated_vars = self._has_mutations(node.body)
-
-        # Check for single assignment or augmented assignment pattern (simple cases)
-        if len(node.body) == 1 and not mutated_vars:
-            stmt = node.body[0]
-
-            # Handle regular assignment: for i in range(n): var = expr
-            if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
-                updated_var = self._to_ocaml_var_name(stmt.targets[0].id)
-                value_expr = self._convert_expression(stmt.value)
-
-                # If this is a mutable variable (ref), use := to avoid shadowing
-                if stmt.targets[0].id in self.mutable_vars:
-                    # Use ref assignment
-                    return [
-                        f"{updated_var} := List.fold_left (fun _ {target} -> {value_expr}) !{updated_var} ({iter_expr})"
-                    ]
-                else:
-                    # Use let-binding for non-ref variables
-                    return [
-                        f"let {updated_var} = List.fold_left (fun _ {target} -> {value_expr}) {updated_var} ({iter_expr}) in"
-                    ]
-
-        # Check for simple accumulation without other mutations
-        if len(node.body) == 1 and len(mutated_vars) == 1:
-            stmt = node.body[0]
-            # Handle augmented assignment: for i in range(n): var += expr
-            if isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
-                updated_var = self._to_ocaml_var_name(stmt.target.id)
-                value_expr = self._convert_expression(stmt.value)
-                op = self._convert_operator(stmt.op)
-
-                # If this is a mutable variable (ref), use := to avoid shadowing
-                if stmt.target.id in self.mutable_vars:
-                    # Use ref assignment
-                    return [
-                        f"{updated_var} := List.fold_left (fun acc {target} -> acc {op} ({value_expr})) !{updated_var} ({iter_expr})"
-                    ]
-                else:
-                    # Use let-binding for non-ref variables
-                    return [
-                        f"let {updated_var} = List.fold_left (fun acc {target} -> acc {op} ({value_expr})) {updated_var} ({iter_expr}) in"
-                    ]
-
-        # General case - convert body to let expressions
-        body_lines = []
-        for stmt in node.body:
-            converted = self._convert_statement(stmt)
-            if isinstance(converted, list):
-                body_lines.extend(converted)
-            else:
-                body_lines.append(converted)
-
-        if body_lines:
-            # Properly sequence statements with semicolons where needed
-            sequenced = []
-            for i, line in enumerate(body_lines):
-                if i < len(body_lines) - 1:  # Not the last statement
-                    if not line.rstrip().endswith(" in"):
-                        sequenced.append(line + ";")
-                    else:
-                        sequenced.append(line)
-                else:
-                    # Last statement - if it ends with 'in', add ()
-                    if line.rstrip().endswith(" in"):
-                        sequenced.append(line)
-                        sequenced.append("()")
-                    else:
-                        sequenced.append(line)
-
-            body_str = " ".join(sequenced)
-            return [f"List.iter (fun {target} -> {body_str}) ({iter_expr})"]
-        else:
+        # Empty loops
+        if not node.body:
             return ["(* Empty for loop *)"]
+
+        # This should rarely execute since OCamlGeneralLoopStrategy handles most cases
+        return ["(* Unsupported for loop pattern *)"]
 
     def _to_ocaml_var_name(self, name: str) -> str:
         """Convert Python variable name to OCaml style."""
