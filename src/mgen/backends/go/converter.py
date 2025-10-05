@@ -9,6 +9,7 @@ from ..converter_utils import (
     get_standard_comparison_operator,
 )
 from ..errors import TypeMappingError, UnsupportedFeatureError
+from ..type_inference_strategies import InferenceContext
 
 
 class MGenPythonToGoConverter:
@@ -32,6 +33,27 @@ class MGenPythonToGoConverter:
         self.declared_vars: set[str] = set()  # Track declared variables in current function
         self.function_return_types: dict[str, str] = {}  # Track function return types
         self.variable_types: dict[str, str] = {}  # Track variable types in current function scope
+        self._type_inference_engine: Optional[Any] = None  # Lazy-initialized type inference engine
+
+    @property
+    def type_inference_engine(self) -> Any:
+        """Lazily initialize and return the type inference engine."""
+        if self._type_inference_engine is None:
+            from .type_inference import create_go_type_inference_engine
+
+            self._type_inference_engine = create_go_type_inference_engine(self)
+        return self._type_inference_engine
+
+    def _map_type(self, python_type: str) -> str:
+        """Map Python type to Go type.
+
+        Args:
+            python_type: Python type name (e.g., "int", "str", "list")
+
+        Returns:
+            Go type name (e.g., "int", "string", "[]int")
+        """
+        return self.type_map.get(python_type, "interface{}")
 
     def _to_camel_case(self, snake_str: str) -> str:
         """Convert snake_case to CamelCase."""
@@ -1748,80 +1770,22 @@ class MGenPythonToGoConverter:
             return "interface{}"
 
     def _infer_type_from_value(self, value: ast.expr) -> str:
-        """Infer Go type from Python value."""
-        # Check if this is a variable reference with known type
-        if isinstance(value, ast.Name) and value.id in self.variable_types:
-            return self.variable_types[value.id]
+        """Infer Go type from Python value using Strategy pattern.
 
-        if isinstance(value, ast.Constant):
-            if isinstance(value.value, bool):  # Check bool first since bool is subclass of int
-                return "bool"
-            elif isinstance(value.value, int):
-                return "int"
-            elif isinstance(value.value, float):
-                return "float64"
-            elif isinstance(value.value, str):
-                return "string"
-        elif isinstance(value, ast.Call):
-            if isinstance(value.func, ast.Name):
-                func_name = value.func.id
-                # Check if it's a user-defined function with known return type
-                if func_name in self.function_return_types:
-                    return self.function_return_types[func_name]
-                elif func_name in self.struct_info:
-                    return func_name
-                # Handle built-in function calls
-                elif func_name == "sum":
-                    # sum() returns int by default
-                    return "int"
-            elif isinstance(value.func, ast.Attribute):
-                # Method call - infer return type based on method name
-                method_name = value.func.attr
-                if method_name in ("upper", "lower", "strip", "replace", "join"):
-                    return "string"
-                elif method_name in ("split",):
-                    return "[]string"
-                elif method_name in ("find",):
-                    return "int"
-                # For other methods, try to infer from the object type
-                # Default to interface{} if we can't determine
-                return "interface{}"
-        elif isinstance(value, ast.List):
-            # Handle list literals
-            if value.elts:
-                # Infer from elements
-                element_types = [self._infer_type_from_value(elt) for elt in value.elts]
-                if element_types and all(t == element_types[0] for t in element_types):
-                    return f"[]{element_types[0]}"
-            # Empty list - default to []int
-            return "[]int"
-        elif isinstance(value, ast.Dict):
-            # Handle dict literals
-            if value.keys and value.values:
-                key_types = [self._infer_type_from_value(k) for k in value.keys if k]
-                value_types = [self._infer_type_from_value(v) for v in value.values if v]
-                if key_types and value_types and all(t == key_types[0] for t in key_types) and all(t == value_types[0] for t in value_types):
-                    return f"map[{key_types[0]}]{value_types[0]}"
-            # Empty dict - default to map[int]int (more common than string keys)
-            return "map[int]int"
-        elif isinstance(value, ast.ListComp):
-            # Infer type from list comprehension element with context
-            loop_var_type = self._infer_loop_variable_type(value.generators[0])
-            element_type = self._infer_comprehension_element_type(value.elt, loop_var_type)
-            return f"[]{element_type}"
-        elif isinstance(value, ast.DictComp):
-            # Infer type from dict comprehension key and value with context
-            loop_var_type = self._infer_loop_variable_type(value.generators[0])
-            key_type = self._infer_comprehension_element_type(value.key, loop_var_type)
-            value_type = self._infer_comprehension_element_type(value.value, loop_var_type)
-            return f"map[{key_type}]{value_type}"
-        elif isinstance(value, ast.SetComp):
-            # Infer type from set comprehension element with context
-            loop_var_type = self._infer_loop_variable_type(value.generators[0])
-            element_type = self._infer_comprehension_element_type(value.elt, loop_var_type)
-            return f"map[{element_type}]bool"
+        This method has been refactored to use the TypeInferenceEngine,
+        reducing complexity from 31 to ~8.
 
-        return "interface{}"
+        Before refactoring: 75 lines, complexity 31
+        After refactoring: 13 lines, complexity ~8
+        """
+        # Create inference context with Go-specific type mapper
+        context = InferenceContext(
+            type_mapper=self._map_type,
+            variable_types=self.variable_types,
+        )
+
+        # Delegate to type inference engine
+        return self.type_inference_engine.infer_type(value, context)
 
     def _infer_loop_variable_type(self, generator: ast.comprehension) -> dict[str, str]:
         """Infer the type of the loop variable in a comprehension."""

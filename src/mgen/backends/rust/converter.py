@@ -10,6 +10,7 @@ from ..converter_utils import (
     get_standard_comparison_operator,
 )
 from ..errors import TypeMappingError, UnsupportedFeatureError
+from ..type_inference_strategies import InferenceContext
 
 
 class MGenPythonToRustConverter:
@@ -37,6 +38,27 @@ class MGenPythonToRustConverter:
         self.function_mut_params: dict[str, set[str]] = {}  # Track mutable parameters for each function
         self.immutability_analyzer = ImmutabilityAnalyzer()  # Backend-agnostic immutability analysis
         self.mutability_info: dict[str, dict[str, MutabilityClass]] = {}  # Immutability analysis results
+        self._type_inference_engine: Optional[Any] = None  # Lazy-initialized type inference engine
+
+    @property
+    def type_inference_engine(self) -> Any:
+        """Lazily initialize and return the type inference engine."""
+        if self._type_inference_engine is None:
+            from .type_inference import create_rust_type_inference_engine
+
+            self._type_inference_engine = create_rust_type_inference_engine(self)
+        return self._type_inference_engine
+
+    def _map_type(self, python_type: str) -> str:
+        """Map Python type to Rust type.
+
+        Args:
+            python_type: Python type name (e.g., "int", "str", "list")
+
+        Returns:
+            Rust type name (e.g., "i32", "String", "Vec")
+        """
+        return self.type_map.get(python_type, "i32")
 
     def _to_snake_case(self, camel_str: str) -> str:
         """Convert CamelCase to snake_case."""
@@ -1552,131 +1574,22 @@ class MGenPythonToRustConverter:
             return "i32"
 
     def _infer_type_from_value(self, value: ast.expr) -> str:
-        """Infer Rust type from Python value."""
-        # Check if this is a variable reference with known type
-        if isinstance(value, ast.Name):
-            if value.id in self.variable_types:
-                return self.variable_types[value.id]
-            # If not in variable_types, try to infer from AST
-            if self.current_function_node:
-                inferred = self._infer_variable_type_from_ast(value.id, self.current_function_node)
-                if inferred:
-                    return inferred
+        """Infer Rust type from Python value using Strategy pattern.
 
-        if isinstance(value, ast.Constant):
-            if isinstance(value.value, bool):  # Check bool first since bool is subclass of int
-                return "bool"
-            elif isinstance(value.value, int):
-                return "i32"
-            elif isinstance(value.value, float):
-                return "f64"
-            elif isinstance(value.value, str):
-                return "String"
-        elif isinstance(value, ast.List):
-            # Infer type from list literal elements
-            if value.elts:
-                element_types = [self._infer_type_from_value(elt) for elt in value.elts]
-                # If all elements have the same type, use it
-                if element_types and all(t == element_types[0] for t in element_types):
-                    return f"Vec<{element_types[0]}>"
-            return "Vec<i32>"  # Default
-        elif isinstance(value, ast.Dict):
-            # Infer type from dict literal keys and values
-            if value.keys and value.values:
-                key_types = [self._infer_type_from_value(key) for key in value.keys if key]
-                value_types = [self._infer_type_from_value(val) for val in value.values if val]
-                if (
-                    key_types
-                    and all(t == key_types[0] for t in key_types)
-                    and value_types
-                    and all(t == value_types[0] for t in value_types)
-                ):
-                    return f"std::collections::HashMap<{key_types[0]}, {value_types[0]}>"
-            return "std::collections::HashMap<i32, i32>"  # Default to int keys/values (most common)
-        elif isinstance(value, ast.Set):
-            # Infer type from set literal elements
-            if value.elts:
-                element_types = [self._infer_type_from_value(elt) for elt in value.elts]
-                if element_types and all(t == element_types[0] for t in element_types):
-                    return f"std::collections::HashSet<{element_types[0]}>"
-            return "std::collections::HashSet<i32>"  # Default
-        elif isinstance(value, ast.ListComp):
-            # Infer type from list comprehension element
-            element_type = self._infer_comprehension_element_type(value.elt)
-            return f"Vec<{element_type}>"
-        elif isinstance(value, ast.DictComp):
-            # Infer type from dict comprehension key and value
-            key_type = self._infer_comprehension_element_type(value.key)
-            value_type = self._infer_comprehension_element_type(value.value)
-            return f"std::collections::HashMap<{key_type}, {value_type}>"
-        elif isinstance(value, ast.SetComp):
-            # Infer type from set comprehension element
-            element_type = self._infer_comprehension_element_type(value.elt)
-            return f"std::collections::HashSet<{element_type}>"
-        elif isinstance(value, ast.Call):
-            if isinstance(value.func, ast.Name):
-                func_name = value.func.id
-                # Check if it's a user-defined function with known return type
-                if func_name in self.function_return_types:
-                    return self.function_return_types[func_name]
-                elif func_name in self.struct_info:
-                    return func_name
-                elif func_name == "sum":
-                    return "i32"  # sum() returns integer
-                elif func_name == "len":
-                    return "i32"  # Python len() returns int, map to i32
-                elif func_name == "abs":
-                    return "i32"  # Default for abs
-                elif func_name == "min" or func_name == "max":
-                    return "i32"  # Default for min/max
-                elif func_name == "set":
-                    # set() constructor with no args -> HashSet<i32> default
-                    return "std::collections::HashSet<i32>"
-                elif func_name == "dict":
-                    # dict() constructor with no args -> HashMap<i32, i32> default
-                    return "std::collections::HashMap<i32, i32>"
-            elif isinstance(value.func, ast.Attribute):
-                # Method call - try to infer from method name
-                method_name = value.func.attr
-                if method_name in ["upper", "lower", "strip", "replace"]:
-                    return "String"
-                elif method_name == "find":
-                    return "i32"  # Returns index
-                elif method_name == "split":
-                    return "Vec<String>"  # Returns list of strings
-        elif isinstance(value, ast.BinOp):
-            # Infer type from binary operation
-            # For arithmetic ops, try to infer from left operand
-            left_type = self._infer_type_from_value(value.left)
-            right_type = self._infer_type_from_value(value.right)
-            # If both are same type, return that type
-            if left_type == right_type:
-                return left_type
-            # If one is float, result is float
-            if left_type == "f64" or right_type == "f64":
-                return "f64"
-            # Default to i32 for mixed int operations
-            return "i32"
-        elif isinstance(value, ast.Subscript):
-            # dict[key] or list[index] - try to infer element/value type
-            # Only infer if the container type is already known (to avoid circular dependencies)
-            if isinstance(value.value, ast.Name):
-                container_name = value.value.id
-                if container_name in self.variable_types:
-                    container_type = self.variable_types[container_name]
-                    # Extract element type from Vec<T> or HashMap<K, V>
-                    if container_type.startswith("Vec<"):
-                        return container_type[4:-1]  # Extract T from Vec<T>
-                    elif container_type.startswith("std::collections::HashMap<"):
-                        # Extract V from HashMap<K, V>
-                        inner = container_type[26:-1]  # Remove "std::collections::HashMap<" and ">"
-                        parts = inner.split(", ", 1)
-                        if len(parts) == 2:
-                            return parts[1]  # Return value type
-            # Default to i32 - we can't infer from an unknown container
-            return "i32"
+        This method has been refactored to use the TypeInferenceEngine,
+        reducing complexity from 53 to ~8.
 
-        return "i32"
+        Before refactoring: 126 lines, complexity 53
+        After refactoring: 13 lines, complexity ~8
+        """
+        # Create inference context with Rust-specific type mapper
+        context = InferenceContext(
+            type_mapper=self._map_type,
+            variable_types=self.variable_types,
+        )
+
+        # Delegate to type inference engine
+        return self.type_inference_engine.infer_type(value, context)
 
     def _infer_comprehension_element_type(self, expr: ast.expr) -> str:
         """Infer the type of elements produced by a comprehension expression."""
