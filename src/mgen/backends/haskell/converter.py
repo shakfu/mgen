@@ -38,7 +38,7 @@ class MGenPythonToHaskellConverter:
         self.current_function: Optional[str] = None  # Track current function context
         self.declared_vars: set[str] = set()  # Track declared variables in current function
         self.needed_imports: set[str] = set()  # Track which imports are needed
-        self._loop_converter: Optional["ForLoopConverter"] = None  # Lazy-initialized loop converter
+        self._loop_converter: Optional[ForLoopConverter] = None  # Lazy-initialized loop converter
 
     @property
     def loop_converter(self) -> "ForLoopConverter":

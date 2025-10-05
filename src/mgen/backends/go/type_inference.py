@@ -14,7 +14,6 @@ from ..type_inference_strategies import (
     InferenceContext,
     ListInferenceStrategy,
     SetInferenceStrategy,
-    TypeInferenceStrategy,
 )
 
 if TYPE_CHECKING:

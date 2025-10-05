@@ -6,7 +6,7 @@ reducing complexity and improving maintainability of the Haskell converter.
 
 import ast
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from typing import Optional
 
 
 class HaskellStatementVisitor(ABC):

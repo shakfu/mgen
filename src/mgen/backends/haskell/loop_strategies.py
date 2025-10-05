@@ -5,7 +5,7 @@ like foldl/foldM, list comprehensions, and do-notation.
 """
 
 import ast
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ..loop_conversion_strategies import ForLoopStrategy, LoopContext
 
@@ -87,7 +87,7 @@ class HaskellNestedListBuildingStrategy(ForLoopStrategy):
 
     def convert(self, node: ast.For, context: LoopContext) -> str:
         """Convert nested list building to Haskell list comprehension."""
-        converter: "MGenPythonToHaskellConverter" = context.converter  # type: ignore
+        converter: MGenPythonToHaskellConverter = context.converter  # type: ignore
 
         # Extract components
         var_name = converter._to_haskell_var_name(node.target.id) if isinstance(node.target, ast.Name) else "i"
@@ -144,7 +144,7 @@ class HaskellListAppendStrategy(ForLoopStrategy):
 
     def convert(self, node: ast.For, context: LoopContext) -> str:
         """Convert list append to foldl/foldM."""
-        converter: "MGenPythonToHaskellConverter" = context.converter  # type: ignore
+        converter: MGenPythonToHaskellConverter = context.converter  # type: ignore
 
         var_name = converter._to_haskell_var_name(node.target.id) if isinstance(node.target, ast.Name) else "i"
         iterable = converter._convert_expression(node.iter)
@@ -184,7 +184,7 @@ class HaskellAccumulationStrategy(ForLoopStrategy):
 
     def convert(self, node: ast.For, context: LoopContext) -> str:
         """Convert accumulation to foldl/foldM."""
-        converter: "MGenPythonToHaskellConverter" = context.converter  # type: ignore
+        converter: MGenPythonToHaskellConverter = context.converter  # type: ignore
 
         var_name = converter._to_haskell_var_name(node.target.id) if isinstance(node.target, ast.Name) else "i"
         iterable = converter._convert_expression(node.iter)
@@ -227,7 +227,7 @@ class HaskellAssignmentInMainStrategy(ForLoopStrategy):
 
     def convert(self, node: ast.For, context: LoopContext) -> str:
         """Convert assignment to foldM."""
-        converter: "MGenPythonToHaskellConverter" = context.converter  # type: ignore
+        converter: MGenPythonToHaskellConverter = context.converter  # type: ignore
 
         var_name = converter._to_haskell_var_name(node.target.id) if isinstance(node.target, ast.Name) else "i"
         iterable = converter._convert_expression(node.iter)

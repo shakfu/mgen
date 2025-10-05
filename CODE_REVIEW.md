@@ -49,8 +49,7 @@ mgen/
 │   ├── optimizers/    # Loop analysis, vectorization, compile-time eval
 │   └── verifiers/     # Theorem proving, correctness verification
 ├── backends/          # Language-specific code generators
-│   ├── base.p1111111wwwwwwwwwwwwww 
-y        # Abstract interfaces (LanguageBackend, AbstractEmitter, etc.)
+│   ├── base           # Abstract interfaces (LanguageBackend, AbstractEmitter, etc.)
 │   ├── c/             # C backend with STC containers
 │   ├── cpp/           # C++ backend with STL
 │   ├── rust/          # Rust backend with ownership analysis

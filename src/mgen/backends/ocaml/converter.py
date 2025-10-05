@@ -41,7 +41,7 @@ class MGenPythonToOCamlConverter:
         self.mutable_vars: set[str] = set()  # Variables that need to be refs
 
         # Lazy-initialized loop converter
-        self._loop_converter: Optional["ForLoopConverter"] = None
+        self._loop_converter: Optional[ForLoopConverter] = None
 
     def convert_code(self, python_code: str) -> str:
         """Convert Python source code to OCaml."""

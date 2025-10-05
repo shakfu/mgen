@@ -27,7 +27,7 @@ class OCamlSimpleAssignmentStrategy(ForLoopStrategy):
 
     def can_handle(self, node: ast.For, context: LoopContext) -> bool:
         """Check for simple assignment pattern."""
-        converter: "MGenPythonToOCamlConverter" = context.converter  # type: ignore
+        converter: MGenPythonToOCamlConverter = context.converter  # type: ignore
 
         if len(node.body) != 1:
             return False
@@ -44,7 +44,7 @@ class OCamlSimpleAssignmentStrategy(ForLoopStrategy):
 
     def convert(self, node: ast.For, context: LoopContext) -> str:
         """Convert simple assignment to List.fold_left."""
-        converter: "MGenPythonToOCamlConverter" = context.converter  # type: ignore
+        converter: MGenPythonToOCamlConverter = context.converter  # type: ignore
 
         if not isinstance(node.target, ast.Name):
             return "(* Complex for loop target not supported *)"
@@ -80,7 +80,7 @@ class OCamlAccumulationStrategy(ForLoopStrategy):
 
     def can_handle(self, node: ast.For, context: LoopContext) -> bool:
         """Check for accumulation pattern."""
-        converter: "MGenPythonToOCamlConverter" = context.converter  # type: ignore
+        converter: MGenPythonToOCamlConverter = context.converter  # type: ignore
 
         if len(node.body) != 1:
             return False
@@ -95,7 +95,7 @@ class OCamlAccumulationStrategy(ForLoopStrategy):
 
     def convert(self, node: ast.For, context: LoopContext) -> str:
         """Convert accumulation to List.fold_left."""
-        converter: "MGenPythonToOCamlConverter" = context.converter  # type: ignore
+        converter: MGenPythonToOCamlConverter = context.converter  # type: ignore
 
         if not isinstance(node.target, ast.Name):
             return "(* Complex for loop target not supported *)"
@@ -135,7 +135,7 @@ class OCamlGeneralLoopStrategy(ForLoopStrategy):
 
     def convert(self, node: ast.For, context: LoopContext) -> str:
         """Convert general loop to List.iter."""
-        converter: "MGenPythonToOCamlConverter" = context.converter  # type: ignore
+        converter: MGenPythonToOCamlConverter = context.converter  # type: ignore
 
         if not isinstance(node.target, ast.Name):
             return "(* Complex for loop target not supported *)"

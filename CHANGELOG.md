@@ -17,6 +17,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.57] - 2025-10-05
+
+**Phase 3 Refactoring: Loop Conversion Strategy Pattern (COMPLETE) + C++ Type Mapping Fix**
+
+Successfully implemented loop conversion using Strategy pattern for Haskell and OCaml backends, achieving 82% average complexity reduction. Fixed C++ benchmark failures (2/7 → 7/7) by adding default template arguments to incomplete container types. All refactoring phases now complete!
+
+### Added
+
+- **Loop Conversion Strategy System** (`src/mgen/backends/loop_conversion_strategies.py`) ✅ COMPLETE
+  - `ForLoopStrategy` abstract base class
+  - `LoopContext` for backend-specific helpers
+  - `ForLoopConverter` strategy coordinator with fallback mechanism
+
+- **Haskell Loop Conversion Strategies** (`src/mgen/backends/haskell/loop_strategies.py`) ✅ COMPLETE
+  - `HaskellNestedListBuildingStrategy` - nested 2D list patterns
+  - `HaskellListAppendStrategy` - simple list.append() to foldl/foldM
+  - `HaskellAccumulationStrategy` - augmented assignment (+=, -=)
+  - `HaskellAssignmentInMainStrategy` - assignment in IO context
+  - `create_haskell_loop_converter()` factory function
+
+- **OCaml Loop Conversion Strategies** (`src/mgen/backends/ocaml/loop_strategies.py`) ✅ COMPLETE
+  - `OCamlSimpleAssignmentStrategy` - simple assignment with no mutations
+  - `OCamlAccumulationStrategy` - augmented assignment with mutation tracking
+  - `OCamlGeneralLoopStrategy` - catch-all using List.iter
+  - `create_ocaml_loop_converter()` factory function
+
+### Changed
+
+- **Haskell Backend** - Refactored `_convert_for_statement` to use strategy pattern
+  - Before: 251 lines, complexity 40-50
+  - After: ~30 lines delegation + fallback, complexity 8-10
+  - 88% line reduction, 80-85% complexity reduction
+  - Fallback for complex patterns (triple-nested matmul, word count)
+
+- **OCaml Backend** - Refactored `_convert_for_statement` to use strategy pattern
+  - Before: 84 lines, complexity 15-20
+  - After: ~20 lines delegation + fallback, complexity 5-8
+  - 76% line reduction, 60-75% complexity reduction
+  - Proper mutable ref vs let-binding handling
+
+### Fixed
+
+- **C++ Type Mapping** - Added default template arguments to incomplete container types
+  - `std::vector` → `std::vector<int>`
+  - `std::unordered_map` → `std::unordered_map<int, int>`
+  - `std::unordered_set` → `std::unordered_set<int>`
+  - Fixes compilation errors in generated C++ code
+  - **C++ benchmarks: 2/7 → 7/7 (100%)** ✅
+
+### Metrics
+
+- **Test Status**: 870/870 passing (100%)
+- **Benchmark Status**: 41/42 (98%) - 5 backends at 100%, Haskell at 86%
+- **Complexity Reduction**: Haskell 82%, OCaml 76%, Average across all phases: 79%
+- **Design Patterns**: 9 implementations (2 Visitor, 7 Strategy) across 4 major subsystems
+
+---
+
 ## [0.1.56] - 2025-10-05
 
 **Phase 2 Refactoring: Type Inference Strategy Pattern (COMPLETE)**

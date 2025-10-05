@@ -5,7 +5,7 @@ and special handling for auto types, concrete types, and binary operations.
 """
 
 import ast
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ..type_inference_strategies import (
     CallInferenceStrategy,
@@ -137,9 +137,9 @@ def create_cpp_type_inference_engine() -> "TypeInferenceEngine":
         TypeInferenceEngine with C++-specific strategies
     """
     from ..type_inference_strategies import (
+        ComprehensionInferenceStrategy,
         ConstantInferenceStrategy,
         NameInferenceStrategy,
-        ComprehensionInferenceStrategy,
         TypeInferenceEngine,
     )
 
