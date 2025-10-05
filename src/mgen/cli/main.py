@@ -22,6 +22,8 @@ from typing import Optional, Union
 from ..backends.preferences import BackendPreferences, PreferencesRegistry
 from ..backends.registry import registry
 from ..common import log
+from ..error_formatter import print_error, set_color_mode
+from ..errors import MGenError
 
 # Import the pipeline and backends
 from ..pipeline import BuildMode, MGenPipeline, OptimizationLevel, PipelineConfig
@@ -71,6 +73,7 @@ Build Directory Structure:
         # Global options
         parser.add_argument("--build-dir", "-d", type=str, default="build", help="Build directory (default: build)")
         parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+        parser.add_argument("--no-color", action="store_true", help="Disable colored error output")
         parser.add_argument(
             "--target", "-t", type=str, default="c", help=f"Target language (default: c, available: {backends_str})"
         )
@@ -315,7 +318,12 @@ Build Directory Structure:
                     self.log.warning(f"Warning: {warning}")
             return 0
 
+        except MGenError as e:
+            # Use enhanced error formatting for MGen errors
+            print_error(e)
+            return 1
         except Exception as e:
+            # Regular exceptions get standard formatting
             self.log.error(f"Pipeline error: {e}")
             return 1
 
@@ -364,8 +372,17 @@ Build Directory Structure:
         )
 
         # Run MGen pipeline
-        pipeline = MGenPipeline(config)
-        result = pipeline.convert(input_path)
+        try:
+            pipeline = MGenPipeline(config)
+            result = pipeline.convert(input_path)
+        except MGenError as e:
+            # Use enhanced error formatting for MGen errors
+            print_error(e)
+            return 1
+        except Exception as e:
+            # Regular exceptions get standard formatting
+            self.log.error(f"Pipeline error: {e}")
+            return 1
 
         if not result.success:
             error_msg = "Build failed:" if args.makefile else "Compilation failed:"
@@ -653,6 +670,10 @@ Build Directory Structure:
 
         # Set verbose flag
         self.verbose = args.verbose
+
+        # Configure error formatting colors
+        if args.no_color:
+            set_color_mode(False)
 
         # Handle no command
         if not args.command:

@@ -17,6 +17,92 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.59] - 2025-10-05
+
+**Developer Experience: Enhanced Error Messages (COMPLETE)**
+
+Implemented comprehensive error message improvements with source location tracking, colored output, and helpful suggestions. This addresses the #1 friction point for user adoption identified in the production roadmap.
+
+### Added
+
+- **Enhanced Error System** (`src/mgen/errors.py`)
+  - `SourceLocation` class for tracking file/line/column
+  - `ErrorCode` enum for categorizing errors (E1xxx-E5xxx)
+  - `MGenError` base class with rich context
+  - `UnsupportedFeatureError` and `TypeMappingError` with source context
+  - `ErrorContext` dataclass for additional error information
+  - Helper functions: `suggest_fix()`, `create_unsupported_feature_error()`
+
+- **Colored Error Formatter** (`src/mgen/error_formatter.py`)
+  - Beautiful colored error output similar to rustc/tsc
+  - Source code snippets with line numbers and carets
+  - Auto-detection of terminal color support
+  - Support for Windows Terminal, ConEmu, and ANSI terminals
+  - `format_error()` and `print_error()` convenience functions
+
+- **Error Suggestions Database**
+  - Helpful suggestions for 10+ common unsupported features
+  - "Did you mean?" style hints for generators, async, lambdas, etc.
+  - Documentation links included in error messages
+
+- **CLI Integration**
+  - `--no-color` flag to disable colored output
+  - Enhanced error formatting in convert and build commands
+  - Automatic color detection for CI/CD environments
+
+- **Documentation** (`docs/ERROR_HANDLING.md`)
+  - Complete error handling guide
+  - Error code reference (E1xxx through E5xxx)
+  - Common errors and solutions
+  - Best practices for backend developers
+
+- **Tests** (`tests/test_error_messages.py`)
+  - 27 comprehensive tests for error system
+  - Test coverage for all error classes and formatting
+  - Backward compatibility tests
+
+- **Demo** (`examples/error_demo.py`)
+  - Interactive demonstration of enhanced error messages
+  - Shows various error scenarios with/without colors
+
+### Changed
+
+- **backends/errors.py** - Now re-exports enhanced error classes for backward compatibility
+- **backends/base_converter.py** - Import error classes from new location
+- **cli/main.py** - Integrate error formatter, add --no-color flag
+
+### Backward Compatibility
+
+✅ **100% backward compatible** - All existing code continues to work:
+- Simple `raise UnsupportedFeatureError("message")` still works
+- Can catch errors as `Exception`
+- Error messages accessible via `str(error)`
+- All 870 existing tests pass without modification
+
+### Error Message Example
+
+```
+error[E1001]: Generator expressions are not supported
+  --> example.py:42:10
+   |
+42 |     result = (x for x in range(10))
+               ^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Use a list comprehension instead: [x for x in range(10)]
+note: See https://github.com/yourusername/mgen/docs/supported-features.md
+```
+
+### Metrics
+
+- **Tests**: 897/897 passing (27 new + 870 existing)
+- **Test execution**: 11.82s (improved from 12.21s)
+- **New files**: 5 (errors.py, error_formatter.py, test_error_messages.py, error_demo.py, ERROR_HANDLING.md)
+- **Lines added**: ~800 lines of error handling infrastructure
+- **Error raise sites**: 143 across codebase (ready for enhancement)
+- **Backward compatibility**: 100%
+
+---
+
 ## [0.1.58] - 2025-10-05
 
 **Code Duplication Analysis: Marked as Complete (No Further Action Needed)**

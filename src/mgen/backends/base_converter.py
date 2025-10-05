@@ -9,15 +9,8 @@ import ast
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-
-class UnsupportedFeatureError(Exception):
-    """Raised when encountering unsupported Python features."""
-    pass
-
-
-class TypeMappingError(Exception):
-    """Raised when type mapping fails."""
-    pass
+# Import error classes (backward compatibility)
+from .errors import TypeMappingError, UnsupportedFeatureError
 
 
 class BaseConverter(ABC):
