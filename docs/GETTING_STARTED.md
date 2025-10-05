@@ -167,6 +167,35 @@ Hello, World!
 
 ## Understanding the Workflow
 
+### Type Inference (NEW!)
+
+**MGen now automatically infers types for local variables!** You no longer need to annotate every variable:
+
+```python
+def example() -> int:
+    # Type annotations are OPTIONAL for local variables!
+    numbers = []           # Inferred as list[int] from append()
+    numbers.append(10)
+
+    result = len(numbers)  # Inferred as int from len() return type
+    x = 5                  # Inferred as int from literal
+
+    return result + x
+```
+
+**What's inferred:**
+- ✅ Local variables from literals (`x = 5` → `int`)
+- ✅ Local variables from function returns (`result = foo()` → inferred from `foo()` return type)
+- ✅ Empty lists from append usage (`numbers = []; numbers.append(10)` → `list[int]`)
+- ✅ Variables from arithmetic operations
+
+**What still needs annotations:**
+- ❗ Function parameters (required)
+- ❗ Function return types (required)
+- ❗ Global variables (required)
+
+See `examples/type_inference_demo.py` for a complete demonstration.
+
 ### MGen Pipeline
 
 MGen uses a 7-phase pipeline to translate your code:
@@ -174,9 +203,9 @@ MGen uses a 7-phase pipeline to translate your code:
 ```
 Python Source
     ↓
-1. Validation ────→ Check Python subset, type annotations
+1. Validation ────→ Check Python subset
     ↓
-2. Analysis ──────→ Parse AST, semantic analysis
+2. Analysis ──────→ Parse AST, type inference, semantic analysis
     ↓
 3. Python Opt ────→ Python-level optimizations
     ↓

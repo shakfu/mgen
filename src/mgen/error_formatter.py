@@ -4,9 +4,10 @@ This module provides beautiful, colored error output similar to modern compilers
 like Rust's rustc or TypeScript's tsc.
 """
 
+import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import IO, Any, Optional
 
 from .errors import ErrorCode, ErrorContext, MGenError, SourceLocation
 
@@ -48,7 +49,7 @@ def supports_color() -> bool:
         return False
 
     # Check TERM environment variable
-    term = sys.environ.get("TERM", "")
+    term = os.environ.get("TERM", "")
     if term == "dumb":
         return False
 
@@ -233,15 +234,14 @@ def format_error(error: Exception) -> str:
         return formatter.format_simple(error)
 
 
-def print_error(error: Exception, file=None) -> None:
+def print_error(error: Exception, file: Optional[IO[str]] = None) -> None:
     """Print formatted error to stderr or specified file.
 
     Args:
         error: Error to print
         file: File to write to (default: stderr)
     """
-    if file is None:
-        file = sys.stderr
+    output_file: IO[str] = file if file is not None else sys.stderr
 
     formatted = format_error(error)
-    print(formatted, file=file)
+    print(formatted, file=output_file)

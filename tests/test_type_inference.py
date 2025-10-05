@@ -162,3 +162,207 @@ def test_func(x: int, y: int) -> int:
         # Should use regular analysis
         results = engine.analyze_function_signature_enhanced(func_node)
         assert len(results) > 0
+
+
+class TestLocalVariableInference:
+    """Test automatic inference for local variables without annotations."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.fallback_engine = TypeInferenceEngine(enable_flow_sensitive=True)
+        self.inferencer = FlowSensitiveInferencer(self.fallback_engine)
+
+    def test_local_variable_without_annotation_allowed(self):
+        """Test that local variables without annotations are allowed to pass analysis."""
+        from mgen.frontend.ast_analyzer import ASTAnalyzer
+
+        code = """
+def test_func() -> int:
+    numbers = []
+    numbers.append(10)
+    return len(numbers)
+"""
+        analyzer = ASTAnalyzer()
+        result = analyzer.analyze(code)
+
+        # Should not have errors about missing type annotations for local variables
+        # (This is the key fix - ast_analyzer now creates placeholders for locals)
+        assert result.convertible
+        assert "test_func" in result.functions
+        assert "numbers" in result.functions["test_func"].local_variables
+
+    def test_infer_from_function_return(self):
+        """Test inferring variable type from function return type."""
+        self.setUp()
+
+        code = """
+def get_number() -> int:
+    return 42
+
+def test_func() -> int:
+    result = get_number()
+    return result
+"""
+        tree = ast.parse(code)
+        # Test the second function
+        func_node = tree.body[1]
+
+        results = self.inferencer.analyze_function_flow(func_node)
+
+        # Should infer result as int
+        assert "result" in results
+        assert results["result"].type_info is not None
+
+    def test_infer_from_literal(self):
+        """Test inferring variable type from literal values."""
+        self.setUp()
+
+        code = """
+def test_func() -> int:
+    x = 5
+    s = "hello"
+    f = 3.14
+    b = True
+    return x
+"""
+        tree = ast.parse(code)
+        func_node = tree.body[0]
+
+        results = self.inferencer.analyze_function_flow(func_node)
+
+        # Should infer x as int
+        assert "x" in results
+        assert results["x"].type_info is not None
+        assert results["x"].type_info.name == "int"
+
+        # Should infer s as str
+        assert "s" in results
+        assert results["s"].type_info is not None
+        assert results["s"].type_info.name == "str"
+
+        # Should infer f as float
+        assert "f" in results
+        assert results["f"].type_info is not None
+        assert results["f"].type_info.name == "float"
+
+        # Should infer b as bool
+        assert "b" in results
+        assert results["b"].type_info is not None
+        assert results["b"].type_info.name == "bool"
+
+    def test_infer_from_arithmetic(self):
+        """Test inferring variable type from arithmetic operations."""
+        self.setUp()
+
+        code = """
+def test_func() -> int:
+    x = 5
+    y = x * 2
+    z = x + y
+    return z
+"""
+        tree = ast.parse(code)
+        func_node = tree.body[0]
+
+        results = self.inferencer.analyze_function_flow(func_node)
+
+        # All should be inferred as int
+        assert "x" in results
+        assert "y" in results
+        assert "z" in results
+        assert results["x"].type_info.name == "int"
+        # y and z should be numeric (int or union with float)
+        assert results["y"].type_info is not None
+        assert results["z"].type_info is not None
+
+    def test_mixed_inference(self):
+        """Test complex case with multiple inference patterns."""
+        self.setUp()
+
+        code = """
+def test_func() -> int:
+    numbers = []
+    numbers.append(10)
+    numbers.append(20)
+
+    count = len(numbers)
+    doubled = count * 2
+
+    return doubled
+"""
+        tree = ast.parse(code)
+        func_node = tree.body[0]
+
+        results = self.inferencer.analyze_function_flow(func_node)
+
+        # Should infer all variables
+        assert "numbers" in results
+        assert "count" in results
+        assert "doubled" in results
+
+        # All should have type info
+        assert results["numbers"].type_info is not None
+        assert results["count"].type_info is not None
+        assert results["doubled"].type_info is not None
+
+
+class TestEndToEndInference:
+    """End-to-end tests using the full MGen pipeline."""
+
+    def test_simple_infer_test_file(self):
+        """Test the simple_infer_test.py example works end-to-end."""
+        import tempfile
+        from pathlib import Path
+        from mgen.pipeline import MGenPipeline, PipelineConfig
+
+        code = """
+def simple_test() -> int:
+    numbers = []
+    numbers.append(10)
+    return len(numbers)
+
+def main() -> int:
+    result = simple_test()
+    print(result)
+    return 0
+"""
+        # Write to temp file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(code)
+            temp_path = Path(f.name)
+
+        try:
+            # Create pipeline
+            config = PipelineConfig(
+                target_language="cpp",
+                enable_advanced_analysis=True
+            )
+            pipeline = MGenPipeline(config)
+
+            # Should convert without errors
+            result = pipeline.convert(temp_path)
+
+            # Should succeed
+            assert result.success, f"Conversion failed with errors: {result.errors}"
+            assert len(result.errors) == 0
+
+        finally:
+            # Clean up
+            temp_path.unlink()
+
+    def test_global_variable_still_requires_annotation(self):
+        """Test that global variables still require explicit annotations."""
+        from mgen.frontend.ast_analyzer import ASTAnalyzer
+
+        code = """
+global_var = 10
+
+def test_func() -> int:
+    return global_var
+"""
+        analyzer = ASTAnalyzer()
+        result = analyzer.analyze(code)
+
+        # Should have error about global variable
+        assert not result.convertible
+        assert any("global_var" in error.lower() for error in result.errors)

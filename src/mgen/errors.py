@@ -9,7 +9,11 @@ import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, TypeVar, Union
+
+
+# TypeVar for class methods that return the same type as the class
+T_MGenError = TypeVar("T_MGenError", bound="MGenError")
 
 
 class ErrorCode(Enum):
@@ -130,14 +134,14 @@ class MGenError(Exception):
 
     @classmethod
     def from_ast_node(
-        cls,
+        cls: type[T_MGenError],
         message: str,
         node: ast.AST,
         filename: str = "<unknown>",
         suggestion: Optional[str] = None,
         help_text: Optional[str] = None,
         error_code: Optional[ErrorCode] = None,
-    ) -> "MGenError":
+    ) -> T_MGenError:
         """Create error from AST node with automatic location extraction.
 
         Args:

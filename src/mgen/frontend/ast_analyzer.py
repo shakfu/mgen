@@ -73,7 +73,7 @@ class VariableInfo:
     """Information about a variable in static analysis."""
 
     name: str
-    type_info: TypeInfo
+    type_info: Optional[TypeInfo]
     scope: str
     is_parameter: bool = False
     is_declared: bool = False
@@ -211,8 +211,24 @@ class ASTAnalyzer(ast.NodeVisitor):
                 # Check if variable is declared
                 var_info = self._get_variable_info(var_name)
                 if not var_info:
-                    self.result.errors.append(f"Variable '{var_name}' used without type annotation declaration")
-                    self.result.convertible = False
+                    # Create placeholder for type inference
+                    # Local variables can be inferred, global variables still require annotations
+                    if self.current_function:
+                        # Create placeholder variable info for local variable
+                        # Type will be inferred later by flow-sensitive analysis
+                        var_info = VariableInfo(
+                            name=var_name,
+                            type_info=None,  # Will be inferred
+                            is_parameter=False,
+                            scope="local"
+                        )
+                        var_info.is_modified = True
+                        var_info.usage_count = 1
+                        self.result.functions[self.current_function].local_variables[var_name] = var_info
+                    else:
+                        # Global variables still require explicit annotation
+                        self.result.errors.append(f"Global variable '{var_name}' used without type annotation declaration")
+                        self.result.convertible = False
                 else:
                     var_info.is_modified = True
                     var_info.usage_count += 1
