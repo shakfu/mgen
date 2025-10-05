@@ -605,20 +605,47 @@ class MGenPythonToOCamlConverter:
 
     def _convert_method_call(self, node: ast.Call) -> str:
         """Convert method call to OCaml function call."""
-        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
-            obj_name = self._to_ocaml_var_name(node.func.value.id)
+        if isinstance(node.func, ast.Attribute):
             method_name = node.func.attr
+
+            # Handle chained method calls: obj.method1().method2()
+            is_chained = False
+            if isinstance(node.func.value, ast.Call):
+                # The value is itself a method call, so convert it first
+                obj_expr = self._convert_method_call(node.func.value)
+                is_chained = True
+            elif isinstance(node.func.value, ast.Name):
+                obj_expr = self._to_ocaml_var_name(node.func.value.id)
+            elif isinstance(node.func.value, ast.Attribute):
+                # Attribute access like obj.attr.method()
+                obj_expr = self._convert_expression(node.func.value)
+            else:
+                raise UnsupportedFeatureError(f"Unsupported method call pattern: {type(node.func.value).__name__}")
+
+            # Wrap in parentheses if it's a chained call (complex expression)
+            if is_chained:
+                obj_expr = f"({obj_expr})"
 
             # Handle string methods
             if method_name in ["upper", "lower", "strip", "find", "replace", "split"]:
-                return self._convert_string_method(obj_name, method_name, node.args)
+                return self._convert_string_method(obj_expr, method_name, node.args)
+            # Handle dict methods
+            elif method_name == "items":
+                # For association lists, items() is just the identity function
+                return obj_expr
+            elif method_name == "keys":
+                # Extract keys from association list
+                return f"List.map fst {obj_expr}"
+            elif method_name == "values":
+                # Extract values from association list
+                return f"List.map snd {obj_expr}"
             else:
                 # Object method call
                 args = [self._convert_expression(arg) for arg in node.args]
                 if args:
-                    return f"{obj_name}_{method_name} {obj_name} {' '.join(args)}"
+                    return f"{obj_expr}_{method_name} {obj_expr} {' '.join(args)}"
                 else:
-                    return f"{obj_name}_{method_name} {obj_name}"
+                    return f"{obj_expr}_{method_name} {obj_expr}"
         else:
             raise UnsupportedFeatureError("Complex method calls not supported")
 
@@ -662,9 +689,13 @@ class MGenPythonToOCamlConverter:
             raise UnsupportedFeatureError("Complex attribute access not supported")
 
     def _convert_list_literal(self, node: ast.List) -> str:
-        """Convert Python list literal to OCaml list."""
+        """Convert Python list literal to OCaml array.
+
+        Note: We use arrays instead of lists because Python lists are mutable
+        and support subscript assignment, which OCaml lists don't support.
+        """
         elements = [self._convert_expression(elt) for elt in node.elts]
-        return "[" + "; ".join(elements) + "]"
+        return "[|" + "; ".join(elements) + "|]"
 
     def _convert_dict_literal(self, node: ast.Dict) -> str:
         """Convert Python dict literal to OCaml association list."""
@@ -709,7 +740,21 @@ class MGenPythonToOCamlConverter:
             raise UnsupportedFeatureError("Multiple generators in comprehensions not supported")
 
         gen = node.generators[0]
-        target = self._to_ocaml_var_name(gen.target.id) if isinstance(gen.target, ast.Name) else "x"
+
+        # Handle tuple unpacking: for k, v in dict.items()
+        if isinstance(gen.target, ast.Tuple):
+            # For dict comprehensions with unpacking, we expect (k, v) pattern
+            if len(gen.target.elts) == 2:
+                key_var = self._to_ocaml_var_name(gen.target.elts[0].id) if isinstance(gen.target.elts[0], ast.Name) else "k"
+                value_var = self._to_ocaml_var_name(gen.target.elts[1].id) if isinstance(gen.target.elts[1], ast.Name) else "v"
+                target = f"({key_var}, {value_var})"
+            else:
+                raise UnsupportedFeatureError("Dict comprehension with tuple unpacking requires exactly 2 elements")
+        elif isinstance(gen.target, ast.Name):
+            target = self._to_ocaml_var_name(gen.target.id)
+        else:
+            target = "x"
+
         iterable = self._convert_expression(gen.iter)
 
         if gen.ifs:
@@ -755,6 +800,19 @@ class MGenPythonToOCamlConverter:
         if isinstance(target, ast.Name):
             var_name = self._to_ocaml_var_name(target.id)
             return f"let {var_name} = {value} in"
+        elif isinstance(target, ast.Subscript):
+            # Handle subscript assignment: container[index] = value
+            container = self._convert_expression(target.value)
+            index = self._convert_expression(target.slice)
+
+            # Check if it's a dict (association list) or array assignment
+            # For now, assume arrays use integer indices and dicts use string keys
+            if isinstance(target.slice, ast.Constant) and isinstance(target.slice.value, str):
+                # Dictionary assignment
+                return f"let {container} = update_assoc_list {container} {index} {value} in"
+            else:
+                # Array assignment
+                return f"let _ = {container}.({index}) <- {value} in"
         else:
             raise UnsupportedFeatureError("Complex assignment targets not supported")
 
@@ -780,6 +838,18 @@ class MGenPythonToOCamlConverter:
                 self.variables[var_name] = type_name
 
             return f"let {var_name} = {value} in"
+        elif isinstance(target, ast.Subscript):
+            # Handle subscript assignment: container[index] = value
+            container = self._convert_expression(target.value)
+            index = self._convert_expression(target.slice)
+
+            # Check if it's a dict (association list) or array assignment
+            if isinstance(target.slice, ast.Constant) and isinstance(target.slice.value, str):
+                # Dictionary assignment
+                return f"let {container} = update_assoc_list {container} {index} {value} in"
+            else:
+                # Array assignment
+                return f"let _ = {container}.({index}) <- {value} in"
         else:
             raise UnsupportedFeatureError("Complex assignment targets not supported")
 
@@ -840,8 +910,18 @@ class MGenPythonToOCamlConverter:
         for stmt in node.body:
             converted = self._convert_statement(stmt)
             if converted:
-                then_stmts.append(converted)
-        then_part = then_stmts[-1] if then_stmts else "()"
+                if isinstance(converted, list):
+                    then_stmts.extend(converted)
+                else:
+                    then_stmts.append(converted)
+
+        # For multiple statements, chain them with semicolons in a begin...end block
+        if len(then_stmts) > 1:
+            then_part = "begin " + "; ".join(then_stmts) + " end"
+        elif then_stmts:
+            then_part = then_stmts[0]
+        else:
+            then_part = "()"
 
         # Convert else branch
         if node.orelse:
@@ -849,8 +929,17 @@ class MGenPythonToOCamlConverter:
             for stmt in node.orelse:
                 converted = self._convert_statement(stmt)
                 if converted:
-                    else_stmts.append(converted)
-            else_part = else_stmts[-1] if else_stmts else "()"
+                    if isinstance(converted, list):
+                        else_stmts.extend(converted)
+                    else:
+                        else_stmts.append(converted)
+
+            if len(else_stmts) > 1:
+                else_part = "begin " + "; ".join(else_stmts) + " end"
+            elif else_stmts:
+                else_part = else_stmts[0]
+            else:
+                else_part = "()"
         else:
             else_part = "()"
 
@@ -1028,5 +1117,11 @@ class MGenPythonToOCamlConverter:
         """Convert subscript access (e.g., list[0], dict[key])."""
         value = self._convert_expression(node.value)
         slice_expr = self._convert_expression(node.slice)
-        # For OCaml, we'll use List.nth for lists or other appropriate access
-        return f"List.nth {value} {slice_expr}"
+
+        # Check if it's a dict (association list) or array access
+        if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+            # Dictionary access - use List.assoc for association lists
+            return f"List.assoc {slice_expr} {value}"
+        else:
+            # Array access - use array indexing notation
+            return f"{value}.({slice_expr})"

@@ -220,3 +220,34 @@ let to_string_bool = Conversions.string_of_bool
 let to_string x = x  (* For strings, identity function *)
 
 let print_value = Conversions.print_value
+
+(* Array operations for mutable sequences *)
+module ArrayOps = struct
+  (* Update array element *)
+  let update_array arr idx value =
+    arr.(idx) <- value;
+    arr
+
+  (* Update association list (dict) *)
+  let update_assoc_list lst key value =
+    let rec update acc = function
+      | [] -> List.rev ((key, value) :: acc)
+      | (k, v) :: rest ->
+        if k = key then
+          List.rev_append acc ((key, value) :: rest)
+        else
+          update ((k, v) :: acc) rest
+    in
+    update [] lst
+
+  (* Convert list to array *)
+  let list_to_array lst = Array.of_list lst
+
+  (* Convert array to list *)
+  let array_to_list arr = Array.to_list arr
+end
+
+let update_array = ArrayOps.update_array
+let update_assoc_list = ArrayOps.update_assoc_list
+let list_to_array = ArrayOps.list_to_array
+let array_to_list = ArrayOps.array_to_list
