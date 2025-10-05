@@ -34,6 +34,7 @@ class MGenPythonToOCamlConverter:
         self.classes: dict[str, Any] = {}
         self.variables: dict[str, str] = {}
         self.current_class: Optional[str] = None
+        self.mutable_vars: set[str] = set()  # Variables that need to be refs
 
     def convert_code(self, python_code: str) -> str:
         """Convert Python source code to OCaml."""
@@ -135,9 +136,20 @@ class MGenPythonToOCamlConverter:
                     return True
         return False
 
+    def _find_mutable_variables(self, node: ast.FunctionDef) -> set[str]:
+        """Find all variables that are mutated (augmented assignment) in a function."""
+        mutable = set()
+        for child in ast.walk(node):
+            if isinstance(child, ast.AugAssign) and isinstance(child.target, ast.Name):
+                mutable.add(child.target.id)
+        return mutable
+
     def _convert_regular_function(self, node: ast.FunctionDef, params: list[tuple], return_type: str) -> list[str]:
         """Convert a regular function definition."""
         func_name = self._to_ocaml_var_name(node.name)
+
+        # Find mutable variables for this function
+        self.mutable_vars = self._find_mutable_variables(node)
 
         # Check if function is recursive
         is_recursive = self._is_recursive_function(node, node.name)
@@ -195,18 +207,31 @@ class MGenPythonToOCamlConverter:
             for _i, stmt in enumerate(filtered_body):
                 if isinstance(stmt, ast.Return):
                     if stmt.value:
-                        body_lines.append(f"  {self._convert_expression(stmt.value)}")
+                        body_lines.append(self._convert_expression(stmt.value))
                     else:
-                        body_lines.append("  ()")
+                        body_lines.append("()")
                 else:
                     converted = self._convert_statement(stmt)
                     if isinstance(converted, list):
-                        body_lines.extend([f"  {line}" for line in converted])
+                        body_lines.extend(converted)
                     else:
-                        body_lines.append(f"  {converted}")
+                        body_lines.append(converted)
 
+            # Properly sequence statements with semicolons where needed
             if body_lines:
-                lines.extend(body_lines)
+                for i, line in enumerate(body_lines):
+                    if i < len(body_lines) - 1:  # Not the last statement
+                        if not line.rstrip().endswith(' in'):
+                            lines.append(f"  {line};")
+                        else:
+                            lines.append(f"  {line}")
+                    else:
+                        # Last statement - if it ends with 'in', add ()
+                        if line.rstrip().endswith(' in'):
+                            lines.append(f"  {line}")
+                            lines.append("  ()")
+                        else:
+                            lines.append(f"  {line}")
             else:
                 lines.append("  ()")
 
@@ -441,7 +466,13 @@ class MGenPythonToOCamlConverter:
 
     def _convert_name(self, node: ast.Name) -> str:
         """Convert Python name to OCaml variable name."""
-        return self._to_ocaml_var_name(node.id)
+        var_name = self._to_ocaml_var_name(node.id)
+
+        # If this is a mutable variable (ref), dereference it for reading
+        if node.id in self.mutable_vars:
+            return f"!{var_name}"
+        else:
+            return var_name
 
     def _convert_binary_operation(self, node: ast.BinOp) -> str:
         """Convert Python binary operation to OCaml."""
@@ -837,7 +868,11 @@ class MGenPythonToOCamlConverter:
                 type_name = self._get_type_annotation(node.annotation)
                 self.variables[var_name] = type_name
 
-            return f"let {var_name} = {value} in"
+            # Check if this variable is mutable (will be mutated later)
+            if target.id in self.mutable_vars:
+                return f"let {var_name} = ref ({value}) in"
+            else:
+                return f"let {var_name} = {value} in"
         elif isinstance(target, ast.Subscript):
             # Handle subscript assignment: container[index] = value
             container = self._convert_expression(target.value)
@@ -880,10 +915,21 @@ class MGenPythonToOCamlConverter:
 
     def _convert_augmented_assignment(self, node: ast.AugAssign) -> str:
         """Convert Python augmented assignment to OCaml."""
-        target = self._convert_expression(node.target)
-        value = self._convert_expression(node.value)
-        op = self._convert_operator(node.op)
-        return f"let {target} = {target} {op} {value} in"
+        if isinstance(node.target, ast.Name):
+            var_name = self._to_ocaml_var_name(node.target.id)
+            value = self._convert_expression(node.value)
+            op = self._convert_operator(node.op)
+
+            # If this is a mutable variable (ref), use := for assignment
+            if node.target.id in self.mutable_vars:
+                return f"{var_name} := (!{var_name}) {op} ({value})"
+            else:
+                return f"let {var_name} = {var_name} {op} {value} in"
+        else:
+            target = self._convert_expression(node.target)
+            value = self._convert_expression(node.value)
+            op = self._convert_operator(node.op)
+            return f"let {target} = {target} {op} {value} in"
 
     def _convert_expression_statement(self, node: ast.Expr) -> str:
         """Convert expression statement."""
@@ -915,13 +961,37 @@ class MGenPythonToOCamlConverter:
                 else:
                     then_stmts.append(converted)
 
-        # For multiple statements, chain them with semicolons in a begin...end block
-        if len(then_stmts) > 1:
-            then_part = "begin " + "; ".join(then_stmts) + " end"
-        elif then_stmts:
-            then_part = then_stmts[0]
-        else:
-            then_part = "()"
+        # Build proper OCaml statement sequences
+        def sequence_statements(stmts: list[str]) -> str:
+            """Properly sequence OCaml statements with semicolons where needed."""
+            if not stmts:
+                return "()"
+            if len(stmts) == 1:
+                # Single statement - if it ends with 'in', add ()
+                if stmts[0].rstrip().endswith(' in'):
+                    return stmts[0] + "\n    ()"
+                return stmts[0]
+
+            # Add semicolons between statements that don't end with 'in'
+            result = []
+            for i, stmt in enumerate(stmts):
+                if i < len(stmts) - 1:  # Not the last statement
+                    # If this statement doesn't end with 'in', add semicolon
+                    if not stmt.rstrip().endswith(' in'):
+                        result.append(stmt + ';')
+                    else:
+                        result.append(stmt)
+                else:
+                    # Last statement - if it ends with 'in', add ()
+                    if stmt.rstrip().endswith(' in'):
+                        result.append(stmt)
+                        result.append("()")
+                    else:
+                        result.append(stmt)
+
+            return "(\n    " + "\n    ".join(result) + "\n  )"
+
+        then_part = sequence_statements(then_stmts)
 
         # Convert else branch
         if node.orelse:
@@ -934,12 +1004,7 @@ class MGenPythonToOCamlConverter:
                     else:
                         else_stmts.append(converted)
 
-            if len(else_stmts) > 1:
-                else_part = "begin " + "; ".join(else_stmts) + " end"
-            elif else_stmts:
-                else_part = else_stmts[0]
-            else:
-                else_part = "()"
+            else_part = sequence_statements(else_stmts)
         else:
             else_part = "()"
 
@@ -950,6 +1015,17 @@ class MGenPythonToOCamlConverter:
         condition = self._convert_expression(node.test)
         return f"(* while {condition} do ... done *)"
 
+    def _has_mutations(self, stmts: list[ast.stmt]) -> set[str]:
+        """Detect variables that are mutated in a list of statements."""
+        mutated = set()
+        for stmt in stmts:
+            if isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
+                mutated.add(stmt.target.id)
+            elif isinstance(stmt, ast.If):
+                mutated.update(self._has_mutations(stmt.body))
+                mutated.update(self._has_mutations(stmt.orelse))
+        return mutated
+
     def _convert_for_statement(self, node: ast.For) -> list[str]:
         """Convert for statement to OCaml."""
         if not isinstance(node.target, ast.Name):
@@ -958,8 +1034,11 @@ class MGenPythonToOCamlConverter:
         target = self._to_ocaml_var_name(node.target.id)
         iter_expr = self._convert_expression(node.iter)
 
-        # Check for single assignment or augmented assignment pattern
-        if len(node.body) == 1:
+        # Check if any variables are mutated in the loop body
+        mutated_vars = self._has_mutations(node.body)
+
+        # Check for single assignment or augmented assignment pattern (simple cases)
+        if len(node.body) == 1 and not mutated_vars:
             stmt = node.body[0]
 
             # Handle regular assignment: for i in range(n): var = expr
@@ -971,8 +1050,11 @@ class MGenPythonToOCamlConverter:
                     f"let {updated_var} = List.fold_left (fun _ {target} -> {value_expr}) {updated_var} ({iter_expr}) in"
                 ]
 
+        # Check for simple accumulation without other mutations
+        if len(node.body) == 1 and len(mutated_vars) == 1:
+            stmt = node.body[0]
             # Handle augmented assignment: for i in range(n): var += expr
-            elif isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
+            if isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
                 updated_var = self._to_ocaml_var_name(stmt.target.id)
                 value_expr = self._convert_expression(stmt.value)
                 op = self._convert_operator(stmt.op)
@@ -991,8 +1073,24 @@ class MGenPythonToOCamlConverter:
                 body_lines.append(converted)
 
         if body_lines:
-            body_str = "; ".join(body_lines)
-            return [f"List.iter (fun {target} -> {body_str}) ({iter_expr});"]
+            # Properly sequence statements with semicolons where needed
+            sequenced = []
+            for i, line in enumerate(body_lines):
+                if i < len(body_lines) - 1:  # Not the last statement
+                    if not line.rstrip().endswith(' in'):
+                        sequenced.append(line + ';')
+                    else:
+                        sequenced.append(line)
+                else:
+                    # Last statement - if it ends with 'in', add ()
+                    if line.rstrip().endswith(' in'):
+                        sequenced.append(line)
+                        sequenced.append("()")
+                    else:
+                        sequenced.append(line)
+
+            body_str = " ".join(sequenced)
+            return [f"List.iter (fun {target} -> {body_str}) ({iter_expr})"]
         else:
             return ["(* Empty for loop *)"]
 

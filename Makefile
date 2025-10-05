@@ -5,7 +5,7 @@ BENCHMARK_RESULTS_DIR := build/benchmark_results
 .PHONY: help install test test-unit test-integration test-translation \
 		test-py2c test-benchmark test-build clean lint format type-check \
 		build docs benchmark benchmark-algorithms benchmark-data-structures \
-		benchmark-report benchmark-clean check
+		benchmark-report benchmark-clean check snap
 
 # Default target
 help:
@@ -85,6 +85,9 @@ test-coverage:
 # quickcheck
 
 check: test type-check benchmark
+
+snap:
+	@git add --all . && git commit -m 'snap' && git push
 
 # Code quality
 lint:
