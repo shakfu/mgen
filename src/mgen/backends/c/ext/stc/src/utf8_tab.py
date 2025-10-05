@@ -9,6 +9,16 @@ _UNICODE_DIR = "https://www.unicode.org/Public/15.0.0/ucd"
 
 
 def read_unidata(casetype="lowcase", category="Lu", bitrange=16):
+    """Read Unicode data from UnicodeData.txt.
+
+    Args:
+        casetype: Case type to filter ('lowcase', 'upcase', or 'titlecase').
+        category: Unicode category to filter (e.g., 'Lu' for uppercase letters).
+        bitrange: Bit range to filter (16 for BMP, >16 for supplementary planes).
+
+    Returns:
+        DataFrame with Unicode character data.
+    """
     df = pd.read_csv(
         _UNICODE_DIR + "/UnicodeData.txt",
         sep=";",
@@ -49,6 +59,14 @@ def read_unidata(casetype="lowcase", category="Lu", bitrange=16):
 
 
 def read_casefold(bitrange):
+    """Read case folding data from CaseFolding.txt.
+
+    Args:
+        bitrange: Bit range to filter (16 for BMP, >16 for supplementary planes).
+
+    Returns:
+        DataFrame with case folding data.
+    """
     df = pd.read_csv(
         _UNICODE_DIR + "/CaseFolding.txt",
         engine="python",
@@ -68,6 +86,15 @@ def read_casefold(bitrange):
 
 
 def make_caselist(df, casetype):
+    """Create a list of case mappings from DataFrame.
+
+    Args:
+        df: DataFrame with Unicode data.
+        casetype: Case type column to extract ('lowcase', 'upcase', or 'titlecase').
+
+    Returns:
+        List of tuples (code, case_mapping, name).
+    """
     caselist = []
     for _idx, row in df.iterrows():
         caselist.append((row["code"], row[casetype], row["name"]))
@@ -75,6 +102,14 @@ def make_caselist(df, casetype):
 
 
 def make_table(caselist):
+    """Create a compact table from case mapping list.
+
+    Args:
+        caselist: List of tuples (code, case_mapping, name).
+
+    Returns:
+        List of table entries with range compression.
+    """
     prev_a, prev_b = 0, 0
     diff_a, diff_b = 0, 0
     prev_offs = 0
@@ -102,6 +137,14 @@ def make_table(caselist):
 
 
 def print_table(name, table, style=1, bitrange=16):
+    """Print a case mapping table (currently unused, but kept for reference).
+
+    Args:
+        name: Table name.
+        table: Table data.
+        style: Print style (1 or 2).
+        bitrange: Bit range for filtering.
+    """
     for a, b, c, _t in table:
         if style == 1:  # first char with name
             b - a + 1 if abs(c - b) != 1 else (b - a) / 2 + 1
@@ -114,11 +157,27 @@ def print_table(name, table, style=1, bitrange=16):
 
 
 def print_index_table(name, indtab):
+    """Print an index table (currently unused, but kept for reference).
+
+    Args:
+        name: Table name.
+        indtab: Index table data.
+    """
     for _i in range(len(indtab)):
         pass
 
 
 def compile_table(casetype="lowcase", category=None, bitrange=16):
+    """Compile a complete case mapping table from Unicode data.
+
+    Args:
+        casetype: Case type ('lowcase', 'upcase', or 'titlecase').
+        category: Unicode category filter, or None for case folding.
+        bitrange: Bit range for filtering (16 for BMP).
+
+    Returns:
+        Compiled case mapping table.
+    """
     if category:
         df = read_unidata(casetype, category, bitrange)
     else:
@@ -129,6 +188,7 @@ def compile_table(casetype="lowcase", category=None, bitrange=16):
 
 
 def main():
+    """Generate UTF-8 case mapping tables from Unicode data."""
     bitrange = 16
 
     casemappings = compile_table("lowcase", None, bitrange)  # CaseFolding.txt

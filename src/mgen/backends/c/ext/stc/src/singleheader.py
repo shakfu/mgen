@@ -11,6 +11,15 @@ extra_paths = [path_join(top_dir, "include"), path_join(top_dir, "..", "include"
 
 
 def find_file(included_name, current_file):
+    """Find an included file in the current directory or extra paths.
+
+    Args:
+        included_name: Name of the file to find.
+        current_file: Path of the file that includes the target file.
+
+    Returns:
+        Absolute path to the found file, or None if not found.
+    """
     current_dir = dirname(abspath(current_file))
     for idir in [current_dir] + extra_paths:
         try_path = path_join(idir, included_name)
@@ -24,6 +33,16 @@ def process_file(
     out_lines=None,
     processed_files=None,
 ):
+    """Process a C file and inline all includes to create a single header.
+
+    Args:
+        file_path: Path to the C file to process.
+        out_lines: List to accumulate output lines.
+        processed_files: List of already processed files to avoid duplicates.
+
+    Returns:
+        Tuple of (out_lines, processed_files).
+    """
     if processed_files is None:
         processed_files = []
     if out_lines is None:

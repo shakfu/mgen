@@ -26,6 +26,7 @@ class z3:
 
     @staticmethod
     def IntVal(val: int) -> None:
+        """Mock create integer value."""
         return None
 
 
@@ -73,6 +74,7 @@ class PerformanceBound:
     conditions: Optional[list[str]] = None
 
     def __post_init__(self) -> None:
+        """Initialize constants and conditions dictionaries if not provided."""
         if self.constants is None:
             self.constants = {}
         if self.conditions is None:
@@ -511,18 +513,22 @@ class AlgorithmStructureExtractor(ast.NodeVisitor):
         self.current_function: Optional[str] = None
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        """Visit a function definition node."""
         self.current_function = node.name
         self.generic_visit(node)
 
     def visit_For(self, node: ast.For) -> None:
+        """Visit a for loop node."""
         self.loops.append({"type": "for", "line": node.lineno, "iterable": self._extract_iterable_info(node.iter)})
         self.generic_visit(node)
 
     def visit_While(self, node: ast.While) -> None:
+        """Visit a while loop node."""
         self.loops.append({"type": "while", "line": node.lineno})
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
+        """Visit a function call node."""
         if isinstance(node.func, ast.Name):
             if node.func.id == self.current_function:
                 self.recursive_calls.append({"line": node.lineno, "function": node.func.id})
@@ -550,6 +556,7 @@ class ComplexityPatternAnalyzer(ast.NodeVisitor):
         self.current_depth = 0
 
     def visit_For(self, node: ast.For) -> None:
+        """Visit a for loop node and track nesting depth."""
         self.current_depth += 1
         self.loop_depth = max(self.loop_depth, self.current_depth)
         self.max_loop_depth = max(self.max_loop_depth, self.current_depth)
@@ -565,6 +572,7 @@ class ComplexityPatternAnalyzer(ast.NodeVisitor):
         self.current_depth -= 1
 
     def visit_While(self, node: ast.While) -> None:
+        """Visit a while loop node and track nesting depth."""
         self.current_depth += 1
         self.loop_depth = max(self.loop_depth, self.current_depth)
         self.max_loop_depth = max(self.max_loop_depth, self.current_depth)
@@ -575,11 +583,13 @@ class ComplexityPatternAnalyzer(ast.NodeVisitor):
         self.current_depth -= 1
 
     def visit_Subscript(self, node: ast.Subscript) -> None:
+        """Visit a subscript node and track array accesses."""
         if isinstance(node.value, ast.Name):
             self.array_accesses.append({"array": node.value.id, "line": node.lineno, "depth": self.current_depth})
         self.generic_visit(node)
 
     def visit_Assign(self, node: ast.Assign) -> None:
+        """Visit an assignment node and track array allocations."""
         # Check for array/list allocations
         if isinstance(node.value, ast.List):
             if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
@@ -589,6 +599,7 @@ class ComplexityPatternAnalyzer(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
+        """Visit a function call node and track function calls."""
         if isinstance(node.func, ast.Name):
             self.function_calls.append({"function": node.func.id, "line": node.lineno, "depth": self.current_depth})
         self.generic_visit(node)

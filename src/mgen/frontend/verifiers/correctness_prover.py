@@ -34,10 +34,12 @@ class z3:
 
     @staticmethod
     def And(*args: Any) -> None:
+        """Mock logical AND operation."""
         return None
 
     @staticmethod
     def Or(*args: Any) -> None:
+        """Mock logical OR operation."""
         return None
 
 
