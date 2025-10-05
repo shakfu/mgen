@@ -17,6 +17,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.60] - 2025-10-05
+
+**Documentation: Getting Started Tutorial (COMPLETE)**
+
+Created comprehensive Getting Started tutorial with working examples for all backends. Provides smooth onboarding experience for new users.
+
+### Added
+
+- **Getting Started Tutorial** (`docs/GETTING_STARTED.md`, ~800 lines)
+  - Complete installation guide (uv, pip, manual)
+  - "Your First Program" walkthrough with Hello World
+  - Language-specific guides for all 6 backends (C++, Rust, Go, Haskell, OCaml, C)
+  - Common patterns section (lists, dicts, comprehensions, classes, file I/O)
+  - Comprehensive troubleshooting guide with solutions
+  - Command reference with correct syntax examples
+  - Next steps and learning resources
+
+- **Tutorial Examples** (`examples/tutorial/`)
+  - `hello.py` - Basic Hello World with string concatenation
+  - `math_ops.py` - Factorial and list operations
+  - `string_ops.py` - String methods (split, upper)
+  - `data_structures.py` - List operations and max finding
+  - `README.md` - Instructions for running examples
+
+### Improved
+
+- **Print Statement Guidance**
+  - Added best practices for cross-backend `print()` compatibility
+  - Documented limitations of string concatenation with `str()`
+  - Recommended simple `print(value)` pattern for beginners
+  - Explained f-string alternatives
+
+- **Example Quality**
+  - All examples tested with C++, Rust, and Go backends
+  - Simplified patterns to avoid backend-specific edge cases
+  - Added type annotations to all variables
+  - Avoided unsupported features (f-strings, dict.keys())
+
+### Technical Notes
+
+- Tutorial focuses on beginner-friendly patterns
+- Examples prioritize cross-backend compatibility
+- All code tested and verified working
+- No external dependencies required in examples
+
 ## [0.1.59] - 2025-10-05
 
 **Developer Experience: Enhanced Error Messages (COMPLETE)**
@@ -73,7 +118,7 @@ Implemented comprehensive error message improvements with source location tracki
 
 ### Backward Compatibility
 
-✅ **100% backward compatible** - All existing code continues to work:
+[x] **100% backward compatible** - All existing code continues to work:
 - Simple `raise UnsupportedFeatureError("message")` still works
 - Can catch errors as `Exception`
 - Error messages accessible via `str(error)`
@@ -121,7 +166,7 @@ After comprehensive analysis, determined that code sharing across backends has r
 ### Changed
 
 - **CODE_REVIEW.md** - Updated Section 4.2 (Code Duplication)
-  - Status: ✅ COMPLETE - Optimal level achieved
+  - Status: [x] COMPLETE - Optimal level achieved
   - Added documentation of shared utilities (operator mapping functions)
   - Explained why remaining "duplication" is intentional
   - Removed recommendation for expression conversion refactoring
@@ -153,7 +198,7 @@ After comprehensive analysis, determined that code sharing across backends has r
 - Proposed visitor pattern would add 200-300 lines for minimal benefit (~120 lines saved)
 - **ROI: NEGATIVE** - Would decrease debuggability and maintainability
 
-**Recommendation**: ✅ COMPLETE - No further action needed
+**Recommendation**: [x] COMPLETE - No further action needed
 
 ### Metrics
 
@@ -161,7 +206,7 @@ After comprehensive analysis, determined that code sharing across backends has r
 - **Operator mapping centralization**: 37+ usages across backends
 - **Strategy pattern implementations**: 9 total (4 subsystems refactored)
 - **Average complexity reduction**: 79% in refactored subsystems
-- **Code sharing status**: ✅ Optimal balance achieved
+- **Code sharing status**: [x] Optimal balance achieved
 
 ---
 
@@ -173,19 +218,19 @@ Successfully implemented loop conversion using Strategy pattern for Haskell and 
 
 ### Added
 
-- **Loop Conversion Strategy System** (`src/mgen/backends/loop_conversion_strategies.py`) ✅ COMPLETE
+- **Loop Conversion Strategy System** (`src/mgen/backends/loop_conversion_strategies.py`) [x] COMPLETE
   - `ForLoopStrategy` abstract base class
   - `LoopContext` for backend-specific helpers
   - `ForLoopConverter` strategy coordinator with fallback mechanism
 
-- **Haskell Loop Conversion Strategies** (`src/mgen/backends/haskell/loop_strategies.py`) ✅ COMPLETE
+- **Haskell Loop Conversion Strategies** (`src/mgen/backends/haskell/loop_strategies.py`) [x] COMPLETE
   - `HaskellNestedListBuildingStrategy` - nested 2D list patterns
   - `HaskellListAppendStrategy` - simple list.append() to foldl/foldM
   - `HaskellAccumulationStrategy` - augmented assignment (+=, -=)
   - `HaskellAssignmentInMainStrategy` - assignment in IO context
   - `create_haskell_loop_converter()` factory function
 
-- **OCaml Loop Conversion Strategies** (`src/mgen/backends/ocaml/loop_strategies.py`) ✅ COMPLETE
+- **OCaml Loop Conversion Strategies** (`src/mgen/backends/ocaml/loop_strategies.py`) [x] COMPLETE
   - `OCamlSimpleAssignmentStrategy` - simple assignment with no mutations
   - `OCamlAccumulationStrategy` - augmented assignment with mutation tracking
   - `OCamlGeneralLoopStrategy` - catch-all using List.iter
@@ -212,7 +257,7 @@ Successfully implemented loop conversion using Strategy pattern for Haskell and 
   - `std::unordered_map` → `std::unordered_map<int, int>`
   - `std::unordered_set` → `std::unordered_set<int>`
   - Fixes compilation errors in generated C++ code
-  - **C++ benchmarks: 2/7 → 7/7 (100%)** ✅
+  - **C++ benchmarks: 2/7 → 7/7 (100%)** [x]
 
 ### Metrics
 
@@ -231,7 +276,7 @@ Successfully implemented unified type inference system using Strategy pattern ac
 
 ### Added
 
-- **Type Inference Strategy System** (`src/mgen/backends/type_inference_strategies.py`) ✅ COMPLETE
+- **Type Inference Strategy System** (`src/mgen/backends/type_inference_strategies.py`) [x] COMPLETE
   - `TypeInferenceStrategy` abstract base class
   - `InferenceContext` for backend-specific type mapping
   - `TypeInferenceEngine` strategy coordinator
@@ -244,7 +289,7 @@ Successfully implemented unified type inference system using Strategy pattern ac
     - `CallInferenceStrategy` - function/method calls
     - `ComprehensionInferenceStrategy` - list/dict/set comprehensions
 
-- **C++ Type Inference Extensions** (`src/mgen/backends/cpp/type_inference.py`) ✅ COMPLETE
+- **C++ Type Inference Extensions** (`src/mgen/backends/cpp/type_inference.py`) [x] COMPLETE
   - `CppListInferenceStrategy` - `std::vector<T>` formatting
   - `CppDictInferenceStrategy` - `std::unordered_map<K,V>` formatting
   - `CppSetInferenceStrategy` - `std::unordered_set<T>` formatting
@@ -252,7 +297,7 @@ Successfully implemented unified type inference system using Strategy pattern ac
   - `CppBinOpInferenceStrategy` - binary operation type promotion
   - `create_cpp_type_inference_engine()` factory function
 
-- **Rust Type Inference Extensions** (`src/mgen/backends/rust/type_inference.py`) ✅ COMPLETE
+- **Rust Type Inference Extensions** (`src/mgen/backends/rust/type_inference.py`) [x] COMPLETE
   - `RustListInferenceStrategy` - `Vec<T>` formatting
   - `RustDictInferenceStrategy` - `std::collections::HashMap<K,V>` formatting
   - `RustSetInferenceStrategy` - `std::collections::HashSet<T>` formatting
@@ -263,7 +308,7 @@ Successfully implemented unified type inference system using Strategy pattern ac
   - `RustSubscriptInferenceStrategy` - element type extraction from containers
   - `create_rust_type_inference_engine()` factory function
 
-- **Go Type Inference Extensions** (`src/mgen/backends/go/type_inference.py`) ✅ COMPLETE
+- **Go Type Inference Extensions** (`src/mgen/backends/go/type_inference.py`) [x] COMPLETE
   - `GoListInferenceStrategy` - `[]T` formatting
   - `GoDictInferenceStrategy` - `map[K]V` formatting
   - `GoSetInferenceStrategy` - `map[T]bool` formatting (Go's set idiom)
@@ -273,14 +318,14 @@ Successfully implemented unified type inference system using Strategy pattern ac
 
 ### Changed
 
-- **_infer_type_from_value (C++) Refactoring** ✅
+- **_infer_type_from_value (C++) Refactoring** [x]
   - Complexity: 53 → ~8 (85% reduction)
   - Lines of code: 93 → 17 (82% reduction)
   - Eliminated 93-line if/elif chain
   - Strategy-based delegation via `TypeInferenceEngine`
   - Added `_map_type()` method for type mapping
 
-- **_infer_type_from_value (Rust) Refactoring** ✅
+- **_infer_type_from_value (Rust) Refactoring** [x]
   - Complexity: 53 → ~8 (85% reduction)
   - Lines of code: 126 → 13 (90% reduction)
   - Eliminated 126-line if/elif chain
@@ -288,7 +333,7 @@ Successfully implemented unified type inference system using Strategy pattern ac
   - Lazy initialization of type inference engine
   - Added `_map_type()` method for type mapping
 
-- **_infer_type_from_value (Go) Refactoring** ✅
+- **_infer_type_from_value (Go) Refactoring** [x]
   - Complexity: 31 → ~8 (74% reduction)
   - Lines of code: 75 → 13 (83% reduction)
   - Eliminated 75-line if/elif chain
@@ -306,12 +351,12 @@ Successfully implemented unified type inference system using Strategy pattern ac
 
 ### Performance
 
-- All 821 tests passing ✅ (13.81s execution)
-- Type-check passing (109 files, up from 105) ✅
-- Zero regressions ✅
-- C++ backend tests: 104/104 passing ✅
-- Rust backend tests: 118/118 passing ✅
-- Go backend tests: 95/95 passing ✅
+- All 821 tests passing [x] (13.81s execution)
+- Type-check passing (109 files, up from 105) [x]
+- Zero regressions [x]
+- C++ backend tests: 104/104 passing [x]
+- Rust backend tests: 118/118 passing [x]
+- Go backend tests: 95/95 passing [x]
 
 ### Cumulative Refactoring Results (Phases 1-2)
 
@@ -331,7 +376,7 @@ Phase 1 of complexity reduction roadmap complete! Successfully refactored two ma
 
 ### Added
 
-- **Container Operation Strategy Pattern** (`src/mgen/backends/c/ext/stc/operation_strategies.py`) ✅ COMPLETE
+- **Container Operation Strategy Pattern** (`src/mgen/backends/c/ext/stc/operation_strategies.py`) [x] COMPLETE
   - `ContainerOperationStrategy` abstract base class
   - `ListOperationStrategy` for list/vector operations (11 methods)
   - `DictOperationStrategy` for dict/map operations (9 methods)
@@ -339,7 +384,7 @@ Phase 1 of complexity reduction roadmap complete! Successfully refactored two ma
   - `StringOperationStrategy` for string/cstr operations (9 methods)
   - `ContainerOperationTranslator` coordinator class
 
-- **Haskell Visitor Pattern Infrastructure** (`src/mgen/backends/haskell/`) ✅ COMPLETE
+- **Haskell Visitor Pattern Infrastructure** (`src/mgen/backends/haskell/`) [x] COMPLETE
   - `HaskellStatementVisitor` abstract base class (`statement_visitor.py`)
   - `MainFunctionVisitor` for IO do-notation functions
   - `PureFunctionVisitor` for pure functional code
@@ -348,13 +393,13 @@ Phase 1 of complexity reduction roadmap complete! Successfully refactored two ma
 
 ### Changed
 
-- **translate_container_operation Refactoring** ✅
+- **translate_container_operation Refactoring** [x]
   - Complexity: 66 → <10 (85% reduction)
   - Lines of code: 197 → 30 (85% reduction)
   - Eliminated massive if/elif chain
   - Strategy-based delegation by container type
 
-- **_convert_function (Haskell) Refactoring** ✅
+- **_convert_function (Haskell) Refactoring** [x]
   - Complexity: 69 → ~15 (78% reduction)
   - Lines of code: 308 → 6 (98% reduction in main function, logic distributed to visitor classes)
   - Separated main() vs pure function handling
@@ -362,8 +407,8 @@ Phase 1 of complexity reduction roadmap complete! Successfully refactored two ma
 
 ### Performance
 
-- **All 821 tests passing** in 12.9 seconds ✅
-- **Type-check passing** (105 source files) ✅
+- **All 821 tests passing** in 12.9 seconds [x]
+- **Type-check passing** (105 source files) [x]
 - Zero regressions from refactoring
 - Significantly improved code maintainability and extensibility
 
@@ -403,7 +448,7 @@ This release adds comprehensive analysis of code complexity and refactoring oppo
   - Statement converters (if/for/while): 15-40 → ~12
 
 - **Strategy Pattern Candidates**: 8 functions (container ops, type inference)
-  - `translate_container_operation`: 66 → ~10 complexity ✅ DONE
+  - `translate_container_operation`: 66 → ~10 complexity [x] DONE
   - `_infer_type_from_value`: 33-45 → ~8
   - `_convert_for_statement`: 40 → ~12
 
@@ -1351,11 +1396,11 @@ This release completes the parameterized template system, achieving full integra
     - New method: `_generate_inline_containers()` (~60 lines) - generates inline implementations
     - Updated `_generate_includes()` to skip runtime include in generated mode
   - **Benefits Validated**:
-    - ✅ Zero external dependencies (single C file output)
-    - ✅ Standard C compilation (plain `gcc -std=c99`)
-    - ✅ Self-contained programs (all code visible in one file)
-    - ✅ Backward compatible (runtime mode still default)
-    - ✅ Production quality (clean, readable generated code)
+    - [x] Zero external dependencies (single C file output)
+    - [x] Standard C compilation (plain `gcc -std=c99`)
+    - [x] Self-contained programs (all code visible in one file)
+    - [x] Backward compatible (runtime mode still default)
+    - [x] Production quality (clean, readable generated code)
   - **Prototype Validation** (`examples/generated_containers/`):
     - `demo_generated_containers.py` - end-to-end demonstration
     - Generates 330-line complete C program with inline hash table
