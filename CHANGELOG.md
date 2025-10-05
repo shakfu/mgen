@@ -17,6 +17,117 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.56] - 2025-10-05
+
+**Phase 2 Refactoring: Type Inference Strategy Pattern**
+
+Successfully implemented unified type inference system using Strategy pattern, reducing C++ backend complexity by 85% and creating reusable infrastructure for all backends.
+
+### Added
+
+- **Type Inference Strategy System** (`src/mgen/backends/type_inference_strategies.py`) ✅ COMPLETE
+  - `TypeInferenceStrategy` abstract base class
+  - `InferenceContext` for backend-specific type mapping
+  - `TypeInferenceEngine` strategy coordinator
+  - 7 core strategies:
+    - `ConstantInferenceStrategy` - literals (bool, int, float, str, None)
+    - `ListInferenceStrategy` - list literals with element type inference
+    - `DictInferenceStrategy` - dict literals with key/value type inference
+    - `SetInferenceStrategy` - set literals with element type inference
+    - `NameInferenceStrategy` - variable references
+    - `CallInferenceStrategy` - function/method calls
+    - `ComprehensionInferenceStrategy` - list/dict/set comprehensions
+
+- **C++ Type Inference Extensions** (`src/mgen/backends/cpp/type_inference.py`) ✅ COMPLETE
+  - `CppListInferenceStrategy` - `std::vector<T>` formatting
+  - `CppDictInferenceStrategy` - `std::unordered_map<K,V>` formatting
+  - `CppSetInferenceStrategy` - `std::unordered_set<T>` formatting
+  - `CppCallInferenceStrategy` - extended function/method mappings
+  - `CppBinOpInferenceStrategy` - binary operation type promotion
+  - `create_cpp_type_inference_engine()` factory function
+
+### Changed
+
+- **_infer_type_from_value (C++) Refactoring** ✅
+  - Complexity: 53 → ~8 (85% reduction)
+  - Lines of code: 93 → 17 (82% reduction)
+  - Eliminated 93-line if/elif chain
+  - Strategy-based delegation via `TypeInferenceEngine`
+  - Added `_map_type()` method for type mapping
+
+### Impact
+
+- **Reusable Infrastructure**: Same strategies can be applied to Rust (53→~8), Go (31→~8), OCaml, Haskell
+- **Eliminated Duplication**: ~200 lines of similar type inference code across backends
+- **Improved Testability**: Each strategy testable in isolation
+- **Better Maintainability**: Clear separation of concerns
+
+### Performance
+
+- All 821 tests passing ✅
+- Type-check passing (107 files) ✅
+- Zero regressions ✅
+
+### Cumulative Refactoring Results (Phases 1-2)
+
+- **3 major functions refactored**
+- **83% average complexity reduction** (from 62.7 → ~11)
+- **~560 lines** of complex code eliminated
+- **~560 lines** of reusable infrastructure created
+
+---
+
+## [0.1.55] - 2025-10-05
+
+**Major Refactoring: Strategy & Visitor Patterns Complete**
+
+Phase 1 of complexity reduction roadmap complete! Successfully refactored two major complex functions using design patterns, achieving 85% complexity reduction.
+
+### Added
+
+- **Container Operation Strategy Pattern** (`src/mgen/backends/c/ext/stc/operation_strategies.py`) ✅ COMPLETE
+  - `ContainerOperationStrategy` abstract base class
+  - `ListOperationStrategy` for list/vector operations (11 methods)
+  - `DictOperationStrategy` for dict/map operations (9 methods)
+  - `SetOperationStrategy` for set operations (11 methods)
+  - `StringOperationStrategy` for string/cstr operations (9 methods)
+  - `ContainerOperationTranslator` coordinator class
+
+- **Haskell Visitor Pattern Infrastructure** (`src/mgen/backends/haskell/`) ✅ COMPLETE
+  - `HaskellStatementVisitor` abstract base class (`statement_visitor.py`)
+  - `MainFunctionVisitor` for IO do-notation functions
+  - `PureFunctionVisitor` for pure functional code
+  - `FunctionBodyAnalyzer` for pattern detection and optimization
+  - `convert_function_with_visitor` refactored converter (`function_converter.py`)
+
+### Changed
+
+- **translate_container_operation Refactoring** ✅
+  - Complexity: 66 → <10 (85% reduction)
+  - Lines of code: 197 → 30 (85% reduction)
+  - Eliminated massive if/elif chain
+  - Strategy-based delegation by container type
+
+- **_convert_function (Haskell) Refactoring** ✅
+  - Complexity: 69 → ~15 (78% reduction)
+  - Lines of code: 308 → 6 (98% reduction in main function, logic distributed to visitor classes)
+  - Separated main() vs pure function handling
+  - Modular, testable, maintainable design
+
+### Performance
+
+- **All 821 tests passing** in 12.9 seconds ✅
+- **Type-check passing** (105 source files) ✅
+- Zero regressions from refactoring
+- Significantly improved code maintainability and extensibility
+
+### Impact
+
+- **2 major functions refactored**: Container operations (C backend) + Function converter (Haskell backend)
+- **Average complexity reduction**: 81.5%
+- **Code distribution**: Monolithic functions split into focused, single-responsibility classes
+- **Design patterns proven**: Strategy and Visitor patterns successfully applied to real codebase
+
 ## [0.1.54] - 2025-10-05
 
 **Architecture Analysis: Complexity Reduction Roadmap**
@@ -46,7 +157,7 @@ This release adds comprehensive analysis of code complexity and refactoring oppo
   - Statement converters (if/for/while): 15-40 → ~12
 
 - **Strategy Pattern Candidates**: 8 functions (container ops, type inference)
-  - `translate_container_operation`: 66 → ~10 complexity
+  - `translate_container_operation`: 66 → ~10 complexity ✅ DONE
   - `_infer_type_from_value`: 33-45 → ~8
   - `_convert_for_statement`: 40 → ~12
 

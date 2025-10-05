@@ -10,6 +10,7 @@ from typing import Any, Optional
 
 from .containers import STCCodeGenerator, get_stc_container_for_python_type
 from .enhanced_type_inference import EnhancedTypeInferenceEngine
+from .operation_strategies import ContainerOperationTranslator
 
 
 class STCPythonToCTranslator:
@@ -21,6 +22,7 @@ class STCPythonToCTranslator:
         self.required_includes: set[str] = set()
         self.type_definitions: list[str] = []
         self.type_inference_engine = EnhancedTypeInferenceEngine()
+        self.operation_translator = ContainerOperationTranslator()
 
     def analyze_variable_types(self, node: ast.AST) -> dict[str, str]:
         """Enhanced variable type analysis using advanced type inference.
@@ -136,6 +138,9 @@ class STCPythonToCTranslator:
     def translate_container_operation(self, call_node: ast.Call) -> Optional[str]:
         """Translate Python container method calls to STC operations.
 
+        Uses the strategy pattern to delegate translation to specialized strategies
+        based on container type (list/dict/set/string).
+
         Args:
             call_node: AST Call node representing a method call
 
@@ -154,180 +159,10 @@ class STCPythonToCTranslator:
             if obj_name in self.container_variables:
                 container_type = self.container_variables[obj_name]
 
-                # Translate common operations
-                if method_name == "append":
-                    if call_node.args:
-                        arg = ast.unparse(call_node.args[0])
-                        return f"{container_type}_push(&{obj_name}, {arg})"
-
-                elif method_name == "pop":
-                    if call_node.args:
-                        # pop(index) - more complex, may need bounds checking
-                        index = ast.unparse(call_node.args[0])
-                        return f"{container_type}_erase_at(&{obj_name}, {index})"
-                    else:
-                        # pop() - remove last element
-                        return f"{container_type}_pop(&{obj_name})"
-
-                elif method_name == "insert":
-                    if len(call_node.args) >= 2:
-                        index = ast.unparse(call_node.args[0])
-                        value = ast.unparse(call_node.args[1])
-                        return f"{container_type}_insert_at(&{obj_name}, {index}, {value})"
-
-                elif method_name == "remove":
-                    if call_node.args:
-                        value = ast.unparse(call_node.args[0])
-                        return f"{container_type}_erase_val(&{obj_name}, {value})"
-
-                elif method_name == "clear":
-                    return f"{container_type}_clear(&{obj_name})"
-
-                elif method_name == "copy":
-                    return f"{container_type}_clone({obj_name})"
-
-                elif method_name == "reverse":
-                    return f"{container_type}_reverse(&{obj_name})"
-
-                elif method_name == "sort":
-                    return f"{container_type}_sort(&{obj_name})"
-
-                elif method_name == "index":
-                    if call_node.args:
-                        value = ast.unparse(call_node.args[0])
-                        return f"{container_type}_find(&{obj_name}, {value})"
-
-                elif method_name == "count":
-                    if call_node.args:
-                        value = ast.unparse(call_node.args[0])
-                        return f"{container_type}_count(&{obj_name}, {value})"
-
-                elif method_name == "extend":
-                    if call_node.args:
-                        other = ast.unparse(call_node.args[0])
-                        return f"{container_type}_extend(&{obj_name}, &{other})"
-
-                # Dict-specific operations
-                elif method_name == "get":
-                    if call_node.args:
-                        key = ast.unparse(call_node.args[0])
-                        if len(call_node.args) > 1:
-                            default = ast.unparse(call_node.args[1])
-                            return f"{container_type}_get_or(&{obj_name}, {key}, {default})"
-                        else:
-                            return f"{container_type}_get(&{obj_name}, {key})"
-
-                elif method_name == "keys":
-                    return f"{container_type}_keys({obj_name})"
-
-                elif method_name == "values":
-                    return f"{container_type}_values({obj_name})"
-
-                elif method_name == "items":
-                    return f"{container_type}_items({obj_name})"
-
-                elif method_name == "update":
-                    if call_node.args:
-                        other = ast.unparse(call_node.args[0])
-                        return f"{container_type}_update(&{obj_name}, &{other})"
-
-                elif method_name == "setdefault":
-                    if len(call_node.args) >= 2:
-                        key = ast.unparse(call_node.args[0])
-                        default = ast.unparse(call_node.args[1])
-                        return f"{container_type}_setdefault(&{obj_name}, {key}, {default})"
-
-                elif method_name == "popitem":
-                    return f"{container_type}_popitem(&{obj_name})"
-
-                # Set-specific operations
-                elif method_name == "add":
-                    if call_node.args:
-                        value = ast.unparse(call_node.args[0])
-                        return f"{container_type}_insert(&{obj_name}, {value})"
-
-                elif method_name == "discard":
-                    if call_node.args:
-                        value = ast.unparse(call_node.args[0])
-                        return f"{container_type}_erase(&{obj_name}, {value})"
-
-                elif method_name == "union":
-                    if call_node.args:
-                        other = ast.unparse(call_node.args[0])
-                        return f"{container_type}_union(&{obj_name}, &{other})"
-
-                elif method_name == "intersection":
-                    if call_node.args:
-                        other = ast.unparse(call_node.args[0])
-                        return f"{container_type}_intersection(&{obj_name}, &{other})"
-
-                elif method_name == "difference":
-                    if call_node.args:
-                        other = ast.unparse(call_node.args[0])
-                        return f"{container_type}_difference(&{obj_name}, &{other})"
-
-                elif method_name == "symmetric_difference":
-                    if call_node.args:
-                        other = ast.unparse(call_node.args[0])
-                        return f"{container_type}_symmetric_difference(&{obj_name}, &{other})"
-
-                elif method_name == "issubset":
-                    if call_node.args:
-                        other = ast.unparse(call_node.args[0])
-                        return f"{container_type}_issubset(&{obj_name}, &{other})"
-
-                elif method_name == "issuperset":
-                    if call_node.args:
-                        other = ast.unparse(call_node.args[0])
-                        return f"{container_type}_issuperset(&{obj_name}, &{other})"
-
-                elif method_name == "isdisjoint":
-                    if call_node.args:
-                        other = ast.unparse(call_node.args[0])
-                        return f"{container_type}_isdisjoint(&{obj_name}, &{other})"
-
-                # String-specific operations
-                elif method_name == "join":
-                    if call_node.args:
-                        iterable = ast.unparse(call_node.args[0])
-                        return f"cstr_join(&{obj_name}, &{iterable})"
-
-                elif method_name == "split":
-                    if call_node.args:
-                        delimiter = ast.unparse(call_node.args[0])
-                        return f"cstr_split(&{obj_name}, {delimiter})"
-                    else:
-                        return f"cstr_split_whitespace(&{obj_name})"
-
-                elif method_name == "strip":
-                    return f"cstr_strip(&{obj_name})"
-
-                elif method_name == "replace":
-                    if len(call_node.args) >= 2:
-                        old = ast.unparse(call_node.args[0])
-                        new = ast.unparse(call_node.args[1])
-                        return f"cstr_replace(&{obj_name}, {old}, {new})"
-
-                elif method_name == "startswith":
-                    if call_node.args:
-                        prefix = ast.unparse(call_node.args[0])
-                        return f"cstr_startswith(&{obj_name}, {prefix})"
-
-                elif method_name == "endswith":
-                    if call_node.args:
-                        suffix = ast.unparse(call_node.args[0])
-                        return f"cstr_endswith(&{obj_name}, {suffix})"
-
-                elif method_name == "find":
-                    if call_node.args:
-                        substring = ast.unparse(call_node.args[0])
-                        return f"cstr_find(&{obj_name}, {substring})"
-
-                elif method_name == "upper":
-                    return f"cstr_upper(&{obj_name})"
-
-                elif method_name == "lower":
-                    return f"cstr_lower(&{obj_name})"
+                # Delegate to strategy pattern translator
+                return self.operation_translator.translate_operation(
+                    method_name, obj_name, container_type, call_node.args
+                )
 
         return None
 

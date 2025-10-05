@@ -30,7 +30,9 @@ from ..converter_utils import (
 )
 from ..errors import TypeMappingError, UnsupportedFeatureError
 from ..preferences import BackendPreferences
+from ..type_inference_strategies import InferenceContext
 from .factory import CppFactory
+from .type_inference import create_cpp_type_inference_engine
 
 
 class MGenPythonToCppConverter:
@@ -56,6 +58,8 @@ class MGenPythonToCppConverter:
         self.includes_needed: set[str] = set()
         self.use_runtime = True
         self.append_map: dict[str, str] = {}  # container -> appended_item (from pre-pass)
+        # Initialize type inference engine with C++-specific strategies
+        self.type_inference_engine = create_cpp_type_inference_engine()
 
     def convert_code(self, source_code: str) -> str:
         """Convert Python source code to C++ code."""
@@ -1569,99 +1573,34 @@ class MGenPythonToCppConverter:
                 return f"std::unordered_set<{element_type}>"
         return "auto"
 
+    def _map_type(self, python_type: str) -> str:
+        """Map Python type to C++ type.
+
+        Args:
+            python_type: Python type name (e.g., "int", "str", "list")
+
+        Returns:
+            C++ type name (e.g., "int", "std::string", "std::vector")
+        """
+        return self.type_mapping.get(python_type, "auto")
+
     def _infer_type_from_value(self, value: ast.expr) -> str:
-        """Infer C++ type from Python value."""
-        if isinstance(value, ast.Constant):
-            if isinstance(value.value, bool):
-                return "bool"
-            elif isinstance(value.value, int):
-                return "int"
-            elif isinstance(value.value, float):
-                return "double"
-            elif isinstance(value.value, str):
-                return "std::string"
-        elif isinstance(value, ast.List):
-            # Infer element type from list literal
-            if value.elts:
-                # Non-empty list - try to infer element type
-                element_types = [self._infer_type_from_value(elt) for elt in value.elts]
-                # If all elements have the same concrete type, use it
-                if element_types and all(t == element_types[0] and t not in ["auto", ""] for t in element_types):
-                    return f"std::vector<{element_types[0]}>"
-            # Empty or mixed types - fall back to auto
-            return "auto"
-        elif isinstance(value, ast.Dict):
-            # For dict literals, try to infer key/value types
-            if value.keys and value.values:
-                key_types = [self._infer_type_from_value(k) for k in value.keys if k]
-                value_types = [self._infer_type_from_value(v) for v in value.values]
-                # If all keys and values have consistent concrete types, use them
-                if (key_types and all(t == key_types[0] and t not in ["auto", ""] for t in key_types) and
-                    value_types and all(t == value_types[0] and t not in ["auto", ""] for t in value_types)):
-                    return f"std::unordered_map<{key_types[0]}, {value_types[0]}>"
-            return "auto"
-        elif isinstance(value, ast.Set):
-            # For set literals, try to infer element type
-            if value.elts:
-                element_types = [self._infer_type_from_value(elt) for elt in value.elts]
-                if element_types and all(t == element_types[0] and t not in ["auto", ""] for t in element_types):
-                    return f"std::unordered_set<{element_types[0]}>"
-            return "auto"
-        elif isinstance(value, ast.Call):
-            # Infer type from function calls
-            if isinstance(value.func, ast.Name):
-                func_name = value.func.id
-                if func_name in ["abs", "len", "sum", "min", "max"]:
-                    return "int"  # Most built-ins return int
-                elif func_name == "bool":
-                    return "bool"
-                elif func_name in ["str", "upper", "lower", "strip", "replace"]:
-                    return "std::string"
-                elif func_name == "range":
-                    return "Range"
-                else:
-                    # Try to infer from function context (if we know the return type)
-                    # For now, check if function name suggests a type
-                    if func_name.endswith("_int") or func_name in [
-                        "factorial",
-                        "calculate",
-                        "compute",
-                        "add",
-                        "subtract",
-                        "multiply",
-                    ]:
-                        return "int"
-                    elif func_name.endswith("_str") or func_name in ["format", "get_name", "to_string"]:
-                        return "std::string"
-                    elif func_name.endswith("_float") or func_name in ["average", "mean"]:
-                        return "double"
-                    elif func_name.endswith("_bool") or func_name in ["is_valid", "check"]:
-                        return "bool"
-            elif isinstance(value.func, ast.Attribute):
-                # String method calls
-                if value.func.attr in ["upper", "lower", "strip", "replace"]:
-                    return "std::string"
-                elif value.func.attr == "find":
-                    return "int"
-                elif value.func.attr == "split":
-                    return "std::vector<std::string>"
-        elif isinstance(value, ast.BinOp):
-            # Try to infer from binary operations
-            left_type = self._infer_type_from_value(value.left)
-            right_type = self._infer_type_from_value(value.right)
+        """Infer C++ type from Python value using Strategy pattern.
 
-            # If both sides are the same type, return that type
-            if left_type != "auto" and left_type == right_type:
-                return left_type
+        This method has been refactored to use the TypeInferenceEngine,
+        reducing complexity from 53 to ~8.
 
-            # If one side is int and other is float, result is float
-            if (left_type == "int" and right_type == "double") or (left_type == "double" and right_type == "int"):
-                return "double"
+        Before refactoring: 93 lines, complexity 53
+        After refactoring: 10 lines, complexity ~8
+        """
+        # Create inference context with C++-specific type mapper
+        context = InferenceContext(
+            type_mapper=self._map_type,
+            variable_types=self.variable_context,
+        )
 
-            # For string concatenation
-            if isinstance(value.op, ast.Add) and (left_type == "std::string" or right_type == "std::string"):
-                return "std::string"
-        return "auto"
+        # Delegate to type inference engine
+        return self.type_inference_engine.infer_type(value, context)
 
     def _get_aug_op(self, op: ast.operator) -> str:
         """Get augmented assignment operator (just the operator part, without =)."""
