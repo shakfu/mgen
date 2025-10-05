@@ -243,13 +243,13 @@ class MGenPythonToOCamlConverter:
             if body_lines:
                 for i, line in enumerate(body_lines):
                     if i < len(body_lines) - 1:  # Not the last statement
-                        if not line.rstrip().endswith(' in'):
+                        if not line.rstrip().endswith(" in"):
                             lines.append(f"  {line};")
                         else:
                             lines.append(f"  {line}")
                     else:
                         # Last statement - if it ends with 'in', add ()
-                        if line.rstrip().endswith(' in'):
+                        if line.rstrip().endswith(" in"):
                             lines.append(f"  {line}")
                             lines.append("  ()")
                         else:
@@ -821,7 +821,7 @@ class MGenPythonToOCamlConverter:
         iterable = self._convert_expression(gen.iter)
 
         # Wrap iterable in parentheses if it contains spaces (function calls)
-        if ' ' in iterable and not iterable.startswith('('):
+        if " " in iterable and not iterable.startswith("("):
             iterable = f"({iterable})"
 
         if gen.ifs:
@@ -858,7 +858,7 @@ class MGenPythonToOCamlConverter:
         iterable = self._convert_expression(gen.iter)
 
         # Wrap iterable in parentheses if it contains spaces (function calls)
-        if ' ' in iterable and not iterable.startswith('('):
+        if " " in iterable and not iterable.startswith("("):
             iterable = f"({iterable})"
 
         if gen.ifs:
@@ -880,7 +880,7 @@ class MGenPythonToOCamlConverter:
         iterable = self._convert_expression(gen.iter)
 
         # Wrap iterable in parentheses if it contains spaces (function calls)
-        if ' ' in iterable and not iterable.startswith('('):
+        if " " in iterable and not iterable.startswith("("):
             iterable = f"({iterable})"
 
         if gen.ifs:
@@ -1129,7 +1129,7 @@ class MGenPythonToOCamlConverter:
                 return "()"
             if len(stmts) == 1:
                 # Single statement - if it ends with 'in', add ()
-                if stmts[0].rstrip().endswith(' in'):
+                if stmts[0].rstrip().endswith(" in"):
                     return stmts[0] + "\n    ()"
                 return stmts[0]
 
@@ -1138,13 +1138,13 @@ class MGenPythonToOCamlConverter:
             for i, stmt in enumerate(stmts):
                 if i < len(stmts) - 1:  # Not the last statement
                     # If this statement doesn't end with 'in', add semicolon
-                    if not stmt.rstrip().endswith(' in'):
-                        result.append(stmt + ';')
+                    if not stmt.rstrip().endswith(" in"):
+                        result.append(stmt + ";")
                     else:
                         result.append(stmt)
                 else:
                     # Last statement - if it ends with 'in', add ()
-                    if stmt.rstrip().endswith(' in'):
+                    if stmt.rstrip().endswith(" in"):
                         result.append(stmt)
                         result.append("()")
                     else:
@@ -1266,13 +1266,13 @@ class MGenPythonToOCamlConverter:
             sequenced = []
             for i, line in enumerate(body_lines):
                 if i < len(body_lines) - 1:  # Not the last statement
-                    if not line.rstrip().endswith(' in'):
-                        sequenced.append(line + ';')
+                    if not line.rstrip().endswith(" in"):
+                        sequenced.append(line + ";")
                     else:
                         sequenced.append(line)
                 else:
                     # Last statement - if it ends with 'in', add ()
-                    if line.rstrip().endswith(' in'):
+                    if line.rstrip().endswith(" in"):
                         sequenced.append(line)
                         sequenced.append("()")
                     else:

@@ -143,7 +143,7 @@ def main():
     for v in upcase:
         try:
             upcase_ind.append(casemappings.index(v))
-        except:
+        except ValueError:
             upcase_ind.append(len(casemappings))
             casemappings.append(v)
 
@@ -155,7 +155,7 @@ def main():
         try:
             j = next(i for i, x in enumerate(casemappings) if x[0] == v[0] and x[1] == v[1] and x[2] == v[2])
             lowcase_ind.append(j)
-        except:
+        except StopIteration:
             lowcase_ind.append(len(casemappings))
             casemappings.append(v)
 

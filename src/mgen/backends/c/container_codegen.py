@@ -1,5 +1,4 @@
-"""
-Container Code Generator - Prototype
+"""Container Code Generator - Prototype.
 
 This module generates type-specific container implementations directly into
 the output C file, eliminating the need for external runtime libraries.
@@ -108,7 +107,7 @@ class ContainerCodeGenerator:
         filtered_lines = []
 
         for line in lines:
-            stripped = line.strip()
+            line.strip()
             # Skip lines with MGEN_SET_ERROR macro
             if "MGEN_SET_ERROR" in line:
                 continue
@@ -186,7 +185,7 @@ class ContainerCodeGenerator:
             # Skip includes, extern C
             if (stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
-                or stripped.startswith("extern \"C\"")
+                or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
                 or stripped == "}"):
                 continue
@@ -248,7 +247,7 @@ class ContainerCodeGenerator:
 
             # Skip extern C wrappers
             if (stripped.startswith("#ifdef __cplusplus")
-                or stripped.startswith("extern \"C\"")
+                or stripped.startswith('extern "C"')
                 or (stripped.startswith("#endif") and not in_header_guard)
                 or (stripped == "}" and not in_header_guard)):
                 continue
@@ -305,7 +304,7 @@ class ContainerCodeGenerator:
             # Skip includes, extern C
             if (stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
-                or stripped.startswith("extern \"C\"")
+                or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
                 or stripped == "}"):
                 continue
@@ -362,7 +361,7 @@ class ContainerCodeGenerator:
             # Skip includes, extern C
             if (stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
-                or stripped.startswith("extern \"C\"")
+                or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
                 or stripped == "}"):
                 continue
@@ -419,7 +418,7 @@ class ContainerCodeGenerator:
             # Skip includes, extern C
             if (stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
-                or stripped.startswith("extern \"C\"")
+                or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
                 or stripped == "}"):
                 continue
@@ -476,7 +475,7 @@ class ContainerCodeGenerator:
             # Skip includes, extern C
             if (stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
-                or stripped.startswith("extern \"C\"")
+                or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
                 or stripped == "}"):
                 continue
@@ -533,7 +532,7 @@ class ContainerCodeGenerator:
             # Skip includes, extern C
             if (stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
-                or stripped.startswith("extern \"C\"")
+                or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
                 or stripped == "}"):
                 continue
@@ -588,7 +587,7 @@ class ContainerCodeGenerator:
 
             if (stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
-                or stripped.startswith("extern \"C\"")
+                or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
                 or stripped == "}"):
                 continue
@@ -642,7 +641,7 @@ class ContainerCodeGenerator:
 
             if (stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
-                or stripped.startswith("extern \"C\"")
+                or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
                 or stripped == "}"):
                 continue
@@ -682,30 +681,30 @@ class ContainerCodeGenerator:
         # Strip header guards and includes from header
         clean_lines = []
         in_header_guard = False
-        for line in code.split('\n'):
+        for line in code.split("\n"):
             stripped = line.strip()
 
             # Skip header guards
-            if stripped.startswith('#ifndef') or stripped.startswith('#define') and '_H' in stripped:
+            if stripped.startswith("#ifndef") or stripped.startswith("#define") and "_H" in stripped:
                 in_header_guard = True
                 continue
-            if stripped.startswith('#endif') and in_header_guard:
+            if stripped.startswith("#endif") and in_header_guard:
                 in_header_guard = False
                 continue
 
             # Skip includes and extern C
-            if stripped.startswith('#include'):
+            if stripped.startswith("#include"):
                 continue
-            if stripped.startswith('#ifdef __cplusplus') or stripped.startswith('extern "C"') or stripped.startswith('{'):
+            if stripped.startswith("#ifdef __cplusplus") or stripped.startswith('extern "C"') or stripped.startswith("{"):
                 continue
-            if stripped.startswith('#endif'):
+            if stripped.startswith("#endif"):
                 continue
-            if stripped == '}':  # Closing brace for extern C
+            if stripped == "}":  # Closing brace for extern C
                 continue
 
             clean_lines.append(line)
 
-        clean_code = '\n'.join(clean_lines)
+        clean_code = "\n".join(clean_lines)
 
         sections = [
             "// ========== Generated Container: map_str_str ==========",
@@ -734,30 +733,30 @@ class ContainerCodeGenerator:
         # Strip header guards and includes from header
         clean_lines = []
         in_header_guard = False
-        for line in code.split('\n'):
+        for line in code.split("\n"):
             stripped = line.strip()
 
             # Skip header guards
-            if stripped.startswith('#ifndef') or stripped.startswith('#define') and '_H' in stripped:
+            if stripped.startswith("#ifndef") or stripped.startswith("#define") and "_H" in stripped:
                 in_header_guard = True
                 continue
-            if stripped.startswith('#endif') and in_header_guard:
+            if stripped.startswith("#endif") and in_header_guard:
                 in_header_guard = False
                 continue
 
             # Skip includes and extern C
-            if stripped.startswith('#include'):
+            if stripped.startswith("#include"):
                 continue
-            if stripped.startswith('#ifdef __cplusplus') or stripped.startswith('extern "C"') or stripped.startswith('{'):
+            if stripped.startswith("#ifdef __cplusplus") or stripped.startswith('extern "C"') or stripped.startswith("{"):
                 continue
-            if stripped.startswith('#endif'):
+            if stripped.startswith("#endif"):
                 continue
-            if stripped == '}':  # Closing brace for extern C
+            if stripped == "}":  # Closing brace for extern C
                 continue
 
             clean_lines.append(line)
 
-        clean_code = '\n'.join(clean_lines)
+        clean_code = "\n".join(clean_lines)
 
         sections = [
             "// ========== Generated Container: set_str ==========",
@@ -844,21 +843,11 @@ if __name__ == "__main__":
     generator = ContainerCodeGenerator()
 
     # Generate str_int_map implementation
-    print("=" * 80)
-    print("Testing Container Code Generator - Prototype")
-    print("=" * 80)
-    print()
 
     code = generator.generate_str_int_map()
 
     # Print first 50 lines to verify
     lines = code.split("\n")
-    for i, line in enumerate(lines[:50], 1):
-        print(f"{i:3}: {line}")
+    for _i, _line in enumerate(lines[:50], 1):
+        pass
 
-    print(f"\n... ({len(lines) - 50} more lines)")
-    print()
-    print(f"Total lines generated: {len(lines)}")
-    print(f"Total characters: {len(code)}")
-    print()
-    print("✅ Code generation successful!")

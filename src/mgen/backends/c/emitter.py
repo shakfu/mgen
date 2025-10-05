@@ -294,7 +294,7 @@ class CEmitter(AbstractEmitter):
                 else:
                     return f"    return {val};"
 
-        return "    /* TODO: Implement complex function body */"
+        raise UnsupportedFeatureError("Complex function body structure not supported in basic emitter mode")
 
     def _emit_expression_basic(self, expr: ast.expr) -> str:
         """Basic expression generation fallback."""

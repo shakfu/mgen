@@ -363,7 +363,7 @@ class MGenPythonToRustConverter:
                 field_name = self._to_snake_case(stmt.target.attr)
                 return f"        self.{field_name} = {value_expr};"
 
-        return "        // TODO: Complex annotated assignment"
+        raise UnsupportedFeatureError(f"Complex annotated assignment not supported: {ast.unparse(stmt)}")
 
     def _convert_method_aug_assignment(self, stmt: ast.AugAssign, class_name: str) -> str:
         """Convert method augmented assignment with proper self handling."""
@@ -385,7 +385,7 @@ class MGenPythonToRustConverter:
                 field_name = self._to_snake_case(stmt.target.attr)
                 return f"        self.{field_name} {op} {value_expr};"
 
-        return f"        // TODO: Complex augmented assignment {op}"
+        raise UnsupportedFeatureError(f"Complex augmented assignment not supported: {ast.unparse(stmt)}")
 
     def _convert_method_return(self, stmt: ast.Return, class_name: str) -> str:
         """Convert method return statement."""
@@ -713,6 +713,8 @@ class MGenPythonToRustConverter:
             return self._convert_for(stmt)
         elif isinstance(stmt, ast.Expr):
             return self._convert_expression_statement(stmt)
+        elif isinstance(stmt, ast.Pass):
+            return "    // pass"
         elif isinstance(stmt, ast.Try):
             raise UnsupportedFeatureError("Exception handling (try/except) is not supported in Rust backend")
         elif isinstance(stmt, ast.With):
@@ -843,7 +845,7 @@ class MGenPythonToRustConverter:
             # Local variable with type annotation
             return f"    let mut {stmt.target.id}: {var_type} = {value_expr};"
 
-        return "    // TODO: Complex annotated assignment"
+        raise UnsupportedFeatureError(f"Complex annotated assignment not supported: {ast.unparse(stmt)}")
 
     def _convert_aug_assignment(self, stmt: ast.AugAssign) -> str:
         """Convert augmented assignment."""
@@ -861,7 +863,7 @@ class MGenPythonToRustConverter:
         if isinstance(stmt.target, ast.Name):
             return f"    {stmt.target.id} {op} {value_expr};"
 
-        return f"    // TODO: Complex augmented assignment {op}"
+        raise UnsupportedFeatureError(f"Complex augmented assignment target not supported: {ast.unparse(stmt.target)}")
 
     def _convert_if(self, stmt: ast.If) -> str:
         """Convert if statement."""
@@ -925,8 +927,8 @@ class MGenPythonToRustConverter:
         if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
             # Convert docstring to Rust comment
             docstring = stmt.value.value
-            if '\n' in docstring:
-                lines = docstring.split('\n')
+            if "\n" in docstring:
+                lines = docstring.split("\n")
                 return "    // " + "\n    // ".join(lines)
             else:
                 return f"    // {docstring}"
@@ -1916,7 +1918,7 @@ class MGenPythonToRustConverter:
                             if func_type and "HashMap" in func_type:
                                 # Extract key and value types from HashMap<K, V>
                                 import re
-                                match = re.search(r'HashMap<(.+),\s*(.+)>', func_type)
+                                match = re.search(r"HashMap<(.+),\s*(.+)>", func_type)
                                 if match:
                                     key_type = match.group(1).strip()
                                     value_type = match.group(2).strip()

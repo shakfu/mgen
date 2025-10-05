@@ -1,12 +1,10 @@
-"""
-Type properties system for parameterized container code generation.
+"""Type properties system for parameterized container code generation.
 
 This module defines type properties that control how code is generated
 for different element/key/value types in containers.
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)

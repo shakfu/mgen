@@ -7,7 +7,6 @@ their own semantics (e.g., Rust uses &T vs &mut T, C++ uses const& vs &).
 
 import ast
 from enum import Enum
-from typing import Optional
 
 
 class MutabilityClass(Enum):

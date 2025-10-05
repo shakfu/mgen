@@ -1,5 +1,4 @@
-"""
-Template substitution engine for parameterized container code generation.
+"""Template substitution engine for parameterized container code generation.
 
 This module substitutes type-specific placeholders in generic templates:
 - {{T}} -> actual type (e.g., "int", "char*")
@@ -11,8 +10,8 @@ This module substitutes type-specific placeholders in generic templates:
 import re
 from typing import Any
 
-from .type_properties import TypeProperties, get_type_properties
 from .type_parameter_extractor import ContainerTypeInfo
+from .type_properties import get_type_properties
 
 
 class TemplateSubstitutionEngine:
@@ -233,7 +232,7 @@ class TemplateSubstitutionEngine:
 
             pos = end_match.end()
 
-        return ''.join(result)
+        return "".join(result)
 
 
 __all__ = ["TemplateSubstitutionEngine"]

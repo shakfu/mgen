@@ -683,13 +683,15 @@ def main(argv: Optional[list] = None) -> int:
     except KeyboardInterrupt:
         try:
             cli.log.error("Interrupted")
-        except:
+        except (AttributeError, Exception):
+            # Logger may not be initialized
             pass
         return 1
     except Exception as e:
         try:
             cli.log.error(f"Error: {e}")
-        except:
+        except (AttributeError, Exception):
+            # Logger may not be initialized
             pass
         return 1
 

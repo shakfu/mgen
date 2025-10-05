@@ -355,7 +355,8 @@ main = printValue "Generated Haskell code executed successfully"'''
 
     def _mutates_array_parameter(self, node: ast.FunctionDef) -> tuple[bool, set[str]]:
         """Detect if function mutates array parameters via subscript assignment.
-        Returns (is_mutating, set_of_mutated_param_names)."""
+        Returns (is_mutating, set_of_mutated_param_names).
+        """
         param_names = {arg.arg for arg in node.args.args}
         mutated_params = set()
 
@@ -380,7 +381,7 @@ main = printValue "Generated Haskell code executed successfully"'''
         is_mutating, mutated_params = self._mutates_array_parameter(node)
         if is_mutating and node.name != "main":
             # Raise an error explaining the limitation for pure functional languages
-            params_list = ', '.join(sorted(mutated_params))
+            params_list = ", ".join(sorted(mutated_params))
             raise UnsupportedFeatureError(
                 f"Function '{node.name}' mutates array parameter(s): {params_list}. "
                 f"In-place array mutations cannot be directly translated to pure Haskell "
@@ -601,14 +602,13 @@ main = printValue "Generated Haskell code executed successfully"'''
                     if len(parts) == 2:
                         var_name = parts[0].strip()
                         # Only process if var_name is a valid identifier (not an expression)
-                        if var_name and var_name.replace('_', '').isalnum():
+                        if var_name and var_name.replace("_", "").isalnum():
                             if var_name not in seen_vars:
                                 seen_vars[var_name] = []
                             seen_vars[var_name].append(i)
 
             # For variables with multiple bindings, replace self-references with previous values
             import re
-            var_values: dict[str, str] = {}  # var_name -> current value expression
             for var_name, indices in seen_vars.items():
                 if len(indices) > 1:
                     # Process in order, accumulating the value
@@ -621,9 +621,9 @@ main = printValue "Generated Haskell code executed successfully"'''
                             value_expr = parts[1].strip()
 
                             # Replace self-references with accumulated value
-                            pattern = rf'\b{re.escape(var_name)}\b'
+                            pattern = rf"\b{re.escape(var_name)}\b"
                             # Escape backslashes in replacement to prevent interpreting \a, \b, etc. as escape sequences
-                            safe_replacement = accumulated_value.replace('\\', r'\\')
+                            safe_replacement = accumulated_value.replace("\\", r"\\")
                             value_expr = re.sub(pattern, safe_replacement, value_expr)
 
                             # Replace variable references in folds with init values
@@ -1518,7 +1518,7 @@ main = printValue "Generated Haskell code executed successfully"'''
                     len(if_stmt.orelse) == 1 and isinstance(if_stmt.orelse[0], ast.Assign)):
 
                     then_stmt = if_stmt.body[0]
-                    else_stmt = if_stmt.orelse[0]
+                    if_stmt.orelse[0]
 
                     # Extract dictionary variable from the assignments
                     if (isinstance(then_stmt.targets[0], ast.Subscript) and
@@ -1546,7 +1546,7 @@ main = printValue "Generated Haskell code executed successfully"'''
             else:
                 # In pure context, can't use mapM_ - need to handle differently
                 # For now, skip side-effect-only loops in pure functions
-                return f"-- for loop with side effects (not converted in pure function)"
+                return "-- for loop with side effects (not converted in pure function)"
         else:
             raise UnsupportedFeatureError("Complex for loop targets not supported")
 

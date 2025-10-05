@@ -1,4 +1,4 @@
-"""Module System for MGen
+"""Module System for MGen.
 
 This module provides support for Python import statements and cross-module function calls
 in the Python-to-multi-language translation system.
@@ -230,7 +230,7 @@ class ImportHandler:
     def process_import(self, import_node: ast.Import) -> list[str]:
         """Process an import statement and return C include directives."""
         includes = []
-        resolved = self.module_resolver.resolve_import(import_node)
+        self.module_resolver.resolve_import(import_node)
 
         for alias_node in import_node.names:
             module_name = alias_node.name

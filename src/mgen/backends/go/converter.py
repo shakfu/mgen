@@ -8,7 +8,7 @@ from ..converter_utils import (
     get_standard_binary_operator,
     get_standard_comparison_operator,
 )
-from ..errors import TypeMappingError
+from ..errors import TypeMappingError, UnsupportedFeatureError
 
 
 class MGenPythonToGoConverter:
@@ -316,7 +316,7 @@ class MGenPythonToGoConverter:
                 field_name = self._to_camel_case(stmt.target.attr)
                 return f"    obj.{field_name} = {value_expr}"
 
-        return "    // TODO: Complex annotated assignment"
+        raise UnsupportedFeatureError(f"Complex annotated assignment not supported: {ast.unparse(stmt)}")
 
     def _convert_method_aug_assignment(self, stmt: ast.AugAssign, class_name: str) -> str:
         """Convert method augmented assignment with proper obj handling."""
@@ -338,7 +338,7 @@ class MGenPythonToGoConverter:
                 field_name = self._to_camel_case(stmt.target.attr)
                 return f"    obj.{field_name} {op} {value_expr}"
 
-        return "    // TODO: Complex augmented assignment"
+        raise UnsupportedFeatureError(f"Complex augmented assignment not supported: {ast.unparse(stmt)}")
 
     def _convert_method_return(self, stmt: ast.Return, class_name: str) -> str:
         """Convert method return statement."""
@@ -620,18 +620,18 @@ class MGenPythonToGoConverter:
             # Insert unused variable markers at the end, before any return statement
             if unused_statements:
                 # Find the last non-return statement position
-                body_lines = body.rstrip().split('\n')
+                body_lines = body.rstrip().split("\n")
                 insert_pos = len(body_lines)
 
                 # Find the last return statement
                 for i in range(len(body_lines) - 1, -1, -1):
-                    if 'return' in body_lines[i]:
+                    if "return" in body_lines[i]:
                         insert_pos = i
                         break
 
                 # Insert the unused markers
                 body_lines[insert_pos:insert_pos] = unused_statements
-                body = '\n'.join(body_lines) + '\n'
+                body = "\n".join(body_lines) + "\n"
 
         self.current_function = None
         self.nested_vars = set()  # Clear
@@ -683,7 +683,7 @@ class MGenPythonToGoConverter:
             elif isinstance(stmt, (ast.For, ast.While)):
                 for s in stmt.body:
                     check_stmt(s)
-                if hasattr(stmt, 'orelse'):
+                if hasattr(stmt, "orelse"):
                     for s in stmt.orelse:
                         check_stmt(s)
             elif isinstance(stmt, ast.If):
@@ -743,7 +743,7 @@ class MGenPythonToGoConverter:
             elif isinstance(stmt, (ast.For, ast.While)):
                 for s in stmt.body:
                     collect_declared(s)
-                if hasattr(stmt, 'orelse'):
+                if hasattr(stmt, "orelse"):
                     for s in stmt.orelse:
                         collect_declared(s)
             elif isinstance(stmt, ast.If):
@@ -781,13 +781,13 @@ class MGenPythonToGoConverter:
                 for s in stmt.orelse:
                     traverse_stmt(s)
             elif isinstance(stmt, (ast.For, ast.While)):
-                if hasattr(stmt, 'iter'):
+                if hasattr(stmt, "iter"):
                     collect_used(stmt.iter)
-                if hasattr(stmt, 'test'):
+                if hasattr(stmt, "test"):
                     collect_used(stmt.test)
                 for s in stmt.body:
                     traverse_stmt(s)
-                if hasattr(stmt, 'orelse'):
+                if hasattr(stmt, "orelse"):
                     for s in stmt.orelse:
                         traverse_stmt(s)
 
@@ -845,7 +845,7 @@ class MGenPythonToGoConverter:
             elif isinstance(stmt, (ast.For, ast.While)):
                 for s in stmt.body:
                     check_stmt(s)
-                if hasattr(stmt, 'orelse'):
+                if hasattr(stmt, "orelse"):
                     for s in stmt.orelse:
                         check_stmt(s)
             elif isinstance(stmt, ast.If):
@@ -879,7 +879,7 @@ class MGenPythonToGoConverter:
             elif isinstance(stmt, (ast.For, ast.While)):
                 for s in stmt.body:
                     check_stmt(s)
-                if hasattr(stmt, 'orelse'):
+                if hasattr(stmt, "orelse"):
                     for s in stmt.orelse:
                         check_stmt(s)
             elif isinstance(stmt, ast.If):
@@ -910,7 +910,7 @@ class MGenPythonToGoConverter:
                             self.variable_types[target.id] = var_type
                 elif isinstance(stmt, (ast.For, ast.While)):
                     collect_types(stmt.body)
-                    if hasattr(stmt, 'orelse'):
+                    if hasattr(stmt, "orelse"):
                         collect_types(stmt.orelse)
                 elif isinstance(stmt, ast.If):
                     collect_types(stmt.body)
@@ -977,8 +977,10 @@ class MGenPythonToGoConverter:
             return self._convert_for(stmt)
         elif isinstance(stmt, ast.Expr):
             return self._convert_expression_statement(stmt)
+        elif isinstance(stmt, ast.Pass):
+            return "    // pass"
         else:
-            return f"    // TODO: Implement {type(stmt).__name__}"
+            raise UnsupportedFeatureError(f"Unsupported statement type: {type(stmt).__name__}")
 
     def _convert_return(self, stmt: ast.Return) -> str:
         """Convert return statement."""
@@ -1022,10 +1024,10 @@ class MGenPythonToGoConverter:
                         else:
                             var_type = self._infer_type_from_value(stmt.value)
                             # Check if this variable should be nested based on usage analysis
-                            if hasattr(self, 'nested_vars') and target.id in self.nested_vars and var_type == "[]int":
+                            if hasattr(self, "nested_vars") and target.id in self.nested_vars and var_type == "[]int":
                                 var_type = "[][]int"
                             # Check if this variable has a vector appended to it
-                            if hasattr(self, 'append_map') and target.id in self.append_map:
+                            if hasattr(self, "append_map") and target.id in self.append_map:
                                 appended_var = self.append_map[target.id]
                                 if appended_var in self.variable_types and self.variable_types[appended_var].startswith("[]"):
                                     var_type = f"[]{self.variable_types[appended_var]}"
@@ -1055,10 +1057,10 @@ class MGenPythonToGoConverter:
 
             # Check if this variable should be nested based on usage analysis
             if isinstance(stmt.target, ast.Name):
-                if hasattr(self, 'nested_vars') and stmt.target.id in self.nested_vars and var_type == "[]int":
+                if hasattr(self, "nested_vars") and stmt.target.id in self.nested_vars and var_type == "[]int":
                     var_type = "[][]int"
                 # Check if this variable has a vector appended to it
-                if hasattr(self, 'append_map') and stmt.target.id in self.append_map:
+                if hasattr(self, "append_map") and stmt.target.id in self.append_map:
                     appended_var = self.append_map[stmt.target.id]
                     if appended_var in self.variable_types and self.variable_types[appended_var].startswith("[]"):
                         var_type = f"[]{self.variable_types[appended_var]}"
@@ -1124,7 +1126,7 @@ class MGenPythonToGoConverter:
         if isinstance(stmt.target, ast.Name):
             return f"    {stmt.target.id} {op} {value_expr}"
 
-        return "    // TODO: Complex augmented assignment"
+        raise UnsupportedFeatureError(f"Complex augmented assignment target not supported: {ast.unparse(stmt.target)}")
 
     def _convert_if(self, stmt: ast.If) -> str:
         """Convert if statement."""
@@ -1234,7 +1236,7 @@ class MGenPythonToGoConverter:
         elif isinstance(expr, ast.Subscript):
             return self._convert_subscript(expr)
         else:
-            return f"/* TODO: {type(expr).__name__} */"
+            raise UnsupportedFeatureError(f"Unsupported expression type: {type(expr).__name__}")
 
     def _convert_constant(self, expr: ast.Constant) -> str:
         """Convert constant values."""
@@ -1702,7 +1704,7 @@ class MGenPythonToGoConverter:
 
         if isinstance(expr.slice, ast.Slice):
             # Handle slicing
-            return "/* TODO: Slice not supported */"
+            raise UnsupportedFeatureError("Slice operations not supported in Go backend")
         else:
             # Simple subscript
             index_expr = self._convert_expression(expr.slice)

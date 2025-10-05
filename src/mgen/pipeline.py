@@ -416,8 +416,8 @@ class MGenPipeline:
                             self.warnings = analysis.warnings if hasattr(analysis, "warnings") else []
 
                     return SimpleAnalysisResult(source_code, simple_analysis)
-                except:
-                    # Fallback to basic analysis
+                except Exception:
+                    # Fallback to basic analysis if simplified result creation fails
                     basic_result = type(
                         "BasicAnalysis",
                         (),

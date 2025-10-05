@@ -238,7 +238,7 @@ class MGenPythonToCppConverter:
             elif isinstance(stmt, (ast.For, ast.While)):
                 for s in stmt.body:
                     check_stmt(s)
-                if hasattr(stmt, 'orelse'):
+                if hasattr(stmt, "orelse"):
                     for s in stmt.orelse:
                         check_stmt(s)
             elif isinstance(stmt, ast.If):
@@ -281,7 +281,7 @@ class MGenPythonToCppConverter:
                 # Recurse into loops and conditionals
                 if isinstance(stmt, (ast.For, ast.While)):
                     collect_initial_types(stmt.body)
-                    if hasattr(stmt, 'orelse'):
+                    if hasattr(stmt, "orelse"):
                         collect_initial_types(stmt.orelse)
                 elif isinstance(stmt, ast.If):
                     collect_initial_types(stmt.body)
@@ -372,7 +372,7 @@ class MGenPythonToCppConverter:
             elif isinstance(stmt, (ast.For, ast.While)):
                 for s in stmt.body:
                     check_stmt(s)
-                if hasattr(stmt, 'orelse'):
+                if hasattr(stmt, "orelse"):
                     for s in stmt.orelse:
                         check_stmt(s)
             elif isinstance(stmt, ast.If):
@@ -856,8 +856,10 @@ class MGenPythonToCppConverter:
             return self._convert_for(stmt)
         elif isinstance(stmt, ast.Expr):
             return self._convert_expression_statement(stmt)
+        elif isinstance(stmt, ast.Pass):
+            return "        // pass"
         else:
-            return f"        // TODO: Implement {type(stmt).__name__}"
+            raise UnsupportedFeatureError(f"Unsupported statement type: {type(stmt).__name__}")
 
     def _convert_return(self, stmt: ast.Return) -> str:
         """Convert return statement."""
@@ -1064,7 +1066,7 @@ class MGenPythonToCppConverter:
         elif isinstance(expr, ast.Subscript):
             return self._convert_subscript(expr)
         else:
-            return f"/* TODO: {type(expr).__name__} */"
+            raise UnsupportedFeatureError(f"Unsupported expression type: {type(expr).__name__}")
 
     def _convert_constant(self, expr: ast.Constant) -> str:
         """Convert constant values."""
@@ -1437,7 +1439,7 @@ class MGenPythonToCppConverter:
 
         if isinstance(expr.slice, ast.Slice):
             # Handle slicing (not fully supported in C++, would need custom implementation)
-            return "/* TODO: Slice not supported */"
+            raise UnsupportedFeatureError("Slice operations not supported in C++ backend")
         else:
             # Simple subscript
             index_expr = self._convert_expression(expr.slice)
@@ -1520,7 +1522,7 @@ class MGenPythonToCppConverter:
                 # Recursively analyze nested statements (loops, ifs, etc.)
                 if isinstance(stmt, (ast.For, ast.While)):
                     analyze_stmts(stmt.body)
-                    if hasattr(stmt, 'orelse'):
+                    if hasattr(stmt, "orelse"):
                         analyze_stmts(stmt.orelse)
                 elif isinstance(stmt, ast.If):
                     analyze_stmts(stmt.body)

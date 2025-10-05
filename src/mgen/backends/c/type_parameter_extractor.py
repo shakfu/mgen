@@ -1,5 +1,4 @@
-"""
-Type parameter extraction for parameterized container code generation.
+"""Type parameter extraction for parameterized container code generation.
 
 This module extracts type parameters from container type patterns:
 - vec_<T> -> T
@@ -12,7 +11,7 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from .type_properties import get_type_properties, is_registered_type, TypeProperties
+from .type_properties import TypeProperties, get_type_properties, is_registered_type
 
 
 @dataclass

@@ -101,7 +101,7 @@ class MGenPythonToCConverter:
         self.inferred_types = self.type_engine.analyze_module(node)
 
         # Get inference statistics for debugging
-        stats = self.type_engine.get_inference_statistics()
+        self.type_engine.get_inference_statistics()
         # Debug: Could log stats here if needed
 
         # Check for comprehensions to enable STC support
@@ -327,7 +327,7 @@ class MGenPythonToCConverter:
         # Now generate STC declarations for all unique types
         # Sort to ensure vec_int comes before vec_vec_int
         generated_types = set()
-        for c_type in sorted(c_types_used, key=lambda x: (x.count('_'), x)):
+        for c_type in sorted(c_types_used, key=lambda x: (x.count("_"), x)):
             if c_type in generated_types:
                 continue
             generated_types.add(c_type)
@@ -530,8 +530,10 @@ class MGenPythonToCConverter:
             return self._convert_expression_statement(stmt)
         elif isinstance(stmt, ast.ClassDef):
             return self._convert_class(stmt)
+        elif isinstance(stmt, ast.Pass):
+            return "/* pass */"
         else:
-            return f"/* TODO: Unsupported statement {type(stmt).__name__} */"
+            raise UnsupportedFeatureError(f"Unsupported statement type: {type(stmt).__name__}")
 
     def _convert_return(self, stmt: ast.Return) -> str:
         """Convert return statement."""
@@ -619,7 +621,7 @@ class MGenPythonToCConverter:
                         # List assignment: vec[i] = value (direct indexing)
                         return f"{obj}.data[{index}] = {value_expr};"
 
-            raise UnsupportedFeatureError(f"Subscript assignment not supported for this container type")
+            raise UnsupportedFeatureError("Subscript assignment not supported for this container type")
 
         # Handle simple variable assignment
         elif isinstance(target, ast.Name):
@@ -968,7 +970,7 @@ class MGenPythonToCConverter:
                         else:
                             return f"({result})"
 
-            raise UnsupportedFeatureError(f"'in' operator not supported for this container type")
+            raise UnsupportedFeatureError("'in' operator not supported for this container type")
 
         left = self._convert_expression(expr.left)
         right = self._convert_expression(expr.comparators[0])
@@ -1678,8 +1680,8 @@ class MGenPythonToCConverter:
             # Convert docstring to C comment
             docstring = stmt.value.value
             # Handle multi-line docstrings
-            if '\n' in docstring:
-                lines = docstring.split('\n')
+            if "\n" in docstring:
+                lines = docstring.split("\n")
                 return "/* " + "\n * ".join(lines) + " */"
             else:
                 return f"/* {docstring} */"
