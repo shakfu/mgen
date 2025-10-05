@@ -102,6 +102,7 @@ module Builtins = struct
 
   let len_string s = String.length s
   let len_list lst = List.length lst
+  let len_array arr = Array.length arr
 
   let min_int x y = min x y
   let min_float x y = min x y
@@ -111,6 +112,9 @@ module Builtins = struct
 
   let sum_int_list lst = List.fold_left (+) 0 lst
   let sum_float_list lst = List.fold_left (+.) 0.0 lst
+
+  (* Set constructor - empty set as empty list *)
+  let set () = []
 end
 
 (* Range operations *)
@@ -202,9 +206,11 @@ let split = StrOps.split
 let abs' = Builtins.abs_int
 let bool' = Builtins.bool_of_int
 let len' = Builtins.len_list
+let len_array = Builtins.len_array
 let min' = Builtins.min_int
 let max' = Builtins.max_int
 let sum' = Builtins.sum_int_list
+let set = Builtins.set
 
 let list_comprehension = Comprehensions.list_comprehension
 let list_comprehension_with_filter = Comprehensions.list_comprehension_with_filter
@@ -245,9 +251,22 @@ module ArrayOps = struct
 
   (* Convert array to list *)
   let array_to_list arr = Array.to_list arr
+
+  (* Append to list (returns new list) *)
+  let list_append lst value =
+    lst @ [value]
+
+  (* Append to array (creates new array with increased size) *)
+  let array_append arr value =
+    let len = Array.length arr in
+    let new_arr = Array.make (len + 1) value in
+    Array.blit arr 0 new_arr 0 len;
+    new_arr
 end
 
 let update_array = ArrayOps.update_array
 let update_assoc_list = ArrayOps.update_assoc_list
 let list_to_array = ArrayOps.list_to_array
 let array_to_list = ArrayOps.array_to_list
+let list_append = ArrayOps.list_append
+let array_append = ArrayOps.array_append

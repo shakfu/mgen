@@ -137,11 +137,32 @@ class MGenPythonToOCamlConverter:
         return False
 
     def _find_mutable_variables(self, node: ast.FunctionDef) -> set[str]:
-        """Find all variables that are mutated (augmented assignment) in a function."""
+        """Find all variables that are mutated in a function.
+
+        This includes:
+        - Augmented assignment: x += 1
+        - Subscript assignment in loops: arr[i] = value
+        - Append calls in loops: data.append(x)
+        """
         mutable = set()
         for child in ast.walk(node):
+            # Augmented assignment
             if isinstance(child, ast.AugAssign) and isinstance(child.target, ast.Name):
                 mutable.add(child.target.id)
+            # For loops with mutations
+            elif isinstance(child, ast.For):
+                # Check what's mutated in the loop body
+                for stmt in child.body:
+                    # Subscript assignment
+                    if isinstance(stmt, ast.Assign):
+                        for target in stmt.targets:
+                            if isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name):
+                                mutable.add(target.value.id)
+                    # Append method call
+                    elif isinstance(stmt, ast.Expr):
+                        if isinstance(stmt.value, ast.Call) and isinstance(stmt.value.func, ast.Attribute):
+                            if stmt.value.func.attr == "append" and isinstance(stmt.value.func.value, ast.Name):
+                                mutable.add(stmt.value.func.value.id)
         return mutable
 
     def _convert_regular_function(self, node: ast.FunctionDef, params: list[tuple], return_type: str) -> list[str]:
@@ -606,10 +627,32 @@ class MGenPythonToOCamlConverter:
 
         arg = self._convert_expression(args[0])
 
+        # Special handling for len() - detect if argument is an array
+        if func_name == "len":
+            is_array = False
+            # Check if argument is a variable with known type
+            if isinstance(args[0], ast.Name):
+                var_name = self._to_ocaml_var_name(args[0].id)
+                var_type = self.variables.get(var_name, "")
+                # Only use len_array if we're certain it's a Python list (not dict/set)
+                # Dicts have tuple pattern " * ", sets have "set", both use len'
+                if var_type and ("dict" in var_type or " * " in var_type or "set" in var_type):
+                    is_array = False
+                # Python lists (annotated as "list") become OCaml arrays
+                elif var_type and ("list" in var_type or "array" in var_type or var_type.endswith("[]")):
+                    is_array = True
+                # Unknown type: default to len' (safer, works for both lists and dicts/sets)
+                else:
+                    is_array = False
+
+            if is_array:
+                return f"len_array {arg}"
+            else:
+                return f"len' {arg}"
+
         builtin_map = {
             "abs": f"abs' {arg}",
             "bool": f"bool' {arg}",
-            "len": f"len' {arg}",
             "min": f"min' {arg} {self._convert_expression(args[1]) if len(args) > 1 else arg}",
             "max": f"max' {arg} {self._convert_expression(args[1]) if len(args) > 1 else arg}",
             "sum": f"sum' {arg}",
@@ -670,6 +713,14 @@ class MGenPythonToOCamlConverter:
             elif method_name == "values":
                 # Extract values from association list
                 return f"List.map snd {obj_expr}"
+            # Handle list/array methods
+            elif method_name == "append":
+                # Append to array (mutation, so this should be a statement)
+                args = [self._convert_expression(arg) for arg in node.args]
+                if args:
+                    return f"array_append {obj_expr} {args[0]}"
+                else:
+                    raise UnsupportedFeatureError("append() requires an argument")
             else:
                 # Object method call
                 args = [self._convert_expression(arg) for arg in node.args]
@@ -755,6 +806,10 @@ class MGenPythonToOCamlConverter:
         target = self._to_ocaml_var_name(gen.target.id) if isinstance(gen.target, ast.Name) else "x"
         iterable = self._convert_expression(gen.iter)
 
+        # Wrap iterable in parentheses if it contains spaces (function calls)
+        if ' ' in iterable and not iterable.startswith('('):
+            iterable = f"({iterable})"
+
         if gen.ifs:
             conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
             condition = " && ".join(conditions)
@@ -788,6 +843,10 @@ class MGenPythonToOCamlConverter:
 
         iterable = self._convert_expression(gen.iter)
 
+        # Wrap iterable in parentheses if it contains spaces (function calls)
+        if ' ' in iterable and not iterable.startswith('('):
+            iterable = f"({iterable})"
+
         if gen.ifs:
             conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
             condition = " && ".join(conditions)
@@ -805,6 +864,10 @@ class MGenPythonToOCamlConverter:
         gen = node.generators[0]
         target = self._to_ocaml_var_name(gen.target.id) if isinstance(gen.target, ast.Name) else "x"
         iterable = self._convert_expression(gen.iter)
+
+        # Wrap iterable in parentheses if it contains spaces (function calls)
+        if ' ' in iterable and not iterable.startswith('('):
+            iterable = f"({iterable})"
 
         if gen.ifs:
             conditions = [self._convert_expression(if_clause) for if_clause in gen.ifs]
@@ -833,17 +896,45 @@ class MGenPythonToOCamlConverter:
             return f"let {var_name} = {value} in"
         elif isinstance(target, ast.Subscript):
             # Handle subscript assignment: container[index] = value
-            container = self._convert_expression(target.value)
             index = self._convert_expression(target.slice)
 
-            # Check if it's a dict (association list) or array assignment
-            # For now, assume arrays use integer indices and dicts use string keys
+            # Get base variable name (without dereferencing for refs)
+            base_var_name = None
+            if isinstance(target.value, ast.Name):
+                base_var_name = self._to_ocaml_var_name(target.value.id)
+
+            # Determine if this is dict or array assignment
+            is_dict = False
+
+            # Check if the base variable has a tracked dict type
+            if base_var_name:
+                var_type = self.variables.get(base_var_name, "")
+                if "dict" in var_type or "string * " in var_type:
+                    is_dict = True
+
+            # Also check if the slice is a string constant
             if isinstance(target.slice, ast.Constant) and isinstance(target.slice.value, str):
+                is_dict = True
+
+            # Check if the base variable is a ref (mutable)
+            is_ref = isinstance(target.value, ast.Name) and target.value.id in self.mutable_vars
+
+            if is_dict:
                 # Dictionary assignment
-                return f"let {container} = update_assoc_list {container} {index} {value} in"
+                if is_ref:
+                    # Use ref assignment for mutable dicts
+                    return f"{base_var_name} := update_assoc_list !{base_var_name} {index} {value}"
+                else:
+                    container = self._convert_expression(target.value)
+                    return f"let {container} = update_assoc_list {container} {index} {value} in"
             else:
                 # Array assignment
-                return f"let _ = {container}.({index}) <- {value} in"
+                if is_ref:
+                    # Use ref assignment for mutable arrays
+                    return f"{base_var_name} := {base_var_name}; !{base_var_name}.({index}) <- {value}"
+                else:
+                    container = self._convert_expression(target.value)
+                    return f"let _ = {container}.({index}) <- {value} in"
         else:
             raise UnsupportedFeatureError("Complex assignment targets not supported")
 
@@ -875,16 +966,45 @@ class MGenPythonToOCamlConverter:
                 return f"let {var_name} = {value} in"
         elif isinstance(target, ast.Subscript):
             # Handle subscript assignment: container[index] = value
-            container = self._convert_expression(target.value)
             index = self._convert_expression(target.slice)
 
-            # Check if it's a dict (association list) or array assignment
+            # Get base variable name (without dereferencing for refs)
+            base_var_name = None
+            if isinstance(target.value, ast.Name):
+                base_var_name = self._to_ocaml_var_name(target.value.id)
+
+            # Determine if this is dict or array assignment
+            is_dict = False
+
+            # Check if the base variable has a tracked dict type
+            if base_var_name:
+                var_type = self.variables.get(base_var_name, "")
+                if "dict" in var_type or "string * " in var_type:
+                    is_dict = True
+
+            # Also check if the slice is a string constant
             if isinstance(target.slice, ast.Constant) and isinstance(target.slice.value, str):
+                is_dict = True
+
+            # Check if the base variable is a ref (mutable)
+            is_ref = isinstance(target.value, ast.Name) and target.value.id in self.mutable_vars
+
+            if is_dict:
                 # Dictionary assignment
-                return f"let {container} = update_assoc_list {container} {index} {value} in"
+                if is_ref:
+                    # Use ref assignment for mutable dicts
+                    return f"{base_var_name} := update_assoc_list !{base_var_name} {index} {value}"
+                else:
+                    container = self._convert_expression(target.value)
+                    return f"let {container} = update_assoc_list {container} {index} {value} in"
             else:
                 # Array assignment
-                return f"let _ = {container}.({index}) <- {value} in"
+                if is_ref:
+                    # Use ref assignment for mutable arrays
+                    return f"{base_var_name} := {base_var_name}; !{base_var_name}.({index}) <- {value}"
+                else:
+                    container = self._convert_expression(target.value)
+                    return f"let _ = {container}.({index}) <- {value} in"
         else:
             raise UnsupportedFeatureError("Complex assignment targets not supported")
 
@@ -936,6 +1056,23 @@ class MGenPythonToOCamlConverter:
         # Ignore docstrings (string constants)
         if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
             return ""  # Ignore docstrings
+
+        # Special handling for .append() method calls - treat as assignment
+        if (isinstance(node.value, ast.Call) and
+            isinstance(node.value.func, ast.Attribute) and
+            node.value.func.attr == "append" and
+            isinstance(node.value.func.value, ast.Name)):
+            var_name = self._to_ocaml_var_name(node.value.func.value.id)
+            args = [self._convert_expression(arg) for arg in node.value.args]
+            if args:
+                # If this is a mutable variable (ref), use := assignment
+                if node.value.func.value.id in self.mutable_vars:
+                    return f"{var_name} := array_append !{var_name} {args[0]}"
+                else:
+                    # data.append(x) -> let data = array_append data x in
+                    return f"let {var_name} = array_append {var_name} {args[0]} in"
+            else:
+                raise UnsupportedFeatureError("append() requires an argument")
 
         expr = self._convert_expression(node.value)
         return f"let _ = {expr} in"
@@ -1019,8 +1156,20 @@ class MGenPythonToOCamlConverter:
         """Detect variables that are mutated in a list of statements."""
         mutated = set()
         for stmt in stmts:
+            # Augmented assignment: x += 1
             if isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
                 mutated.add(stmt.target.id)
+            # Subscript assignment: arr[i] = value
+            elif isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    if isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name):
+                        mutated.add(target.value.id)
+            # Append method call: data.append(x)
+            elif isinstance(stmt, ast.Expr):
+                if isinstance(stmt.value, ast.Call) and isinstance(stmt.value.func, ast.Attribute):
+                    if stmt.value.func.attr == "append" and isinstance(stmt.value.func.value, ast.Name):
+                        mutated.add(stmt.value.func.value.id)
+            # Recurse into if statements
             elif isinstance(stmt, ast.If):
                 mutated.update(self._has_mutations(stmt.body))
                 mutated.update(self._has_mutations(stmt.orelse))
@@ -1045,10 +1194,18 @@ class MGenPythonToOCamlConverter:
             if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
                 updated_var = self._to_ocaml_var_name(stmt.targets[0].id)
                 value_expr = self._convert_expression(stmt.value)
-                # Use fold_left to thread state through iterations
-                return [
-                    f"let {updated_var} = List.fold_left (fun _ {target} -> {value_expr}) {updated_var} ({iter_expr}) in"
-                ]
+
+                # If this is a mutable variable (ref), use := to avoid shadowing
+                if stmt.targets[0].id in self.mutable_vars:
+                    # Use ref assignment
+                    return [
+                        f"{updated_var} := List.fold_left (fun _ {target} -> {value_expr}) !{updated_var} ({iter_expr})"
+                    ]
+                else:
+                    # Use let-binding for non-ref variables
+                    return [
+                        f"let {updated_var} = List.fold_left (fun _ {target} -> {value_expr}) {updated_var} ({iter_expr}) in"
+                    ]
 
         # Check for simple accumulation without other mutations
         if len(node.body) == 1 and len(mutated_vars) == 1:
@@ -1058,10 +1215,18 @@ class MGenPythonToOCamlConverter:
                 updated_var = self._to_ocaml_var_name(stmt.target.id)
                 value_expr = self._convert_expression(stmt.value)
                 op = self._convert_operator(stmt.op)
-                # Use fold_left for accumulation
-                return [
-                    f"let {updated_var} = List.fold_left (fun acc {target} -> acc {op} ({value_expr})) {updated_var} ({iter_expr}) in"
-                ]
+
+                # If this is a mutable variable (ref), use := to avoid shadowing
+                if stmt.target.id in self.mutable_vars:
+                    # Use ref assignment
+                    return [
+                        f"{updated_var} := List.fold_left (fun acc {target} -> acc {op} ({value_expr})) !{updated_var} ({iter_expr})"
+                    ]
+                else:
+                    # Use let-binding for non-ref variables
+                    return [
+                        f"let {updated_var} = List.fold_left (fun acc {target} -> acc {op} ({value_expr})) {updated_var} ({iter_expr}) in"
+                    ]
 
         # General case - convert body to let expressions
         body_lines = []
@@ -1216,8 +1381,21 @@ class MGenPythonToOCamlConverter:
         value = self._convert_expression(node.value)
         slice_expr = self._convert_expression(node.slice)
 
-        # Check if it's a dict (association list) or array access
+        # Determine if this is dict or array access
+        is_dict = False
+
+        # Check if the base variable has a tracked dict type
+        if isinstance(node.value, ast.Name):
+            var_name = self._to_ocaml_var_name(node.value.id)
+            var_type = self.variables.get(var_name, "")
+            if "dict" in var_type or "string * " in var_type:
+                is_dict = True
+
+        # Also check if the slice is a string constant (clear indicator of dict)
         if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+            is_dict = True
+
+        if is_dict:
             # Dictionary access - use List.assoc for association lists
             return f"List.assoc {slice_expr} {value}"
         else:
