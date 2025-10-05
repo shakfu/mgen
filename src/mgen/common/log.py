@@ -70,6 +70,14 @@ class CustomFormatter(logging.Formatter):
 
 
 def config(name: str) -> logging.Logger:
+    """Configure and return a logger with custom formatting.
+
+    Args:
+        name: Logger name.
+
+    Returns:
+        Configured logger instance.
+    """
     strm_handler = logging.StreamHandler()
     strm_handler.setFormatter(CustomFormatter())
     # file_handler = logging.FileHandler("log.txt", mode='w')

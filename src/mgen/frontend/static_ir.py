@@ -178,6 +178,7 @@ class IRModule(IRNode):
         self.global_variables.append(variable)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize module to dictionary representation."""
         return {
             "type": "module",
             "name": self.name,
@@ -188,6 +189,7 @@ class IRModule(IRNode):
         }
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_module(self)
 
 
@@ -240,6 +242,7 @@ class IRFunction(IRNode):
         return f"{modifier_str}{self.return_type.to_c_declaration(self.name)}({param_list})"
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize function to dictionary representation."""
         return {
             "type": "function",
             "name": self.name,
@@ -251,6 +254,7 @@ class IRFunction(IRNode):
         }
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_function(self)
 
 
@@ -268,6 +272,7 @@ class IRVariable(IRNode):
         self.scope: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize variable to dictionary representation."""
         return {
             "type": "variable",
             "name": self.name,
@@ -278,6 +283,7 @@ class IRVariable(IRNode):
         }
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_variable(self)
 
 
@@ -308,6 +314,7 @@ class IRAssignment(IRStatement):
             self.add_child(value)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize assignment to dictionary representation."""
         return {
             "type": "assignment",
             "target": self.target.to_dict(),
@@ -315,6 +322,7 @@ class IRAssignment(IRStatement):
         }
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_assignment(self)
 
 
@@ -337,6 +345,7 @@ class IRBinaryOperation(IRExpression):
         self.add_child(right)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize binary operation to dictionary representation."""
         return {
             "type": "binary_operation",
             "left": self.left.to_dict(),
@@ -346,6 +355,7 @@ class IRBinaryOperation(IRExpression):
         }
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_binary_operation(self)
 
 
@@ -357,9 +367,11 @@ class IRLiteral(IRExpression):
         self.value = value
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize literal to dictionary representation."""
         return {"type": "literal", "value": str(self.value), "ir_type": str(self.result_type)}
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_literal(self)
 
 
@@ -371,9 +383,11 @@ class IRVariableReference(IRExpression):
         self.variable = variable
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize variable reference to dictionary representation."""
         return {"type": "variable_reference", "variable": self.variable.name, "ir_type": str(self.result_type)}
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_variable_reference(self)
 
 
@@ -394,6 +408,7 @@ class IRFunctionCall(IRExpression):
             self.add_child(arg)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize function call to dictionary representation."""
         return {
             "type": "function_call",
             "function_name": self.function_name,
@@ -402,6 +417,7 @@ class IRFunctionCall(IRExpression):
         }
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_function_call(self)
 
 
@@ -415,9 +431,11 @@ class IRReturn(IRStatement):
             self.add_child(value)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize return statement to dictionary representation."""
         return {"type": "return", "value": self.value.to_dict() if self.value else None}
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_return(self)
 
 
@@ -443,6 +461,7 @@ class IRIf(IRStatement):
             self.add_child(stmt)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize if statement to dictionary representation."""
         return {
             "type": "if",
             "condition": self.condition.to_dict(),
@@ -451,6 +470,7 @@ class IRIf(IRStatement):
         }
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_if(self)
 
 
@@ -467,9 +487,11 @@ class IRWhile(IRStatement):
             self.add_child(stmt)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize while loop to dictionary representation."""
         return {"type": "while", "condition": self.condition.to_dict(), "body": [s.to_dict() for s in self.body]}
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_while(self)
 
 
@@ -501,6 +523,7 @@ class IRFor(IRStatement):
             self.add_child(stmt)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize for loop to dictionary representation."""
         return {
             "type": "for",
             "variable": self.variable.to_dict(),
@@ -511,6 +534,7 @@ class IRFor(IRStatement):
         }
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_for(self)
 
 
@@ -529,6 +553,7 @@ class IRTypeDeclaration(IRNode):
         self.fields.append(field)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize type declaration to dictionary representation."""
         return {
             "type": "type_declaration",
             "name": self.name,
@@ -537,6 +562,7 @@ class IRTypeDeclaration(IRNode):
         }
 
     def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_type_declaration(self)
 
 
@@ -545,54 +571,67 @@ class IRVisitor(ABC):
 
     @abstractmethod
     def visit_module(self, node: IRModule) -> Any:
+        """Visit a module node."""
         pass
 
     @abstractmethod
     def visit_function(self, node: IRFunction) -> Any:
+        """Visit a function node."""
         pass
 
     @abstractmethod
     def visit_variable(self, node: IRVariable) -> Any:
+        """Visit a variable node."""
         pass
 
     @abstractmethod
     def visit_assignment(self, node: IRAssignment) -> Any:
+        """Visit an assignment node."""
         pass
 
     @abstractmethod
     def visit_binary_operation(self, node: IRBinaryOperation) -> Any:
+        """Visit a binary operation node."""
         pass
 
     @abstractmethod
     def visit_literal(self, node: IRLiteral) -> Any:
+        """Visit a literal node."""
         pass
 
     @abstractmethod
     def visit_variable_reference(self, node: IRVariableReference) -> Any:
+        """Visit a variable reference node."""
         pass
 
     @abstractmethod
     def visit_function_call(self, node: IRFunctionCall) -> Any:
+        """Visit a function call node."""
         pass
 
     @abstractmethod
     def visit_return(self, node: IRReturn) -> Any:
+        """Visit a return statement node."""
         pass
 
     @abstractmethod
     def visit_if(self, node: IRIf) -> Any:
+        """Visit an if statement node."""
         pass
 
     @abstractmethod
     def visit_while(self, node: IRWhile) -> Any:
+        """Visit a while loop node."""
         pass
 
     @abstractmethod
     def visit_for(self, node: IRFor) -> Any:
+        """Visit a for loop node."""
         pass
 
     @abstractmethod
     def visit_type_declaration(self, node: IRTypeDeclaration) -> Any:
+        """Visit a type declaration node."""
         pass
 
 

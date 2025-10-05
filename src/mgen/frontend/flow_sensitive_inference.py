@@ -25,11 +25,13 @@ class FlowType:
     union_options: Optional[set["FlowType"]] = None
 
     def __str__(self) -> str:
+        """Return string representation of the flow type."""
         if self.is_union and self.union_options:
             return " | ".join(sorted(str(opt) for opt in self.union_options))
         return self.name
 
     def __hash__(self) -> int:
+        """Return hash of the flow type for use in sets and dicts."""
         if self.is_union and self.union_options:
             return hash(frozenset(self.union_options))
         return hash((self.name, self.c_equivalent))

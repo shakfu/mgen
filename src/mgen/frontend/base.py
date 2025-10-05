@@ -42,6 +42,7 @@ class AnalysisContext:
     metadata: Optional[dict[str, Any]] = None
 
     def __post_init__(self) -> None:
+        """Initialize metadata dictionary if not provided."""
         if self.metadata is None:
             self.metadata = {}
 
