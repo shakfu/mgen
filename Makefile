@@ -24,6 +24,7 @@ help:
 	@echo "  test-integration  Run integration tests only"
 	@echo "  test-py2c     Run Python-to-C conversion tests"
 	@echo "  test-benchmark    Run performance benchmarks"
+	@echo "  test-coverage Run tests with coverage report"
 	@echo "  test-legacy   Display info about legacy unittest conversion"
 	@echo ""
 	@echo "Benchmarking:"
@@ -80,7 +81,9 @@ test-benchmark:
 	uv run python tests/benchmarks.py
 
 test-coverage:
-	uv run pytest --cov=src/mgen --cov-report=html --cov-report=term-missing tests/
+	uv run pytest --cov=src/mgen --cov-branch --cov-report=html --cov-report=term-missing --ignore=tests/test_demos.py --ignore=tests/translation tests/
+	@echo ""
+	@echo "Coverage report generated in htmlcov/index.html"
 
 # quickcheck
 

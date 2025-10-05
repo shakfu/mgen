@@ -41,7 +41,7 @@ class STCTemplateManager:
         combined = f"{stc_type}_{'_'.join(element_types)}"
         # Use hash for very long type names
         if len(combined) > 50:
-            hash_obj = hashlib.md5(combined.encode())
+            hash_obj = hashlib.sha256(combined.encode())
             return f"{stc_type}_{hash_obj.hexdigest()[:8]}"
         return combined
 

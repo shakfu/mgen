@@ -110,7 +110,7 @@ class BaseAnalyzer(ABC):
         import hashlib
 
         key_data = f"{context.source_code}:{self.analysis_level.value}"
-        return hashlib.md5(key_data.encode()).hexdigest()
+        return hashlib.sha256(key_data.encode()).hexdigest()
 
 
 class BaseOptimizer(ABC):

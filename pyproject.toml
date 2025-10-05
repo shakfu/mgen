@@ -68,13 +68,18 @@ markers = [
 
 [tool.coverage.run]
 source = ["src/mgen"]
+branch = true
 omit = [
     "*/tests/*",
     "*/test_*",
     "*/conftest.py",
+    "*/backends/c/ext/stc/*",  # External STC library
 ]
 
 [tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
@@ -87,6 +92,9 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 [tool.mypy]
 python_version = "3.9"
