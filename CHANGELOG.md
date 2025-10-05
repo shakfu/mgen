@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.52] - 2025-10-05
 
-**🎉 OCaml Backend: 100% Benchmark Success - Production Ready**
+**OCaml Backend: 100% Benchmark Success - Production Ready**
 
 This release achieves perfect 7/7 (100%) benchmark success for the OCaml backend, up from 1/7 (14%), making it the **5th production-ready backend**. Major improvements include comprehensive mutable reference handling, type-aware code generation, and sophisticated variable scoping.
 
@@ -94,13 +94,13 @@ This release achieves perfect 7/7 (100%) benchmark success for the OCaml backend
 ### Benchmark Results
 
 - **OCaml**: 7/7 (100%) - **PRODUCTION READY** 🎉 (up from 1/7, 14%)
-  - ✅ **fibonacci** (514229) ← already working
-  - ✅ **quicksort** (5) ← NEWLY FIXED (ref parameter exclusion)
-  - ✅ **matmul** (120) ← NEWLY FIXED (fold ref handling)
-  - ✅ **wordcount** (4) ← NEWLY FIXED (conditional assignment refs)
-  - ✅ **list_ops** (166750) ← NEWLY FIXED (array len, loop scoping)
-  - ✅ **dict_ops** (6065) ← NEWLY FIXED (dict subscript, len detection)
-  - ✅ **set_ops** (234) ← NEWLY FIXED (set constructor, len detection)
+  - [x] **fibonacci** (514229) ← already working
+  - [x] **quicksort** (5) ← NEWLY FIXED (ref parameter exclusion)
+  - [x] **matmul** (120) ← NEWLY FIXED (fold ref handling)
+  - [x] **wordcount** (4) ← NEWLY FIXED (conditional assignment refs)
+  - [x] **list_ops** (166750) ← NEWLY FIXED (array len, loop scoping)
+  - [x] **dict_ops** (6065) ← NEWLY FIXED (dict subscript, len detection)
+  - [x] **set_ops** (234) ← NEWLY FIXED (set constructor, len detection)
 
 - **Runtime**: 216 lines, pure std library (Printf, List, Array)
 - **Tests**: 821/821 passing (100%)
@@ -117,12 +117,12 @@ This release achieves perfect 7/7 (100%) benchmark success for the OCaml backend
 ### Production Readiness Status
 
 **5/6 backends now production-ready (83%)**:
-- ✅ C++: 7/7 (100%)
-- ✅ C: 7/7 (100%)
-- ✅ Rust: 7/7 (100%)
-- ✅ Go: 7/7 (100%)
-- ✅ **OCaml: 7/7 (100%)** ← NEW
-- ✅ Haskell: 6/7 (86%) - considered complete (quicksort requires mutations)
+- [x] C++: 7/7 (100%)
+- [x] C: 7/7 (100%)
+- [x] Rust: 7/7 (100%)
+- [x] Go: 7/7 (100%)
+- [x] **OCaml: 7/7 (100%)** ← NEW
+- [x] Haskell: 6/7 (86%) - considered complete (quicksort requires mutations)
 
 ## [0.1.51] - 2025-10-04
 
@@ -180,13 +180,13 @@ This release improves the Haskell backend from 5/7 (71%) to 6/7 (85.7%) benchmar
 ### Benchmark Results
 
 - **Haskell**: 6/7 (85.7%) - up from 5/7 (71%)
-  - ✅ fibonacci (514229)
-  - ✅ list_ops (166750)
-  - ✅ wordcount (4)
-  - ✅ dict_ops (2340)
-  - ✅ set_ops (34)
-  - ✅ **matmul (120)** ← NEWLY FIXED
-  - ❌ quicksort (Generation error - requires array mutations, incompatible with pure Haskell)
+  - [x] fibonacci (514229)
+  - [x] list_ops (166750)
+  - [x] wordcount (4)
+  - [x] dict_ops (2340)
+  - [x] set_ops (34)
+  - [x] **matmul (120)** ← NEWLY FIXED
+  - [ ] quicksort (Generation error - requires array mutations, incompatible with pure Haskell)
 
 - **Performance**: 0.507s avg compile, 0.285s avg execute, 20.2MB avg binary
 - **Tests**: 870/870 passing (100%) - includes 96 Haskell-specific tests
@@ -391,12 +391,12 @@ return found_count
 ```
 Backend   | Benchmarks | Compile (s) | Execute (s) | Binary (KB) | Status
 ----------|-----------|-------------|-------------|-------------|------------------
-C         | 7/7 (100%) | 0.368      | 0.284      | 67.2       | ✅ Production
-C++       | 7/7 (100%) | 0.401      | 0.268      | 36.9       | ✅ Production
-Rust      | 7/7 (100%) | 0.218      | 0.244      | 456.8      | ✅ Production
-Go        | 7/7 (100%) | 0.072      | 0.048      | 2422.1     | ✅ Production (NEW)
-Haskell   | 1/7 (14%)  | 0.498      | 0.279      | 20196.9    | 🚧 In Progress
-OCaml     | 1/7 (14%)  | 0.211      | 0.248      | 789.2      | 🚧 In Progress
+C         | 7/7 (100%) | 0.368      | 0.284      | 67.2       | [x] Production
+C++       | 7/7 (100%) | 0.401      | 0.268      | 36.9       | [x] Production
+Rust      | 7/7 (100%) | 0.218      | 0.244      | 456.8      | [x] Production
+Go        | 7/7 (100%) | 0.072      | 0.048      | 2422.1     | [x] Production (NEW)
+Haskell   | 1/7 (14%)  | 0.498      | 0.279      | 20196.9    | [ ] In Progress
+OCaml     | 1/7 (14%)  | 0.211      | 0.248      | 789.2      | [ ] In Progress
 ```
 
 **Go Backend Highlights**:
@@ -548,7 +548,7 @@ This release achieves 100% benchmark success rate for the Rust backend, marking 
 
 ### Statistics
 
-- **Rust Backend Success Rate**: 7/7 (100%) - **PRODUCTION READY** 🎉
+- **Rust Backend Success Rate**: 7/7 (100%) - **PRODUCTION READY** 
 - **Total Benchmarks Passing**: 21/42 (50%)
   - C++: 7/7 (100%)
   - C: 7/7 (100%)
@@ -1022,14 +1022,14 @@ mgen_str_int_map_free(map);
 
 ### Changed
 
-- **C++ Backend Status**: 🎉 **FIRST BACKEND TO ACHIEVE 100% BENCHMARK SUCCESS** (7/7 passing)
-  - ✅ list_ops: 166750 operations, 0.246s execution
-  - ✅ dict_ops: 6065 operations, 0.254s execution
-  - ✅ set_ops: 234 operations, 0.243s execution
-  - ✅ matmul: 120 result, 0.278s execution
-  - ✅ wordcount: 4 occurrences, 0.244s execution
-  - ✅ quicksort: 100 result, 0.144s execution
-  - ✅ fibonacci: 514229 result, 0.242s execution
+- **C++ Backend Status**:  **FIRST BACKEND TO ACHIEVE 100% BENCHMARK SUCCESS** (7/7 passing)
+  - [x] list_ops: 166750 operations, 0.246s execution
+  - [x] dict_ops: 6065 operations, 0.254s execution
+  - [x] set_ops: 234 operations, 0.243s execution
+  - [x] matmul: 120 result, 0.278s execution
+  - [x] wordcount: 4 occurrences, 0.244s execution
+  - [x] quicksort: 100 result, 0.144s execution
+  - [x] fibonacci: 514229 result, 0.242s execution
   - Average compilation: 0.422s
   - Average binary size: 36.1 KB
   - **Production Ready**: C++ backend now handles nested containers, string-keyed dicts, and complex data structures
