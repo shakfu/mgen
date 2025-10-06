@@ -85,8 +85,9 @@ class TestMGenPipeline:
 
         # Create a simple Python file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write("""def main():
+            f.write("""def main() -> int:
     print("Hello, world!")
+    return 0
 """)
             temp_python_file = f.name
 

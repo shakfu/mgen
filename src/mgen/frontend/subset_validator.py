@@ -67,6 +67,7 @@ class StaticPythonSubsetValidator:
         self.log = log.config(self.__class__.__name__)
         self.feature_rules = self._initialize_feature_rules()
         self.validation_cache: dict[str, ValidationResult] = {}
+        self.last_validation_error: Optional[str] = None  # Store detailed error from validators
 
     def validate_code(self, source_code: str) -> ValidationResult:
         """Validate that code conforms to the Static Python Subset."""
@@ -182,7 +183,12 @@ class StaticPythonSubsetValidator:
                                 "Dynamic code execution functions (eval, exec, compile) not supported"
                             )
                         else:
-                            result.violations.append(f"Validation failed for {rule.name}")
+                            # Use detailed error if available
+                            if self.last_validation_error:
+                                result.violations.append(self.last_validation_error)
+                                self.last_validation_error = None
+                            else:
+                                result.violations.append(f"Validation failed for {rule.name}")
 
         return result
 
@@ -405,9 +411,20 @@ class StaticPythonSubsetValidator:
 
     def _validate_function_def(self, node: ast.FunctionDef) -> bool:
         """Validate function definition constraints."""
+        # Check return type annotation
+        if not node.returns:
+            self.last_validation_error = (
+                f"Function '{node.name}' at line {node.lineno} is missing return type annotation"
+            )
+            return False
+
         # Must have type annotations for all parameters
         for arg in node.args.args:
             if not arg.annotation:
+                self.last_validation_error = (
+                    f"Function '{node.name}' at line {node.lineno}: "
+                    f"parameter '{arg.arg}' is missing type annotation"
+                )
                 return False
 
         # No complex decorators
@@ -415,6 +432,10 @@ class StaticPythonSubsetValidator:
         for decorator in node.decorator_list:
             if isinstance(decorator, ast.Name):
                 if decorator.id not in allowed_decorators:
+                    self.last_validation_error = (
+                        f"Function '{node.name}' at line {node.lineno}: "
+                        f"decorator '@{decorator.id}' is not allowed"
+                    )
                     return False
 
         return True

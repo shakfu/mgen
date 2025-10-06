@@ -48,6 +48,9 @@ MANIFEST
 *.manifest
 *.spec
 
+# static scanner
+.pyscn
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt

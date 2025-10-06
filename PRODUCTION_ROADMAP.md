@@ -1,7 +1,7 @@
 # MGen Production Readiness Roadmap
 
-**Status**: v0.1.57 - 🎉 **5/6 Backends Production-Ready (83%)**
-**Goal**: Enhance developer experience and documentation
+**Status**: v0.1.61 - 🎉 **5/6 Backends Production-Ready (83%)**
+**Goal**: Documentation and tooling enhancements
 **Strategy**: Depth over breadth - polish existing features before adding new ones
 
 ---
@@ -9,11 +9,11 @@
 ## Current Status (October 2025)
 
 **Overall Progress**:
-- **870 tests** passing (100%)
+- **904 tests** passing (100%)
 - **41/42 benchmarks** passing (98%)
 - **5/6 backends** production-ready (C++, C, Rust, Go, OCaml)
 - **1/6 backends** functionally complete (Haskell - 6/7 due to purity constraints)
-- **Code quality**: 79% complexity reduction through design pattern refactoring
+- **Code quality**: 79% complexity reduction, 2.93% duplication rate (excellent)
 
 **Backend Status**:
 - 🎉 **C++**: 7/7 (100%) - **PRODUCTION READY**
@@ -23,83 +23,86 @@
 - 🎉 **OCaml**: 7/7 (100%) - **PRODUCTION READY**
 - ✅ **Haskell**: 6/7 (86%) - **FUNCTIONALLY COMPLETE** (quicksort requires mutations)
 
-**Recent Achievements**:
+**Recent Achievements** (v0.1.59-0.1.61):
+- ✅ Enhanced error messages with source locations and colored output (v0.1.59)
+- ✅ Comprehensive Getting Started tutorial with examples (v0.1.60)
+- ✅ Automatic local variable type inference (v0.1.61)
 - ✅ Design pattern refactoring complete (9 implementations: 2 Visitor, 7 Strategy)
-- ✅ 79% average complexity reduction on critical functions
-- ✅ All backends stable and well-tested
 - ✅ Zero external dependencies across all runtimes
 
 ---
 
 ## Immediate Priorities (Next 2-4 Weeks)
 
-### 🎯 Phase 4A: Developer Experience - Quick Wins
+### 🎯 Phase 4A: Documentation & Tooling - Final Polish
 
-**Status**: Backend development complete, shifting focus to usability
+**Status**: Core usability features complete (error messages, tutorial, type inference)
 
-**Top 3 Priorities**:
+**Current Priority**:
 
-1. **Error Message Improvements** (HIGH - 3-4 days)
-   - Add source line/column to all errors
-   - Implement helpful fix suggestions
-   - Add colored output for better readability
-   - **Why now**: Poor error messages are the #1 friction point for new users
-
-2. **Getting Started Tutorial** (HIGH - 2-3 days)
-   - Create comprehensive step-by-step tutorial
-   - Include examples for each backend
-   - Add troubleshooting section
-   - **Why now**: Essential for onboarding, uses existing examples
-
-3. **Backend Selection Guide** (MEDIUM - 1-2 days)
+1. **Backend Selection Guide** (HIGH - 1-2 days) ⬅️ **IN PROGRESS**
    - Document when to use each backend
    - Performance comparison table (compile time, execution speed, binary size)
    - Feature matrix across backends
-   - **Why now**: Helps users make informed decisions, builds on existing data
+   - **Why now**: Final piece of onboarding experience, users need guidance on backend choice
 
-**Estimated Time**: 6-9 days total for all three
+**Completed**:
+- ✅ **Error Message Improvements** (v0.1.59)
+  - Source location tracking with file/line/column
+  - Colored terminal output (rustc/tsc style)
+  - Error suggestions database
+  - `--no-color` flag support
 
-### 🔮 Stretch Goals (If Time Permits)
+- ✅ **Getting Started Tutorial** (v0.1.60)
+  - 800-line comprehensive tutorial (docs/GETTING_STARTED.md)
+  - Examples for all 6 backends
+  - Troubleshooting guide
+  - Tutorial examples tested and verified
 
-4. **CLI Improvements** (MEDIUM - 2-3 days)
+- ✅ **Type Inference Enhancement** (v0.1.61)
+  - Automatic local variable type inference
+  - 30-50% reduction in boilerplate annotations
+  - Cross-backend support
+
+### Medium-Term Goals (Next 2-4 weeks after Backend Guide)
+
+2. **CLI Improvements** (MEDIUM - 2-3 days)
    - Add progress bars for compilation
    - Implement verbose mode with detailed logging
-   - Add dry-run mode
-   - **Why later**: Nice-to-have, not blocking adoption
+   - Add dry-run mode (show what would be generated)
+   - Better help messages with examples
 
-5. **Use Case Documentation** (MEDIUM - 2-3 days)
+3. **Use Case Documentation** (MEDIUM - 2-3 days)
    - Document real-world integration patterns
-   - Add decision tree for backend selection
-   - **Why later**: Can build on backend selection guide
+   - Decision tree for backend selection
+   - Python → C/Rust/Go integration examples
+
+4. **Contributing Guide** (MEDIUM - 2-3 days)
+   - How to add a new backend
+   - Testing guidelines
+   - Code style guide
+   - Architecture deep-dive
+
+5. **API Reference** (MEDIUM - 3-4 days)
+   - Auto-generate from docstrings (Sphinx or MkDocs)
+   - Document all public APIs
+   - GitHub Pages deployment
 
 ---
 
-## Phase 4B: Developer Experience Enhancement (Medium Term)
+## Phase 4B: Developer Experience Enhancement (Future)
 
-### 4.1 Error Message Improvements ✅ PROMOTED TO IMMEDIATE
-**Status**: Moved to immediate priorities
-**Effort**: 3-4 days
+### 4.1 Error Message Improvements ✅ COMPLETE (v0.1.59)
+**Status**: Completed October 2025
+**Delivered**:
+- ✅ Source location tracking (SourceLocation class)
+- ✅ Enhanced exception classes (MGenError, ErrorCode enum)
+- ✅ Colored terminal output with auto-detection
+- ✅ Error suggestions database (10+ common errors)
+- ✅ Documentation (docs/ERROR_HANDLING.md)
+- ✅ 27 new tests, 897/897 passing
 
-**Goals**:
-- Source line/column in all errors
-- Helpful fix suggestions
-- Colored output for better readability
-- Link to documentation for error codes
-
-**Implementation Plan**:
-1. Add `SourceLocation` class to track file/line/column
-2. Enhance exception classes with source context
-3. Implement colored terminal output (using `colorama` or `rich`)
-4. Create error code registry with suggestions
-5. Add "did you mean?" suggestions for common mistakes
-
-**Deliverables**:
-- Enhanced error formatting with colors
-- Error code documentation
-- Quick fix suggestions
-- Source location in all error messages
-
-### 4.2 Debugging Support (MEDIUM)
+### 4.2 Debugging Support (LOW PRIORITY)
 **Effort**: 4-5 days
 
 **Goals**:
@@ -113,22 +116,11 @@
 - Debug mode flag
 - Debugging guide documentation
 
-### 4.3 CLI Improvements (LOW)
+### 4.3 CLI Improvements ⬅️ PROMOTED TO MEDIUM-TERM
+**Status**: Moved to immediate medium-term priorities (item #2)
 **Effort**: 2-3 days
 
-**Goals**:
-- Progress bars for compilation
-- Verbose mode with detailed logging
-- Dry-run mode (show what would be generated)
-- Watch mode (auto-regenerate on file changes)
-- Better help messages with examples
-
-**Deliverables**:
-- Enhanced CLI with rich output
-- Interactive mode for configuration
-- Shell completion (bash/zsh)
-
-### 4.4 IDE Integration (LOW)
+### 4.4 IDE Integration (FUTURE)
 **Effort**: 5-7 days
 
 **Goals**:
@@ -272,19 +264,21 @@ docs/
 - [x] Strict mypy type checking
 - [x] Clean architecture with clear abstractions
 
-### Documentation (IN PROGRESS)
-- [ ] Complete user documentation
-- [ ] Getting started tutorial ⬅️ **NEXT**
-- [ ] Backend selection guide ⬅️ **NEXT**
-- [ ] API reference auto-generated
+### Documentation (IN PROGRESS - 60% Complete)
+- [x] Getting started tutorial (v0.1.60)
+- [x] Error handling documentation (v0.1.59)
+- [ ] Backend selection guide ⬅️ **IN PROGRESS**
 - [ ] Use case guide published
 - [ ] Contributing guide complete
+- [ ] API reference auto-generated
+- [ ] Complete user documentation
 
-### Developer Experience (IN PROGRESS)
-- [ ] Error messages with source locations ⬅️ **NEXT**
+### Developer Experience (IN PROGRESS - 66% Complete)
+- [x] Error messages with source locations (v0.1.59)
+- [x] Type inference for local variables (v0.1.61)
+- [ ] Enhanced CLI with progress indicators ⬅️ **NEXT**
 - [ ] Debugging support for compiled code
 - [ ] IDE integration (at least VSCode)
-- [ ] Enhanced CLI with progress indicators
 
 ### Community (FUTURE)
 - [ ] GitHub stars: >100
@@ -298,21 +292,22 @@ docs/
 ### ✅ Completed (September-October 2025)
 - ✅ All 6 backends production-ready or functionally complete
 - ✅ Design pattern refactoring (79% complexity reduction)
-- ✅ 870 tests, 41/42 benchmarks passing
+- ✅ 904 tests, 41/42 benchmarks passing
 - ✅ Zero external dependencies across all backends
+- ✅ Enhanced error messages with colored output (v0.1.59)
+- ✅ Getting started tutorial with examples (v0.1.60)
+- ✅ Automatic local variable type inference (v0.1.61)
 
-### 🎯 Immediate (Next 2-4 weeks)
-1. **Error message improvements** (3-4 days)
-2. **Getting started tutorial** (2-3 days)
-3. **Backend selection guide** (1-2 days)
-- **Milestone**: Enhanced usability and onboarding
+### 🎯 Immediate (Next 1-2 weeks)
+1. **Backend selection guide** (1-2 days) ⬅️ **IN PROGRESS**
+- **Milestone**: Complete onboarding experience
 
-### Medium Term (1-2 months)
-- CLI improvements (progress bars, verbose mode)
-- Use case documentation
-- Contributing guide
-- API reference setup
-- **Milestone**: Developer-friendly tooling
+### Medium Term (Next 2-4 weeks)
+2. **CLI improvements** (2-3 days) - Progress bars, verbose mode, dry-run
+3. **Use case documentation** (2-3 days) - Integration patterns, decision trees
+4. **Contributing guide** (2-3 days) - Backend development, testing, architecture
+5. **API reference** (3-4 days) - Sphinx/MkDocs auto-generation
+- **Milestone**: Complete developer-friendly tooling and documentation
 
 ### Long Term (3-6 months)
 - Debugging support with source maps
@@ -325,23 +320,25 @@ docs/
 
 ## Recommended Next Steps
 
-### Option 1: Developer Experience (Recommended)
-**Priority**: Error message improvements
-**Rationale**: Biggest pain point for new users, high impact
-**Effort**: 3-4 days
-**Dependencies**: None
+### Current Priority: Backend Selection Guide (1-2 days)
+**Rationale**: Final piece of onboarding experience, users need guidance
+**Effort**: 1-2 days
+**Dependencies**: None (benchmark data already available)
+**Status**: ⬅️ **IN PROGRESS**
 
-### Option 2: Documentation (Alternative)
-**Priority**: Getting started tutorial
-**Rationale**: Essential for onboarding, uses existing examples
+### Next Priority: CLI Improvements (2-3 days)
+**Rationale**: Enhances user experience during code generation
 **Effort**: 2-3 days
 **Dependencies**: None
+**Status**: Ready to start after backend guide
 
-### Option 3: Both in Parallel
-**Priority**: Error messages + tutorial
-**Rationale**: Parallel work possible, complementary improvements
-**Effort**: 5-7 days total
-**Dependencies**: None
+### Follow-up: Documentation Completion (7-10 days total)
+**Priorities**:
+1. Use case documentation (2-3 days)
+2. Contributing guide (2-3 days)
+3. API reference setup (3-4 days)
+**Rationale**: Comprehensive documentation for v1.0 release
+**Dependencies**: Backend selection guide recommended first
 
 ---
 
@@ -349,13 +346,16 @@ docs/
 
 ### v1.0 Release Criteria
 - [x] All 6 backends production-ready (98% benchmarks, considered complete)
-- [ ] Comprehensive user documentation ⬅️ **IN PROGRESS**
-- [ ] Error messages with source locations ⬅️ **NEXT**
-- [ ] Getting started tutorial ⬅️ **NEXT**
+- [x] Error messages with source locations (v0.1.59)
+- [x] Getting started tutorial (v0.1.60)
+- [ ] Backend selection guide ⬅️ **IN PROGRESS**
+- [ ] CLI improvements (progress bars, verbose mode)
+- [ ] Comprehensive user documentation (use cases, contributing, API reference)
 - [ ] At least 3 production users
 - [ ] 100+ GitHub stars
 
-**Estimated Timeline**: 2-3 months (targeting December 2025)
+**Progress**: 5/8 technical criteria complete (62.5%)
+**Estimated Timeline**: 3-4 weeks for remaining documentation (targeting November 2025)
 
 ### Post-v1.0 Enhancements
 **Note**: Only after v1.0 release and user feedback
@@ -383,6 +383,6 @@ docs/
 
 **Philosophy**: Quality and reliability over quantity. Polish existing features before adding new ones.
 
-**Key Insight**: With backends stable and well-tested, the bottleneck is now usability and onboarding. Priority shifts to documentation and error handling.
+**Key Insight**: Core usability complete (error messages, tutorial, type inference). Focus now on completing documentation suite and CLI polish for v1.0 release.
 
-**Decision Point**: The roadmap recommends starting with error message improvements (Option 1) as the highest-impact next step, but getting started tutorial (Option 2) is equally valuable for onboarding.
+**Current Focus**: Backend selection guide → CLI improvements → comprehensive documentation (use cases, contributing, API reference) → v1.0 release.

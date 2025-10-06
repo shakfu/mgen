@@ -27,6 +27,7 @@ from ..errors import MGenError
 
 # Import the pipeline and backends
 from ..pipeline import BuildMode, MGenPipeline, OptimizationLevel, PipelineConfig
+from .progress import progress_context, spinner_context
 
 BUILD_DIR = "build"
 
@@ -50,13 +51,14 @@ class MGenCLI:
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog=f"""
 Examples:
-  mgen convert my_module.py --target c     # Generate C code in build/src/
-  mgen convert my_module.py --target haskell --prefer use_native_comprehensions=true
-  mgen build example.py --target haskell --prefer use_native_comprehensions=true --prefer camel_case_conversion=false
-  mgen convert my_module.py --target rust  # Generate Rust code in build/src/
-  mgen build my_module.py --target go      # Generate Go code and compile
-  mgen build my_module.py -m --target cpp  # Generate C++ code and Makefile
-  mgen batch --target c                    # Batch translate all files to C
+  mgen convert -t rust app.py              # Convert single file to Rust
+  mgen convert -t c app1.py app2.py        # Convert multiple files to C
+  mgen convert --to go *.py                # Convert all Python files to Go
+  mgen convert -t haskell app.py --prefer use_native_comprehensions=true
+  mgen build -t rust app.py                # Build Rust executable
+  mgen build -t cpp app.py -m              # Generate C++ code and Makefile
+  mgen build -t go app.py --progress       # Show build progress
+  mgen batch -t c -s src/                  # Batch convert directory to C
   mgen backends                            # List available language backends
   mgen clean                               # Clean build directory
 
@@ -70,27 +72,27 @@ Build Directory Structure:
             """,
         )
 
-        # Global options
+        # Global options (kept minimal - most moved to subcommands)
         parser.add_argument("--build-dir", "-d", type=str, default="build", help="Build directory (default: build)")
         parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
         parser.add_argument("--no-color", action="store_true", help="Disable colored error output")
-        parser.add_argument(
-            "--target", "-t", type=str, default="c", help=f"Target language (default: c, available: {backends_str})"
-        )
-        parser.add_argument(
-            "--prefer",
-            "-p",
-            action="append",
-            metavar="KEY=VALUE",
-            help="Set backend preferences (e.g., --prefer use_native_comprehensions=true)",
-        )
 
         # Subcommands
         subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
         # Convert command
         convert_parser = subparsers.add_parser("convert", help="Convert Python to target language")
-        convert_parser.add_argument("input_file", help="Python file to convert")
+        convert_parser.add_argument(
+            "-t", "--to",
+            type=str,
+            default="c",
+            help=f"Target language (default: c, available: {backends_str})"
+        )
+        convert_parser.add_argument(
+            "input_files",
+            nargs="+",
+            help="Python file(s) to convert"
+        )
         convert_parser.add_argument(
             "-O",
             "--optimization",
@@ -98,12 +100,39 @@ Build Directory Structure:
             default="moderate",
             help="Optimization level (default: moderate)",
         )
+        convert_parser.add_argument(
+            "--prefer",
+            "-p",
+            action="append",
+            metavar="KEY=VALUE",
+            help="Set backend preferences (e.g., --prefer use_native_comprehensions=true)",
+        )
+        convert_parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Show what would be generated without actually writing files"
+        )
+        convert_parser.add_argument(
+            "--progress",
+            action="store_true",
+            help="Show progress indicators during conversion"
+        )
 
         # Build command
         build_parser = subparsers.add_parser(
             "build", help="Convert Python to target language and build (compile directly or generate build file)"
         )
-        build_parser.add_argument("input_file", help="Python file to convert")
+        build_parser.add_argument(
+            "-t", "--to",
+            type=str,
+            default="c",
+            help=f"Target language (default: c, available: {backends_str})"
+        )
+        build_parser.add_argument(
+            "input_files",
+            nargs="+",
+            help="Python file(s) to build"
+        )
         build_parser.add_argument(
             "-m", "--makefile", action="store_true", help="Generate Makefile instead of compiling directly"
         )
@@ -114,7 +143,24 @@ Build Directory Structure:
             default="moderate",
             help="Optimization level (default: moderate)",
         )
+        build_parser.add_argument(
+            "--prefer",
+            "-p",
+            action="append",
+            metavar="KEY=VALUE",
+            help="Set backend preferences (e.g., --prefer use_native_comprehensions=true)",
+        )
         build_parser.add_argument("--compiler", help="Compiler to use (uses backend default if not specified)")
+        build_parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Show what would be built without actually compiling"
+        )
+        build_parser.add_argument(
+            "--progress",
+            action="store_true",
+            help="Show progress indicators during build"
+        )
 
         # Clean command
         subparsers.add_parser("clean", help="Clean build directory")
@@ -127,6 +173,12 @@ Build Directory Structure:
             "batch",
             help="Batch translate all Python files in a directory",
             description="Translate all Python files in a directory to target language in build/src",
+        )
+        batch_parser.add_argument(
+            "--to", "-t",
+            type=str,
+            default="c",
+            help=f"Target language (default: c, available: {backends_str})"
         )
         batch_parser.add_argument(
             "-s",
@@ -152,6 +204,13 @@ Build Directory Structure:
             choices=["none", "basic", "moderate", "aggressive"],
             default="moderate",
             help="Optimization level (default: moderate)",
+        )
+        batch_parser.add_argument(
+            "--prefer",
+            "-p",
+            action="append",
+            metavar="KEY=VALUE",
+            help="Set backend preferences (e.g., --prefer use_native_comprehensions=true)",
         )
         batch_parser.add_argument("-b", "--build", action="store_true", help="Build (compile) files after translation")
         batch_parser.add_argument("--compiler", help="Compiler to use (uses backend default if not specified)")
@@ -271,22 +330,37 @@ Build Directory Structure:
 
     def convert_command(self, args: argparse.Namespace) -> int:
         """Execute convert command."""
-        input_path = Path(args.input_file)
-        if not input_path.exists():
-            self.log.error(f"Input file not found: {input_path}")
-            return 1
-
         # Validate target language
-        target = args.target
+        target = args.to
         if not registry.has_backend(target):
             available = ", ".join(registry.list_backends())
             self.log.error(f"Unsupported target language '{target}'. Available: {available}")
             return 1
 
         # Parse backend preferences
-        preferences = self.parse_preferences(target, args.prefer)
+        preferences = self.parse_preferences(target, getattr(args, 'prefer', None))
 
         build_dir = Path(args.build_dir)
+
+        # Get input files
+        input_files = [Path(f) for f in args.input_files]
+
+        # Check all files exist
+        for input_path in input_files:
+            if not input_path.exists():
+                self.log.error(f"Input file not found: {input_path}")
+                return 1
+
+        # Dry-run mode
+        if hasattr(args, 'dry_run') and args.dry_run:
+            for input_path in input_files:
+                self.log.info(f"[DRY RUN] Would convert {input_path} to {target.upper()}")
+            self.log.info(f"[DRY RUN] Output directory: {build_dir / 'src'}")
+            self.log.info(f"[DRY RUN] Optimization level: {args.optimization}")
+            if preferences:
+                self.log.info(f"[DRY RUN] Backend preferences: {preferences}")
+            return 0
+
         self.setup_build_directory(build_dir)
 
         # Configure pipeline
@@ -298,60 +372,126 @@ Build Directory Structure:
             backend_preferences=preferences,
         )
 
-        try:
-            # Run multi-language pipeline
-            pipeline = MGenPipeline(config)
-            result = pipeline.convert(input_path)
+        # Progress tracking
+        show_progress = hasattr(args, 'progress') and args.progress
 
-            if not result.success:
-                self.log.error("Conversion failed")
-                if result.errors:
-                    for error in result.errors:
-                        self.log.error(f"Error: {error}")
+        # Process each file
+        failed_files = []
+        successful_files = []
+
+        for input_path in input_files:
+            try:
+                title = f"Converting {input_path.name} to {target.upper()}"
+                with progress_context(title, enabled=show_progress, verbose=self.verbose) as progress:
+                    if show_progress:
+                        progress.start(7)
+                        progress.step("Parsing source code")
+
+                    # Run multi-language pipeline
+                    pipeline = MGenPipeline(config)
+
+                    if show_progress:
+                        progress.step("Validating AST")
+                        progress.step("Analyzing types")
+                        progress.step("Optimizing Python IR")
+                        progress.step("Mapping to target language")
+                        progress.step("Generating code")
+                        progress.step("Writing output files")
+
+                    result = pipeline.convert(input_path)
+
+                    if not result.success:
+                        if show_progress:
+                            progress.fail("Conversion failed")
+                        self.log.error(f"Conversion failed for {input_path}")
+                        if result.errors:
+                            for error in result.errors:
+                                self.log.error(f"Error: {error}")
+                        failed_files.append(str(input_path))
+                        continue
+
+                    source_key = f"{target}_source"
+                    source_file = result.output_files.get(source_key, "N/A")
+
+                    if show_progress:
+                        progress.finish(f"Generated {source_file}")
+
+                    self.log.info(f"Conversion successful! {target.upper()} source: {source_file}")
+                    successful_files.append(str(input_path))
+
+                    if result.warnings:
+                        for warning in result.warnings:
+                            self.log.warning(f"Warning: {warning}")
+
+            except MGenError as e:
+                # Use enhanced error formatting for MGen errors
+                print_error(e)
+                failed_files.append(str(input_path))
+            except Exception as e:
+                # Regular exceptions get standard formatting
+                self.log.error(f"Pipeline error for {input_path}: {e}")
+                failed_files.append(str(input_path))
+
+        # Summary
+        if len(input_files) > 1:
+            self.log.info(f"\nConversion summary: {len(successful_files)}/{len(input_files)} files succeeded")
+            if failed_files:
+                self.log.error(f"Failed files: {', '.join(failed_files)}")
                 return 1
 
-            source_key = f"{target}_source"
-            source_file = result.output_files.get(source_key, "N/A")
-            self.log.info(f"Conversion successful! {target.upper()} source: {source_file}")
-            if result.warnings:
-                for warning in result.warnings:
-                    self.log.warning(f"Warning: {warning}")
-            return 0
-
-        except MGenError as e:
-            # Use enhanced error formatting for MGen errors
-            print_error(e)
-            return 1
-        except Exception as e:
-            # Regular exceptions get standard formatting
-            self.log.error(f"Pipeline error: {e}")
-            return 1
+        return 0 if not failed_files else 1
 
     def build_command(self, args: argparse.Namespace) -> int:
         """Execute build command (compile directly or generate build file based on -m flag)."""
-        input_path = Path(args.input_file)
-        if not input_path.exists():
-            self.log.error(f"Input file not found: {input_path}")
-            return 1
-
         # Validate target language
-        target = args.target
+        target = args.to
         if not registry.has_backend(target):
             available = ", ".join(registry.list_backends())
             self.log.error(f"Unsupported target language '{target}'. Available: {available}")
             return 1
 
         # Parse backend preferences
-        preferences = self.parse_preferences(target, args.prefer)
+        preferences = self.parse_preferences(target, getattr(args, 'prefer', None))
+
+        # Get input files
+        input_files = [Path(f) for f in args.input_files]
+
+        # Check all files exist
+        for input_path in input_files:
+            if not input_path.exists():
+                self.log.error(f"Input file not found: {input_path}")
+                return 1
+
+        # For now, only support single file build (multi-file build needs more design)
+        if len(input_files) > 1:
+            self.log.error("Build command currently supports only one file at a time")
+            self.log.info("Use 'convert' for multiple files, then build manually")
+            return 1
+
+        input_path = input_files[0]
 
         build_dir = Path(args.build_dir)
-        self.setup_build_directory(build_dir)
 
         # Determine build mode based on -m flag
         if args.makefile:
             build_mode = BuildMode.MAKEFILE
+            mode_desc = "generate Makefile"
         else:
             build_mode = BuildMode.DIRECT
+            mode_desc = "compile directly"
+
+        # Dry-run mode
+        if hasattr(args, 'dry_run') and args.dry_run:
+            self.log.info(f"[DRY RUN] Would convert {input_path} to {target.upper()} and {mode_desc}")
+            self.log.info(f"[DRY RUN] Build directory: {build_dir}")
+            self.log.info(f"[DRY RUN] Optimization level: {args.optimization}")
+            if hasattr(args, 'compiler') and args.compiler:
+                self.log.info(f"[DRY RUN] Compiler: {args.compiler}")
+            if preferences:
+                self.log.info(f"[DRY RUN] Backend preferences: {preferences}")
+            return 0
+
+        self.setup_build_directory(build_dir)
 
         # Copy runtime libraries (language-specific)
         self.copy_runtime_libraries(build_dir, target)
@@ -371,10 +511,90 @@ Build Directory Structure:
             backend_preferences=preferences,
         )
 
+        # Progress tracking
+        show_progress = hasattr(args, 'progress') and args.progress
+
         # Run MGen pipeline
         try:
-            pipeline = MGenPipeline(config)
-            result = pipeline.convert(input_path)
+            if args.makefile:
+                title = f"Building {input_path.name} → {target.upper()} + Makefile"
+            else:
+                title = f"Compiling {input_path.name} → {target.upper()} executable"
+
+            with progress_context(title, enabled=show_progress, verbose=self.verbose) as progress:
+                if show_progress:
+                    progress.start(9)
+                    progress.step("Parsing source code")
+
+                pipeline = MGenPipeline(config)
+
+                if show_progress:
+                    progress.step("Validating AST")
+                    progress.step("Analyzing types")
+                    progress.step("Optimizing Python IR")
+                    progress.step("Mapping to target language")
+                    progress.step("Generating code")
+                    progress.step("Writing output files")
+
+                if not args.makefile and show_progress:
+                    progress.step("Invoking compiler")
+
+                result = pipeline.convert(input_path)
+
+                if not result.success:
+                    if show_progress:
+                        progress.fail("Build failed")
+                    error_msg = "Build failed:" if args.makefile else "Compilation failed:"
+                    self.log.error(error_msg)
+                    if result.errors:
+                        for error in result.errors:
+                            self.log.error(f"Error: {error}")
+                    return 1
+
+                if show_progress:
+                    progress.step("Finalizing output")
+
+                if args.makefile:
+                    # Build file generation mode
+                    build_file_key = "build_file"
+                    if build_file_key in result.output_files:
+                        build_file_src = Path(result.output_files[build_file_key])
+                        build_file_name = self._get_build_file_name(target)
+                        build_file_dest = build_dir / build_file_name
+                        if build_file_src != build_file_dest:
+                            shutil.move(str(build_file_src), str(build_file_dest))
+                            result.output_files[build_file_key] = str(build_file_dest)
+
+                    source_key = f"{target}_source"
+                    source_file = result.output_files.get(source_key, "N/A")
+                    build_file = result.output_files.get(build_file_key, "N/A")
+
+                    if show_progress:
+                        progress.finish(f"Generated {build_file}")
+
+                    self.log.info(
+                        f"Build preparation successful! {target.upper()} source: {source_file}, Build file: {build_file}"
+                    )
+                else:
+                    # Direct compilation mode
+                    if result.executable_path:
+                        exe_src = Path(result.executable_path)
+                        exe_dest = build_dir / exe_src.name
+                        if exe_src != exe_dest:
+                            shutil.move(str(exe_src), str(exe_dest))
+                            result.executable_path = str(exe_dest)
+
+                    if show_progress:
+                        progress.finish(f"Compiled {result.executable_path}")
+
+                    self.log.info(f"Compilation successful! Executable: {result.executable_path}")
+
+                if result.warnings:
+                    for warning in result.warnings:
+                        self.log.warning(f"Warning: {warning}")
+
+                return 0
+
         except MGenError as e:
             # Use enhanced error formatting for MGen errors
             print_error(e)
@@ -383,48 +603,6 @@ Build Directory Structure:
             # Regular exceptions get standard formatting
             self.log.error(f"Pipeline error: {e}")
             return 1
-
-        if not result.success:
-            error_msg = "Build failed:" if args.makefile else "Compilation failed:"
-            self.log.error(error_msg)
-            if result.errors:
-                for error in result.errors:
-                    self.log.error(f"Error: {error}")
-            return 1
-
-        if args.makefile:
-            # Build file generation mode
-            build_file_key = "build_file"
-            if build_file_key in result.output_files:
-                build_file_src = Path(result.output_files[build_file_key])
-                build_file_name = self._get_build_file_name(target)
-                build_file_dest = build_dir / build_file_name
-                if build_file_src != build_file_dest:
-                    shutil.move(str(build_file_src), str(build_file_dest))
-                    result.output_files[build_file_key] = str(build_file_dest)
-
-            source_key = f"{target}_source"
-            source_file = result.output_files.get(source_key, "N/A")
-            build_file = result.output_files.get(build_file_key, "N/A")
-            self.log.info(
-                f"Build preparation successful! {target.upper()} source: {source_file}, Build file: {build_file}"
-            )
-        else:
-            # Direct compilation mode
-            if result.executable_path:
-                exe_src = Path(result.executable_path)
-                exe_dest = build_dir / exe_src.name
-                if exe_src != exe_dest:
-                    shutil.move(str(exe_src), str(exe_dest))
-                    result.executable_path = str(exe_dest)
-
-            self.log.info(f"Compilation successful! Executable: {result.executable_path}")
-
-        if result.warnings:
-            for warning in result.warnings:
-                self.log.warning(f"Warning: {warning}")
-
-        return 0
 
     def _get_build_file_name(self, target_language: str) -> str:
         """Get the appropriate build file name for the target language."""
@@ -453,14 +631,14 @@ Build Directory Structure:
         import os
 
         # Validate target language
-        target = args.target
+        target = args.to
         if not registry.has_backend(target):
             available = ", ".join(registry.list_backends())
             self.log.error(f"Unsupported target language '{target}'. Available: {available}")
             return 1
 
         # Parse backend preferences
-        preferences = self.parse_preferences(target, args.prefer)
+        preferences = self.parse_preferences(target, getattr(args, 'prefer', None))
 
         source_dir = args.source_dir
         output_dir = args.output_dir
