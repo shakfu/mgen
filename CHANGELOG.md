@@ -19,9 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.65] - 2025-10-06
 
-**Codebase Cleanup: Removed Deprecated Constraint Checker**
+**Codebase Cleanup: Removed Deprecated and Legacy Code**
 
-Completed migration from monolithic `constraint_checker.py` to specialized modules. Removed deprecated code and updated all references to use new architecture.
+Completed migration from monolithic `constraint_checker.py` to specialized modules. Removed deprecated code and legacy generators that were superseded by modern backend architecture.
 
 ### Removed
 
@@ -30,6 +30,13 @@ Completed migration from monolithic `constraint_checker.py` to specialized modul
   - Replaced by `PythonConstraintChecker` (frontend) and `MemorySafetyChecker` (C/C++ backend)
   - All tests updated to use new modules
   - Pipeline no longer references deprecated checker
+
+- **generators/** directory (1,712 lines)
+  - `simple_translator.py` (1,114 lines) - Early Python→C translator, superseded by backends/c/
+  - `stc_enhanced_translator.py` (598 lines) - STC container translator, superseded by modern backend system
+  - Legacy code from pre-v0.1.30, completely replaced by comprehensive backend architecture
+  - No imports or references found in codebase
+  - **Total cleanup**: 2,489 lines removed (777 + 1,712)
 
 ### Changed
 
