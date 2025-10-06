@@ -17,6 +17,235 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.70] - 2025-10-06
+
+**Type Safety: Fixed Mypy Errors for Z3 Integration**
+
+Fixed all mypy type checking errors introduced by Z3 integration, ensuring strict type safety across the codebase.
+
+### Fixed
+
+- **Z3 Import Type Annotations**
+  - Added `# type: ignore[import-untyped]` to all z3 imports (6 files)
+  - Z3 library lacks type stubs, so explicit ignore required
+  - Files: `pipeline.py`, `bounds_prover.py`, `theorem_prover.py`, `correctness_prover.py`, `performance_analyzer.py`, `z3_formula_generator.py`
+
+- **Missing Return Type Annotation**
+  - Added `-> None` to `Z3FormulaGenerator.__init__()` method
+  - Satisfies `disallow_untyped_defs` mypy setting
+
+- **AnalysisContext Type Signature**
+  - Changed `analysis_result: AnalysisResult` to `analysis_result: Optional[AnalysisResult] = None`
+  - Allows verifiers to create context without pre-existing analysis result
+  - Maintains backward compatibility with code that provides analysis_result
+
+### Verification
+
+- **Mypy**: ✓ Success - no issues found in 114 source files
+- **Tests**: ✓ 961 tests passing (100%)
+- **Strict mode**: `disallow_untyped_defs = true` maintained
+
+### Impact
+
+- Zero runtime changes (type annotations only)
+- Strict type checking passes for entire codebase
+- Z3 integration fully type-safe (with appropriate ignores for untyped library)
+
+## [0.1.69] - 2025-10-06
+
+**Strict Verification Mode: Halt Code Generation on Safety Failures**
+
+Added strict verification mode that treats formal verification failures as hard errors, preventing code generation when memory safety cannot be proven.
+
+### Added
+
+- **`strict_verification` Flag in PipelineConfig**
+  - New boolean flag (default: `False`)
+  - Requires `enable_formal_verification=True` to function
+  - When enabled, verification failures become **hard errors** instead of warnings
+  - Code generation halts immediately on first unsafe function
+  - Provides clear error messages with function name and line numbers
+
+- **Strict Mode Behavior**
+  - **Non-strict mode** (default): Warnings only, code generation proceeds
+  - **Strict mode**: Errors halt pipeline, `result.success = False`
+  - Verification failures moved from `result.warnings` to `result.errors`
+  - Error message: `"Code generation halted due to verification failures in 'func_name'"`
+  - Recommendations also promoted to errors in strict mode
+
+- **Configuration Validation**
+  - Warning if `strict_verification=True` but `enable_formal_verification=False`
+  - Error if strict mode enabled but Z3 not available
+  - Helpful log messages indicating mode: "strict mode" vs "warning mode"
+
+- **Comprehensive Tests** (8 new tests, 961 total)
+  - `test_strict_verification.py`: Tests for strict mode behavior
+  - Verifies default disabled state
+  - Tests configuration warnings
+  - Tests safe code passes in strict mode
+  - Tests unsafe code blocked in strict mode
+  - Validates errors vs warnings behavior
+  - **Integration test**: Verifies pipeline halts and no C code generated when verification fails
+  - **Multi-function test**: Verifies strict mode halts on first unsafe function
+
+### Changed
+
+- **Pipeline Validation Phase** (`pipeline.py:408-440`)
+  - Enhanced verification result handling
+  - Conditional error/warning assignment based on `strict_verification`
+  - Early return `False` on verification failure in strict mode
+  - Clear separation of strict vs non-strict behavior
+
+### Example Usage
+
+```python
+# Strict mode: halt on verification failures
+config = PipelineConfig(
+    target_language="c",
+    enable_formal_verification=True,
+    strict_verification=True  # NEW
+)
+pipeline = MGenPipeline(config=config)
+result = pipeline.convert("unsafe_code.py")
+# result.success = False if verification finds issues
+# result.errors contains verification failures
+```
+
+### Use Cases
+
+- **CI/CD pipelines**: Fail builds on unverified unsafe code
+- **Safety-critical applications**: Require mathematical proof of memory safety
+- **Development**: Catch buffer overflows before compilation/testing
+- **Code quality gates**: Enforce formal verification standards
+
+## [0.1.68] - 2025-10-06
+
+**Optional Dependencies: Z3 as Pip Extra**
+
+Made Z3 an optional dependency installable via pip extras syntax, following standard Python packaging conventions.
+
+### Added
+
+- **Optional Dependencies in pyproject.toml**
+  - Added `[project.optional-dependencies]` section
+  - `pip install mgen[z3]` - Install with Z3 formal verification support
+  - `pip install mgen[verification]` - Alias for backward compatibility
+  - Z3 minimum version: 4.13.0
+
+### Changed
+
+- **Updated Install Instructions**
+  - Pipeline warning now says: `pip install mgen[z3]` (was: `uv pip install --extra verification mgen`)
+  - Z3 proof-of-concept example updated with new install command
+  - Cleaner, standard pip install syntax
+
+### Notes
+
+- Z3 remains optional (not in core dependencies)
+- Verification disabled gracefully when Z3 not available
+- Both `mgen[z3]` and `mgen[verification]` extras work
+
+## [0.1.67] - 2025-10-06
+
+**Code Cleanup: Removed Z3 Mock Classes**
+
+Removed unnecessary Z3 mock classes from all verifier modules. Since verification is disabled when Z3 is unavailable (pipeline won't instantiate verifiers), mock implementations serve no purpose.
+
+### Removed
+
+- **Z3 Mock Classes** (~205 lines total)
+  - `bounds_prover.py`: Removed mock z3.Int class with operator overloads (~45 lines)
+  - `theorem_prover.py`: Removed mock z3.Solver, z3.Int, z3.Bool, and static methods (~100 lines)
+  - `correctness_prover.py`: Removed mock z3.Int, z3.Real, z3.Bool classes (~20 lines)
+  - `performance_analyzer.py`: Removed mock z3.Int, z3.IntVal (~15 lines)
+  - `z3_formula_generator.py`: Removed mock z3 static methods (~25 lines)
+  - Replaced with simple `z3 = None` assignment when import fails
+  - Verification disabled when Z3 unavailable, so mocks never execute
+
+### Changed
+
+- **Import Pattern Simplification**
+  - All verifiers now use: `try: import z3; Z3_AVAILABLE = True; except ImportError: Z3_AVAILABLE = False; z3 = None`
+  - Type checker satisfied with `# type: ignore[assignment]` on None assignment
+  - Cleaner, more maintainable code
+
+## [0.1.66] - 2025-10-06
+
+**Formal Verification: Complete Z3 Integration**
+
+Fully integrated Z3 theorem prover into the pipeline, enabling formal verification of array bounds safety and other safety properties. Implemented formula generation from Python AST and wired verification results into pipeline reporting.
+
+### Added
+
+- **Z3 Integration in Pipeline** (`src/mgen/pipeline.py`)
+  - Added `enable_formal_verification` flag to `PipelineConfig` (default: `False`)
+  - Imports verifiers (`BoundsProver`, `CorrectnessProver`, `TheoremProver`) when enabled
+  - Checks Z3 availability and provides helpful install message if missing
+  - Verifiers initialized only when both flag enabled and Z3 available
+  - **Verification runs during validation phase** - analyzes each function and reports warnings
+  - Verification results added to pipeline warnings (non-blocking)
+
+- **Z3 Formula Generator** (`src/mgen/frontend/verifiers/z3_formula_generator.py` - 266 lines)
+  - Converts Python AST expressions to Z3 formulas
+  - Generates array bounds safety formulas: `0 <= index < arr_len`
+  - Generates loop bounds formulas with universal quantifiers
+  - Supports binary operations (`+`, `-`, `*`, `/`), comparisons, unary operations
+  - Handles constants, variables, and complex expressions
+  - Accumulates constraints for solver
+
+- **Z3 Proof-of-Concept** (`examples/z3_array_bounds_poc.py`)
+  - Demonstrates Z3 formally proving array bounds safety
+  - Shows detection of buffer overflows and off-by-one errors
+  - Generates counterexamples when safety cannot be proven
+  - Three examples: safe access, unsafe access detection, off-by-one detection
+
+- **Real Z3 Import in All Verifiers**
+  - `bounds_prover.py`: Enabled real `import z3` with conditional fallback to mock
+  - `theorem_prover.py`: Enabled real `import z3` with conditional fallback to mock
+  - `correctness_prover.py`: Enabled real `import z3` with conditional fallback to mock
+  - `performance_analyzer.py`: Enabled real `import z3` with conditional fallback to mock
+  - Mock z3 classes only used when Z3 not available
+  - Defensive checks for `None` analysis_result in all verifiers
+  - Proper indentation and structure for conditional imports
+
+- **Comprehensive Test Suite** (51 new tests, 953 total passing)
+  - `tests/test_verifiers.py` (13 tests): BoundsProver, TheoremProver, CorrectnessProver smoke tests
+  - `tests/test_z3_formula_generator.py` (11 tests): Formula generation from AST
+  - `tests/test_pipeline_verification.py` (5 tests): Pipeline integration
+  - `tests/test_bounds_prover_comprehensive.py` (13 tests): Comprehensive bounds verification tests
+  - `tests/test_correctness_prover_comprehensive.py` (9 tests): Algorithm correctness verification tests
+
+### Technical Details
+
+- **Optional Dependency**: Z3 installed via `uv` dependency group `extra`
+- **Graceful Degradation**: Pipeline works without Z3, warns if verification requested but unavailable
+- **Formula Generation**: Converts Python AST → Z3 formulas → Formal proofs
+- **Pipeline Integration**: Verification runs after memory safety checks, reports as warnings
+- **Zero Regressions**: All 904 tests passing (12.21s)
+
+### Example Usage
+
+```python
+# Enable formal verification in pipeline
+config = PipelineConfig(
+    target_language="c",
+    enable_formal_verification=True,
+    enable_advanced_analysis=True
+)
+pipeline = MGenPipeline(config=config)
+result = pipeline.convert("my_code.py")
+
+# Verification warnings will appear in result.warnings
+```
+
+### Next Steps
+
+- Implement additional verification types (null safety, resource leaks, use-after-free)
+- Enhance formula generation for more complex AST patterns
+- Add verification result caching for performance
+- Document formal verification capabilities in user guide
+- Consider integration with IDE (LSP) for real-time verification warnings
+
 ## [0.1.65] - 2025-10-06
 
 **Codebase Cleanup: Removed Deprecated and Legacy Code**

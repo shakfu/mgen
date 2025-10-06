@@ -35,7 +35,7 @@ class AnalysisContext:
 
     source_code: str
     ast_node: ast.AST
-    analysis_result: AnalysisResult
+    analysis_result: Optional[AnalysisResult] = None
     analysis_level: AnalysisLevel = AnalysisLevel.BASIC
     optimization_level: OptimizationLevel = OptimizationLevel.BASIC
     target_architecture: str = "x86_64"

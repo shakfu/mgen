@@ -13,109 +13,13 @@ from enum import Enum
 from typing import Any
 
 # Z3 integration - graceful fallback if not installed
-# import z3  # TODO: Fix missing z3 dependency
-Z3_AVAILABLE = False
+try:
+    import z3  # type: ignore[import-untyped]
 
-
-# Mock Z3 classes for development without Z3
-class z3:
-    class Solver:
-        """Mock Z3 solver."""
-
-        def __init__(self) -> None:
-            """Initialize mock Z3 solver."""
-            pass
-
-        def add(self, constraint: Any) -> None:
-            """Mock add constraint to solver."""
-            pass
-
-        def check(self) -> str:
-            """Mock check satisfiability."""
-            return "unknown"
-
-        def model(self) -> None:
-            """Mock get satisfying model."""
-            return None
-
-        def set(self, param: str, value: Any) -> None:
-            """Mock set solver parameter."""
-            pass
-
-    @staticmethod
-    def Not(expr: Any) -> None:
-        """Mock logical NOT operation."""
-        return None
-
-    @staticmethod
-    def IntVal(val: int) -> None:
-        """Mock create integer value."""
-        return None
-
-    sat = "sat"
-    unsat = "unsat"
-
-    class Int:
-        """Mock Z3 integer type."""
-
-        def __init__(self, name: str) -> None:
-            """Initialize mock Z3 integer."""
-            self.name = name
-
-        def __add__(self, other: Any) -> z3.Int:
-            """Mock addition operator."""
-            return z3.Int(f"({self.name} + {other})")
-
-        def __sub__(self, other: Any) -> z3.Int:
-            """Mock subtraction operator."""
-            return z3.Int(f"({self.name} - {other})")
-
-        def __mul__(self, other: Any) -> z3.Int:
-            """Mock multiplication operator."""
-            return z3.Int(f"({self.name} * {other})")
-
-        def __le__(self, other: Any) -> str:
-            """Mock less-than-or-equal operator."""
-            return f"({self.name} <= {other})"
-
-        def __lt__(self, other: Any) -> str:
-            """Mock less-than operator."""
-            return f"({self.name} < {other})"
-
-        def __ge__(self, other: Any) -> str:
-            """Mock greater-than-or-equal operator."""
-            return f"({self.name} >= {other})"
-
-        def __gt__(self, other: Any) -> str:
-            """Mock greater-than operator."""
-            return f"({self.name} > {other})"
-
-    class Bool:
-        """Mock Z3 boolean type."""
-
-        def __init__(self, name: str) -> None:
-            """Initialize mock Z3 boolean."""
-            self.name = name
-
-    @staticmethod
-    def And(*args: Any) -> str:
-        """Mock logical AND operation."""
-        return "And(" + str(args) + ")"
-
-    @staticmethod
-    def Or(*args: Any) -> str:
-        """Mock logical OR operation."""
-        return "Or(" + str(args) + ")"
-
-    @staticmethod
-    def Implies(a: Any, b: Any) -> str:
-        """Mock logical implication operation."""
-        return f"Implies({a}, {b})"
-
-    @staticmethod
-    def ForAll(vars: Any, body: Any) -> str:
-        """Mock universal quantifier operation."""
-        return f"ForAll({vars}, {body})"
+    Z3_AVAILABLE = True
+except ImportError:
+    Z3_AVAILABLE = False
+    z3 = None  # type: ignore[assignment]
 
 
 from ..base import AnalysisContext

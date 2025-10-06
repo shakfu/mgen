@@ -40,8 +40,10 @@ try:
         AnalysisContext,
         ASTAnalyzer,
         BoundsChecker,
+        BoundsProver,
         CallGraphAnalyzer,
         CompileTimeEvaluator,
+        CorrectnessProver,
         FunctionSpecializer,
         ImmutabilityAnalyzer,
         LoopAnalyzer,
@@ -49,6 +51,7 @@ try:
         StaticAnalyzer,
         StaticPythonSubsetValidator,
         SymbolicExecutor,
+        TheoremProver,
         TypeInferenceEngine,
         VectorizationDetector,
         analyze_python_code,
@@ -61,6 +64,14 @@ try:
 except ImportError:
     # Fallback if frontend components not available
     FRONTEND_AVAILABLE = False
+
+# Import Z3 for formal verification (optional)
+try:
+    import z3  # type: ignore[import-untyped]
+
+    Z3_AVAILABLE = True
+except ImportError:
+    Z3_AVAILABLE = False
 
 # Import C/C++ memory safety checker
 try:
@@ -114,6 +125,8 @@ class PipelineConfig:
     libraries: Optional[list[str]] = None
     enable_advanced_analysis: bool = True
     enable_optimizations: bool = True
+    enable_formal_verification: bool = False  # Z3-based formal verification (optional)
+    strict_verification: bool = False  # Halt code generation on verification failures (requires enable_formal_verification)
     backend_preferences: Optional[BackendPreferences] = None
     progress_callback: Optional[Callable[[PipelinePhase, str], None]] = None
 
@@ -218,6 +231,37 @@ class MGenPipeline:
                 self.loop_analyzer = LoopAnalyzer()
                 self.function_specializer = FunctionSpecializer()
                 self.vectorization_detector = VectorizationDetector()
+
+            # Formal verification components (optional, requires Z3)
+            if self.config.enable_formal_verification:
+                if not Z3_AVAILABLE:
+                    self.log.warning(
+                        "Formal verification requested but Z3 not available. "
+                        "Install with: pip install mgen[z3]"
+                    )
+                    if self.config.strict_verification:
+                        self.log.error(
+                            "Strict verification mode requires Z3. "
+                            "Code generation will fail without formal verification."
+                        )
+                    self.bounds_prover = None
+                    self.correctness_prover = None
+                    self.theorem_prover = None
+                else:
+                    mode = "strict mode" if self.config.strict_verification else "warning mode"
+                    self.log.info(f"Formal verification enabled in {mode} (Z3 available)")
+                    self.bounds_prover = BoundsProver()
+                    self.correctness_prover = CorrectnessProver()
+                    self.theorem_prover = TheoremProver()
+            else:
+                if self.config.strict_verification:
+                    self.log.warning(
+                        "Strict verification mode enabled but formal verification is disabled. "
+                        "Set enable_formal_verification=True to use strict mode."
+                    )
+                self.bounds_prover = None
+                self.correctness_prover = None
+                self.theorem_prover = None
         else:
             self.log.debug("Using simplified analysis pipeline")
 
@@ -351,6 +395,61 @@ class MGenPipeline:
                     if critical_errors:
                         result.success = False
                         return False
+
+                # Run formal verification if enabled
+                if self.config.enable_formal_verification and self.bounds_prover is not None:
+                    self.log.info("Running formal verification with Z3...")
+
+                    # Parse AST for verification
+                    tree = ast.parse(source_code)
+
+                    # Verify each function
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.FunctionDef):
+                            # Create analysis context for verifier
+                            from .frontend.base import AnalysisLevel
+
+                            context = AnalysisContext(
+                                ast_node=node,
+                                source_code=source_code,
+                                analysis_level=AnalysisLevel.BASIC,
+                                analysis_result=None,
+                            )
+
+                            # Run bounds verification
+                            proof = self.bounds_prover.verify_memory_safety(context)
+
+                            # Report verification results
+                            if not proof.is_safe:
+                                for unsafe_access in proof.unsafe_accesses:
+                                    error_msg = (
+                                        f"[FORMAL_VERIFICATION] Potential unsafe memory access "
+                                        f"in '{proof.function_name}' at line {unsafe_access.line_number}"
+                                    )
+                                    if self.config.strict_verification:
+                                        result.errors.append(error_msg)
+                                    else:
+                                        result.warnings.append(error_msg)
+
+                                # In strict mode, halt on first unsafe function
+                                if self.config.strict_verification:
+                                    result.success = False
+                                    result.errors.append(
+                                        f"[FORMAL_VERIFICATION] Code generation halted due to verification failures in '{proof.function_name}'. "
+                                        f"Fix unsafe memory accesses or disable strict_verification mode."
+                                    )
+                                    self.log.error(f"Verification failed in strict mode: {proof.summary}")
+                                    return False
+
+                            # Add verification recommendations
+                            for recommendation in proof.recommendations:
+                                if self.config.strict_verification and not proof.is_safe:
+                                    result.errors.append(f"[FORMAL_VERIFICATION] {recommendation}")
+                                else:
+                                    result.warnings.append(f"[FORMAL_VERIFICATION] {recommendation}")
+
+                            self.log.debug(f"Verification complete: {proof.summary}")
+
             else:
                 # Basic validation - just check if it parses
                 result.phase_results[PipelinePhase.VALIDATION] = {"basic_parse": True}

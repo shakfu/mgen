@@ -26,6 +26,10 @@ dependencies = [
     "typing-extensions>=4.0.0",
 ]
 
+[project.optional-dependencies]
+z3 = ["z3-solver>=4.13.0"]
+verification = ["z3-solver>=4.13.0"]  # Alias for backward compatibility
+
 [build-system]
 requires = ["uv_build>=0.8.19,<0.9.0"]
 build-backend = "uv_build"
@@ -38,6 +42,9 @@ dev = [
     "mypy>=1.18.2",
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
+]
+extra = [
+    "z3-solver>=4.15.3.0",
 ]
 
 

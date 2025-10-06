@@ -11,59 +11,12 @@ from enum import Enum
 from typing import Any, Optional, Union
 
 try:
-    # import z3  # TODO: Fix missing z3 dependency
+    import z3  # type: ignore[import-untyped]
 
     Z3_AVAILABLE = True
 except ImportError:
     Z3_AVAILABLE = False
-
-
-# Mock z3 for when not available
-class z3:
-    class Int:
-        """Mock Z3 integer type."""
-
-        def __init__(self, name: str) -> None:
-            """Initialize mock Z3 integer."""
-            self.name = name
-
-        def __add__(self, other: Any) -> "z3.Int":
-            """Mock addition operator."""
-            return z3.Int(f"({self.name} + {other})")
-
-        def __sub__(self, other: Any) -> "z3.Int":
-            """Mock subtraction operator."""
-            return z3.Int(f"({self.name} - {other})")
-
-        def __mul__(self, other: Any) -> "z3.Int":
-            """Mock multiplication operator."""
-            return z3.Int(f"({self.name} * {other})")
-
-        def __le__(self, other: Any) -> str:
-            """Mock less-than-or-equal operator."""
-            return f"({self.name} <= {other})"
-
-        def __lt__(self, other: Any) -> str:
-            """Mock less-than operator."""
-            return f"({self.name} < {other})"
-
-        def __ge__(self, other: Any) -> str:
-            """Mock greater-than-or-equal operator."""
-            return f"({self.name} >= {other})"
-
-        def __gt__(self, other: Any) -> str:
-            """Mock greater-than operator."""
-            return f"({self.name} > {other})"
-
-    @staticmethod
-    def And(*args: Any) -> None:
-        """Mock logical AND operation."""
-        return None
-
-    @staticmethod
-    def IntVal(val: int) -> "z3.Int":
-        """Mock create integer value."""
-        return z3.Int(str(val))
+    z3 = None  # type: ignore[assignment]
 
 
 from ..base import AnalysisContext
@@ -195,9 +148,12 @@ class BoundsProver:
 
         verification_time = time.time() - start_time
 
-        function_name = (
-            list(context.analysis_result.functions.keys())[0] if context.analysis_result.functions else "unknown"
-        )
+        function_name = "unknown"
+        if context.analysis_result and hasattr(context.analysis_result, "functions"):
+            if context.analysis_result.functions:
+                function_name = list(context.analysis_result.functions.keys())[0]
+        elif hasattr(context.ast_node, "name"):
+            function_name = context.ast_node.name
 
         return MemorySafetyProof(
             function_name=function_name,

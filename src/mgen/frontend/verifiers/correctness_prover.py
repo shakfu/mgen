@@ -11,36 +11,12 @@ from enum import Enum
 from typing import Any, Optional
 
 try:
-    # import z3  # TODO: Fix missing z3 dependency
+    import z3  # type: ignore[import-untyped]
 
     Z3_AVAILABLE = True
 except ImportError:
     Z3_AVAILABLE = False
-
-
-# Mock z3 for when not available
-class z3:
-    class Int:
-        def __init__(self, name: str) -> None:
-            self.name = name
-
-    class Real:
-        def __init__(self, name: str) -> None:
-            self.name = name
-
-    class Bool:
-        def __init__(self, name: str) -> None:
-            self.name = name
-
-    @staticmethod
-    def And(*args: Any) -> None:
-        """Mock logical AND operation."""
-        return None
-
-    @staticmethod
-    def Or(*args: Any) -> None:
-        """Mock logical OR operation."""
-        return None
+    z3 = None  # type: ignore[assignment]
 
 
 from ..base import AnalysisContext
@@ -405,8 +381,11 @@ class CorrectnessProver:
 
     def _extract_function_name(self, context: AnalysisContext) -> str:
         """Extract function name from context."""
-        if context.analysis_result.functions:
-            return list(context.analysis_result.functions.keys())[0]
+        if context.analysis_result and hasattr(context.analysis_result, "functions"):
+            if context.analysis_result.functions:
+                return list(context.analysis_result.functions.keys())[0]
+        elif hasattr(context.ast_node, "name"):
+            return context.ast_node.name
         return "unknown_function"
 
     def _infer_specification(self, function_name: str, context: AnalysisContext) -> FormalSpecification:
