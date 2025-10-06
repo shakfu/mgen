@@ -1,8 +1,23 @@
 """Static Constraint Checking for Python-to-C Conversion.
 
-This module implements comprehensive constraint checking to ensure
-that Python code can be safely and correctly converted to C code.
+⚠️ DEPRECATED: This module is deprecated and will be removed in a future version.
+
+Use the new constraint checking system instead:
+- For universal Python constraints: frontend.python_constraints.PythonConstraintChecker
+- For C/C++ memory safety: backends.c.memory_safety.MemorySafetyChecker
+
+This module remains for backwards compatibility but is no longer used by the pipeline.
+See CONSTRAINT_SPLIT_PROPOSAL.md for details.
 """
+
+import warnings
+
+warnings.warn(
+    "StaticConstraintChecker is deprecated. Use PythonConstraintChecker "
+    "and MemorySafetyChecker instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import ast
 from dataclasses import dataclass, field

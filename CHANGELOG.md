@@ -17,6 +17,62 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.64] - 2025-10-06
+
+**Constraint Checker Architecture: Split into Specialized Modules**
+
+Refactored monolithic constraint checker into two specialized, well-architected modules with clear separation between backend-specific and universal validation. This improves code organization, reduces duplication, and enables shared analysis infrastructure.
+
+### Added
+
+- **MemorySafetyChecker** (`src/mgen/backends/c/memory_safety.py` - 198 lines)
+  - C/C++-specific memory safety validation (manual memory management)
+  - **MS001**: Buffer overflow detection (variable indices, off-by-one errors)
+  - **MS002**: Null pointer dereference detection (nullable function returns)
+  - **MS003**: Memory leak detection (allocations without cleanup)
+  - **MS004**: Dangling pointer detection (returning local containers in C)
+  - Integrated into pipeline validation phase for C/C++ targets only
+
+- **PythonConstraintChecker** (`src/mgen/frontend/python_constraints.py` - 398 lines)
+  - Universal Python code quality validation (all backends)
+  - **Type Safety**: TS001 (type consistency), TS002 (implicit conversions), TS003 (division by zero), TS004 (integer overflow)
+  - **Static Analysis**: SA001 (unreachable code), SA002 (unused variables), SA005 (parameter mutability hints)
+  - **Code Quality**: CC004 (function complexity warnings)
+  - Integrated into pipeline analysis phase (uses immutability results for SA005)
+  - SA003 (uninitialized variables) disabled due to false positives - needs proper dataflow analysis
+
+### Changed
+
+- **Pipeline Integration** (`src/mgen/pipeline.py`)
+  - Validation phase now runs MemorySafetyChecker for C/C++ targets
+  - Analysis phase now runs PythonConstraintChecker after immutability analysis
+  - Both checkers report violations as errors/warnings in pipeline results
+  - Critical violations (severity="error") cause pipeline to fail
+
+- **Frontend Exports** (`src/mgen/frontend/__init__.py`)
+  - Added `PythonConstraintChecker`, `PythonConstraintViolation`, `PythonConstraintCategory`
+  - Kept existing exports for backwards compatibility
+
+### Deprecated
+
+- **StaticConstraintChecker** (`src/mgen/frontend/constraint_checker.py`)
+  - Added deprecation warning at module level
+  - Module now emits `DeprecationWarning` on import
+  - Users directed to `PythonConstraintChecker` and `MemorySafetyChecker`
+  - Will be removed in future version after migration period
+
+### Technical Details
+
+- **Code Reduction**: 777 lines (monolithic) → 596 lines (split) = 23% reduction
+- **Better Architecture**: Backend-specific checks in `backends/`, universal checks in `frontend/`
+- **Shared Analysis**: Immutability analysis now accessible to all backends (was Rust-only)
+- **Zero Regressions**: All 855 tests passing (12.51s)
+
+### Documentation
+
+- Created `CONSTRAINT_SPLIT_COMPLETE.md` - Complete implementation summary
+- Updated `CONSTRAINT_SPLIT_PROPOSAL.md` - Design rationale and architecture
+
 ## [0.1.63] - 2025-10-06
 
 **Error Messages: Detailed Validation Diagnostics**

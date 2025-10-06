@@ -123,6 +123,13 @@ from .type_inference import InferenceMethod, InferenceResult, TypeConstraint, Ty
 # Immutability Analysis
 from .immutability_analyzer import ImmutabilityAnalyzer, MutabilityClass
 
+# Python Constraint Checking
+from .python_constraints import (
+    ConstraintCategory as PythonConstraintCategory,
+    PythonConstraintChecker,
+    PythonConstraintViolation,
+)
+
 # Formal Verification
 from .verifiers import (
     AlgorithmProof,
@@ -158,6 +165,10 @@ __all__ = [
     "ConstraintViolation",
     "ConstraintSeverity",
     "ConstraintCategory",
+    # Python Constraint Checking
+    "PythonConstraintChecker",
+    "PythonConstraintViolation",
+    "PythonConstraintCategory",
     # Subset Validation
     "StaticPythonSubsetValidator",
     "ValidationResult",

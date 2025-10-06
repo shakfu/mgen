@@ -56,11 +56,20 @@ try:
     )
     from .frontend.base import AnalysisLevel
     from .frontend.base import OptimizationLevel as FrontendOptimizationLevel
+    from .frontend.python_constraints import PythonConstraintChecker
 
     FRONTEND_AVAILABLE = True
 except ImportError:
     # Fallback if frontend components not available
     FRONTEND_AVAILABLE = False
+
+# Import C/C++ memory safety checker
+try:
+    from .backends.c.memory_safety import MemorySafetyChecker
+
+    MEMORY_SAFETY_AVAILABLE = True
+except ImportError:
+    MEMORY_SAFETY_AVAILABLE = False
 
 
 class OptimizationLevel(Enum):
@@ -326,22 +335,20 @@ class MGenPipeline:
                     result.errors.extend([str(violation) for violation in validation_result.violations])
                     return False
 
-                # Check static constraints - only for C target for now
-                # TODO: Implement language-specific constraint checking
-                if self.config.target_language == "c":
-                    constraint_report = self.constraint_checker.check_code(source_code)
+                # Check memory safety constraints for C/C++ targets
+                if MEMORY_SAFETY_AVAILABLE and self.config.target_language in ["c", "cpp"]:
+                    memory_safety_checker = MemorySafetyChecker(language=self.config.target_language)
+                    memory_warnings = memory_safety_checker.check_code(source_code)
 
-                    # Add warnings for constraint violations
-                    for violation in constraint_report.violations:
-                        if violation.severity.name in ["ERROR", "CRITICAL"]:
-                            result.errors.append(f"Constraint violation: {violation.message}")
+                    # Add memory safety warnings/errors
+                    for warning in memory_warnings:
+                        if warning.severity == "error":
+                            result.errors.append(f"[{warning.violation_type.value}] {warning.message} (line {warning.line})")
                         else:
-                            result.warnings.append(f"Constraint warning: {violation.message}")
+                            result.warnings.append(f"[{warning.violation_type.value}] {warning.message} (line {warning.line})")
 
-                    # Fail if there are critical constraint violations
-                    critical_errors = [
-                        v for v in constraint_report.violations if v.severity.name in ["ERROR", "CRITICAL"]
-                    ]
+                    # Fail if there are critical memory safety errors
+                    critical_errors = [w for w in memory_warnings if w.severity == "error"]
                     if critical_errors:
                         result.success = False
                         return False
@@ -420,6 +427,25 @@ class MGenPipeline:
                 immutability_results = immutability_analyzer.analyze_module(ast_root)
                 advanced_analysis["immutability"] = immutability_results
                 self.log.debug(f"Immutability analysis completed for {len(immutability_results)} functions")
+
+                # Python constraint checking (uses immutability results)
+                python_constraint_checker = PythonConstraintChecker(immutability_results=immutability_results)
+                constraint_violations = python_constraint_checker.check_code(source_code)
+                advanced_analysis["python_constraints"] = constraint_violations
+
+                # Add warnings/errors from constraint violations
+                for violation in constraint_violations:
+                    if violation.severity == "error":
+                        result.errors.append(f"[{violation.rule_id}] {violation.message} (line {violation.line})")
+                    else:
+                        result.warnings.append(f"[{violation.rule_id}] {violation.message} (line {violation.line})")
+
+                # Fail if there are critical constraint violations
+                critical_errors = [v for v in constraint_violations if v.severity == "error"]
+                if critical_errors:
+                    result.success = False
+                    self.log.error(f"Found {len(critical_errors)} critical constraint violations")
+                    return None
 
                 # Store advanced analysis results
                 result.phase_results[PipelinePhase.ANALYSIS]["advanced"] = advanced_analysis
