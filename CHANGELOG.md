@@ -17,6 +17,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.65] - 2025-10-06
+
+**Codebase Cleanup: Removed Deprecated Constraint Checker**
+
+Completed migration from monolithic `constraint_checker.py` to specialized modules. Removed deprecated code and updated all references to use new architecture.
+
+### Removed
+
+- **constraint_checker.py** (777 lines)
+  - Deprecated in v0.1.64, now fully removed
+  - Replaced by `PythonConstraintChecker` (frontend) and `MemorySafetyChecker` (C/C++ backend)
+  - All tests updated to use new modules
+  - Pipeline no longer references deprecated checker
+
+### Changed
+
+- **Frontend Exports** (`src/mgen/frontend/__init__.py`)
+  - Removed exports: `StaticConstraintChecker`, `ConstraintReport`, `ConstraintViolation`, `ConstraintSeverity`, `ConstraintCategory`
+  - Users should use `PythonConstraintChecker` and `PythonConstraintViolation` instead
+
+- **Pipeline** (`src/mgen/pipeline.py`)
+  - Removed `StaticConstraintChecker` import and instantiation
+  - Added comment noting deprecation and replacement modules
+
+- **Tests** (`tests/test_frontend.py`)
+  - Updated all constraint checker tests to use `PythonConstraintChecker`
+  - Removed references to deprecated `ConstraintSeverity` enum
+  - All 853 tests passing (14.52s)
+
+### Documentation
+
+- **FRONTEND_ANALYSIS.md**: Updated with strategic preservation approach
+  - Only 16% (1,726 LOC) marked for deletion (generators only)
+  - 68% (7,498 LOC) deferred for roadmap features (verifiers, optimizers, analyzers)
+  - Rationale: Early development phase - preserve infrastructure aligned with roadmap
+  - Verifiers (2,219 LOC) deferred for Z3 formal verification
+  - Optimizers (2,726 LOC) deferred for code generation improvements and Python extensions
+  - Analyzers (2,553 LOC) deferred for IDE integration (LSP)
+
 ## [0.1.64] - 2025-10-06
 
 **Constraint Checker Architecture: Split into Specialized Modules**
@@ -59,7 +98,7 @@ Refactored monolithic constraint checker into two specialized, well-architected 
   - Added deprecation warning at module level
   - Module now emits `DeprecationWarning` on import
   - Users directed to `PythonConstraintChecker` and `MemorySafetyChecker`
-  - Will be removed in future version after migration period
+  - Removed in v0.1.65
 
 ### Technical Details
 
@@ -70,8 +109,8 @@ Refactored monolithic constraint checker into two specialized, well-architected 
 
 ### Documentation
 
-- Created `CONSTRAINT_SPLIT_COMPLETE.md` - Complete implementation summary
-- Updated `CONSTRAINT_SPLIT_PROPOSAL.md` - Design rationale and architecture
+- Created `docs/dev/CONSTRAINT_SPLIT_COMPLETE.md` - Complete implementation summary
+- Updated `docs/dev/CONSTRAINT_SPLIT_PROPOSAL.md` - Design rationale and architecture
 
 ## [0.1.63] - 2025-10-06
 

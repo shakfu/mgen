@@ -47,7 +47,6 @@ try:
         LoopAnalyzer,
         MutabilityClass,
         StaticAnalyzer,
-        StaticConstraintChecker,
         StaticPythonSubsetValidator,
         SymbolicExecutor,
         TypeInferenceEngine,
@@ -202,7 +201,7 @@ class MGenPipeline:
         # Initialize frontend analysis components if available
         if FRONTEND_AVAILABLE and self.config.enable_advanced_analysis:
             self.subset_validator = StaticPythonSubsetValidator()
-            self.constraint_checker = StaticConstraintChecker()
+            # Note: constraint_checker deprecated in v0.1.64 (replaced by PythonConstraintChecker + backend-specific checkers)
             self.ast_analyzer = ASTAnalyzer()
 
             # Advanced static analysis components

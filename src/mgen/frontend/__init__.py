@@ -70,14 +70,7 @@ from .base import (
     VerificationResult,
 )
 
-# Static Constraint Checking
-from .constraint_checker import (
-    ConstraintCategory,
-    ConstraintReport,
-    ConstraintSeverity,
-    ConstraintViolation,
-    StaticConstraintChecker,
-)
+# Static Constraint Checking (DEPRECATED - replaced by python_constraints.py and backend-specific checkers)
 
 # Optimization Analysis
 from .optimizers import (
@@ -159,12 +152,6 @@ __all__ = [
     # Immutability Analysis
     "ImmutabilityAnalyzer",
     "MutabilityClass",
-    # Constraint Checking
-    "StaticConstraintChecker",
-    "ConstraintReport",
-    "ConstraintViolation",
-    "ConstraintSeverity",
-    "ConstraintCategory",
     # Python Constraint Checking
     "PythonConstraintChecker",
     "PythonConstraintViolation",
