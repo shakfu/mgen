@@ -3,7 +3,7 @@
 import ast
 from typing import Any, Optional
 
-from ...analysis.immutability import ImmutabilityAnalyzer, MutabilityClass
+from ...frontend.immutability_analyzer import ImmutabilityAnalyzer, MutabilityClass
 from ..converter_utils import (
     get_augmented_assignment_operator,
     get_standard_binary_operator,

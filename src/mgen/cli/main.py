@@ -26,7 +26,7 @@ from ..error_formatter import print_error, set_color_mode
 from ..errors import MGenError
 
 # Import the pipeline and backends
-from ..pipeline import BuildMode, MGenPipeline, OptimizationLevel, PipelineConfig
+from ..pipeline import BuildMode, MGenPipeline, OptimizationLevel, PipelineConfig, PipelinePhase
 from .progress import progress_context, spinner_context
 
 BUILD_DIR = "build"
@@ -214,6 +214,11 @@ Build Directory Structure:
         )
         batch_parser.add_argument("-b", "--build", action="store_true", help="Build (compile) files after translation")
         batch_parser.add_argument("--compiler", help="Compiler to use (uses backend default if not specified)")
+        batch_parser.add_argument(
+            "--progress",
+            action="store_true",
+            help="Show progress indicators during batch conversion"
+        )
 
         return parser
 
@@ -382,27 +387,25 @@ Build Directory Structure:
         for input_path in input_files:
             try:
                 title = f"Converting {input_path.name} to {target.upper()}"
-                with progress_context(title, enabled=show_progress, verbose=self.verbose) as progress:
+                with progress_context(title, enabled=show_progress, verbose=self.verbose) as progress_indicator:
                     if show_progress:
-                        progress.start(7)
-                        progress.step("Parsing source code")
+                        progress_indicator.start(7)
+
+                    # Create progress callback
+                    def progress_callback(phase: PipelinePhase, message: str) -> None:
+                        if show_progress:
+                            progress_indicator.step(message)
+
+                    # Configure pipeline with progress callback
+                    config.progress_callback = progress_callback
 
                     # Run multi-language pipeline
                     pipeline = MGenPipeline(config)
-
-                    if show_progress:
-                        progress.step("Validating AST")
-                        progress.step("Analyzing types")
-                        progress.step("Optimizing Python IR")
-                        progress.step("Mapping to target language")
-                        progress.step("Generating code")
-                        progress.step("Writing output files")
-
                     result = pipeline.convert(input_path)
 
                     if not result.success:
                         if show_progress:
-                            progress.fail("Conversion failed")
+                            progress_indicator.fail("Conversion failed")
                         self.log.error(f"Conversion failed for {input_path}")
                         if result.errors:
                             for error in result.errors:
@@ -414,7 +417,7 @@ Build Directory Structure:
                     source_file = result.output_files.get(source_key, "N/A")
 
                     if show_progress:
-                        progress.finish(f"Generated {source_file}")
+                        progress_indicator.finish(f"Generated {source_file}")
 
                     self.log.info(f"Conversion successful! {target.upper()} source: {source_file}")
                     successful_files.append(str(input_path))
@@ -521,29 +524,26 @@ Build Directory Structure:
             else:
                 title = f"Compiling {input_path.name} → {target.upper()} executable"
 
-            with progress_context(title, enabled=show_progress, verbose=self.verbose) as progress:
+            with progress_context(title, enabled=show_progress, verbose=self.verbose) as progress_indicator:
+                # Build mode has 7 pipeline phases + optional finalize
+                num_steps = 8 if args.makefile else 8
                 if show_progress:
-                    progress.start(9)
-                    progress.step("Parsing source code")
+                    progress_indicator.start(num_steps)
+
+                # Create progress callback
+                def progress_callback(phase: PipelinePhase, message: str) -> None:
+                    if show_progress:
+                        progress_indicator.step(message)
+
+                # Configure pipeline with progress callback
+                config.progress_callback = progress_callback
 
                 pipeline = MGenPipeline(config)
-
-                if show_progress:
-                    progress.step("Validating AST")
-                    progress.step("Analyzing types")
-                    progress.step("Optimizing Python IR")
-                    progress.step("Mapping to target language")
-                    progress.step("Generating code")
-                    progress.step("Writing output files")
-
-                if not args.makefile and show_progress:
-                    progress.step("Invoking compiler")
-
                 result = pipeline.convert(input_path)
 
                 if not result.success:
                     if show_progress:
-                        progress.fail("Build failed")
+                        progress_indicator.fail("Build failed")
                     error_msg = "Build failed:" if args.makefile else "Compilation failed:"
                     self.log.error(error_msg)
                     if result.errors:
@@ -552,7 +552,7 @@ Build Directory Structure:
                     return 1
 
                 if show_progress:
-                    progress.step("Finalizing output")
+                    progress_indicator.step("Finalizing output")
 
                 if args.makefile:
                     # Build file generation mode
@@ -570,7 +570,7 @@ Build Directory Structure:
                     build_file = result.output_files.get(build_file_key, "N/A")
 
                     if show_progress:
-                        progress.finish(f"Generated {build_file}")
+                        progress_indicator.finish(f"Generated {build_file}")
 
                     self.log.info(
                         f"Build preparation successful! {target.upper()} source: {source_file}, Build file: {build_file}"
@@ -585,7 +585,7 @@ Build Directory Structure:
                             result.executable_path = str(exe_dest)
 
                     if show_progress:
-                        progress.finish(f"Compiled {result.executable_path}")
+                        progress_indicator.finish(f"Compiled {result.executable_path}")
 
                     self.log.info(f"Compilation successful! Executable: {result.executable_path}")
 
@@ -684,6 +684,9 @@ Build Directory Structure:
 
         self.log.info(f"Batch processing {len(python_files)} files from {source_dir} to {output_dir}")
 
+        # Progress tracking
+        show_progress = hasattr(args, 'progress') and args.progress
+
         # Process each file
         successful_translations = 0
         failed_translations = 0
@@ -726,8 +729,29 @@ Build Directory Structure:
                         target_language=target,
                     )
 
-                pipeline = MGenPipeline(config)
-                result = pipeline.convert(Path(input_file))
+                # Create progress callback if enabled
+                if show_progress:
+                    file_title = f"[{i}/{len(python_files)}] {filename}"
+
+                    with progress_context(file_title, enabled=True, verbose=self.verbose) as progress_indicator:
+                        # Determine number of steps (7 for convert, 8 for build)
+                        num_steps = 8 if build_after_translation else 7
+                        progress_indicator.start(num_steps)
+
+                        def progress_callback(phase: PipelinePhase, message: str) -> None:
+                            progress_indicator.step(message)
+
+                        config.progress_callback = progress_callback
+                        pipeline = MGenPipeline(config)
+                        result = pipeline.convert(Path(input_file))
+
+                        if result.success:
+                            progress_indicator.finish("Complete")
+                        else:
+                            progress_indicator.fail("Failed")
+                else:
+                    pipeline = MGenPipeline(config)
+                    result = pipeline.convert(Path(input_file))
 
                 if result.success:
                     successful_translations += 1

@@ -24,6 +24,7 @@ Usage:
 """
 
 import ast
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -42,7 +43,9 @@ try:
         CallGraphAnalyzer,
         CompileTimeEvaluator,
         FunctionSpecializer,
+        ImmutabilityAnalyzer,
         LoopAnalyzer,
+        MutabilityClass,
         StaticAnalyzer,
         StaticConstraintChecker,
         StaticPythonSubsetValidator,
@@ -104,6 +107,7 @@ class PipelineConfig:
     enable_advanced_analysis: bool = True
     enable_optimizations: bool = True
     backend_preferences: Optional[BackendPreferences] = None
+    progress_callback: Optional[Callable[[PipelinePhase, str], None]] = None
 
     def __post_init__(self) -> None:
         """Initialize default values."""
@@ -163,6 +167,16 @@ class MGenPipeline:
         self.config = config
         self.log = log.config(self.__class__.__name__)
         self._init_components()
+
+    def _report_progress(self, phase: PipelinePhase, message: str) -> None:
+        """Report progress to callback if configured.
+
+        Args:
+            phase: Current pipeline phase
+            message: Progress message
+        """
+        if self.config.progress_callback:
+            self.config.progress_callback(phase, message)
 
     def _init_components(self) -> None:
         """Initialize pipeline components."""
@@ -243,12 +257,14 @@ class MGenPipeline:
 
             # Phase 1: Validation
             self.log.debug("Starting validation phase")
+            self._report_progress(PipelinePhase.VALIDATION, "Validating Python code")
             if not self._validation_phase(source_code, input_path, result):
                 self.log.error("Validation phase failed")
                 return result
 
             # Phase 2: Analysis
             self.log.debug("Starting analysis phase")
+            self._report_progress(PipelinePhase.ANALYSIS, "Analyzing AST and types")
             analysis_result = self._analysis_phase(source_code, result)
             if analysis_result is None:
                 self.log.error("Analysis phase failed")
@@ -256,18 +272,22 @@ class MGenPipeline:
 
             # Phase 3: Python Optimization
             self.log.debug("Starting Python optimization phase")
+            self._report_progress(PipelinePhase.PYTHON_OPTIMIZATION, "Optimizing Python IR")
             optimized_analysis = self._python_optimization_phase(source_code, analysis_result, result)
 
             # Phase 4: Mapping (language-agnostic to target-specific)
             self.log.debug("Starting mapping phase")
+            self._report_progress(PipelinePhase.MAPPING, f"Mapping to {self.config.target_language.upper()}")
             mapped_result = self._mapping_phase(optimized_analysis, result)
 
             # Phase 5: Target Optimization
             self.log.debug("Starting target optimization phase")
+            self._report_progress(PipelinePhase.TARGET_OPTIMIZATION, f"Optimizing {self.config.target_language.upper()} code")
             target_optimized = self._target_optimization_phase(mapped_result, result)
 
             # Phase 6: Generation
             self.log.debug("Starting generation phase")
+            self._report_progress(PipelinePhase.GENERATION, f"Generating {self.config.target_language.upper()} source")
             if not self._generation_phase(source_code, target_optimized, output_dir, result):
                 self.log.error("Generation phase failed")
                 return result
@@ -275,6 +295,8 @@ class MGenPipeline:
             # Phase 7: Build
             if self.config.build_mode != BuildMode.NONE:
                 self.log.debug(f"Starting build phase with mode: {self.config.build_mode}")
+                build_msg = "Compiling" if self.config.build_mode == BuildMode.DIRECT else "Generating build file"
+                self._report_progress(PipelinePhase.BUILD, build_msg)
                 if not self._build_phase(output_dir, result):
                     self.log.error("Build phase failed")
                     return result
@@ -392,6 +414,12 @@ class MGenPipeline:
                         self.log.debug(f"Type inference completed for function: {node.name}")
 
                 advanced_analysis["type_inference"] = type_inference_results
+
+                # Immutability analysis
+                immutability_analyzer = ImmutabilityAnalyzer()
+                immutability_results = immutability_analyzer.analyze_module(ast_root)
+                advanced_analysis["immutability"] = immutability_results
+                self.log.debug(f"Immutability analysis completed for {len(immutability_results)} functions")
 
                 # Store advanced analysis results
                 result.phase_results[PipelinePhase.ANALYSIS]["advanced"] = advanced_analysis

@@ -120,6 +120,9 @@ from .subset_validator import FeatureRule, FeatureStatus, StaticPythonSubsetVali
 # Type Inference System
 from .type_inference import InferenceMethod, InferenceResult, TypeConstraint, TypeInferenceEngine
 
+# Immutability Analysis
+from .immutability_analyzer import ImmutabilityAnalyzer, MutabilityClass
+
 # Formal Verification
 from .verifiers import (
     AlgorithmProof,
@@ -146,6 +149,9 @@ __all__ = [
     "InferenceResult",
     "InferenceMethod",
     "TypeConstraint",
+    # Immutability Analysis
+    "ImmutabilityAnalyzer",
+    "MutabilityClass",
     # Constraint Checking
     "StaticConstraintChecker",
     "ConstraintReport",
