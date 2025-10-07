@@ -540,3 +540,51 @@ def main() -> int:
         llvm_ir = self._convert_to_llvm(python_code)
         exit_code = self._execute_llvm_ir(llvm_ir)
         assert exit_code == 3
+
+    def test_comprehensive_program_execution(self):
+        """Test comprehensive program with multiple algorithms."""
+        python_code = """
+def fibonacci(n: int) -> int:
+    if n <= 1:
+        return n
+    a: int = 0
+    b: int = 1
+    i: int
+    for i in range(2, n + 1):
+        temp: int = a + b
+        a = b
+        b = temp
+    return b
+
+def factorial(n: int) -> int:
+    result: int = 1
+    i: int
+    for i in range(1, n + 1):
+        result *= i
+    return result
+
+def is_prime(n: int) -> bool:
+    if n < 2:
+        return False
+    if n == 2:
+        return True
+    if n % 2 == 0:
+        return False
+    i: int = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+def main() -> int:
+    fib10: int = fibonacci(10)
+    fact5: int = factorial(5)
+    prime: bool = is_prime(17)
+    prime_int: int = int(prime)
+    return fib10 + fact5 + prime_int
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # fib(10)=55, fact(5)=120, is_prime(17)=1 => 55+120+1=176
+        assert exit_code == 176
