@@ -1210,7 +1210,8 @@ class IRBuilder:
         return IRWhile(condition, body, self._get_location(node))
 
     def _build_for(self, node: ast.For) -> Optional[IRFor]:
-        """Build for loop (range-based only)."""
+        """Build for loop - supports both range() and list iteration."""
+        # Check if it's a range-based loop
         if isinstance(node.iter, ast.Call) and isinstance(node.iter.func, ast.Name):
             if node.iter.func.id == "range":
                 # Extract range parameters
@@ -1244,6 +1245,58 @@ class IRBuilder:
                     body: list[IRStatement] = [stmt for stmt in body_raw if stmt is not None]
 
                     return IRFor(loop_var, start, end, step, body, self._get_location(node))
+
+        # Handle list iteration: for item in list:
+        # Convert to: for __idx in range(len(list)): item = list[__idx]
+        if isinstance(node.target, ast.Name):
+            item_name = node.target.id
+
+            # Build expression for the iterable (list)
+            iter_expr = self._build_expression(node.iter)
+            if iter_expr is None:
+                return None
+
+            # Create: len(list) call
+            len_call = IRFunctionCall(
+                "len",
+                [iter_expr],
+                IRType(IRDataType.INT),
+                self._get_location(node)
+            )
+
+            # Create index variable: __idx_<item_name>
+            idx_var_name = f"__idx_{item_name}"
+            idx_var = IRVariable(idx_var_name, IRType(IRDataType.INT), self._get_location(node))
+            self.symbol_table[idx_var_name] = idx_var
+
+            # Create item variable
+            item_var = IRVariable(item_name, IRType(IRDataType.INT), self._get_location(node.target))
+            self.symbol_table[item_name] = item_var
+
+            # Build body with item assignment prepended
+            # item = list[__idx]
+            index_ref = IRVariableReference(idx_var, self._get_location(node))
+            subscript_call = IRFunctionCall(
+                "__getitem__",
+                [iter_expr, index_ref],
+                IRType(IRDataType.INT),
+                self._get_location(node)
+            )
+            item_assignment = IRAssignment(item_var, subscript_call, self._get_location(node))
+
+            # Build original body statements
+            body_raw = [self._build_statement(stmt) for stmt in node.body]
+            body_stmts: list[IRStatement] = [stmt for stmt in body_raw if stmt is not None]
+
+            # Prepend item assignment to body
+            body = [item_assignment] + body_stmts
+
+            # Create for loop: for __idx in range(len(list))
+            start = IRLiteral(0, IRType(IRDataType.INT))
+            end = len_call
+            step = IRLiteral(1, IRType(IRDataType.INT))
+
+            return IRFor(idx_var, start, end, step, body, self._get_location(node))
 
         return None
 
