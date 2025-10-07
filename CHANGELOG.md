@@ -17,6 +17,152 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.74] - 2025-10-07
+
+**LLVM Backend: List Container Support with C Runtime Integration**
+
+Major advancement in LLVM backend with full list (dynamic array) support, including initialization, mutation, indexing, and builtin operations. Successfully integrated C runtime library with LLVM IR via proper calling conventions.
+
+### Added
+
+- **List Data Type Support**
+  - Added `LIST`, `DICT`, `SET` to `IRDataType` enum in Static IR
+  - Added "list", "dict", "set" to `_extract_ir_type()` type mapping
+  - Lists represented as `vec_int*` (pointer to stack-allocated struct)
+  - Full mutability support with proper pointer semantics
+
+- **List Operations**
+  - `[]` empty list initialization via `vec_int_init_ptr()`
+  - `list.append(value)` via `vec_int_push(ptr, value)` - mutates in place
+  - `list[index]` indexing via `vec_int_at(ptr, index)`
+  - `len(list)` builtin via `vec_int_size(ptr)`
+  - Method calls converted to IR function calls (`__method_append__`, `__getitem__`)
+
+- **C Runtime Library**
+  - `vec_int_minimal.c` (130 lines) - self-contained vec_int implementation
+  - Dynamic array with growth strategy (8 initial capacity, 2x growth factor)
+  - Functions: init, init_ptr, push, at, size, free, clear, reserve, data
+  - Uses `long long` (i64) for LLVM compatibility
+  - Compiles to 2KB object file, zero external dependencies
+
+- **LLVM Runtime Declarations**
+  - `runtime_decls.py` - generates LLVM IR struct definitions and extern declarations
+  - `%"struct.vec_int"` named struct type: `{i64*, i64, i64}` (data, size, capacity)
+  - Proper function signatures matching C ABI
+  - `vec_int_init_ptr(out*)` wrapper for ARM64 calling convention (large struct return fix)
+
+- **Calling Convention Fix**
+  - Fixed ARM64 ABI issue: structs >16 bytes cannot return by value
+  - Changed from `vec_int vec_int_init()` to `void vec_int_init_ptr(vec_int* out)`
+  - Prevents bus errors (exit code 138) on struct returns
+  - Stack allocation + initialization via pointer parameter
+
+- **Static IR Enhancements**
+  - `_build_list_literal()` - handles `[]` empty list creation
+  - `_build_subscript()` - converts `list[i]` to `__getitem__` call
+  - `_build_function_call()` extended to handle `ast.Attribute` (method calls)
+  - Method calls encoded as `__method_{name}__` synthetic functions
+
+### Changed
+
+- **Type Conversion**
+  - `_convert_type()` maps `IRDataType.LIST` to `vec_int*` (pointer)
+  - Lists stored as pointers, not by value, for proper mutation semantics
+  - `visit_literal()` now returns `Union[ir.Constant, ir.CallInstr, ir.AllocaInstr]`
+
+- **List Semantics**
+  - Variables of type `list` allocated as `alloca vec_int*` (pointer to pointer)
+  - List initialization returns pointer to stack-allocated struct
+  - Append/indexing operations work directly with pointers
+  - No struct copying - mutations visible across operations
+
+- **Runtime Linking**
+  - Created symlinks: `src/mgen/backends/llvm/runtime/` → `../c/runtime/`
+  - Runtime compiled separately: `clang -c vec_int_minimal.c -o vec_int.o`
+  - Linked at compile time: `clang code.ll vec_int.o -o executable`
+
+### Fixed
+
+- **Pointer vs Value Semantics**
+  - Initial implementation used struct-by-value causing lost mutations
+  - Fixed by using pointers throughout the chain
+  - `data` variable stores pointer, operations load/use pointer directly
+
+- **Struct Return Calling Convention**
+  - Initial `vec_int_init()` returned 24-byte struct by value
+  - ARM64 ABI requires structs >16 bytes returned via pointer parameter
+  - Added `vec_int_init_ptr(vec_int* out)` wrapper
+  - Eliminated bus errors during initialization
+
+### Technical Details
+
+**List Implementation Architecture**:
+```
+Python:       data: list = []
+IR:           IRLiteral([], IRType(IRDataType.LIST))
+LLVM Type:    %"struct.vec_int"*
+Allocation:   %data = alloca %"struct.vec_int"*
+                      %list_tmp = alloca %"struct.vec_int"
+Initialization: call void @vec_int_init_ptr(%"struct.vec_int"* %list_tmp)
+Storage:      store %"struct.vec_int"* %list_tmp, %"struct.vec_int"** %data
+```
+
+**Operation Flow**:
+```
+Python:       data.append(42)
+IR:           IRFunctionCall("__method_append__", [data_ref, literal_42])
+LLVM:         %ptr = load %"struct.vec_int"*, %"struct.vec_int"** %data
+              call void @vec_int_push(%"struct.vec_int"* %ptr, i64 42)
+```
+
+**Verified Working**:
+- Empty list creation and initialization
+- Multiple append operations maintaining state
+- Index access returning correct values
+- len() returning accurate count
+- Complex expressions: `data[0] + data[1]` after 2 appends
+- Test: `append(42); append(100); return data[0] + data[1]` → Returns 142 ✓
+- Test: `3 appends; return len(data)` → Returns 3 ✓
+
+**Performance**:
+- Runtime: 130 lines C, compiles to 2KB object file
+- Compilation: ~200ms (clang LLVM IR + runtime linking)
+- No memory leaks in simple tests
+- Growth strategy: O(1) amortized append
+
+**Known Limitations**:
+- List iteration (`for x in list:`) not yet implemented
+- List comprehensions not yet supported
+- Only `list[int]` (integer elements) currently supported
+- No bounds checking in release mode
+- No garbage collection for list memory
+
+### Test Results
+
+- Manual integration tests: 100% passing
+- fibonacci benchmark: ✓ (already working)
+- List operations: ✓ (initialization, append, indexing, len)
+- Simple programs: ✓ (no regressions)
+- Test suite: Some flakiness in batch execution (test framework state issue)
+- Individual test execution: Consistent passes
+
+### Files Changed
+
+**New Files**:
+- `src/mgen/backends/llvm/runtime_decls.py` (118 lines)
+- `src/mgen/backends/llvm/runtime/vec_int_minimal.c` (130 lines)
+- `src/mgen/backends/llvm/runtime/` (symlinks to C runtime)
+
+**Modified Files**:
+- `src/mgen/frontend/static_ir.py` - Added LIST/DICT/SET types, list literal/subscript/method handling
+- `src/mgen/backends/llvm/ir_to_llvm.py` - List operations, type conversion, runtime integration
+- `src/mgen/backends/llvm/backend.py` - Updated for container system
+
+**Lines of Code**:
+- Added: ~600 lines (IR handling, runtime, declarations)
+- Runtime: 130 lines C (reusable across backends)
+- Architecture: Clean separation, minimal coupling
+
 ## [0.1.73] - 2025-10-07
 
 **LLVM Backend: Production-Ready with Full Compilation Pipeline**

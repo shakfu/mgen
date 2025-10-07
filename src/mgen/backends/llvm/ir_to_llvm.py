@@ -31,6 +31,7 @@ from ...frontend.static_ir import (
     IRVisitor,
     IRWhile,
 )
+from .runtime_decls import LLVMRuntimeDeclarations
 
 
 class IRToLLVMConverter(IRVisitor):
@@ -50,6 +51,8 @@ class IRToLLVMConverter(IRVisitor):
         # Track current loop blocks for break/continue
         self.loop_exit_stack: list[ir.Block] = []
         self.loop_continue_stack: list[ir.Block] = []
+        # Runtime declarations for C library
+        self.runtime = LLVMRuntimeDeclarations(self.module)
 
     def visit_module(self, node: IRModule) -> ir.Module:
         """Convert IR module to LLVM module.
@@ -60,6 +63,9 @@ class IRToLLVMConverter(IRVisitor):
         Returns:
             LLVM module with generated functions
         """
+        # Declare runtime library functions first
+        self.runtime.declare_all()
+
         # Generate type declarations first (for structs, etc.)
         for type_decl in node.type_declarations:
             type_decl.accept(self)
@@ -369,18 +375,34 @@ class IRToLLVMConverter(IRVisitor):
         else:
             raise RuntimeError(f"Unexpected operator in short-circuit: {node.operator}")
 
-    def visit_literal(self, node: IRLiteral) -> ir.Constant:
-        """Convert IR literal to LLVM constant.
+    def visit_literal(self, node: IRLiteral) -> Union[ir.Constant, ir.CallInstr]:
+        """Convert IR literal to LLVM constant or initialization call.
 
         Args:
             node: IR literal to convert
 
         Returns:
-            LLVM constant value
+            LLVM constant value or call instruction for complex types
         """
         llvm_type = self._convert_type(node.result_type)
 
-        if node.result_type.base_type == IRDataType.INT:
+        if node.result_type.base_type == IRDataType.LIST:
+            # Empty list [] - allocate and initialize with vec_int_init_ptr()
+            if self.builder is None:
+                raise RuntimeError("Builder not initialized - must be inside a function")
+
+            vec_int_type = self.runtime.get_vec_int_type()
+            vec_int_init_ptr_func = self.runtime.get_function("vec_int_init_ptr")
+
+            # Allocate space for the vec_int struct on stack
+            vec_ptr = self.builder.alloca(vec_int_type, name="list_tmp")
+
+            # Initialize it by calling vec_int_init_ptr() which takes a pointer
+            self.builder.call(vec_int_init_ptr_func, [vec_ptr], name="")
+
+            # Return the pointer
+            return vec_ptr
+        elif node.result_type.base_type == IRDataType.INT:
             return ir.Constant(llvm_type, int(node.value))
         elif node.result_type.base_type == IRDataType.FLOAT:
             return ir.Constant(llvm_type, float(node.value))
@@ -532,9 +554,41 @@ class IRToLLVMConverter(IRVisitor):
         if self.builder is None:
             raise RuntimeError("Builder not initialized - must be inside a function")
 
+        # Handle method calls (from IR builder)
+        if node.function_name == "__method_append__":
+            # list.append(value) -> vec_int_push(list_ptr, value)
+            if len(node.arguments) != 2:
+                raise RuntimeError("append() requires exactly 2 arguments (list and value)")
+
+            list_ptr = node.arguments[0].accept(self)  # Already a pointer
+            value = node.arguments[1].accept(self)
+
+            # Get vec_int_push function
+            vec_int_push_func = self.runtime.get_function("vec_int_push")
+
+            # Call vec_int_push - it modifies the list in place
+            self.builder.call(vec_int_push_func, [list_ptr, value], name="")
+
+            # Return the pointer (unchanged, since append mutates in place)
+            return list_ptr
+
+        elif node.function_name == "__getitem__":
+            # list[index] -> vec_int_at(list_ptr, index)
+            if len(node.arguments) != 2:
+                raise RuntimeError("__getitem__() requires exactly 2 arguments (list and index)")
+
+            list_ptr = node.arguments[0].accept(self)  # Already a pointer
+            index = node.arguments[1].accept(self)
+
+            # Get vec_int_at function
+            vec_int_at_func = self.runtime.get_function("vec_int_at")
+
+            # Call vec_int_at
+            return self.builder.call(vec_int_at_func, [list_ptr, index], name="list_at")
+
         # Handle builtin functions
-        if node.function_name == "len":
-            # len() function - use strlen for strings, array length for lists
+        elif node.function_name == "len":
+            # len() function - use strlen for strings, vec_int_size for lists
             if len(node.arguments) != 1:
                 raise NotImplementedError("len() requires exactly one argument")
 
@@ -547,6 +601,11 @@ class IRToLLVMConverter(IRVisitor):
                 i64 = ir.IntType(64)
                 strlen_func = self._get_or_create_c_function("strlen", i64, [i8_ptr])
                 return self.builder.call(strlen_func, [llvm_arg], name="len_tmp")
+            elif arg.result_type.base_type == IRDataType.LIST:
+                # Use vec_int_size function from runtime
+                # llvm_arg is already a pointer
+                vec_int_size_func = self.runtime.get_function("vec_int_size")
+                return self.builder.call(vec_int_size_func, [llvm_arg], name="len_tmp")
             else:
                 raise NotImplementedError(f"len() for type {arg.result_type.base_type} not implemented")
 
@@ -879,6 +938,13 @@ class IRToLLVMConverter(IRVisitor):
         Returns:
             Corresponding llvmlite type
         """
+        # Handle list types (LIST<T>)
+        if ir_type.base_type == IRDataType.LIST:
+            # Lists are represented as pointers to vec_int structs
+            # This allows proper mutation semantics (append modifies in place)
+            # TODO: Support other element types (vec_double, vec_str, etc.)
+            return self.runtime.get_vec_int_type().as_pointer()
+
         # Base type mapping
         type_mapping = {
             IRDataType.VOID: ir.VoidType(),

@@ -34,6 +34,9 @@ class IRDataType(Enum):
     FLOAT = ("float", "double")  # Python float maps to C double
     BOOL = ("bool", "bool")
     STRING = ("str", "char*")
+    LIST = ("list", "vec_int")  # Python list maps to vec_int (dynamic array)
+    DICT = ("dict", "map")  # Python dict maps to hash map
+    SET = ("set", "set")  # Python set maps to hash set
     POINTER = ("pointer", "*")
     ARRAY = ("array", "[]")
     STRUCT = ("struct", "struct")
@@ -912,6 +915,10 @@ class IRBuilder:
             return self._build_unary_operation(node)
         elif isinstance(node, ast.Call):
             return self._build_function_call(node)
+        elif isinstance(node, ast.List):
+            return self._build_list_literal(node)
+        elif isinstance(node, ast.Subscript):
+            return self._build_subscript(node)
 
         # Fallback for unknown expressions
         return IRLiteral(None, IRType(IRDataType.VOID), self._get_location(node))
@@ -1079,12 +1086,56 @@ class IRBuilder:
                         break
 
             return IRFunctionCall(func_name, arguments, return_type, self._get_location(node))
+        elif isinstance(node.func, ast.Attribute):
+            # Method call (e.g., list.append(), str.split())
+            obj = self._build_expression(node.func.value)
+            method_name = node.func.attr
+            arguments = [obj] + [self._build_expression(arg) for arg in node.args]
+
+            # Create synthetic function name for method
+            func_name = f"__method_{method_name}__"
+            return_type = IRType(IRDataType.VOID)  # Most methods return void
+
+            return IRFunctionCall(func_name, arguments, return_type, self._get_location(node))
         else:
             # Handle complex function calls (attribute access, etc.)
             func_name = "complex_call"  # Placeholder for complex calls
             arguments = [self._build_expression(arg) for arg in node.args]
             return_type = IRType(IRDataType.VOID)
             return IRFunctionCall(func_name, arguments, return_type, self._get_location(node))
+
+    def _build_list_literal(self, node: ast.List) -> IRLiteral:
+        """Build list literal from AST.
+
+        For empty list [], creates an IR literal with LIST type.
+        For non-empty lists, elements would need to be processed (future work).
+        """
+        # For now, only support empty lists []
+        # Element type inference would be needed for non-empty lists
+        if len(node.elts) == 0:
+            # Empty list - represented as literal with LIST type
+            ir_type = IRType(IRDataType.LIST)
+            return IRLiteral([], ir_type, self._get_location(node))
+        else:
+            # Non-empty list - not yet implemented
+            # Would need to infer element type and generate initialization code
+            raise NotImplementedError(f"Non-empty list literals not yet supported: {ast.unparse(node)}")
+
+    def _build_subscript(self, node: ast.Subscript) -> IRExpression:
+        """Build subscript expression (array/list indexing).
+
+        Creates a function call to a subscript operation.
+        """
+        # Get the base object being indexed
+        base = self._build_expression(node.value)
+        # Get the index
+        index = self._build_expression(node.slice)
+
+        # Create a synthetic function call for subscript operation
+        # Backend will translate this to appropriate indexing code
+        # Return type depends on container element type (for now assume INT)
+        return_type = IRType(IRDataType.INT)
+        return IRFunctionCall("__getitem__", [base, index], return_type, self._get_location(node))
 
     def _build_return(self, node: ast.Return) -> IRReturn:
         """Build return statement."""
@@ -1158,6 +1209,9 @@ class IRBuilder:
                 "float": IRDataType.FLOAT,
                 "bool": IRDataType.BOOL,
                 "str": IRDataType.STRING,
+                "list": IRDataType.LIST,
+                "dict": IRDataType.DICT,
+                "set": IRDataType.SET,
                 "void": IRDataType.VOID,
             }
             base_type = type_mapping.get(annotation.id, IRDataType.VOID)
