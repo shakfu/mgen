@@ -1,8 +1,10 @@
 """LLVM builder for compilation and execution."""
 
+import re
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 from ..base import AbstractBuilder
 
@@ -106,7 +108,7 @@ run: $(TARGET)
                 str(executable_path),
             ]
 
-            result = subprocess.run(clang_cmd, capture_output=True, text=True, cwd=output_path)
+            result = subprocess.run(clang_cmd, capture_output=True, text=True)
             if result.returncode != 0:
                 print(f"Linking failed: {result.stderr}")
                 return False
@@ -140,3 +142,171 @@ run: $(TARGET)
             List of optimization flags
         """
         return [f"-O{level}"]
+
+    def generate_main_wrapper(self, llvm_ir_file: str) -> Optional[str]:
+        """Generate C wrapper for LLVM main function if needed.
+
+        Args:
+            llvm_ir_file: Path to LLVM IR file
+
+        Returns:
+            C wrapper code if main function exists with quotes, None otherwise
+        """
+        # Read LLVM IR to check for quoted main function
+        ir_path = Path(llvm_ir_file)
+        if not ir_path.exists():
+            return None
+
+        ir_content = ir_path.read_text()
+
+        # Check if there's a quoted main function: define ... @"main"(...)
+        main_pattern = r'define\s+(\w+)\s+@"main"\s*\(([^)]*)\)'
+        match = re.search(main_pattern, ir_content)
+
+        if not match:
+            return None
+
+        return_type = match.group(1)
+        params = match.group(2).strip()
+
+        # Map LLVM types to C types
+        c_return_type = self._llvm_type_to_c(return_type)
+
+        # Parse parameters if any
+        c_params = ""
+        if params:
+            # For now, assume no parameters for main
+            c_params = "void"
+        else:
+            c_params = "void"
+
+        # Generate wrapper that calls the LLVM-generated function
+        # Since the LLVM function is named "main" with quotes, we need to provide
+        # a C main that can link properly
+
+        # The trick: The LLVM @"main" mangles to "main" in the object file,
+        # but we can't have two main functions. So we'll use __attribute__((weak))
+        # or just not generate a wrapper and rely on proper function naming.
+
+        # For now, let's create a wrapper that assumes the LLVM function
+        # will be available and we'll link them together properly
+        wrapper = f"""// Auto-generated C wrapper for LLVM IR main function
+
+// Forward declare the mgen-generated main function
+extern {c_return_type} main({c_params});
+
+// C standard main function
+int main_wrapper(int argc, char** argv) {{
+    (void)argc;  // Unused
+    (void)argv;  // Unused
+    {c_return_type} result = main();
+    return (int)result;
+}}
+"""
+        return wrapper
+
+    def _llvm_type_to_c(self, llvm_type: str) -> str:
+        """Map LLVM type to C type.
+
+        Args:
+            llvm_type: LLVM type string (e.g., 'i64', 'double', 'void')
+
+        Returns:
+            C type string
+        """
+        type_map = {
+            "i1": "char",
+            "i8": "char",
+            "i16": "short",
+            "i32": "int",
+            "i64": "long long",
+            "float": "float",
+            "double": "double",
+            "void": "void",
+        }
+        return type_map.get(llvm_type, "long long")  # Default to long long
+
+    def compile_with_wrapper(self, source_file: str, output_dir: str) -> bool:
+        """Compile LLVM IR with C wrapper for main function.
+
+        Args:
+            source_file: Path to LLVM IR (.ll) file
+            output_dir: Directory for output files
+
+        Returns:
+            True if compilation succeeded
+        """
+        try:
+            source_path = Path(source_file)
+            output_path = Path(output_dir)
+            executable_name = source_path.stem
+
+            # Check if we need a wrapper
+            wrapper_code = self.generate_main_wrapper(source_file)
+
+            # Step 1: Compile LLVM IR to object file
+            object_file = output_path / f"{executable_name}.o"
+            llc_cmd = [
+                self.llc_path,
+                "-filetype=obj",
+                str(source_path),
+                "-o",
+                str(object_file),
+            ]
+
+            result = subprocess.run(llc_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"LLC compilation failed: {result.stderr}")
+                return False
+
+            # Step 2: Compile wrapper if needed
+            object_files = [str(object_file)]
+            if wrapper_code:
+                wrapper_file = output_path / f"{executable_name}_wrapper.c"
+                wrapper_file.write_text(wrapper_code)
+
+                wrapper_obj = output_path / f"{executable_name}_wrapper.o"
+                clang_compile_cmd = [
+                    self.clang_path,
+                    "-c",
+                    str(wrapper_file),
+                    "-o",
+                    str(wrapper_obj),
+                ]
+
+                result = subprocess.run(clang_compile_cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    print(f"Wrapper compilation failed: {result.stderr}")
+                    return False
+
+                object_files.append(str(wrapper_obj))
+
+            # Step 3: Link all object files
+            executable_path = output_path / executable_name
+
+            # If we have a wrapper, define the entry point
+            link_flags = []
+            if wrapper_code:
+                link_flags = ["-e", "_mgen_main"]
+
+            clang_cmd = [
+                self.clang_path,
+                *object_files,
+                *link_flags,
+                "-o",
+                str(executable_path),
+            ]
+
+            result = subprocess.run(clang_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"Linking failed: {result.stderr}")
+                return False
+
+            return True
+
+        except FileNotFoundError as e:
+            print(f"Tool not found: {e}. Make sure LLVM tools are installed.")
+            return False
+        except Exception as e:
+            print(f"Compilation error: {e}")
+            return False

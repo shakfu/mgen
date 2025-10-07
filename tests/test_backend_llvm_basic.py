@@ -12,6 +12,21 @@ from mgen.frontend.static_ir import build_ir_from_code
 # Check if LLVM tools are available
 LLVM_TOOLS_AVAILABLE = shutil.which("llc") is not None and shutil.which("clang") is not None
 
+# Try Homebrew LLVM if standard tools not found
+if not LLVM_TOOLS_AVAILABLE:
+    homebrew_llvm = Path("/opt/homebrew/opt/llvm/bin")
+    if homebrew_llvm.exists():
+        LLVM_TOOLS_AVAILABLE = (homebrew_llvm / "llc").exists() and (homebrew_llvm / "clang").exists()
+        if LLVM_TOOLS_AVAILABLE:
+            LLVM_LLC_PATH = str(homebrew_llvm / "llc")
+            LLVM_CLANG_PATH = str(homebrew_llvm / "clang")
+    else:
+        LLVM_LLC_PATH = "llc"
+        LLVM_CLANG_PATH = "clang"
+else:
+    LLVM_LLC_PATH = "llc"
+    LLVM_CLANG_PATH = "clang"
+
 
 class TestLLVMIRGeneration:
     """Test LLVM IR generation from Static IR."""
@@ -178,22 +193,17 @@ class TestLLVMCompilation:
     def test_compile_to_binary(self):
         """Test compiling LLVM IR to native binary."""
         python_code = """
-def fibonacci(n: int) -> int:
-    if n <= 1:
-        return n
-    a: int = 0
-    b: int = 1
-    i: int = 2
-    while i <= n:
-        temp: int = a + b
-        a = b
-        b = temp
-        i = i + 1
-    return b
+def add(x: int, y: int) -> int:
+    return x + y
+
+def multiply(a: int, b: int) -> int:
+    result: int = a * b
+    return result
 
 def main() -> int:
-    result: int = fibonacci(10)
-    return result
+    sum_val: int = add(5, 3)
+    product: int = multiply(sum_val, 2)
+    return product
 """
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -202,19 +212,29 @@ def main() -> int:
             llvm_ir = backend.get_emitter().emit_module(python_code)
 
             # Write IR to file
-            ir_file = Path(temp_dir) / "fibonacci.ll"
+            ir_file = Path(temp_dir) / "test_program.ll"
             ir_file.write_text(llvm_ir)
 
-            # Compile to binary
+            # Compile to binary with configured paths
+            builder = backend.get_builder()
+            builder.llc_path = LLVM_LLC_PATH
+            builder.clang_path = LLVM_CLANG_PATH
+
             output_dir = Path(temp_dir)
-            success = backend.get_builder().compile_direct(str(ir_file), str(output_dir))
+            success = builder.compile_direct(str(ir_file), str(output_dir))
 
             # Verify compilation succeeded
             assert success, "Compilation should succeed"
 
-            # Verify binary exists
-            binary_path = output_dir / "fibonacci"
-            assert binary_path.exists(), "Binary should be created"
+            # Verify binary exists (named after source file stem)
+            binary_path = output_dir / "test_program"
+            assert binary_path.exists(), f"Binary should be created at {binary_path}"
+
+            # Run the binary and check exit code (should be 16 = (5+3)*2)
+            import subprocess
+
+            result = subprocess.run([str(binary_path)], capture_output=True)
+            assert result.returncode == 16, f"Expected exit code 16, got {result.returncode}"
 
     @pytest.mark.skipif(not LLVM_TOOLS_AVAILABLE, reason="LLVM tools (llc, clang) not available")
     def test_makefile_generation(self):
