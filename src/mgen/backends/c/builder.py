@@ -3,6 +3,7 @@
 import subprocess
 from pathlib import Path
 
+from ...common.makefilegen import MakefileGenerator
 from ..base import AbstractBuilder
 
 
@@ -19,71 +20,36 @@ class CBuilder(AbstractBuilder):
         return "Makefile"
 
     def generate_build_file(self, source_files: list[str], target_name: str) -> str:
-        """Generate Makefile for C project with MGen runtime support."""
-        # Get source file basenames
-        source_basenames = [Path(f).name for f in source_files]
-        object_files = [f.replace(".c", ".o") for f in source_basenames]
-
-        # Add MGen runtime sources if available
-        runtime_sources = []
-        runtime_objects = []
-        include_flags = []
+        """Generate Makefile for C project with MGen runtime support using makefilegen."""
+        # Prepare include directories
+        include_dirs = []
+        additional_sources = []
 
         if self.use_runtime:
-            runtime_sources = self.get_runtime_sources()
-            runtime_objects = [Path(src).name.replace(".c", ".o") for src in runtime_sources]
-            include_flags.append(f"-I{self.runtime_dir}")
+            include_dirs.append(str(self.runtime_dir))
             # Add include path for STC headers
             stc_include_dir = Path(__file__).parent / "ext" / "stc" / "include"
             if stc_include_dir.exists():
-                include_flags.append(f"-I{stc_include_dir}")
+                include_dirs.append(str(stc_include_dir))
 
-        all_sources = source_basenames + [Path(src).name for src in runtime_sources]
-        all_objects = object_files + runtime_objects
+            # Add runtime sources
+            additional_sources = self.get_runtime_sources()
 
-        # Build compiler flags
-        base_flags = "-Wall -Wextra -std=c11 -O2"
-        if include_flags:
-            base_flags += " " + " ".join(include_flags)
+        # Use MakefileGenerator for sophisticated Makefile generation
+        generator = MakefileGenerator(
+            name=target_name,
+            source_dir=".",
+            build_dir="build",
+            flags=["-Wall", "-Wextra", "-O2"],
+            include_dirs=include_dirs,
+            compiler="gcc",
+            std="c11",
+            use_stc=True,
+            project_type="MGen",
+            additional_sources=additional_sources,
+        )
 
-        makefile_content = f"""# Generated Makefile by MGen with runtime support
-CC = gcc
-CFLAGS = {base_flags}
-TARGET = {target_name}
-SOURCES = {" ".join(all_sources)}
-OBJECTS = {" ".join(all_objects)}
-
-all: $(TARGET)
-
-$(TARGET): $(OBJECTS)
-\t$(CC) $(OBJECTS) -o $(TARGET)
-
-%.o: %.c
-\t$(CC) $(CFLAGS) -c $< -o $@
-
-clean:
-\trm -f $(OBJECTS) $(TARGET)
-
-.PHONY: all clean
-"""
-
-        # Add development targets
-        if self.use_runtime:
-            makefile_content += """
-# Development targets
-test: $(TARGET)
-\t./$(TARGET)
-
-debug: CFLAGS += -g -DDEBUG
-debug: clean $(TARGET)
-
-release: CFLAGS += -O3 -DNDEBUG
-release: clean $(TARGET)
-
-.PHONY: test debug release
-"""
-
-        return makefile_content
+        return generator.generate_makefile()
 
     def compile_direct(self, source_file: str, output_path: str) -> bool:
         """Compile C source directly using gcc with MGen runtime support."""

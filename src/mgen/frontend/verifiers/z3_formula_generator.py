@@ -7,7 +7,7 @@ import ast
 from typing import Any, Optional
 
 try:
-    import z3  # type: ignore[import-untyped]
+    import z3  # type: ignore[import-untyped,import-not-found]
 
     Z3_AVAILABLE = True
 except ImportError:
@@ -32,8 +32,11 @@ class Z3FormulaGenerator:
             var_type: Variable type ("int", "bool", etc.)
 
         Returns:
-            Z3 variable
+            Z3 variable or None if Z3 is not available
         """
+        if not self.z3_available:
+            return None
+
         if name not in self.variables:
             if var_type == "int":
                 self.variables[name] = z3.Int(name)

@@ -33,6 +33,7 @@ class TestZ3FormulaGenerator:
         assert hasattr(gen, "z3_available")
         assert gen.z3_available == Z3_AVAILABLE
 
+    @pytest.mark.skipif(not Z3_AVAILABLE, reason="Z3 not available")
     def test_create_variable(self):
         """Test creating Z3 variables."""
         gen = Z3FormulaGenerator()
@@ -54,6 +55,7 @@ class TestZ3FormulaGenerator:
         if Z3_AVAILABLE:
             assert z3_expr == 42
 
+    @pytest.mark.skipif(not Z3_AVAILABLE, reason="Z3 not available")
     def test_variable_expr_to_z3(self):
         """Test converting variable expressions to Z3."""
         gen = Z3FormulaGenerator()
@@ -63,6 +65,7 @@ class TestZ3FormulaGenerator:
         z3_expr = gen._expr_to_z3(expr)
         assert z3_expr is not None
 
+    @pytest.mark.skipif(not Z3_AVAILABLE, reason="Z3 not available")
     def test_binop_expr_to_z3(self):
         """Test converting binary operations to Z3."""
         gen = Z3FormulaGenerator()
@@ -184,6 +187,7 @@ class TestZ3FormulaGenerator:
         gen.clear_constraints()
         assert len(gen.get_all_constraints()) == 0
 
+    @pytest.mark.skipif(not Z3_AVAILABLE, reason="Z3 not available")
     def test_variable_clearing(self):
         """Test clearing variables."""
         gen = Z3FormulaGenerator()

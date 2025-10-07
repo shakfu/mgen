@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
+from ...common.makefilegen import MakefileGenerator
 from ..base import AbstractBuilder
 
 
@@ -22,66 +23,34 @@ class CppBuilder(AbstractBuilder):
         return "Makefile"
 
     def generate_build_file(self, source_files: list[str], target_name: str) -> str:
-        """Generate a Makefile for the C++ project."""
-        sources = " ".join(Path(f).name for f in source_files)
+        """Generate a Makefile for the C++ project using makefilegen."""
+        # Prepare include directories
+        include_dirs = []
+        if self.runtime_headers_dir:
+            include_dirs.append(self.runtime_headers_dir)
 
-        makefile_content = f"""# Generated Makefile for {target_name}
+        # Extract flags from default_flags
+        flags = [f for f in self.default_flags if not f.startswith("-std=")]
+        std = "c++17"  # Default
+        for f in self.default_flags:
+            if f.startswith("-std=c++"):
+                std = f[5:]  # Extract 'c++17' from '-std=c++17'
+                break
 
-CXX = {self.compiler}
-CXXFLAGS = {" ".join(self.default_flags)}
-TARGET = {target_name}
-SOURCES = {sources}
-OBJECTS = $(SOURCES:.cpp=.o)
+        # Use MakefileGenerator for sophisticated Makefile generation
+        generator = MakefileGenerator(
+            name=target_name,
+            source_dir=".",
+            build_dir="build",
+            flags=flags,
+            include_dirs=include_dirs,
+            compiler=self.compiler,
+            std=std,
+            use_stc=False,  # C++ doesn't use STC
+            project_type="MGen",
+        )
 
-# Default target
-all: $(TARGET)
-
-# Build the target executable
-$(TARGET): $(OBJECTS)
-\t$(CXX) $(OBJECTS) -o $(TARGET)
-
-# Compile source files to object files
-%.o: %.cpp
-\t$(CXX) $(CXXFLAGS) -c $< -o $@
-
-# Clean build artifacts
-clean:
-\trm -f $(OBJECTS) $(TARGET)
-
-# Force rebuild
-rebuild: clean all
-
-# Install (copy to /usr/local/bin)
-install: $(TARGET)
-\tcp $(TARGET) /usr/local/bin/
-
-# Run the program
-run: $(TARGET)
-\t./$(TARGET)
-
-# Debug build
-debug: CXXFLAGS += -g -DDEBUG
-debug: $(TARGET)
-
-# Release build with optimization
-release: CXXFLAGS += -O3 -DNDEBUG
-release: $(TARGET)
-
-# Show help
-help:
-\t@echo "Available targets:"
-\t@echo "  all      - Build the program (default)"
-\t@echo "  clean    - Remove build artifacts"
-\t@echo "  rebuild  - Clean and build"
-\t@echo "  install  - Install to /usr/local/bin"
-\t@echo "  run      - Build and run the program"
-\t@echo "  debug    - Build with debug information"
-\t@echo "  release  - Build optimized release version"
-\t@echo "  help     - Show this help message"
-
-.PHONY: all clean rebuild install run debug release help
-"""
-        return makefile_content
+        return generator.generate_makefile()
 
     def compile_direct(self, source_file: str, output_dir: str) -> bool:
         """Compile C++ source directly to executable."""

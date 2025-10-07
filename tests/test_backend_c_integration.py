@@ -258,7 +258,8 @@ def use_builtin(x: int) -> int:
 
             makefile = builder.generate_build_file(source_files, "test_app")
 
-            assert "test.c" in makefile
+            # With new makefilegen, sources are collected via wildcard
+            assert "$(wildcard $(SRCDIR)/*.c)" in makefile or "test.c" in makefile
             assert "test_app" in makefile
             assert "CC = gcc" in makefile
 
