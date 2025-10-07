@@ -126,6 +126,7 @@ class IRType:
     struct_name: Optional[str] = None
     union_name: Optional[str] = None
     qualifiers: set[str] = field(default_factory=set)
+    element_type: Optional["IRType"] = None  # For containers (LIST, DICT, SET)
 
     def is_numeric(self) -> bool:
         """Check if type is numeric."""
@@ -376,6 +377,25 @@ class IRLiteral(IRExpression):
     def accept(self, visitor: "IRVisitor") -> Any:
         """Accept a visitor for traversal (visitor pattern)."""
         return visitor.visit_literal(self)
+
+
+class IRComprehension(IRExpression):
+    """IR representation of list/dict/set comprehensions.
+
+    Stores the original AST node for backends to expand into loops.
+    """
+
+    def __init__(self, ast_node: ast.expr, ir_type: IRType, location: Optional[IRLocation] = None):
+        super().__init__(ir_type, location)
+        self.ast_node = ast_node  # ast.ListComp, ast.DictComp, or ast.SetComp
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize comprehension to dictionary representation."""
+        return {"type": "comprehension", "ast_type": type(self.ast_node).__name__, "ir_type": str(self.result_type)}
+
+    def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
+        return visitor.visit_comprehension(self)
 
 
 class IRVariableReference(IRExpression):
@@ -676,6 +696,11 @@ class IRVisitor(ABC):
         pass
 
     @abstractmethod
+    def visit_comprehension(self, node: IRComprehension) -> Any:
+        """Visit a comprehension node."""
+        pass
+
+    @abstractmethod
     def visit_variable_reference(self, node: IRVariableReference) -> Any:
         """Visit a variable reference node."""
         pass
@@ -934,6 +959,9 @@ class IRBuilder:
             return self._build_function_call(node)
         elif isinstance(node, ast.List):
             return self._build_list_literal(node)
+        elif isinstance(node, ast.ListComp):
+            # List comprehension - store AST node for backend expansion
+            return IRComprehension(node, IRType(IRDataType.LIST), self._get_location(node))
         elif isinstance(node, ast.Subscript):
             return self._build_subscript(node)
 

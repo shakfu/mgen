@@ -4,6 +4,7 @@ This module implements the IRVisitor pattern to traverse MGen's Static IR
 and generate corresponding LLVM IR instructions.
 """
 
+import ast
 from typing import Any, Optional, Union
 
 from llvmlite import ir  # type: ignore[import-untyped]
@@ -12,6 +13,7 @@ from ...frontend.static_ir import (
     IRAssignment,
     IRBinaryOperation,
     IRBreak,
+    IRComprehension,
     IRContinue,
     IRDataType,
     IRExpression,
@@ -391,23 +393,42 @@ class IRToLLVMConverter(IRVisitor):
             if self.builder is None:
                 raise RuntimeError("Builder not initialized - must be inside a function")
 
-            vec_int_type = self.runtime.get_vec_int_type()
-            vec_int_init_ptr_func = self.runtime.get_function("vec_int_init_ptr")
-            vec_int_push_func = self.runtime.get_function("vec_int_push")
+            # Check if this is a 2D list (list of lists)
+            is_2d_list = (hasattr(node.result_type, 'element_type') and
+                         node.result_type.element_type and
+                         node.result_type.element_type.base_type == IRDataType.LIST)
 
-            # Allocate space for the vec_int struct on stack
-            vec_ptr = self.builder.alloca(vec_int_type, name="list_tmp")
+            if is_2d_list:
+                # 2D list: vec_vec_int
+                vec_type = self.runtime.get_vec_vec_int_type()
+                vec_init_ptr_func = self.runtime.get_function("vec_vec_int_init_ptr")
+                vec_push_func = self.runtime.get_function("vec_vec_int_push")
+            else:
+                # 1D list: vec_int
+                vec_type = self.runtime.get_vec_int_type()
+                vec_init_ptr_func = self.runtime.get_function("vec_int_init_ptr")
+                vec_push_func = self.runtime.get_function("vec_int_push")
 
-            # Initialize it by calling vec_int_init_ptr() which takes a pointer
-            self.builder.call(vec_int_init_ptr_func, [vec_ptr], name="")
+            # Allocate space for the vec struct on stack
+            vec_ptr = self.builder.alloca(vec_type, name="list_tmp")
+
+            # Initialize it by calling vec_init_ptr() which takes a pointer
+            self.builder.call(vec_init_ptr_func, [vec_ptr], name="")
 
             # If list has elements, push them
             if isinstance(node.value, list) and len(node.value) > 0:
                 for element_expr in node.value:
                     # Visit the element expression to get its LLVM value
                     element_val = element_expr.accept(self)
-                    # Push the element to the list
-                    self.builder.call(vec_int_push_func, [vec_ptr, element_val], name="")
+
+                    if is_2d_list:
+                        # For 2D lists, element_val is a pointer to vec_int
+                        # vec_vec_int_push takes vec_int by value, so load it
+                        element_struct = self.builder.load(element_val, name="vec_int_struct")
+                        self.builder.call(vec_push_func, [vec_ptr, element_struct], name="")
+                    else:
+                        # For 1D lists, element_val is an i64
+                        self.builder.call(vec_push_func, [vec_ptr, element_val], name="")
 
             # Return the pointer
             return vec_ptr
@@ -442,6 +463,222 @@ class IRToLLVMConverter(IRVisitor):
             return ir.Constant(ir.IntType(8).as_pointer(), None)
 
         raise NotImplementedError(f"Literal type {node.result_type.base_type} not implemented (value={node.value})")
+
+    def visit_comprehension(self, node: IRComprehension) -> ir.Value:
+        """Convert IR comprehension to LLVM loop with append operations.
+
+        Handles list comprehensions like [expr for var in iterable if condition]
+        by generating:
+        1. Allocate result list
+        2. Generate for loop
+        3. Add conditional if present
+        4. Append expression to result
+        """
+        if self.builder is None or self.current_function is None:
+            raise RuntimeError("Builder not initialized - must be inside a function")
+
+        ast_node = node.ast_node
+        if not isinstance(ast_node, ast.ListComp):
+            raise NotImplementedError(f"Only list comprehensions supported, got {type(ast_node).__name__}")
+
+        # Allocate result list
+        vec_int_type = self.runtime.get_vec_int_type()
+        vec_int_init_ptr_func = self.runtime.get_function("vec_int_init_ptr")
+        vec_int_push_func = self.runtime.get_function("vec_int_push")
+
+        result_ptr = self.builder.alloca(vec_int_type, name="comp_result")
+        self.builder.call(vec_int_init_ptr_func, [result_ptr], name="")
+
+        # Process the comprehension (only single generator supported for now)
+        if len(ast_node.generators) != 1:
+            raise NotImplementedError("Only single generator in comprehensions supported")
+
+        generator = ast_node.generators[0]
+
+        # Determine iteration type: range() or list iteration
+        is_range_iter = (isinstance(generator.iter, ast.Call) and
+                        isinstance(generator.iter.func, ast.Name) and
+                        generator.iter.func.id == "range")
+
+        if is_range_iter:
+            # Handle range() iteration
+            # At this point we know generator.iter is ast.Call due to is_range_iter check
+            assert isinstance(generator.iter, ast.Call)  # For mypy
+            range_args = generator.iter.args
+            if len(range_args) == 1:
+                start_val = ir.Constant(ir.IntType(64), 0)
+                end_expr = self._convert_ast_expr(range_args[0])
+                step_val = ir.Constant(ir.IntType(64), 1)
+            elif len(range_args) == 2:
+                start_expr = self._convert_ast_expr(range_args[0])
+                end_expr = self._convert_ast_expr(range_args[1])
+                start_val = start_expr
+                step_val = ir.Constant(ir.IntType(64), 1)
+            elif len(range_args) == 3:
+                start_expr = self._convert_ast_expr(range_args[0])
+                end_expr = self._convert_ast_expr(range_args[1])
+                step_expr = self._convert_ast_expr(range_args[2])
+                start_val = start_expr
+                step_val = step_expr
+            else:
+                raise ValueError("Invalid range() arguments")
+
+            # Create loop variable for range iteration
+            loop_var_name = generator.target.id if isinstance(generator.target, ast.Name) else "loop_var"
+            loop_var = self.builder.alloca(ir.IntType(64), name=loop_var_name)
+            self.builder.store(start_val, loop_var)
+
+            # Create loop blocks
+            loop_cond_block = self.current_function.append_basic_block(name="loop_cond")
+            loop_body_block = self.current_function.append_basic_block(name="loop_body")
+            loop_end_block = self.current_function.append_basic_block(name="loop_end")
+
+            # Branch to loop condition
+            self.builder.branch(loop_cond_block)
+
+            # Loop condition: i < end
+            self.builder.position_at_end(loop_cond_block)
+            loop_var_val = self.builder.load(loop_var, name=f"{loop_var_name}_val")
+            cond = self.builder.icmp_signed("<", loop_var_val, end_expr, name="loop_cond")
+            self.builder.cbranch(cond, loop_body_block, loop_end_block)
+
+            # Loop body
+            self.builder.position_at_end(loop_body_block)
+
+            # Store loop variable in symbol table
+            old_var = self.var_symtab.get(loop_var_name)
+            self.var_symtab[loop_var_name] = loop_var
+
+        else:
+            # Handle list iteration: for x in some_list
+            # Get the list being iterated over
+            iter_expr = self._convert_ast_expr(generator.iter)
+
+            # Get list size
+            vec_int_size_func = self.runtime.get_function("vec_int_size")
+            list_size = self.builder.call(vec_int_size_func, [iter_expr], name="list_size")
+
+            # Create index variable
+            idx_var = self.builder.alloca(ir.IntType(64), name="idx")
+            self.builder.store(ir.Constant(ir.IntType(64), 0), idx_var)
+
+            # Create element variable for loop target
+            loop_var_name = generator.target.id if isinstance(generator.target, ast.Name) else "loop_var"
+            elem_var = self.builder.alloca(ir.IntType(64), name=loop_var_name)
+
+            # Create loop blocks
+            loop_cond_block = self.current_function.append_basic_block(name="loop_cond")
+            loop_body_block = self.current_function.append_basic_block(name="loop_body")
+            loop_end_block = self.current_function.append_basic_block(name="loop_end")
+
+            # Branch to loop condition
+            self.builder.branch(loop_cond_block)
+
+            # Loop condition: idx < size
+            self.builder.position_at_end(loop_cond_block)
+            idx_val = self.builder.load(idx_var, name="idx_val")
+            cond = self.builder.icmp_signed("<", idx_val, list_size, name="loop_cond")
+            self.builder.cbranch(cond, loop_body_block, loop_end_block)
+
+            # Loop body
+            self.builder.position_at_end(loop_body_block)
+
+            # Get element at index: elem = list[idx]
+            vec_int_at_func = self.runtime.get_function("vec_int_at")
+            elem_val = self.builder.call(vec_int_at_func, [iter_expr, idx_val], name="elem")
+            self.builder.store(elem_val, elem_var)
+
+            # Store element variable in symbol table
+            old_var = self.var_symtab.get(loop_var_name)
+            self.var_symtab[loop_var_name] = elem_var
+
+            # Store current index and list size for increment later
+            start_val = None  # Not used for list iteration
+            step_val = ir.Constant(ir.IntType(64), 1)
+            loop_var = idx_var  # Use idx_var for increment
+            loop_var_val = idx_val
+
+        # Handle optional condition (common for both range and list iteration)
+        if generator.ifs:
+            if_cond_expr = self._convert_ast_expr(generator.ifs[0])
+            if_then_block = self.current_function.append_basic_block(name="if_then")
+            if_merge_block = self.current_function.append_basic_block(name="if_merge")
+
+            self.builder.cbranch(if_cond_expr, if_then_block, if_merge_block)
+
+            self.builder.position_at_end(if_then_block)
+            # Evaluate and append expression
+            expr_val = self._convert_ast_expr(ast_node.elt)
+            self.builder.call(vec_int_push_func, [result_ptr, expr_val], name="")
+            self.builder.branch(if_merge_block)
+
+            self.builder.position_at_end(if_merge_block)
+        else:
+            # No condition - just append
+            expr_val = self._convert_ast_expr(ast_node.elt)
+            self.builder.call(vec_int_push_func, [result_ptr, expr_val], name="")
+
+        # Increment loop variable
+        incremented = self.builder.add(loop_var_val, step_val, name="inc")
+        self.builder.store(incremented, loop_var)
+        self.builder.branch(loop_cond_block)
+
+        # Restore symbol table
+        loop_var_name = generator.target.id if isinstance(generator.target, ast.Name) else "loop_var"
+        if old_var is not None:
+            self.var_symtab[loop_var_name] = old_var
+        else:
+            self.var_symtab.pop(loop_var_name, None)
+
+        # Continue after loop
+        self.builder.position_at_end(loop_end_block)
+
+        return result_ptr
+
+    def _convert_ast_expr(self, ast_expr: ast.expr) -> ir.Value:
+        """Helper to convert AST expression to LLVM value."""
+        if self.builder is None:
+            raise RuntimeError("Builder not initialized")
+
+        if isinstance(ast_expr, ast.Constant):
+            # Handle constant values - must be int for our use case
+            if not isinstance(ast_expr.value, int):
+                raise ValueError(f"Expected int constant, got {type(ast_expr.value)}")
+            return ir.Constant(ir.IntType(64), ast_expr.value)
+        elif isinstance(ast_expr, ast.Name):
+            var_ptr = self.var_symtab[ast_expr.id]
+            return self.builder.load(var_ptr, name=ast_expr.id)
+        elif isinstance(ast_expr, ast.BinOp):
+            left = self._convert_ast_expr(ast_expr.left)
+            right = self._convert_ast_expr(ast_expr.right)
+            if isinstance(ast_expr.op, ast.Add):
+                return self.builder.add(left, right, name="add_tmp")
+            elif isinstance(ast_expr.op, ast.Sub):
+                return self.builder.sub(left, right, name="sub_tmp")
+            elif isinstance(ast_expr.op, ast.Mult):
+                return self.builder.mul(left, right, name="mul_tmp")
+            elif isinstance(ast_expr.op, ast.Mod):
+                return self.builder.srem(left, right, name="mod_tmp")
+            else:
+                raise NotImplementedError(f"Binary op {type(ast_expr.op).__name__} not implemented")
+        elif isinstance(ast_expr, ast.Compare):
+            left = self._convert_ast_expr(ast_expr.left)
+            right = self._convert_ast_expr(ast_expr.comparators[0])
+            op = ast_expr.ops[0]
+            if isinstance(op, ast.Lt):
+                return self.builder.icmp_signed("<", left, right, name="cmp_tmp")
+            elif isinstance(op, ast.Gt):
+                return self.builder.icmp_signed(">", left, right, name="cmp_tmp")
+            elif isinstance(op, ast.Eq):
+                return self.builder.icmp_signed("==", left, right, name="cmp_tmp")
+            elif isinstance(op, ast.LtE):
+                return self.builder.icmp_signed("<=", left, right, name="cmp_tmp")
+            elif isinstance(op, ast.GtE):
+                return self.builder.icmp_signed(">=", left, right, name="cmp_tmp")
+            else:
+                raise NotImplementedError(f"Compare op {type(op).__name__} not implemented")
+        else:
+            raise NotImplementedError(f"AST expression {type(ast_expr).__name__} not implemented in comprehensions")
 
     def visit_variable_reference(self, node: IRVariableReference) -> ir.LoadInstr:
         """Convert IR variable reference to LLVM load instruction.
@@ -565,35 +802,80 @@ class IRToLLVMConverter(IRVisitor):
 
         # Handle method calls (from IR builder)
         if node.function_name == "__method_append__":
-            # list.append(value) -> vec_int_push(list_ptr, value)
+            # list.append(value) -> vec_int_push or vec_vec_int_push
             if len(node.arguments) != 2:
                 raise RuntimeError("append() requires exactly 2 arguments (list and value)")
 
             list_ptr = node.arguments[0].accept(self)  # Already a pointer
             value = node.arguments[1].accept(self)
 
-            # Get vec_int_push function
-            vec_int_push_func = self.runtime.get_function("vec_int_push")
+            # Determine if this is a 1D or 2D list based on LLVM types
+            from llvmlite import ir as llvm_ir
+            list_ptr_type = list_ptr.type
+            value_type = value.type
 
-            # Call vec_int_push - it modifies the list in place
-            self.builder.call(vec_int_push_func, [list_ptr, value], name="")
+            # Check if list pointer points to vec_vec_int
+            list_is_2d = False
+            if isinstance(list_ptr_type, llvm_ir.PointerType):
+                pointee_type = list_ptr_type.pointee
+                list_is_2d = "vec_vec_int" in str(pointee_type)
+
+            # Check if value is a vec_int* (indicates 2D list append)
+            value_is_vec_int_ptr = False
+            if isinstance(value_type, llvm_ir.PointerType):
+                value_pointee = value_type.pointee
+                value_is_vec_int_ptr = "vec_int" in str(value_pointee) and "vec_vec_int" not in str(value_pointee)
+
+            # Use 2D list operations if either the list is declared as 2D OR we're appending a list
+            is_2d_list = list_is_2d or value_is_vec_int_ptr
+
+            if is_2d_list:
+                # 2D list: vec_vec_int_push(list_ptr, vec_int_struct)
+                vec_vec_int_push_func = self.runtime.get_function("vec_vec_int_push")
+
+                # value is a pointer to vec_int, but vec_vec_int_push takes vec_int by value
+                # Load the struct from the pointer
+                vec_int_struct = self.builder.load(value, name="vec_int_struct")
+
+                # Call vec_vec_int_push
+                self.builder.call(vec_vec_int_push_func, [list_ptr, vec_int_struct], name="")
+            else:
+                # 1D list: vec_int_push(list_ptr, int_value)
+                vec_int_push_func = self.runtime.get_function("vec_int_push")
+
+                # Call vec_int_push - it modifies the list in place
+                self.builder.call(vec_int_push_func, [list_ptr, value], name="")
 
             # Return the pointer (unchanged, since append mutates in place)
             return list_ptr
 
         elif node.function_name == "__getitem__":
-            # list[index] -> vec_int_at(list_ptr, index)
+            # list[index] -> vec_int_at or vec_vec_int_at
             if len(node.arguments) != 2:
                 raise RuntimeError("__getitem__() requires exactly 2 arguments (list and index)")
 
             list_ptr = node.arguments[0].accept(self)  # Already a pointer
             index = node.arguments[1].accept(self)
 
-            # Get vec_int_at function
-            vec_int_at_func = self.runtime.get_function("vec_int_at")
+            # Determine if this is a 1D or 2D list based on LLVM type
+            from llvmlite import ir as llvm_ir
+            list_ptr_type = list_ptr.type
 
-            # Call vec_int_at
-            return self.builder.call(vec_int_at_func, [list_ptr, index], name="list_at")
+            # Check if pointer points to vec_vec_int or vec_int
+            if isinstance(list_ptr_type, llvm_ir.PointerType):
+                pointee_type = list_ptr_type.pointee
+                is_2d_list = "vec_vec_int" in str(pointee_type)
+            else:
+                is_2d_list = False
+
+            if is_2d_list:
+                # 2D list: vec_vec_int_at(list_ptr, index) returns vec_int*
+                vec_vec_int_at_func = self.runtime.get_function("vec_vec_int_at")
+                return self.builder.call(vec_vec_int_at_func, [list_ptr, index], name="list_at")
+            else:
+                # 1D list: vec_int_at(list_ptr, index) returns i64
+                vec_int_at_func = self.runtime.get_function("vec_int_at")
+                return self.builder.call(vec_int_at_func, [list_ptr, index], name="list_at")
 
         elif node.function_name == "__setitem__":
             # list[index] = value -> vec_int_set(list_ptr, index, value)
@@ -964,10 +1246,16 @@ class IRToLLVMConverter(IRVisitor):
         """
         # Handle list types (LIST<T>)
         if ir_type.base_type == IRDataType.LIST:
-            # Lists are represented as pointers to vec_int structs
-            # This allows proper mutation semantics (append modifies in place)
-            # TODO: Support other element types (vec_double, vec_str, etc.)
-            return self.runtime.get_vec_int_type().as_pointer()
+            # Lists are represented as pointers to vec_int or vec_vec_int structs
+            # Check if element type is also a list (nested list / 2D array)
+            if (hasattr(ir_type, 'element_type') and ir_type.element_type and
+                ir_type.element_type.base_type == IRDataType.LIST):
+                # 2D list: list[list[int]] -> vec_vec_int*
+                return self.runtime.get_vec_vec_int_type().as_pointer()
+            else:
+                # 1D list: list[int] -> vec_int*
+                # This allows proper mutation semantics (append modifies in place)
+                return self.runtime.get_vec_int_type().as_pointer()
 
         # Base type mapping
         type_mapping = {
