@@ -490,3 +490,53 @@ def main() -> int:
         llvm_ir = self._convert_to_llvm(python_code)
         exit_code = self._execute_llvm_ir(llvm_ir)
         assert exit_code == 2
+
+    def test_bitwise_operations_execution(self):
+        """Test bitwise operations execution."""
+        python_code = """
+def test_bitwise(a: int, b: int) -> int:
+    x: int = a << 2
+    y: int = b >> 1
+    z: int = a & b
+    w: int = a | b
+    v: int = a ^ b
+    return x + y + z + w + v
+
+def main() -> int:
+    return test_bitwise(12, 5)
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # 48 + 2 + 4 + 13 + 9 = 76
+        assert exit_code == 76
+
+    def test_integer_division_execution(self):
+        """Test integer division execution."""
+        python_code = """
+def test_intdiv(a: int, b: int) -> int:
+    return a // b
+
+def main() -> int:
+    return test_intdiv(17, 5)
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        assert exit_code == 3
+
+    def test_type_cast_execution(self):
+        """Test type casting execution."""
+        python_code = """
+def int_to_float(x: int) -> float:
+    return float(x)
+
+def float_to_int(x: float) -> int:
+    return int(x)
+
+def main() -> int:
+    a: float = int_to_float(42)
+    b: int = float_to_int(3.7)
+    return b
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        assert exit_code == 3

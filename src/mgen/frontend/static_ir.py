@@ -421,6 +421,32 @@ class IRFunctionCall(IRExpression):
         return visitor.visit_function_call(self)
 
 
+class IRTypeCast(IRExpression):
+    """IR representation of type casts (int(), float(), etc.)."""
+
+    def __init__(
+        self,
+        value: IRExpression,
+        target_type: IRType,
+        location: Optional[IRLocation] = None,
+    ):
+        super().__init__(target_type, location)
+        self.value = value
+        self.add_child(value)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize type cast to dictionary representation."""
+        return {
+            "type": "type_cast",
+            "value": self.value.to_dict(),
+            "target_type": str(self.result_type),
+        }
+
+    def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
+        return visitor.visit_type_cast(self)
+
+
 class IRReturn(IRStatement):
     """IR representation of return statements."""
 
@@ -637,6 +663,11 @@ class IRVisitor(ABC):
     @abstractmethod
     def visit_function_call(self, node: IRFunctionCall) -> Any:
         """Visit a function call node."""
+        pass
+
+    @abstractmethod
+    def visit_type_cast(self, node: "IRTypeCast") -> Any:
+        """Visit a type cast node."""
         pass
 
     @abstractmethod
@@ -950,10 +981,30 @@ class IRBuilder:
         # Unknown unary operator
         return IRLiteral(None, IRType(IRDataType.VOID), self._get_location(node))
 
-    def _build_function_call(self, node: ast.Call) -> IRFunctionCall:
-        """Build function call."""
+    def _build_function_call(self, node: ast.Call) -> IRExpression:
+        """Build function call or type cast."""
         if isinstance(node.func, ast.Name):
             func_name = node.func.id
+
+            # Check if this is a type cast function
+            if func_name in ("int", "float", "bool", "str") and len(node.args) == 1:
+                value = self._build_expression(node.args[0])
+
+                # Determine target type
+                if func_name == "int":
+                    target_type = IRType(IRDataType.INT)
+                elif func_name == "float":
+                    target_type = IRType(IRDataType.FLOAT)
+                elif func_name == "bool":
+                    target_type = IRType(IRDataType.BOOL)
+                elif func_name == "str":
+                    target_type = IRType(IRDataType.STRING)
+                else:
+                    target_type = IRType(IRDataType.VOID)
+
+                return IRTypeCast(value, target_type, self._get_location(node))
+
+            # Regular function call
             arguments = [self._build_expression(arg) for arg in node.args]
 
             # Look up function return type from module

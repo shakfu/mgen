@@ -23,6 +23,7 @@ from ...frontend.static_ir import (
     IRModule,
     IRReturn,
     IRType,
+    IRTypeCast,
     IRTypeDeclaration,
     IRVariable,
     IRVariableReference,
@@ -179,7 +180,7 @@ class IRToLLVMConverter(IRVisitor):
                 return self.builder.sub(left, right, name="sub_tmp")
             elif node.operator == "*":
                 return self.builder.mul(left, right, name="mul_tmp")
-            elif node.operator == "/":
+            elif node.operator == "/" or node.operator == "//":
                 return self.builder.sdiv(left, right, name="div_tmp")
             elif node.operator == "%":
                 return self.builder.srem(left, right, name="rem_tmp")
@@ -315,6 +316,55 @@ class IRToLLVMConverter(IRVisitor):
 
         args = [arg.accept(self) for arg in node.arguments]
         return self.builder.call(func, args, name="call_tmp")
+
+    def visit_type_cast(self, node: IRTypeCast) -> ir.Instruction:
+        """Convert IR type cast to LLVM cast instruction.
+
+        Args:
+            node: IR type cast to convert
+
+        Returns:
+            LLVM cast instruction
+        """
+        if self.builder is None:
+            raise RuntimeError("Builder not initialized - must be inside a function")
+
+        value = node.value.accept(self)
+        source_type = node.value.result_type.base_type
+        target_type = node.result_type.base_type
+
+        # INT to FLOAT
+        if source_type == IRDataType.INT and target_type == IRDataType.FLOAT:
+            llvm_target = self._convert_type(node.result_type)
+            return self.builder.sitofp(value, llvm_target, name="cast_tmp")
+
+        # FLOAT to INT
+        elif source_type == IRDataType.FLOAT and target_type == IRDataType.INT:
+            llvm_target = self._convert_type(node.result_type)
+            return self.builder.fptosi(value, llvm_target, name="cast_tmp")
+
+        # INT to BOOL
+        elif source_type == IRDataType.INT and target_type == IRDataType.BOOL:
+            zero = ir.Constant(ir.IntType(64), 0)
+            return self.builder.icmp_signed("!=", value, zero, name="cast_tmp")
+
+        # FLOAT to BOOL
+        elif source_type == IRDataType.FLOAT and target_type == IRDataType.BOOL:
+            zero = ir.Constant(ir.DoubleType(), 0.0)
+            return self.builder.fcmp_ordered("!=", value, zero, name="cast_tmp")
+
+        # BOOL to INT
+        elif source_type == IRDataType.BOOL and target_type == IRDataType.INT:
+            llvm_target = self._convert_type(node.result_type)
+            return self.builder.zext(value, llvm_target, name="cast_tmp")
+
+        # Same type - no cast needed
+        elif source_type == target_type:
+            return value
+
+        # Unsupported cast
+        else:
+            raise NotImplementedError(f"Type cast from {source_type} to {target_type} not implemented")
 
     def visit_return(self, node: IRReturn) -> None:
         """Convert IR return statement to LLVM ret instruction.
