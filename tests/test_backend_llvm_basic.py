@@ -251,5 +251,102 @@ def main() -> int:
         assert "test.ll" in makefile
 
 
+class TestLLVMControlFlow:
+    """Test LLVM control flow (if/while/for) - requires fixed Static IR."""
+
+    @pytest.mark.skipif(not LLVM_TOOLS_AVAILABLE, reason="LLVM tools (llc, clang) not available")
+    def test_if_statement_compilation(self):
+        """Test if statement with comparison."""
+        python_code = """
+def max_val(a: int, b: int) -> int:
+    if a > b:
+        return a
+    else:
+        return b
+
+def main() -> int:
+    return max_val(10, 5)
+"""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = LLVMBackend()
+            llvm_ir = backend.get_emitter().emit_module(python_code)
+
+            # Verify comparison instruction is generated
+            assert "icmp sgt" in llvm_ir, "Should generate signed greater than comparison"
+            assert "br i1" in llvm_ir, "Should generate conditional branch with i1"
+
+            # Compile and test
+            ir_file = Path(temp_dir) / "test_if.ll"
+            ir_file.write_text(llvm_ir)
+
+            builder = backend.get_builder()
+            builder.llc_path = LLVM_LLC_PATH
+            builder.clang_path = LLVM_CLANG_PATH
+
+            success = builder.compile_direct(str(ir_file), str(temp_dir))
+            assert success, "Compilation should succeed"
+
+            binary = Path(temp_dir) / "test_if"
+            assert binary.exists()
+
+            # Run and check result (max(10, 5) = 10)
+            import subprocess
+
+            result = subprocess.run([str(binary)], capture_output=True)
+            assert result.returncode == 10
+
+    @pytest.mark.skipif(not LLVM_TOOLS_AVAILABLE, reason="LLVM tools (llc, clang) not available")
+    def test_while_loop_compilation(self):
+        """Test while loop with comparison (fibonacci)."""
+        python_code = """
+def fibonacci(n: int) -> int:
+    if n <= 1:
+        return n
+    a: int = 0
+    b: int = 1
+    i: int = 2
+    while i <= n:
+        temp: int = a + b
+        a = b
+        b = temp
+        i = i + 1
+    return b
+
+def main() -> int:
+    return fibonacci(10)
+"""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = LLVMBackend()
+            llvm_ir = backend.get_emitter().emit_module(python_code)
+
+            # Verify while loop structure
+            assert "while.cond:" in llvm_ir
+            assert "while.body:" in llvm_ir
+            assert "while.exit:" in llvm_ir
+            assert "icmp sle" in llvm_ir  # Less than or equal comparison
+
+            # Compile and test
+            ir_file = Path(temp_dir) / "test_while.ll"
+            ir_file.write_text(llvm_ir)
+
+            builder = backend.get_builder()
+            builder.llc_path = LLVM_LLC_PATH
+            builder.clang_path = LLVM_CLANG_PATH
+
+            success = builder.compile_direct(str(ir_file), str(temp_dir))
+            assert success
+
+            binary = Path(temp_dir) / "test_while"
+            assert binary.exists()
+
+            # Run and check result (fibonacci(10) = 55)
+            import subprocess
+
+            result = subprocess.run([str(binary)], capture_output=True)
+            assert result.returncode == 55
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

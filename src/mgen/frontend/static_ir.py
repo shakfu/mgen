@@ -741,6 +741,8 @@ class IRBuilder:
             return self._build_variable_reference(node)
         elif isinstance(node, ast.BinOp):
             return self._build_binary_operation(node)
+        elif isinstance(node, ast.Compare):
+            return self._build_comparison(node)
         elif isinstance(node, ast.Call):
             return self._build_function_call(node)
 
@@ -782,6 +784,27 @@ class IRBuilder:
         result_type = left.result_type  # Simplified type inference
 
         operator = self._get_operator_string(node.op)
+
+        return IRBinaryOperation(left, operator, right, result_type, self._get_location(node))
+
+    def _build_comparison(self, node: ast.Compare) -> IRBinaryOperation:
+        """Build comparison operation.
+
+        Comparisons in Python can chain (e.g., a < b < c), but for now we only
+        support simple binary comparisons.
+        """
+        # For simplicity, only handle single comparison (left op comparator)
+        # TODO: Support chained comparisons like a < b < c
+        if len(node.ops) > 1:
+            # Chained comparison - not yet supported, return VOID
+            return IRLiteral(None, IRType(IRDataType.VOID), self._get_location(node))  # type: ignore[return-value]
+
+        left = self._build_expression(node.left)
+        right = self._build_expression(node.comparators[0])
+        operator = self._get_comparison_operator_string(node.ops[0])
+
+        # Comparisons always return bool
+        result_type = IRType(IRDataType.BOOL)
 
         return IRBinaryOperation(left, operator, right, result_type, self._get_location(node))
 
@@ -912,6 +935,22 @@ class IRBuilder:
             ast.BitAnd: "&",
         }
         return operator_mapping.get(type(op), "?")
+
+    def _get_comparison_operator_string(self, op: ast.cmpop) -> str:
+        """Convert AST comparison operator to string."""
+        comparison_mapping = {
+            ast.Lt: "<",
+            ast.LtE: "<=",
+            ast.Gt: ">",
+            ast.GtE: ">=",
+            ast.Eq: "==",
+            ast.NotEq: "!=",
+            ast.Is: "is",
+            ast.IsNot: "is not",
+            ast.In: "in",
+            ast.NotIn: "not in",
+        }
+        return comparison_mapping.get(type(op), "?")
 
 
 def build_ir_from_code(source_code: str, module_name: str = "main") -> IRModule:
