@@ -723,6 +723,8 @@ class IRBuilder:
             return self._build_annotated_assignment(node)
         elif isinstance(node, ast.Assign):
             return self._build_assignment(node)
+        elif isinstance(node, ast.AugAssign):
+            return self._build_augmented_assignment(node)
         elif isinstance(node, ast.Return):
             return self._build_return(node)
         elif isinstance(node, ast.Break):
@@ -774,6 +776,29 @@ class IRBuilder:
                 target_var = self.symbol_table[target_name]
                 value_expr = self._build_expression(node.value)
                 return IRAssignment(target_var, value_expr, self._get_location(node))
+
+        return None
+
+    def _build_augmented_assignment(self, node: ast.AugAssign) -> Optional[IRStatement]:
+        """Build augmented assignment (+=, -=, etc.).
+
+        Converts 'x += y' to 'x = x + y'.
+        """
+        if isinstance(node.target, ast.Name):
+            target_name = node.target.id
+            if target_name in self.symbol_table:
+                target_var = self.symbol_table[target_name]
+
+                # Create binary operation: target op value
+                left = IRVariableReference(target_var, self._get_location(node))
+                right = self._build_expression(node.value)
+                operator = self._get_operator_string(node.op)
+
+                # Infer result type from target variable
+                result_type = target_var.ir_type
+
+                binary_op = IRBinaryOperation(left, operator, right, result_type, self._get_location(node))
+                return IRAssignment(target_var, binary_op, self._get_location(node))
 
         return None
 

@@ -459,3 +459,34 @@ def main() -> int:
         llvm_ir = self._convert_to_llvm(python_code)
         exit_code = self._execute_llvm_ir(llvm_ir)
         assert exit_code == 2
+
+    def test_augmented_assignment_execution(self):
+        """Test augmented assignment execution."""
+        python_code = """
+def test_augmented(x: int) -> int:
+    y: int = 10
+    y += x
+    y -= 2
+    y *= 2
+    return y
+
+def main() -> int:
+    return test_augmented(5)
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # (10 + 5 - 2) * 2 = 26
+        assert exit_code == 26
+
+    def test_modulo_operation_execution(self):
+        """Test modulo operation execution."""
+        python_code = """
+def test_mod(a: int, b: int) -> int:
+    return a % b
+
+def main() -> int:
+    return test_mod(17, 5)
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        assert exit_code == 2
