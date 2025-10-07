@@ -746,3 +746,133 @@ def main() -> int:
         exit_code = self._execute_llvm_ir(llvm_ir)
         # 5! = 120, fib(7) = 13, total = 133
         assert exit_code == 133
+
+    def test_float_arithmetic_execution(self):
+        """Test floating point arithmetic operations."""
+        python_code = """
+def main() -> int:
+    a: float = 10.5
+    b: float = 3.0
+
+    # Basic arithmetic
+    c: float = a + b
+    d: float = a - b
+    e: float = a * b
+    f: float = a / b
+
+    # Convert results to int for testing
+    result: int = int(c) + int(d) + int(e) + int(f)
+    return result
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # c=13.5->13, d=7.5->7, e=31.5->31, f=3.5->3, total=54
+        assert exit_code == 54
+
+    def test_float_comparisons_execution(self):
+        """Test floating point comparison operations."""
+        python_code = """
+def main() -> int:
+    a: float = 5.5
+    b: float = 3.2
+
+    result: int = 0
+
+    if a > b:
+        result += 1
+
+    if a >= 5.5:
+        result += 2
+
+    if b < a:
+        result += 4
+
+    if b <= 3.2:
+        result += 8
+
+    if a == 5.5:
+        result += 16
+
+    if a != b:
+        result += 32
+
+    return result
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # All conditions true: 1 + 2 + 4 + 8 + 16 + 32 = 63
+        assert exit_code == 63
+
+    def test_float_int_conversion_execution(self):
+        """Test conversions between float and int."""
+        python_code = """
+def main() -> int:
+    # Int to float
+    i: int = 42
+    f: float = float(i)
+
+    # Float to int (truncation)
+    f2: float = 3.7
+    i2: int = int(f2)
+
+    f3: float = -2.9
+    i3: int = int(f3)
+
+    # Should be 42 + 3 + (-2) = 43
+    return int(f) + i2 + i3
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        assert exit_code == 43
+
+    def test_while_loop_execution(self):
+        """Test while loops with various conditions."""
+        python_code = """
+def main() -> int:
+    # Simple while loop
+    count: int = 0
+    i: int = 0
+    while i < 5:
+        count += 1
+        i += 1
+
+    # While with complex condition
+    j: int = 10
+    k: int = 0
+    while j > 0 and k < 5:
+        k += 1
+        j -= 1
+
+    return count + k
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # count=5, k=5, total=10
+        assert exit_code == 10
+
+    def test_nested_loops_execution(self):
+        """Test nested for and while loops."""
+        python_code = """
+def main() -> int:
+    total: int = 0
+
+    # Nested for loops
+    for i in range(3):
+        for j in range(2):
+            total += 1
+
+    # Nested while
+    x: int = 0
+    while x < 2:
+        y: int = 0
+        while y < 3:
+            total += 10
+            y += 1
+        x += 1
+
+    return total
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # Nested for: 3*2=6, Nested while: 2*3*10=60, total=66
+        assert exit_code == 66
