@@ -365,3 +365,97 @@ def main() -> int:
         exit_code = self._execute_llvm_ir(llvm_ir)
         # sum(0..9) = 45
         assert exit_code == 45
+
+    def test_break_statement_execution(self):
+        """Test break statement execution."""
+        python_code = """
+def test_break(n: int) -> int:
+    i: int = 0
+    while i < n:
+        if i == 5:
+            break
+        i = i + 1
+    return i
+
+def main() -> int:
+    return test_break(10)
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        assert exit_code == 5
+
+    def test_continue_statement_execution(self):
+        """Test continue statement execution."""
+        python_code = """
+def test_continue(n: int) -> int:
+    total: int = 0
+    i: int = 0
+    while i < n:
+        i = i + 1
+        if i % 2 == 0:
+            continue
+        total = total + i
+    return total
+
+def main() -> int:
+    return test_continue(10)
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # Sum of odd numbers 1,3,5,7,9 = 25
+        assert exit_code == 25
+
+    def test_elif_chain_execution(self):
+        """Test elif chain execution."""
+        python_code = """
+def classify(x: int) -> int:
+    if x > 10:
+        return 1
+    elif x > 5:
+        return 2
+    elif x > 0:
+        return 3
+    else:
+        return 4
+
+def main() -> int:
+    return classify(7)
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        assert exit_code == 2
+
+    def test_comparison_chaining_execution(self):
+        """Test comparison chaining execution."""
+        python_code = """
+def is_between(x: int, low: int, high: int) -> int:
+    if low < x < high:
+        return 1
+    return 0
+
+def main() -> int:
+    return is_between(5, 3, 10)
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        assert exit_code == 1
+
+    def test_boolean_chaining_execution(self):
+        """Test boolean chaining execution."""
+        python_code = """
+def test_and_chain(a: int, b: int, c: int) -> int:
+    if a > 0 and b > 0 and c > 0:
+        return 1
+    return 0
+
+def test_or_chain(a: int, b: int, c: int) -> int:
+    if a > 10 or b > 10 or c > 10:
+        return 1
+    return 0
+
+def main() -> int:
+    return test_and_chain(1, 2, 3) + test_or_chain(1, 2, 15)
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        assert exit_code == 2

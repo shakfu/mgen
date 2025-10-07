@@ -11,6 +11,8 @@ from llvmlite import ir  # type: ignore[import-untyped]
 from ...frontend.static_ir import (
     IRAssignment,
     IRBinaryOperation,
+    IRBreak,
+    IRContinue,
     IRDataType,
     IRExpression,
     IRFor,
@@ -42,6 +44,9 @@ class IRToLLVMConverter(IRVisitor):
         self.func_symtab: dict[str, ir.Function] = {}
         self.var_symtab: dict[str, ir.AllocaInstr] = {}
         self.current_function: Optional[ir.Function] = None
+        # Track current loop blocks for break/continue
+        self.loop_exit_stack: list[ir.Block] = []
+        self.loop_continue_stack: list[ir.Block] = []
 
     def visit_module(self, node: IRModule) -> ir.Module:
         """Convert IR module to LLVM module.
@@ -326,6 +331,36 @@ class IRToLLVMConverter(IRVisitor):
         else:
             self.builder.ret_void()
 
+    def visit_break(self, node: IRBreak) -> None:
+        """Convert IR break statement to LLVM branch to loop exit.
+
+        Args:
+            node: IR break statement to convert
+        """
+        if self.builder is None:
+            raise RuntimeError("Builder not initialized - must be inside a function")
+
+        if not self.loop_exit_stack:
+            raise RuntimeError("Break statement outside of loop")
+
+        # Branch to the current loop's exit block
+        self.builder.branch(self.loop_exit_stack[-1])
+
+    def visit_continue(self, node: IRContinue) -> None:
+        """Convert IR continue statement to LLVM branch to loop condition.
+
+        Args:
+            node: IR continue statement to convert
+        """
+        if self.builder is None:
+            raise RuntimeError("Builder not initialized - must be inside a function")
+
+        if not self.loop_continue_stack:
+            raise RuntimeError("Continue statement outside of loop")
+
+        # Branch to the current loop's condition block
+        self.builder.branch(self.loop_continue_stack[-1])
+
     def visit_if(self, node: IRIf) -> None:
         """Convert IR if statement to LLVM basic blocks with branches.
 
@@ -377,6 +412,10 @@ class IRToLLVMConverter(IRVisitor):
         body_block = self.current_function.append_basic_block("while.body")
         exit_block = self.current_function.append_basic_block("while.exit")
 
+        # Track loop blocks for break/continue
+        self.loop_exit_stack.append(exit_block)
+        self.loop_continue_stack.append(cond_block)
+
         # Jump to condition check
         self.builder.branch(cond_block)
 
@@ -391,6 +430,10 @@ class IRToLLVMConverter(IRVisitor):
             stmt.accept(self)
         if not self.builder.block.is_terminated:
             self.builder.branch(cond_block)  # Loop back
+
+        # Pop loop blocks from stack
+        self.loop_exit_stack.pop()
+        self.loop_continue_stack.pop()
 
         # Continue after loop
         self.builder.position_at_end(exit_block)
@@ -419,6 +462,10 @@ class IRToLLVMConverter(IRVisitor):
         inc_block = self.current_function.append_basic_block("for.inc")
         exit_block = self.current_function.append_basic_block("for.exit")
 
+        # Track loop blocks for break/continue
+        self.loop_exit_stack.append(exit_block)
+        self.loop_continue_stack.append(inc_block)  # continue jumps to increment
+
         # Jump to condition
         self.builder.branch(cond_block)
 
@@ -446,6 +493,10 @@ class IRToLLVMConverter(IRVisitor):
         next_val = self.builder.add(loop_var_val, step_val, name="for.inc")
         self.builder.store(next_val, loop_var_ptr)
         self.builder.branch(cond_block)
+
+        # Pop loop blocks from stack
+        self.loop_exit_stack.pop()
+        self.loop_continue_stack.pop()
 
         # Exit
         self.builder.position_at_end(exit_block)

@@ -439,6 +439,36 @@ class IRReturn(IRStatement):
         return visitor.visit_return(self)
 
 
+class IRBreak(IRStatement):
+    """IR representation of break statements."""
+
+    def __init__(self, location: Optional[IRLocation] = None):
+        super().__init__(location)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize break statement to dictionary representation."""
+        return {"type": "break"}
+
+    def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
+        return visitor.visit_break(self)
+
+
+class IRContinue(IRStatement):
+    """IR representation of continue statements."""
+
+    def __init__(self, location: Optional[IRLocation] = None):
+        super().__init__(location)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize continue statement to dictionary representation."""
+        return {"type": "continue"}
+
+    def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
+        return visitor.visit_continue(self)
+
+
 class IRIf(IRStatement):
     """IR representation of if statements."""
 
@@ -615,6 +645,16 @@ class IRVisitor(ABC):
         pass
 
     @abstractmethod
+    def visit_break(self, node: "IRBreak") -> Any:
+        """Visit a break statement node."""
+        pass
+
+    @abstractmethod
+    def visit_continue(self, node: "IRContinue") -> Any:
+        """Visit a continue statement node."""
+        pass
+
+    @abstractmethod
     def visit_if(self, node: IRIf) -> Any:
         """Visit an if statement node."""
         pass
@@ -685,6 +725,10 @@ class IRBuilder:
             return self._build_assignment(node)
         elif isinstance(node, ast.Return):
             return self._build_return(node)
+        elif isinstance(node, ast.Break):
+            return IRBreak(self._get_location(node))
+        elif isinstance(node, ast.Continue):
+            return IRContinue(self._get_location(node))
         elif isinstance(node, ast.If):
             return self._build_if(node)
         elif isinstance(node, ast.While):
@@ -791,43 +835,54 @@ class IRBuilder:
 
         return IRBinaryOperation(left, operator, right, result_type, self._get_location(node))
 
-    def _build_comparison(self, node: ast.Compare) -> IRBinaryOperation:
+    def _build_comparison(self, node: ast.Compare) -> IRExpression:
         """Build comparison operation.
 
-        Comparisons in Python can chain (e.g., a < b < c), but for now we only
-        support simple binary comparisons.
+        Supports chained comparisons like a < b < c by converting to
+        (a < b) and (b < c).
         """
-        # For simplicity, only handle single comparison (left op comparator)
-        # TODO: Support chained comparisons like a < b < c
-        if len(node.ops) > 1:
-            # Chained comparison - not yet supported, return VOID
-            return IRLiteral(None, IRType(IRDataType.VOID), self._get_location(node))  # type: ignore[return-value]
+        # Handle simple single comparison
+        if len(node.ops) == 1:
+            left = self._build_expression(node.left)
+            right = self._build_expression(node.comparators[0])
+            operator = self._get_comparison_operator_string(node.ops[0])
+            result_type = IRType(IRDataType.BOOL)
+            return IRBinaryOperation(left, operator, right, result_type, self._get_location(node))
 
-        left = self._build_expression(node.left)
-        right = self._build_expression(node.comparators[0])
-        operator = self._get_comparison_operator_string(node.ops[0])
+        # Handle chained comparisons: a < b < c becomes (a < b) and (b < c)
+        comparisons = []
+        left_expr = self._build_expression(node.left)
 
-        # Comparisons always return bool
-        result_type = IRType(IRDataType.BOOL)
+        for i, (op, comparator) in enumerate(zip(node.ops, node.comparators)):
+            right_expr = self._build_expression(comparator)
+            operator = self._get_comparison_operator_string(op)
+            result_type = IRType(IRDataType.BOOL)
 
-        return IRBinaryOperation(left, operator, right, result_type, self._get_location(node))
+            # Create comparison: left op right
+            comparison = IRBinaryOperation(left_expr, operator, right_expr, result_type, self._get_location(node))
+            comparisons.append(comparison)
 
-    def _build_bool_operation(self, node: ast.BoolOp) -> IRBinaryOperation:
+            # For next iteration, left becomes current right
+            left_expr = right_expr
+
+        # Chain all comparisons with 'and'
+        result = comparisons[0]
+        for comparison in comparisons[1:]:
+            result = IRBinaryOperation(result, "and", comparison, IRType(IRDataType.BOOL), self._get_location(node))
+
+        return result
+
+    def _build_bool_operation(self, node: ast.BoolOp) -> IRExpression:
         """Build boolean operation (and/or).
 
-        Python's BoolOp can have multiple values (a and b and c), but we'll
-        convert to nested binary operations for simplicity.
+        Supports chaining like a and b and c by converting to nested
+        binary operations: (a and b) and c.
         """
-        # For now, only handle binary case (2 values)
-        if len(node.values) != 2:
-            # Multiple values - would need to create nested operations
-            # For now, return VOID
+        if len(node.values) < 2:
+            # Need at least 2 values
             return IRLiteral(None, IRType(IRDataType.VOID), self._get_location(node))  # type: ignore[return-value]
 
-        left = self._build_expression(node.values[0])
-        right = self._build_expression(node.values[1])
-
-        # Map boolean operator
+        # Determine the operator
         if isinstance(node.op, ast.And):
             operator = "and"
         elif isinstance(node.op, ast.Or):
@@ -835,10 +890,15 @@ class IRBuilder:
         else:
             return IRLiteral(None, IRType(IRDataType.VOID), self._get_location(node))  # type: ignore[return-value]
 
-        # Boolean operations return bool
-        result_type = IRType(IRDataType.BOOL)
+        # Build first expression
+        result = self._build_expression(node.values[0])
 
-        return IRBinaryOperation(left, operator, right, result_type, self._get_location(node))
+        # Chain with remaining values
+        for value in node.values[1:]:
+            right = self._build_expression(value)
+            result = IRBinaryOperation(result, operator, right, IRType(IRDataType.BOOL), self._get_location(node))
+
+        return result
 
     def _build_unary_operation(self, node: ast.UnaryOp) -> IRExpression:
         """Build unary operation (not, -, +, ~)."""
