@@ -73,6 +73,10 @@ class BenchmarkRunner:
                 # Create go.mod file
                 go_mod_content = "module mgenproject\n\ngo 1.21\n"
                 (build_dir / "go.mod").write_text(go_mod_content)
+            elif backend == "llvm":
+                # LLVM only needs vec_int_minimal.c (compilation handles linking)
+                # Runtime is compiled during benchmark compilation, not copied
+                pass  # No runtime files to copy
             else:
                 # Other backends: copy directly to build directory
                 for src_file in src_runtime_dir.glob("*"):
@@ -105,6 +109,7 @@ class BenchmarkRunner:
             "go": ".go",
             "haskell": ".hs",
             "ocaml": ".ml",
+            "llvm": ".ll",
         }
         ext = extensions.get(backend)
         if not ext:
@@ -304,6 +309,57 @@ class BenchmarkRunner:
                     "-o", str((output_dir / executable_name).absolute())
                 ]
                 result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
+                if result.returncode != 0:
+                    return False, result.stderr[:200]
+                return True, ""
+
+            elif backend == "llvm":
+                # Compile LLVM IR - llc + clang with vec_int runtime
+                project_root = Path(__file__).parent.parent
+                runtime_path = project_root / "src" / "mgen" / "backends" / "llvm" / "runtime"
+
+                # Runtime C files
+                runtime_c_files = [
+                    runtime_path / "vec_int_minimal.c",
+                    runtime_path / "vec_vec_int_minimal.c",
+                ]
+
+                # Find llc (try Homebrew path first, then system)
+                llc_paths = [
+                    "/opt/homebrew/opt/llvm/bin/llc",
+                    "llc"
+                ]
+                llc_cmd = next((p for p in llc_paths if shutil.which(p) or Path(p).exists()), None)
+                if not llc_cmd:
+                    return False, "llc not found"
+
+                # Compile LLVM IR to object file
+                obj_file = output_dir / f"{executable_name}.o"
+                cmd = [llc_cmd, "-filetype=obj", str(source_file.absolute()), "-o", str(obj_file.absolute())]
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    return False, result.stderr[:200]
+
+                # Compile runtime libraries
+                runtime_objs = []
+                for runtime_c_file in runtime_c_files:
+                    if not runtime_c_file.exists():
+                        continue  # Skip if doesn't exist
+                    runtime_obj = output_dir / f"{runtime_c_file.stem}.o"
+                    cmd = ["clang", "-c", "-o", str(runtime_obj.absolute()), str(runtime_c_file.absolute())]
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        return False, result.stderr[:200]
+                    runtime_objs.append(runtime_obj)
+
+                # Link object files
+                cmd = [
+                    "clang",
+                    str(obj_file.absolute()),
+                    *[str(obj.absolute()) for obj in runtime_objs],
+                    "-o", str((output_dir / executable_name).absolute())
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True)
                 if result.returncode != 0:
                     return False, result.stderr[:200]
                 return True, ""

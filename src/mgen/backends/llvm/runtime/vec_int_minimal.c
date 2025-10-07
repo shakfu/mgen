@@ -74,6 +74,14 @@ long long vec_int_at(vec_int* vec, size_t index) {
     return vec->data[index];
 }
 
+// Set element at index
+void vec_int_set(vec_int* vec, size_t index, long long value) {
+    if (!vec || index >= vec->size) {
+        exit(1);
+    }
+    vec->data[index] = value;
+}
+
 // Get size of vector
 size_t vec_int_size(vec_int* vec) {
     if (!vec) {

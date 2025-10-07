@@ -106,6 +106,11 @@ class LLVMRuntimeDeclarations:
         func = ir.Function(self.module, func_type, name="vec_int_reserve")
         self.function_decls["vec_int_reserve"] = func
 
+        # void vec_int_set(vec_int* vec, size_t index, long long value)
+        func_type = ir.FunctionType(void, [vec_int_ptr, i64, i64])
+        func = ir.Function(self.module, func_type, name="vec_int_set")
+        self.function_decls["vec_int_set"] = func
+
     def get_function(self, name: str) -> ir.Function:
         """Get declared function by name.
 
@@ -122,7 +127,84 @@ class LLVMRuntimeDeclarations:
             raise KeyError(f"Function '{name}' not declared. Call declare_*_functions() first.")
         return self.function_decls[name]
 
+    def get_vec_vec_int_type(self) -> ir.Type:
+        """Get or create vec_vec_int struct type.
+
+        C struct definition:
+            typedef struct {
+                vec_int* data;
+                size_t size;
+                size_t capacity;
+            } vec_vec_int;
+
+        Returns:
+            LLVM struct type for vec_vec_int
+        """
+        if "vec_vec_int" in self.struct_types:
+            return self.struct_types["vec_vec_int"]
+
+        # Get vec_int type first
+        vec_int_type = self.get_vec_int_type()
+        vec_int_ptr = vec_int_type.as_pointer()
+
+        # Create named struct type for vec_vec_int
+        vec_vec_int_type = self.module.context.get_identified_type("struct.vec_vec_int")
+
+        if not vec_vec_int_type.is_opaque:
+            self.struct_types["vec_vec_int"] = vec_vec_int_type
+            return vec_vec_int_type
+
+        vec_vec_int_type.set_body(
+            vec_int_ptr,       # data: vec_int* (pointer to array of vec_int)
+            ir.IntType(64),    # size
+            ir.IntType(64),    # capacity
+        )
+
+        self.struct_types["vec_vec_int"] = vec_vec_int_type
+        return vec_vec_int_type
+
+    def declare_vec_vec_int_functions(self) -> None:
+        """Declare vec_vec_int C runtime functions in LLVM IR."""
+        vec_vec_int_type = self.get_vec_vec_int_type()
+        vec_vec_int_ptr = vec_vec_int_type.as_pointer()
+        vec_int_type = self.get_vec_int_type()
+        vec_int_ptr = vec_int_type.as_pointer()
+        i64 = ir.IntType(64)
+        void = ir.VoidType()
+
+        # void vec_vec_int_init_ptr(vec_vec_int* out)
+        func_type = ir.FunctionType(void, [vec_vec_int_ptr])
+        func = ir.Function(self.module, func_type, name="vec_vec_int_init_ptr")
+        self.function_decls["vec_vec_int_init_ptr"] = func
+
+        # void vec_vec_int_push(vec_vec_int* vec, vec_int row)
+        # Note: row is passed by value (struct copy)
+        func_type = ir.FunctionType(void, [vec_vec_int_ptr, vec_int_type])
+        func = ir.Function(self.module, func_type, name="vec_vec_int_push")
+        self.function_decls["vec_vec_int_push"] = func
+
+        # vec_int* vec_vec_int_at(vec_vec_int* vec, size_t index)
+        func_type = ir.FunctionType(vec_int_ptr, [vec_vec_int_ptr, i64])
+        func = ir.Function(self.module, func_type, name="vec_vec_int_at")
+        self.function_decls["vec_vec_int_at"] = func
+
+        # size_t vec_vec_int_size(vec_vec_int* vec)
+        func_type = ir.FunctionType(i64, [vec_vec_int_ptr])
+        func = ir.Function(self.module, func_type, name="vec_vec_int_size")
+        self.function_decls["vec_vec_int_size"] = func
+
+        # void vec_vec_int_free(vec_vec_int* vec)
+        func_type = ir.FunctionType(void, [vec_vec_int_ptr])
+        func = ir.Function(self.module, func_type, name="vec_vec_int_free")
+        self.function_decls["vec_vec_int_free"] = func
+
+        # void vec_vec_int_clear(vec_vec_int* vec)
+        func_type = ir.FunctionType(void, [vec_vec_int_ptr])
+        func = ir.Function(self.module, func_type, name="vec_vec_int_clear")
+        self.function_decls["vec_vec_int_clear"] = func
+
     def declare_all(self) -> None:
         """Declare all runtime library functions and types."""
         self.declare_vec_int_functions()
+        self.declare_vec_vec_int_functions()
         # Future: declare map, set, string functions

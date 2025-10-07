@@ -24,6 +24,8 @@ classifiers = [
 keywords = ["code-generation", "compiler", "metaprogramming"]
 dependencies = [
     "typing-extensions>=4.0.0",
+    "llvmlite>=0.43.0",
+    "z3-solver>=4.13.0",
 ]
 
 [project.optional-dependencies]

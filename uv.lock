@@ -547,7 +547,10 @@ name = "mgen"
 version = "0.1.46"
 source = { editable = "." }
 dependencies = [
+    { name = "llvmlite", version = "0.43.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "llvmlite", version = "0.45.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "typing-extensions" },
+    { name = "z3-solver" },
 ]
 
 [package.optional-dependencies]
@@ -582,7 +585,9 @@ llvm = [
 
 [package.metadata]
 requires-dist = [
+    { name = "llvmlite", specifier = ">=0.43.0" },
     { name = "typing-extensions", specifier = ">=4.0.0" },
+    { name = "z3-solver", specifier = ">=4.13.0" },
     { name = "z3-solver", marker = "extra == 'verification'", specifier = ">=4.13.0" },
     { name = "z3-solver", marker = "extra == 'z3'", specifier = ">=4.13.0" },
 ]

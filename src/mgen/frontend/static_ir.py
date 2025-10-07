@@ -867,12 +867,29 @@ class IRBuilder:
 
     def _build_assignment(self, node: ast.Assign) -> Optional[IRStatement]:
         """Build regular assignment."""
-        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-            target_name = node.targets[0].id
-            if target_name in self.symbol_table:
-                target_var = self.symbol_table[target_name]
-                value_expr = self._build_expression(node.value)
-                return IRAssignment(target_var, value_expr, self._get_location(node))
+        if len(node.targets) == 1:
+            target = node.targets[0]
+
+            # Handle simple variable assignment
+            if isinstance(target, ast.Name):
+                target_name = target.id
+                if target_name in self.symbol_table:
+                    target_var = self.symbol_table[target_name]
+                    value_expr = self._build_expression(node.value)
+                    return IRAssignment(target_var, value_expr, self._get_location(node))
+
+            # Handle subscript assignment (arr[i] = val)
+            elif isinstance(target, ast.Subscript):
+                # Build as a function call to __setitem__(base, index, value)
+                base = self._build_expression(target.value)
+                index = self._build_expression(target.slice)
+                value = self._build_expression(node.value)
+
+                # Create synthetic function call for subscript assignment
+                # This will be translated to vec_int_set or similar by backend
+                return_type = IRType(IRDataType.VOID)
+                setitem_call = IRFunctionCall("__setitem__", [base, index, value], return_type, self._get_location(node))
+                return IRExpressionStatement(setitem_call, self._get_location(node))
 
         return None
 
@@ -1108,18 +1125,19 @@ class IRBuilder:
         """Build list literal from AST.
 
         For empty list [], creates an IR literal with LIST type.
-        For non-empty lists, elements would need to be processed (future work).
+        For non-empty lists, elements are stored and will be initialized by backend.
         """
-        # For now, only support empty lists []
-        # Element type inference would be needed for non-empty lists
+        # Build list literal with elements
+        ir_type = IRType(IRDataType.LIST)
+
         if len(node.elts) == 0:
-            # Empty list - represented as literal with LIST type
-            ir_type = IRType(IRDataType.LIST)
+            # Empty list
             return IRLiteral([], ir_type, self._get_location(node))
         else:
-            # Non-empty list - not yet implemented
-            # Would need to infer element type and generate initialization code
-            raise NotImplementedError(f"Non-empty list literals not yet supported: {ast.unparse(node)}")
+            # Non-empty list - store element expressions
+            # Backend will generate initialization code (allocate + push each element)
+            elements = [self._build_expression(elt) for elt in node.elts]
+            return IRLiteral(elements, ir_type, self._get_location(node))
 
     def _build_subscript(self, node: ast.Subscript) -> IRExpression:
         """Build subscript expression (array/list indexing).

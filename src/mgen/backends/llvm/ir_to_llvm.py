@@ -387,18 +387,27 @@ class IRToLLVMConverter(IRVisitor):
         llvm_type = self._convert_type(node.result_type)
 
         if node.result_type.base_type == IRDataType.LIST:
-            # Empty list [] - allocate and initialize with vec_int_init_ptr()
+            # List literal - allocate and initialize
             if self.builder is None:
                 raise RuntimeError("Builder not initialized - must be inside a function")
 
             vec_int_type = self.runtime.get_vec_int_type()
             vec_int_init_ptr_func = self.runtime.get_function("vec_int_init_ptr")
+            vec_int_push_func = self.runtime.get_function("vec_int_push")
 
             # Allocate space for the vec_int struct on stack
             vec_ptr = self.builder.alloca(vec_int_type, name="list_tmp")
 
             # Initialize it by calling vec_int_init_ptr() which takes a pointer
             self.builder.call(vec_int_init_ptr_func, [vec_ptr], name="")
+
+            # If list has elements, push them
+            if isinstance(node.value, list) and len(node.value) > 0:
+                for element_expr in node.value:
+                    # Visit the element expression to get its LLVM value
+                    element_val = element_expr.accept(self)
+                    # Push the element to the list
+                    self.builder.call(vec_int_push_func, [vec_ptr, element_val], name="")
 
             # Return the pointer
             return vec_ptr
@@ -585,6 +594,21 @@ class IRToLLVMConverter(IRVisitor):
 
             # Call vec_int_at
             return self.builder.call(vec_int_at_func, [list_ptr, index], name="list_at")
+
+        elif node.function_name == "__setitem__":
+            # list[index] = value -> vec_int_set(list_ptr, index, value)
+            if len(node.arguments) != 3:
+                raise RuntimeError("__setitem__() requires exactly 3 arguments (list, index, value)")
+
+            list_ptr = node.arguments[0].accept(self)  # Already a pointer
+            index = node.arguments[1].accept(self)
+            value = node.arguments[2].accept(self)
+
+            # Get vec_int_set function
+            vec_int_set_func = self.runtime.get_function("vec_int_set")
+
+            # Call vec_int_set - it modifies the list in place
+            return self.builder.call(vec_int_set_func, [list_ptr, index, value], name="")
 
         # Handle builtin functions
         elif node.function_name == "len":

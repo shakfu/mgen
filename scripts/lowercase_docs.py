@@ -59,9 +59,16 @@ def rename_to_lowercase(root_dir: Path, dry_run: bool = False, verbose: bool = F
 
         new_path = lowercase_name(path)
 
-        # Check if target already exists (case-insensitive duplicate)
-        if new_path.exists() and new_path != path:
-            # Lowercase version exists, remove the uppercase version
+        # On case-insensitive filesystems, path.samefile(new_path) will be True
+        # if they refer to the same file with different casing
+        try:
+            is_same_file = path.samefile(new_path)
+        except (OSError, FileNotFoundError):
+            is_same_file = False
+
+        # Check if target already exists as a different file (true duplicate)
+        if new_path.exists() and not is_same_file:
+            # Lowercase version exists as a separate file, remove the uppercase version
             action = "Would remove duplicate" if dry_run else "Removing duplicate"
             print(f"{action}: {path.relative_to(root_dir)} (lowercase version exists)")
             if not dry_run:
