@@ -588,3 +588,71 @@ def main() -> int:
         exit_code = self._execute_llvm_ir(llvm_ir)
         # fib(10)=55, fact(5)=120, is_prime(17)=1 => 55+120+1=176
         assert exit_code == 176
+
+    def test_unary_operators_execution(self):
+        """Test unary operators execution."""
+        python_code = """
+def test_unary(x: int) -> int:
+    a: int = -x
+    b: int = +x
+    c: int = ~x
+    return a + b + c
+
+def test_negative() -> int:
+    x: int = -42
+    y: int = -10
+    return x + y
+
+def main() -> int:
+    result1: int = test_unary(5)
+    result2: int = test_negative()
+    return result1 + result2
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # -5+5-6 + -42-10 = -6 + -52 = -58 => 256-58=198 (unsigned byte wrapping)
+        assert exit_code == 198
+
+    def test_boolean_literals_execution(self):
+        """Test boolean literals execution."""
+        python_code = """
+def test_bool() -> int:
+    a: bool = True
+    b: bool = False
+    if a and not b:
+        return 1
+    return 0
+
+def main() -> int:
+    return test_bool()
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        assert exit_code == 1
+
+    def test_multiple_early_returns_execution(self):
+        """Test multiple early return paths."""
+        python_code = """
+def classify_number(x: int) -> int:
+    if x < 0:
+        return -1
+    if x == 0:
+        return 0
+    if x < 10:
+        return 1
+    if x < 100:
+        return 2
+    return 3
+
+def main() -> int:
+    a: int = classify_number(-5)
+    b: int = classify_number(0)
+    c: int = classify_number(5)
+    d: int = classify_number(50)
+    e: int = classify_number(200)
+    return a + b + c + d + e
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # -1 + 0 + 1 + 2 + 3 = 5
+        assert exit_code == 5
