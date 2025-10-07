@@ -200,6 +200,50 @@ class IRToLLVMConverter(IRVisitor):
             elif node.operator == "/":
                 return self.builder.fdiv(left, right, name="fdiv_tmp")
 
+        # Boolean operations (comparisons)
+        elif node.result_type.base_type == IRDataType.BOOL:
+            # Determine operand types to choose correct comparison instruction
+            left_type = node.left.result_type.base_type
+
+            if left_type == IRDataType.INT:
+                # Integer comparisons (icmp)
+                if node.operator == "<":
+                    return self.builder.icmp_signed("<", left, right, name="cmp_tmp")
+                elif node.operator == "<=":
+                    return self.builder.icmp_signed("<=", left, right, name="cmp_tmp")
+                elif node.operator == ">":
+                    return self.builder.icmp_signed(">", left, right, name="cmp_tmp")
+                elif node.operator == ">=":
+                    return self.builder.icmp_signed(">=", left, right, name="cmp_tmp")
+                elif node.operator == "==":
+                    return self.builder.icmp_signed("==", left, right, name="cmp_tmp")
+                elif node.operator == "!=":
+                    return self.builder.icmp_signed("!=", left, right, name="cmp_tmp")
+            elif left_type == IRDataType.FLOAT:
+                # Float comparisons (fcmp)
+                if node.operator == "<":
+                    return self.builder.fcmp_ordered("<", left, right, name="fcmp_tmp")
+                elif node.operator == "<=":
+                    return self.builder.fcmp_ordered("<=", left, right, name="fcmp_tmp")
+                elif node.operator == ">":
+                    return self.builder.fcmp_ordered(">", left, right, name="fcmp_tmp")
+                elif node.operator == ">=":
+                    return self.builder.fcmp_ordered(">=", left, right, name="fcmp_tmp")
+                elif node.operator == "==":
+                    return self.builder.fcmp_ordered("==", left, right, name="fcmp_tmp")
+                elif node.operator == "!=":
+                    return self.builder.fcmp_ordered("!=", left, right, name="fcmp_tmp")
+            elif left_type == IRDataType.BOOL:
+                # Boolean comparisons
+                if node.operator == "==":
+                    return self.builder.icmp_signed("==", left, right, name="cmp_tmp")
+                elif node.operator == "!=":
+                    return self.builder.icmp_signed("!=", left, right, name="cmp_tmp")
+                elif node.operator == "and":
+                    return self.builder.and_(left, right, name="and_tmp")
+                elif node.operator == "or":
+                    return self.builder.or_(left, right, name="or_tmp")
+
         raise NotImplementedError(f"Binary operator '{node.operator}' not implemented for type {node.result_type.base_type}")
 
     def visit_literal(self, node: IRLiteral) -> ir.Constant:
@@ -223,8 +267,12 @@ class IRToLLVMConverter(IRVisitor):
             # String literals are handled as global constants
             # For now, return null pointer as placeholder
             return ir.Constant(llvm_type, None)
+        elif node.result_type.base_type == IRDataType.VOID:
+            # VOID literals shouldn't exist - this is likely a bug in IR generation
+            # Return null pointer as workaround
+            return ir.Constant(ir.IntType(8).as_pointer(), None)
 
-        raise NotImplementedError(f"Literal type {node.result_type.base_type} not implemented")
+        raise NotImplementedError(f"Literal type {node.result_type.base_type} not implemented (value={node.value})")
 
     def visit_variable_reference(self, node: IRVariableReference) -> ir.LoadInstr:
         """Convert IR variable reference to LLVM load instruction.
