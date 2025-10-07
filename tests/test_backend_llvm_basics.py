@@ -656,3 +656,93 @@ def main() -> int:
         exit_code = self._execute_llvm_ir(llvm_ir)
         # -1 + 0 + 1 + 2 + 3 = 5
         assert exit_code == 5
+
+    def test_range_two_args_execution(self):
+        """Test range(start, stop) - should iterate from start to stop-1."""
+        python_code = """
+def main() -> int:
+    total: int = 0
+    # range(2, 7) should give 2, 3, 4, 5, 6
+    for i in range(2, 7):
+        total += i
+    return total
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # 2 + 3 + 4 + 5 + 6 = 20
+        assert exit_code == 20
+
+    def test_range_three_args_execution(self):
+        """Test range(start, stop, step) - should iterate with custom step."""
+        python_code = """
+def main() -> int:
+    total: int = 0
+    # range(0, 10, 2) should give 0, 2, 4, 6, 8
+    for i in range(0, 10, 2):
+        total += i
+    return total
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # 0 + 2 + 4 + 6 + 8 = 20
+        assert exit_code == 20
+
+    def test_range_negative_step_execution(self):
+        """Test range with negative step - should iterate backwards."""
+        python_code = """
+def main() -> int:
+    total: int = 0
+    # range(10, 0, -2) should give 10, 8, 6, 4, 2
+    for i in range(10, 0, -2):
+        total += i
+    return total
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # 10 + 8 + 6 + 4 + 2 = 30
+        assert exit_code == 30
+
+    def test_void_function_call_execution(self):
+        """Test calling void functions (expression statements)."""
+        python_code = """
+def increment_global(x: int) -> None:
+    # For this test, we'll use a global-style approach with return value
+    # Since we can't test true global state, we'll use a helper that returns a value
+    pass
+
+def add_values(a: int, b: int) -> int:
+    return a + b
+
+def main() -> int:
+    # Test that void function calls work (even if they do nothing)
+    increment_global(5)
+    # Test that we can still call and use return values
+    result: int = add_values(10, 20)
+    return result
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        assert exit_code == 30
+
+    def test_recursion_execution(self):
+        """Test recursive function calls."""
+        python_code = """
+def factorial(n: int) -> int:
+    if n <= 1:
+        return 1
+    return n * factorial(n - 1)
+
+def fibonacci(n: int) -> int:
+    if n <= 1:
+        return n
+    return fibonacci(n - 1) + fibonacci(n - 2)
+
+def main() -> int:
+    fact5: int = factorial(5)
+    fib7: int = fibonacci(7)
+    return fact5 + fib7
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # 5! = 120, fib(7) = 13, total = 133
+        assert exit_code == 133

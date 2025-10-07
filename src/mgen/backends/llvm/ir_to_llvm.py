@@ -15,6 +15,7 @@ from ...frontend.static_ir import (
     IRContinue,
     IRDataType,
     IRExpression,
+    IRExpressionStatement,
     IRFor,
     IRFunction,
     IRFunctionCall,
@@ -411,6 +412,19 @@ class IRToLLVMConverter(IRVisitor):
         # Branch to the current loop's condition block
         self.builder.branch(self.loop_continue_stack[-1])
 
+    def visit_expression_statement(self, node: IRExpressionStatement) -> None:
+        """Convert IR expression statement to LLVM.
+
+        Args:
+            node: IR expression statement to convert
+        """
+        if self.builder is None:
+            raise RuntimeError("Builder not initialized - must be inside a function")
+
+        # Evaluate the expression (e.g., void function call)
+        # The expression's side effects (like function calls) will be executed
+        node.expression.accept(self)
+
     def visit_if(self, node: IRIf) -> None:
         """Convert IR if statement to LLVM basic blocks with branches.
 
@@ -519,11 +533,30 @@ class IRToLLVMConverter(IRVisitor):
         # Jump to condition
         self.builder.branch(cond_block)
 
-        # Condition: loop_var < end
+        # Condition: loop_var < end (or > end for negative step)
         self.builder.position_at_end(cond_block)
         loop_var_val = self.builder.load(loop_var_ptr)
         end_val = node.end.accept(self)
-        cond = self.builder.icmp_signed("<", loop_var_val, end_val, name="for.cond")
+
+        # Determine comparison operator based on step value
+        # For negative steps, use >, for positive steps use <
+        from ...frontend.static_ir import IRBinaryOperation, IRLiteral
+
+        def is_negative_step(step: Optional[IRExpression]) -> bool:
+            """Check if step is a negative constant."""
+            if step is None:
+                return False
+            if isinstance(step, IRLiteral):
+                return isinstance(step.value, int) and step.value < 0
+            # Handle negative literals encoded as 0 - N
+            if isinstance(step, IRBinaryOperation) and step.operator == "-":
+                if isinstance(step.left, IRLiteral) and step.left.value == 0:
+                    if isinstance(step.right, IRLiteral) and isinstance(step.right.value, int):
+                        return step.right.value > 0
+            return False
+
+        comparison_op = ">" if is_negative_step(node.step) else "<"
+        cond = self.builder.icmp_signed(comparison_op, loop_var_val, end_val, name="for.cond")
         self.builder.cbranch(cond, body_block, exit_block)
 
         # Body

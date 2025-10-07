@@ -495,6 +495,23 @@ class IRContinue(IRStatement):
         return visitor.visit_continue(self)
 
 
+class IRExpressionStatement(IRStatement):
+    """IR representation of expression statements (e.g., void function calls)."""
+
+    def __init__(self, expression: "IRExpression", location: Optional[IRLocation] = None):
+        super().__init__(location)
+        self.expression = expression
+        self.add_child(expression)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize expression statement to dictionary representation."""
+        return {"type": "expression_statement", "expression": self.expression.to_dict()}
+
+    def accept(self, visitor: "IRVisitor") -> Any:
+        """Accept a visitor for traversal (visitor pattern)."""
+        return visitor.visit_expression_statement(self)
+
+
 class IRIf(IRStatement):
     """IR representation of if statements."""
 
@@ -686,6 +703,11 @@ class IRVisitor(ABC):
         pass
 
     @abstractmethod
+    def visit_expression_statement(self, node: "IRExpressionStatement") -> Any:
+        """Visit an expression statement node."""
+        pass
+
+    @abstractmethod
     def visit_if(self, node: IRIf) -> Any:
         """Visit an if statement node."""
         pass
@@ -715,13 +737,33 @@ class IRBuilder:
         self.symbol_table: dict[str, IRVariable] = {}
 
     def build_from_ast(self, tree: ast.AST, module_name: str = "main") -> IRModule:
-        """Build IR from Python AST."""
+        """Build IR from Python AST using a two-pass approach.
+
+        Pass 1: Create function declarations (signatures) so recursive calls can resolve types
+        Pass 2: Build function bodies with full type information
+        """
         self.current_module = IRModule(module_name)
 
+        # Pass 1: Collect function signatures
+        function_nodes: list[ast.FunctionDef] = []
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
-                ir_func = self._build_function(node)
-                self.current_module.add_function(ir_func)
+                function_nodes.append(node)
+                # Create function declaration with signature only
+                return_type = self._extract_ir_type(node.returns) if node.returns else IRType(IRDataType.VOID)
+                func_decl = IRFunction(node.name, return_type)
+                # Add parameters
+                for arg in node.args.args:
+                    param_type = self._extract_ir_type(arg.annotation) if arg.annotation else IRType(IRDataType.VOID)
+                    param = IRVariable(arg.arg, param_type)
+                    func_decl.add_parameter(param)
+                self.current_module.add_function(func_decl)
+
+        # Pass 2: Build function bodies
+        for i, node in enumerate(function_nodes):
+            ir_func = self._build_function(node)
+            # Replace the declaration with the full function
+            self.current_module.functions[i] = ir_func
 
         return self.current_module
 
@@ -762,6 +804,10 @@ class IRBuilder:
             return IRBreak(self._get_location(node))
         elif isinstance(node, ast.Continue):
             return IRContinue(self._get_location(node))
+        elif isinstance(node, ast.Expr):
+            # Expression statement (e.g., void function call)
+            expr = self._build_expression(node.value)
+            return IRExpressionStatement(expr, self._get_location(node))
         elif isinstance(node, ast.If):
             return self._build_if(node)
         elif isinstance(node, ast.While):
