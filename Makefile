@@ -4,8 +4,8 @@ BENCHMARK_RESULTS_DIR := build/benchmark_results
 
 .PHONY: help install test test-unit test-integration test-translation \
 		test-py2c test-benchmark test-build clean lint format type-check \
-		build docs benchmark benchmark-algorithms benchmark-data-structures \
-		benchmark-report benchmark-clean check snap
+		build docs docs-clean docs-serve benchmark benchmark-algorithms \
+		benchmark-data-structures benchmark-report benchmark-clean check snap
 
 # Default target
 help:
@@ -46,7 +46,9 @@ help:
 	@echo "  clean         Clean build artifacts"
 	@echo ""
 	@echo "Documentation:"
-	@echo "  docs          Build documentation"
+	@echo "  docs          Build Sphinx documentation"
+	@echo "  docs-clean    Clean documentation build"
+	@echo "  docs-serve    Open documentation in browser"
 
 # Installation
 install:
@@ -128,8 +130,18 @@ clean:
 
 # Documentation
 docs:
-	@echo "Documentation build not yet implemented"
-	@echo "Planned: Sphinx documentation in doc/ directory"
+	@echo "Building Sphinx documentation..."
+	cd docs/sphinx && $(MAKE) html
+	@echo ""
+	@echo "Documentation built successfully!"
+	@echo "Open docs/sphinx/build/index.html in your browser"
+
+docs-clean:
+	cd docs/sphinx && $(MAKE) clean
+
+docs-serve:
+	@echo "Opening documentation in browser..."
+	@open docs/sphinx/build/index.html || xdg-open docs/sphinx/build/index.html 2>/dev/null || echo "Please open docs/sphinx/build/index.html manually"
 
 # Development utilities
 run-examples:
