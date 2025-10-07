@@ -35,6 +35,9 @@ class IRToLLVMConverter(IRVisitor):
     def __init__(self) -> None:
         """Initialize the LLVM IR converter."""
         self.module: ir.Module = ir.Module(name="mgen_module")
+        # Set target triple to empty string to use native target
+        # llvmlite will use the host's target triple
+        self.module.triple = ""
         self.builder: Optional[ir.IRBuilder] = None
         self.func_symtab: dict[str, ir.Function] = {}
         self.var_symtab: dict[str, ir.AllocaInstr] = {}

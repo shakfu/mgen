@@ -1,5 +1,6 @@
 """Basic tests for LLVM backend."""
 
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -7,6 +8,9 @@ import pytest
 
 from mgen.backends.llvm import IRToLLVMConverter, LLVMBackend
 from mgen.frontend.static_ir import build_ir_from_code
+
+# Check if LLVM tools are available
+LLVM_TOOLS_AVAILABLE = shutil.which("llc") is not None and shutil.which("clang") is not None
 
 
 class TestLLVMIRGeneration:
@@ -165,6 +169,66 @@ def multiply(x: int, y: int) -> int:
             assert len(content) > 0
             assert "define" in content
             assert '@"multiply"' in content or "@multiply" in content
+
+
+class TestLLVMCompilation:
+    """Test LLVM compilation (requires llc and clang)."""
+
+    @pytest.mark.skipif(not LLVM_TOOLS_AVAILABLE, reason="LLVM tools (llc, clang) not available")
+    def test_compile_to_binary(self):
+        """Test compiling LLVM IR to native binary."""
+        python_code = """
+def fibonacci(n: int) -> int:
+    if n <= 1:
+        return n
+    a: int = 0
+    b: int = 1
+    i: int = 2
+    while i <= n:
+        temp: int = a + b
+        a = b
+        b = temp
+        i = i + 1
+    return b
+
+def main() -> int:
+    result: int = fibonacci(10)
+    return result
+"""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Generate LLVM IR
+            backend = LLVMBackend()
+            llvm_ir = backend.get_emitter().emit_module(python_code)
+
+            # Write IR to file
+            ir_file = Path(temp_dir) / "fibonacci.ll"
+            ir_file.write_text(llvm_ir)
+
+            # Compile to binary
+            output_dir = Path(temp_dir)
+            success = backend.get_builder().compile_direct(str(ir_file), str(output_dir))
+
+            # Verify compilation succeeded
+            assert success, "Compilation should succeed"
+
+            # Verify binary exists
+            binary_path = output_dir / "fibonacci"
+            assert binary_path.exists(), "Binary should be created"
+
+    @pytest.mark.skipif(not LLVM_TOOLS_AVAILABLE, reason="LLVM tools (llc, clang) not available")
+    def test_makefile_generation(self):
+        """Test Makefile generation for LLVM IR."""
+        backend = LLVMBackend()
+        builder = backend.get_builder()
+
+        makefile = builder.generate_build_file(["test.ll"], "test_program")
+
+        # Verify Makefile has required components
+        assert "LLC" in makefile
+        assert "CLANG" in makefile
+        assert "test_program" in makefile
+        assert "test.ll" in makefile
 
 
 if __name__ == "__main__":

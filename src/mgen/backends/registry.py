@@ -88,6 +88,14 @@ class BackendRegistry:
         except ImportError:
             pass  # OCaml backend not yet implemented
 
+        # Try to register LLVM backend
+        try:
+            from .llvm.backend import LLVMBackend
+
+            self.register_backend("llvm", LLVMBackend)
+        except ImportError:
+            pass  # LLVM backend not yet implemented
+
 
 # Global registry instance
 registry = BackendRegistry()

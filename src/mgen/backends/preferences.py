@@ -230,6 +230,43 @@ class OCamlPreferences(BackendPreferences):
         )
 
 
+class LLVMPreferences(BackendPreferences):
+    """LLVM-specific backend preferences."""
+
+    def __post_init__(self) -> None:
+        """Initialize LLVM-specific default preferences."""
+        self.language_specific.update(
+            {
+                # LLVM version and target preferences
+                "llvm_version": "18.0",  # LLVM version targeting
+                "target_triple": "native",  # native, x86_64, aarch64, wasm32, etc.
+                "data_layout": "auto",  # Auto-detect or custom data layout
+                # Optimization preferences
+                "optimization_level": 2,  # 0-3, corresponds to -O0 through -O3
+                "lto": False,  # Link-time optimization
+                "vectorization": True,  # Auto-vectorization
+                "loop_unrolling": True,  # Loop unrolling optimization
+                # Code generation preferences
+                "ssa_form": True,  # Generate SSA form (always true for LLVM)
+                "named_values": True,  # Use descriptive names for values
+                "debug_info": False,  # Generate DWARF debug information
+                "metadata": True,  # Include LLVM metadata
+                # Compilation preferences
+                "compile_to": "binary",  # binary, object, assembly, llvm-ir
+                "static_linking": False,  # Static vs dynamic linking
+                "position_independent": False,  # Position-independent code
+                # Runtime preferences
+                "use_runtime": False,  # Use MGen runtime library (future)
+                "memory_model": "default",  # default, safe, unsafe
+                "bounds_checking": False,  # Runtime bounds checking
+                # Backend tool preferences
+                "llc_path": "llc",  # Path to llc compiler
+                "clang_path": "clang",  # Path to clang for linking
+                "opt_path": "opt",  # Path to LLVM optimizer
+            }
+        )
+
+
 class PreferencesRegistry:
     """Registry for backend preference classes."""
 
@@ -240,6 +277,7 @@ class PreferencesRegistry:
         "rust": RustPreferences,
         "go": GoPreferences,
         "ocaml": OCamlPreferences,
+        "llvm": LLVMPreferences,
     }
 
     @classmethod
