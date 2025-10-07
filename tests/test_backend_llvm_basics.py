@@ -1252,3 +1252,105 @@ def main() -> int:
         # Should print "42" and return 0
         assert result.returncode == 0
         assert "42" in result.stdout
+
+    def test_string_literal_print_execution(self) -> None:
+        """Test string literal with print."""
+        python_code = """
+def main() -> int:
+    s: str = "Hello, World!"
+    print(s)
+    return 0
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        # Execute and verify output
+        import subprocess
+        with open('/tmp/test_string_print.ll', 'w') as f:
+            f.write(llvm_ir)
+        result = subprocess.run(['/opt/homebrew/opt/llvm/bin/lli', '/tmp/test_string_print.ll'],
+                              capture_output=True, text=True)
+        assert result.returncode == 0
+        assert "Hello, World!" in result.stdout
+
+    def test_string_concatenation_execution(self) -> None:
+        """Test string concatenation."""
+        python_code = """
+def main() -> int:
+    a: str = "Hello"
+    b: str = " World"
+    c: str = a + b
+    print(c)
+    return 0
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        # Execute and verify output
+        import subprocess
+        with open('/tmp/test_string_concat.ll', 'w') as f:
+            f.write(llvm_ir)
+        result = subprocess.run(['/opt/homebrew/opt/llvm/bin/lli', '/tmp/test_string_concat.ll'],
+                              capture_output=True, text=True)
+        assert result.returncode == 0
+        assert "Hello World" in result.stdout
+
+    def test_builtin_len_execution(self) -> None:
+        """Test len() builtin function."""
+        python_code = """
+def main() -> int:
+    s: str = "Hello"
+    n: int = len(s)
+    return n
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        assert exit_code == 5  # "Hello" has 5 characters
+
+    def test_llvmlite_compilation_execution(self) -> None:
+        """Test compilation using llvmlite instead of lli."""
+        python_code = """
+def main() -> int:
+    x: int = 10
+    y: int = 20
+    return x + y
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+
+        # Use llvmlite compiler
+        from mgen.backends.llvm import LLVMCompiler
+        compiler = LLVMCompiler()
+
+        # Compile and run
+        result = compiler.compile_and_run(llvm_ir, capture_output=True)
+        assert result.returncode == 30  # 10 + 20 = 30
+
+    def test_llvmlite_compile_to_executable(self) -> None:
+        """Test compiling to standalone executable."""
+        python_code = """
+def main() -> int:
+    print(42)
+    return 0
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+
+        # Use llvmlite compiler
+        from mgen.backends.llvm import LLVMCompiler
+        import tempfile
+        compiler = LLVMCompiler()
+
+        # Compile to executable
+        with tempfile.NamedTemporaryFile(suffix="", delete=False) as exe_file:
+            exe_path = exe_file.name
+
+        try:
+            success = compiler.compile_ir_to_executable(llvm_ir, exe_path)
+            assert success
+
+            # Verify executable exists
+            from pathlib import Path
+            assert Path(exe_path).exists()
+
+            # Execute directly
+            import subprocess
+            result = subprocess.run([exe_path], capture_output=True, text=True)
+            assert result.returncode == 0
+            assert "42" in result.stdout
+        finally:
+            Path(exe_path).unlink(missing_ok=True)

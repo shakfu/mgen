@@ -207,6 +207,12 @@ class IRToLLVMConverter(IRVisitor):
         left = node.left.accept(self)
         right = node.right.accept(self)
 
+        # String operations
+        if node.left.result_type.base_type == IRDataType.STRING:
+            if node.operator == "+":
+                # String concatenation using C library functions
+                return self._concat_strings(left, right)
+
         # Integer operations
         if node.result_type.base_type == IRDataType.INT:
             if node.operator == "+":
@@ -381,9 +387,24 @@ class IRToLLVMConverter(IRVisitor):
         elif node.result_type.base_type == IRDataType.BOOL:
             return ir.Constant(llvm_type, 1 if node.value else 0)
         elif node.result_type.base_type == IRDataType.STRING:
-            # String literals are handled as global constants
-            # For now, return null pointer as placeholder
-            return ir.Constant(llvm_type, None)
+            # String literals are stored as global constants
+            # Create a null-terminated string
+            str_value = str(node.value)
+            str_bytes = (str_value + '\0').encode('utf-8')
+            str_const = ir.Constant(ir.ArrayType(ir.IntType(8), len(str_bytes)), bytearray(str_bytes))
+
+            # Create global variable for the string
+            str_global = ir.GlobalVariable(self.module, str_const.type, name=f"str_{len(self.module.globals)}")
+            str_global.linkage = 'internal'
+            str_global.global_constant = True
+            str_global.initializer = str_const
+
+            # Return pointer to the string (i8*)
+            if self.builder is not None:
+                return self.builder.gep(str_global, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)])
+            else:
+                # During global variable initialization, return the global itself
+                return str_global
         elif node.result_type.base_type == IRDataType.VOID:
             # VOID literals shouldn't exist - this is likely a bug in IR generation
             # Return null pointer as workaround
@@ -411,6 +432,67 @@ class IRToLLVMConverter(IRVisitor):
             raise RuntimeError(f"Variable '{node.variable.name}' not found in symbol table")
 
         return self.builder.load(var_ptr, name=node.variable.name)
+
+    def _get_or_create_c_function(self, name: str, ret_type: ir.Type, arg_types: list[ir.Type], var_arg: bool = False) -> ir.Function:
+        """Get or create a C library function declaration.
+
+        Args:
+            name: Name of the C function
+            ret_type: Return type
+            arg_types: List of argument types
+            var_arg: Whether function has variable arguments
+
+        Returns:
+            LLVM function declaration
+        """
+        if name in self.func_symtab:
+            return self.func_symtab[name]
+
+        func_ty = ir.FunctionType(ret_type, arg_types, var_arg=var_arg)
+        func = ir.Function(self.module, func_ty, name=name)
+        self.func_symtab[name] = func
+        return func
+
+    def _concat_strings(self, left: ir.Value, right: ir.Value) -> ir.Value:
+        """Concatenate two strings using C library functions.
+
+        Args:
+            left: First string (i8*)
+            right: Second string (i8*)
+
+        Returns:
+            Concatenated string (i8*)
+        """
+        if self.builder is None:
+            raise RuntimeError("Builder not initialized")
+
+        # Declare C library functions if not already declared
+        i8_ptr = ir.IntType(8).as_pointer()
+        i64 = ir.IntType(64)
+
+        strlen_func = self._get_or_create_c_function("strlen", i64, [i8_ptr])
+        malloc_func = self._get_or_create_c_function("malloc", i8_ptr, [i64])
+        strcpy_func = self._get_or_create_c_function("strcpy", i8_ptr, [i8_ptr, i8_ptr])
+        strcat_func = self._get_or_create_c_function("strcat", i8_ptr, [i8_ptr, i8_ptr])
+
+        # Get lengths of both strings
+        left_len = self.builder.call(strlen_func, [left], name="left_len")
+        right_len = self.builder.call(strlen_func, [right], name="right_len")
+
+        # Calculate total length (left_len + right_len + 1 for null terminator)
+        total_len = self.builder.add(left_len, right_len, name="total_len")
+        total_len_plus_null = self.builder.add(total_len, ir.Constant(i64, 1), name="total_len_plus_null")
+
+        # Allocate memory for result
+        result_ptr = self.builder.call(malloc_func, [total_len_plus_null], name="result_ptr")
+
+        # Copy first string
+        self.builder.call(strcpy_func, [result_ptr, left], name="strcpy_tmp")
+
+        # Concatenate second string
+        self.builder.call(strcat_func, [result_ptr, right], name="strcat_tmp")
+
+        return result_ptr
 
     def _get_or_create_builtin(self, name: str, arg_types: list[ir.Type]) -> ir.Function:
         """Get or create a builtin function declaration.
@@ -451,7 +533,24 @@ class IRToLLVMConverter(IRVisitor):
             raise RuntimeError("Builder not initialized - must be inside a function")
 
         # Handle builtin functions
-        if node.function_name == "print":
+        if node.function_name == "len":
+            # len() function - use strlen for strings, array length for lists
+            if len(node.arguments) != 1:
+                raise NotImplementedError("len() requires exactly one argument")
+
+            arg = node.arguments[0]
+            llvm_arg = arg.accept(self)
+
+            if arg.result_type.base_type == IRDataType.STRING:
+                # Use C strlen function
+                i8_ptr = ir.IntType(8).as_pointer()
+                i64 = ir.IntType(64)
+                strlen_func = self._get_or_create_c_function("strlen", i64, [i8_ptr])
+                return self.builder.call(strlen_func, [llvm_arg], name="len_tmp")
+            else:
+                raise NotImplementedError(f"len() for type {arg.result_type.base_type} not implemented")
+
+        elif node.function_name == "print":
             # Get or create printf declaration
             arg_types = [arg.result_type for arg in node.arguments]
             printf_func = self._get_or_create_builtin("print", arg_types)
@@ -465,6 +564,8 @@ class IRToLLVMConverter(IRVisitor):
                     fmt_str = "%f\\0A\\00"  # %f\n\0
                 elif arg.result_type.base_type == IRDataType.BOOL:
                     fmt_str = "%d\\0A\\00"  # %d\n\0
+                elif arg.result_type.base_type == IRDataType.STRING:
+                    fmt_str = "%s\\0A\\00"  # %s\n\0
                 else:
                     raise NotImplementedError(f"Print for type {arg.result_type.base_type} not implemented")
 
