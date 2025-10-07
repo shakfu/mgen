@@ -743,6 +743,10 @@ class IRBuilder:
             return self._build_binary_operation(node)
         elif isinstance(node, ast.Compare):
             return self._build_comparison(node)
+        elif isinstance(node, ast.BoolOp):
+            return self._build_bool_operation(node)
+        elif isinstance(node, ast.UnaryOp):
+            return self._build_unary_operation(node)
         elif isinstance(node, ast.Call):
             return self._build_function_call(node)
 
@@ -808,14 +812,72 @@ class IRBuilder:
 
         return IRBinaryOperation(left, operator, right, result_type, self._get_location(node))
 
+    def _build_bool_operation(self, node: ast.BoolOp) -> IRBinaryOperation:
+        """Build boolean operation (and/or).
+
+        Python's BoolOp can have multiple values (a and b and c), but we'll
+        convert to nested binary operations for simplicity.
+        """
+        # For now, only handle binary case (2 values)
+        if len(node.values) != 2:
+            # Multiple values - would need to create nested operations
+            # For now, return VOID
+            return IRLiteral(None, IRType(IRDataType.VOID), self._get_location(node))  # type: ignore[return-value]
+
+        left = self._build_expression(node.values[0])
+        right = self._build_expression(node.values[1])
+
+        # Map boolean operator
+        if isinstance(node.op, ast.And):
+            operator = "and"
+        elif isinstance(node.op, ast.Or):
+            operator = "or"
+        else:
+            return IRLiteral(None, IRType(IRDataType.VOID), self._get_location(node))  # type: ignore[return-value]
+
+        # Boolean operations return bool
+        result_type = IRType(IRDataType.BOOL)
+
+        return IRBinaryOperation(left, operator, right, result_type, self._get_location(node))
+
+    def _build_unary_operation(self, node: ast.UnaryOp) -> IRExpression:
+        """Build unary operation (not, -, +, ~)."""
+        operand = self._build_expression(node.operand)
+
+        # For 'not' operation, we need special handling
+        if isinstance(node.op, ast.Not):
+            # Create a comparison: operand == False
+            # This is equivalent to 'not operand'
+            false_literal = IRLiteral(False, IRType(IRDataType.BOOL), self._get_location(node))
+            return IRBinaryOperation(operand, "==", false_literal, IRType(IRDataType.BOOL), self._get_location(node))
+        elif isinstance(node.op, ast.USub):
+            # Unary minus: 0 - operand
+            zero = IRLiteral(0, operand.result_type, self._get_location(node))
+            return IRBinaryOperation(zero, "-", operand, operand.result_type, self._get_location(node))
+        elif isinstance(node.op, ast.UAdd):
+            # Unary plus: just return operand
+            return operand
+        elif isinstance(node.op, ast.Invert):
+            # Bitwise not: ~operand (XOR with -1)
+            neg_one = IRLiteral(-1, operand.result_type, self._get_location(node))
+            return IRBinaryOperation(operand, "^", neg_one, operand.result_type, self._get_location(node))
+
+        # Unknown unary operator
+        return IRLiteral(None, IRType(IRDataType.VOID), self._get_location(node))
+
     def _build_function_call(self, node: ast.Call) -> IRFunctionCall:
         """Build function call."""
         if isinstance(node.func, ast.Name):
             func_name = node.func.id
             arguments = [self._build_expression(arg) for arg in node.args]
 
-            # Simple return type inference
-            return_type = IRType(IRDataType.VOID)  # Would need better inference
+            # Look up function return type from module
+            return_type = IRType(IRDataType.VOID)  # Default
+            if self.current_module:
+                for func in self.current_module.functions:
+                    if func.name == func_name:
+                        return_type = func.return_type
+                        break
 
             return IRFunctionCall(func_name, arguments, return_type, self._get_location(node))
         else:
