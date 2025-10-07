@@ -876,3 +876,170 @@ def main() -> int:
         exit_code = self._execute_llvm_ir(llvm_ir)
         # Nested for: 3*2=6, Nested while: 2*3*10=60, total=66
         assert exit_code == 66
+
+    def test_loop_break_continue_execution(self):
+        """Test break and continue in various loop contexts."""
+        python_code = """
+def main() -> int:
+    # Break in for loop
+    count1: int = 0
+    for i in range(10):
+        if i == 5:
+            break
+        count1 += 1
+
+    # Continue in for loop
+    count2: int = 0
+    for j in range(10):
+        if j % 2 == 0:
+            continue
+        count2 += 1
+
+    # Break in while loop
+    count3: int = 0
+    k: int = 0
+    while k < 10:
+        k += 1
+        if k == 3:
+            break
+        count3 += 1
+
+    # Continue in while loop
+    count4: int = 0
+    m: int = 0
+    while m < 5:
+        m += 1
+        if m == 3:
+            continue
+        count4 += 1
+
+    return count1 + count2 + count3 + count4
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # count1=5, count2=5, count3=2, count4=4, total=16
+        assert exit_code == 16
+
+    def test_complex_conditional_execution(self):
+        """Test complex conditional expressions."""
+        python_code = """
+def main() -> int:
+    x: int = 10
+    y: int = 5
+    z: int = 3
+
+    # Nested if with multiple conditions
+    result: int = 0
+
+    if x > y:
+        if y > z:
+            result += 1
+        if x > z:
+            result += 2
+
+    # elif chains
+    if x < 0:
+        result += 100
+    elif x < 5:
+        result += 200
+    elif x < 15:
+        result += 4
+    else:
+        result += 400
+
+    # Complex boolean expressions
+    if (x > y and y > z) or x == 10:
+        result += 8
+
+    return result
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # result: 1 + 2 + 4 + 8 = 15
+        assert exit_code == 15
+
+    def test_mathematical_expressions_execution(self):
+        """Test complex mathematical expressions."""
+        python_code = """
+def main() -> int:
+    # Order of operations
+    a: int = 2 + 3 * 4
+
+    # Nested operations
+    b: int = (5 + 3) * (10 - 6)
+
+    # Division and modulo
+    c: int = 17 // 5
+    d: int = 17 % 5
+
+    # Bitwise operations
+    e: int = 12 & 10
+    f: int = 12 | 3
+    g: int = 12 ^ 10
+
+    # Shifts
+    h: int = 4 << 2
+    i: int = 32 >> 3
+
+    return a + b + c + d + e + f + g + h + i
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # a=14, b=32, c=3, d=2, e=8, f=15, g=6, h=16, i=4, total=100
+        assert exit_code == 100
+
+    def test_comprehensive_benchmark_execution(self):
+        """Comprehensive benchmark testing multiple features together."""
+        python_code = """
+def is_prime(n: int) -> int:
+    if n < 2:
+        return 0
+    if n == 2:
+        return 1
+    if n % 2 == 0:
+        return 0
+
+    i: int = 3
+    while i * i <= n:
+        if n % i == 0:
+            return 0
+        i += 2
+
+    return 1
+
+def count_primes(limit: int) -> int:
+    count: int = 0
+    for i in range(2, limit):
+        if is_prime(i) == 1:
+            count += 1
+    return count
+
+def sum_of_squares(n: int) -> int:
+    total: int = 0
+    for i in range(n):
+        total += i * i
+    return total
+
+def gcd(a: int, b: int) -> int:
+    while b != 0:
+        temp: int = b
+        b = a % b
+        a = temp
+    return a
+
+def main() -> int:
+    # Count primes up to 20: 2,3,5,7,11,13,17,19 = 8 primes
+    primes: int = count_primes(20)
+
+    # Sum of squares 0²+1²+2²+3²+4² = 0+1+4+9+16 = 30
+    squares: int = sum_of_squares(5)
+
+    # GCD of 48 and 18 = 6
+    divisor: int = gcd(48, 18)
+
+    # Combine results: 8 + 30 + 6 = 44
+    return primes + squares + divisor
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        assert exit_code == 44
