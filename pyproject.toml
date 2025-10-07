@@ -49,6 +49,9 @@ dev = [
 extra = [
     "z3-solver>=4.15.3.0",
 ]
+llvm = [
+    "llvmlite>=0.43.0",
+]
 
 
 [project.urls]
