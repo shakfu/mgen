@@ -170,6 +170,12 @@ class IRToLLVMConverter(IRVisitor):
         if self.builder is None:
             raise RuntimeError("Builder not initialized - must be inside a function")
 
+        # For short-circuit operators (and, or), we need special handling
+        # to avoid evaluating the right side when not necessary
+        if node.result_type.base_type == IRDataType.BOOL and node.operator in ("and", "or"):
+            return self._visit_short_circuit_boolean(node)
+
+        # For all other operators, evaluate both sides immediately
         left = node.left.accept(self)
         right = node.right.accept(self)
 
@@ -241,17 +247,74 @@ class IRToLLVMConverter(IRVisitor):
                 elif node.operator == "!=":
                     return self.builder.fcmp_ordered("!=", left, right, name="fcmp_tmp")
             elif left_type == IRDataType.BOOL:
-                # Boolean comparisons
+                # Boolean comparisons (and/or handled separately via _visit_short_circuit_boolean)
                 if node.operator == "==":
                     return self.builder.icmp_signed("==", left, right, name="cmp_tmp")
                 elif node.operator == "!=":
                     return self.builder.icmp_signed("!=", left, right, name="cmp_tmp")
-                elif node.operator == "and":
-                    return self.builder.and_(left, right, name="and_tmp")
-                elif node.operator == "or":
-                    return self.builder.or_(left, right, name="or_tmp")
 
         raise NotImplementedError(f"Binary operator '{node.operator}' not implemented for type {node.result_type.base_type}")
+
+    def _visit_short_circuit_boolean(self, node: IRBinaryOperation) -> ir.Instruction:
+        """Handle short-circuit evaluation for 'and' and 'or' operators.
+
+        Args:
+            node: IR binary operation with 'and' or 'or' operator
+
+        Returns:
+            LLVM instruction representing the short-circuit boolean result
+        """
+        if self.builder is None or self.current_function is None:
+            raise RuntimeError("Builder not initialized - must be inside a function")
+
+        # Evaluate left side first
+        left = node.left.accept(self)
+        left_end_block = self.builder.block  # Block where left evaluation ended
+
+        if node.operator == "and":
+            # Short-circuit AND: if left is false, result is false without evaluating right
+            eval_right_block = self.current_function.append_basic_block("and.eval_right")
+            merge_block = self.current_function.append_basic_block("and.merge")
+
+            # Branch: if left is true, evaluate right; otherwise skip to merge
+            self.builder.cbranch(left, eval_right_block, merge_block)
+
+            # Evaluate right side (only if left was true)
+            self.builder.position_at_end(eval_right_block)
+            right = node.right.accept(self)
+            eval_right_end_block = self.builder.block  # May have changed during right evaluation
+            self.builder.branch(merge_block)
+
+            # Merge block: use phi to select result
+            self.builder.position_at_end(merge_block)
+            phi = self.builder.phi(ir.IntType(1), name="and_tmp")
+            phi.add_incoming(ir.Constant(ir.IntType(1), 0), left_end_block)  # Left was false
+            phi.add_incoming(right, eval_right_end_block)  # Right result
+            return phi
+
+        elif node.operator == "or":
+            # Short-circuit OR: if left is true, result is true without evaluating right
+            eval_right_block = self.current_function.append_basic_block("or.eval_right")
+            merge_block = self.current_function.append_basic_block("or.merge")
+
+            # Branch: if left is false, evaluate right; otherwise skip to merge
+            self.builder.cbranch(left, merge_block, eval_right_block)
+
+            # Evaluate right side (only if left was false)
+            self.builder.position_at_end(eval_right_block)
+            right = node.right.accept(self)
+            eval_right_end_block = self.builder.block  # May have changed during right evaluation
+            self.builder.branch(merge_block)
+
+            # Merge block: use phi to select result
+            self.builder.position_at_end(merge_block)
+            phi = self.builder.phi(ir.IntType(1), name="or_tmp")
+            phi.add_incoming(ir.Constant(ir.IntType(1), 1), left_end_block)  # Left was true
+            phi.add_incoming(right, eval_right_end_block)  # Right result
+            return phi
+
+        else:
+            raise RuntimeError(f"Unexpected operator in short-circuit: {node.operator}")
 
     def visit_literal(self, node: IRLiteral) -> ir.Constant:
         """Convert IR literal to LLVM constant.

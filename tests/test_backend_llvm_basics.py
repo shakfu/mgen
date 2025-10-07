@@ -169,7 +169,7 @@ class TestLLVMBooleanOperations:
         return str(llvm_module)
 
     def test_and_operation(self):
-        """Test boolean and operation."""
+        """Test boolean and operation with short-circuit evaluation."""
         python_code = """
 def test_and(a: int, b: int) -> int:
     if a > 5 and b > 5:
@@ -177,15 +177,17 @@ def test_and(a: int, b: int) -> int:
     return 0
 """
         llvm_ir = self._convert_to_llvm(python_code)
-        
 
         # Check for comparison instructions
         assert "icmp sgt" in llvm_ir
-        # Check for and instruction
-        assert "and i1" in llvm_ir
+        # Check for short-circuit blocks
+        assert "and.eval_right" in llvm_ir
+        assert "and.merge" in llvm_ir
+        # Check for phi node
+        assert "phi" in llvm_ir
 
     def test_or_operation(self):
-        """Test boolean or operation."""
+        """Test boolean or operation with short-circuit evaluation."""
         python_code = """
 def test_or(a: int, b: int) -> int:
     if a > 5 or b > 5:
@@ -193,12 +195,14 @@ def test_or(a: int, b: int) -> int:
     return 0
 """
         llvm_ir = self._convert_to_llvm(python_code)
-        
 
         # Check for comparison instructions
         assert "icmp sgt" in llvm_ir
-        # Check for or instruction
-        assert "or i1" in llvm_ir
+        # Check for short-circuit blocks
+        assert "or.eval_right" in llvm_ir
+        assert "or.merge" in llvm_ir
+        # Check for phi node
+        assert "phi" in llvm_ir
 
     def test_not_operation(self):
         """Test boolean not operation."""
@@ -1043,3 +1047,52 @@ def main() -> int:
         llvm_ir = self._convert_to_llvm(python_code)
         exit_code = self._execute_llvm_ir(llvm_ir)
         assert exit_code == 44
+
+    def test_short_circuit_and_execution(self):
+        """Test short-circuit evaluation for 'and' operator."""
+        python_code = """
+def divide_safe(x: int, y: int) -> int:
+    # Should short-circuit before division by zero
+    if y != 0 and x // y > 2:
+        return 1
+    return 0
+
+def main() -> int:
+    # Test 1: y=0, should short-circuit and not divide
+    a: int = divide_safe(10, 0)
+
+    # Test 2: y!=0 but x//y <= 2
+    b: int = divide_safe(10, 5)
+
+    # Test 3: y!=0 and x//y > 2
+    c: int = divide_safe(10, 3)
+
+    return a + b + c
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # a=0 (short-circuit), b=0 (false), c=1 (true), total=1
+        assert exit_code == 1
+
+    def test_short_circuit_or_execution(self):
+        """Test short-circuit evaluation for 'or' operator."""
+        python_code = """
+def check_or(x: int, y: int) -> int:
+    # Should short-circuit if x > 5, not evaluating y // 0
+    if x > 5 or y // x > 0:
+        return 1
+    return 0
+
+def main() -> int:
+    # Test 1: x > 5, should short-circuit (y//x not evaluated, no div by zero)
+    a: int = check_or(10, 0)
+
+    # Test 2: x <= 5, need to evaluate second part
+    b: int = check_or(2, 4)
+
+    return a + b
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # a=1 (short-circuit), b=1 (2//4 gives 2>0 true), total=2
+        assert exit_code == 2
