@@ -744,9 +744,26 @@ class IRBuilder:
         """
         self.current_module = IRModule(module_name)
 
+        # Get module-level statements if tree is a Module
+        module_nodes: list[ast.stmt] = []
+        if isinstance(tree, ast.Module):
+            module_nodes = tree.body
+
+        # Process module-level global variables first
+        for node in module_nodes:
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                # This is a global variable declaration
+                var_type = self._extract_ir_type(node.annotation) if node.annotation else IRType(IRDataType.VOID)
+                var = IRVariable(node.target.id, var_type, self._get_location(node))
+                if node.value:
+                    var.initial_value = self._build_expression(node.value)
+                self.current_module.add_global_variable(var)
+                # Add to symbol table for lookup
+                self.symbol_table[node.target.id] = var
+
         # Pass 1: Collect function signatures
         function_nodes: list[ast.FunctionDef] = []
-        for node in ast.walk(tree):
+        for node in module_nodes:
             if isinstance(node, ast.FunctionDef):
                 function_nodes.append(node)
                 # Create function declaration with signature only

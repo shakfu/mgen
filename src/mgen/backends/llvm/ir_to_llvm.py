@@ -4,7 +4,7 @@ This module implements the IRVisitor pattern to traverse MGen's Static IR
 and generate corresponding LLVM IR instructions.
 """
 
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from llvmlite import ir  # type: ignore[import-untyped]
 
@@ -45,6 +45,7 @@ class IRToLLVMConverter(IRVisitor):
         self.builder: Optional[ir.IRBuilder] = None
         self.func_symtab: dict[str, ir.Function] = {}
         self.var_symtab: dict[str, ir.AllocaInstr] = {}
+        self.global_symtab: dict[str, ir.GlobalVariable] = {}
         self.current_function: Optional[ir.Function] = None
         # Track current loop blocks for break/continue
         self.loop_exit_stack: list[ir.Block] = []
@@ -62,6 +63,10 @@ class IRToLLVMConverter(IRVisitor):
         # Generate type declarations first (for structs, etc.)
         for type_decl in node.type_declarations:
             type_decl.accept(self)
+
+        # Generate global variables
+        for global_var in node.global_variables:
+            global_var.accept(self)
 
         # Generate functions
         for func in node.functions:
@@ -118,22 +123,43 @@ class IRToLLVMConverter(IRVisitor):
 
         return func
 
-    def visit_variable(self, node: IRVariable) -> ir.AllocaInstr:
+    def visit_variable(self, node: IRVariable) -> Union[ir.AllocaInstr, ir.GlobalVariable]:
         """Visit a variable node (used for declarations).
 
         Args:
             node: IR variable to convert
 
         Returns:
-            LLVM alloca instruction for the variable
+            LLVM alloca instruction for local variables or GlobalVariable for globals
         """
-        if self.builder is None:
-            raise RuntimeError("Builder not initialized - must be inside a function")
-
         var_type = self._convert_type(node.ir_type)
-        var_ptr = self.builder.alloca(var_type, name=node.name)
-        self.var_symtab[node.name] = var_ptr
-        return var_ptr
+
+        # If builder is None, this is a global variable
+        if self.builder is None:
+            # Create global variable with initializer
+            if node.initial_value is not None:
+                initial_value = node.initial_value.accept(self)
+            else:
+                # Default initialization to zero
+                if var_type == ir.IntType(64):
+                    initial_value = ir.Constant(ir.IntType(64), 0)
+                elif var_type == ir.DoubleType():
+                    initial_value = ir.Constant(ir.DoubleType(), 0.0)
+                elif var_type == ir.IntType(1):
+                    initial_value = ir.Constant(ir.IntType(1), 0)
+                else:
+                    raise NotImplementedError(f"Default initialization for type {var_type} not implemented")
+
+            global_var = ir.GlobalVariable(self.module, var_type, name=node.name)
+            global_var.initializer = initial_value
+            global_var.linkage = "internal"  # Make it module-private
+            self.global_symtab[node.name] = global_var
+            return global_var
+        else:
+            # Local variable - use alloca
+            var_ptr = self.builder.alloca(var_type, name=node.name)
+            self.var_symtab[node.name] = var_ptr
+            return var_ptr
 
     def visit_assignment(self, node: IRAssignment) -> None:
         """Convert IR assignment to LLVM store instruction.
@@ -144,9 +170,11 @@ class IRToLLVMConverter(IRVisitor):
         if self.builder is None:
             raise RuntimeError("Builder not initialized - must be inside a function")
 
-        # Get or create variable
-        if node.target.name not in self.var_symtab:
-            # Allocate new variable
+        # Check if it's a global variable first
+        if node.target.name in self.global_symtab:
+            var_ptr = self.global_symtab[node.target.name]
+        elif node.target.name not in self.var_symtab:
+            # Allocate new local variable
             var_type = self._convert_type(node.target.ir_type)
             var_ptr = self.builder.alloca(var_type, name=node.target.name)
             self.var_symtab[node.target.name] = var_ptr
@@ -190,7 +218,26 @@ class IRToLLVMConverter(IRVisitor):
             elif node.operator == "/" or node.operator == "//":
                 return self.builder.sdiv(left, right, name="div_tmp")
             elif node.operator == "%":
-                return self.builder.srem(left, right, name="rem_tmp")
+                # Python modulo uses floored division, C uses truncated division
+                # To convert: if remainder and divisor have different signs, add divisor to remainder
+                c_rem = self.builder.srem(left, right, name="c_rem")
+
+                # Check if signs differ: (c_rem < 0) != (right < 0)
+                zero = ir.Constant(ir.IntType(64), 0)
+                rem_neg = self.builder.icmp_signed("<", c_rem, zero, name="rem_neg")
+                divisor_neg = self.builder.icmp_signed("<", right, zero, name="divisor_neg")
+                signs_differ = self.builder.xor(rem_neg, divisor_neg, name="signs_differ")
+
+                # Check if remainder is non-zero
+                rem_nonzero = self.builder.icmp_signed("!=", c_rem, zero, name="rem_nonzero")
+
+                # Adjust if signs differ AND remainder is non-zero
+                need_adjust = self.builder.and_(signs_differ, rem_nonzero, name="need_adjust")
+
+                # result = need_adjust ? (c_rem + right) : c_rem
+                adjusted = self.builder.add(c_rem, right, name="adjusted")
+                result = self.builder.select(need_adjust, adjusted, c_rem, name="mod_tmp")
+                return result
             elif node.operator == "<<":
                 return self.builder.shl(left, right, name="shl_tmp")
             elif node.operator == ">>":
@@ -356,7 +403,10 @@ class IRToLLVMConverter(IRVisitor):
         if self.builder is None:
             raise RuntimeError("Builder not initialized - must be inside a function")
 
-        var_ptr = self.var_symtab.get(node.variable.name)
+        # Check global variables first, then local
+        var_ptr = self.global_symtab.get(node.variable.name)
+        if var_ptr is None:
+            var_ptr = self.var_symtab.get(node.variable.name)
         if var_ptr is None:
             raise RuntimeError(f"Variable '{node.variable.name}' not found in symbol table")
 

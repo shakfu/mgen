@@ -1096,3 +1096,138 @@ def main() -> int:
         exit_code = self._execute_llvm_ir(llvm_ir)
         # a=1 (short-circuit), b=1 (2//4 gives 2>0 true), total=2
         assert exit_code == 2
+
+    def test_modulo_negative_numbers_execution(self):
+        """Test modulo operation with negative numbers.
+
+        Tests Python-style modulo (floored division) semantics.
+        """
+        python_code = """
+def main() -> int:
+    # Test various modulo cases
+    a: int = 17 % 5
+    b: int = -17 % 5
+    c: int = 17 % -5
+    d: int = -17 % -5
+
+    # Return sum of absolute values to fit in exit code
+    result: int = a
+    if b < 0:
+        result += -b
+    else:
+        result += b
+    if c < 0:
+        result += -c
+    else:
+        result += c
+    if d < 0:
+        result += -d
+    else:
+        result += d
+
+    return result
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # Python modulo: 17%5=2, -17%5=3, 17%-5=-3, -17%-5=-2
+        # Sum of absolute values: 2+3+3+2 = 10
+        assert exit_code == 10
+
+    def test_mixed_int_float_operations_execution(self):
+        """Test operations mixing int and float types."""
+        python_code = """
+def main() -> int:
+    i: int = 10
+    f: float = 3.5
+
+    # Int to float conversion for operation
+    result1: float = float(i) + f
+
+    # Float to int conversion
+    v1: int = int(result1)
+
+    # Another mixed operation
+    result2: float = float(i) * 2.5
+    v2: int = int(result2)
+
+    return v1 + v2
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # v1 = int(10.0 + 3.5) = 13, v2 = int(10.0 * 2.5) = 25, total = 38
+        assert exit_code == 38
+
+    def test_complex_elif_chains_execution(self):
+        """Test complex elif chains with multiple branches."""
+        python_code = """
+def classify(x: int) -> int:
+    if x < -10:
+        return 1
+    elif x < 0:
+        return 2
+    elif x == 0:
+        return 3
+    elif x < 10:
+        return 4
+    elif x < 100:
+        return 5
+    else:
+        return 6
+
+def main() -> int:
+    a: int = classify(-20)
+    b: int = classify(-5)
+    c: int = classify(0)
+    d: int = classify(5)
+    e: int = classify(50)
+    f: int = classify(200)
+
+    return a + b + c + d + e + f
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # 1 + 2 + 3 + 4 + 5 + 6 = 21
+        assert exit_code == 21
+
+    def test_global_variable_execution(self) -> None:
+        """Test global variable access and modification."""
+        python_code = """
+counter: int = 0
+
+def increment() -> int:
+    global counter
+    counter = counter + 1
+    return counter
+
+def main() -> int:
+    a: int = increment()
+    b: int = increment()
+    c: int = increment()
+    return a + b + c
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # First call: counter = 1, Second: counter = 2, Third: counter = 3
+        # Result: 1 + 2 + 3 = 6
+        assert exit_code == 6
+
+    def test_multiple_globals_execution(self) -> None:
+        """Test multiple global variables with different types."""
+        python_code = """
+x: int = 10
+y: int = 20
+result: int = 0
+
+def add_globals() -> int:
+    global result
+    result = x + y
+    return result
+
+def main() -> int:
+    a: int = add_globals()
+    return a
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        exit_code = self._execute_llvm_ir(llvm_ir)
+        # x + y = 10 + 20 = 30
+        assert exit_code == 30
