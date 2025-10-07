@@ -383,8 +383,8 @@ Successfully compiled and executed:
 
 - **Augmented Assignment**
   - Was silently ignored (no AST handler)
-  - Now properly converts x += y to x = x + y in IR
-  - All augmented operators work (+=, -=, *=, /=, %=, etc.)
+  - Now properly converts `x += y to x = x + y` in IR
+  - All augmented operators work (`+=`, `-=`, `*=`, `/=`, `%=`, etc.)
 
 - **Type Casting**
   - int() and float() were treated as undefined functions
@@ -393,7 +393,7 @@ Successfully compiled and executed:
 
 - **Comparison Chaining**
   - Was returning VOID for chained comparisons
-  - Now properly converts a < b < c to (a < b) and (b < c)
+  - Now properly converts `a < b < c` to `(a < b) and (b < c)`
   - Generates correct nested boolean operations
 
 - **Boolean Chaining**
@@ -415,12 +415,12 @@ Successfully compiled and executed:
 
 The LLVM backend now supports:
 
-**Arithmetic**: +, -, *, /, //, %, augmented (+=, -=, *=, /=, %=)
-**Bitwise**: <<, >>, &, |, ^
-**Comparisons**: <, <=, >, >=, ==, !=, chaining (a < b < c)
-**Boolean**: and, or, not, chaining (a and b and c)
-**Control Flow**: if/elif/else, while, for with range(), break, continue
-**Types**: int (i64), float (double), bool (i1), type casting
+**Arithmetic**: `+, -, *, /, //, %, augmented (+=, -=, *=, /=, %=)`
+**Bitwise**: `<<, >>, &, |, ^`
+**Comparisons**: `<, <=, >, >=, ==, !=, chaining (a < b < c)`
+**Boolean**: `and, or, not, chaining (a and b and c)`
+**Control Flow**: `if/elif/else, while, for with range(), break, continue`
+**Types**: `int (i64), float (double), bool (i1)`, type casting
 **Functions**: definitions, calls, parameters, returns, recursion-ready
 **Advanced**: nested control flow, early returns, complex expressions
 
