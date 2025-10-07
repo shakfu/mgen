@@ -1231,3 +1231,24 @@ def main() -> int:
         exit_code = self._execute_llvm_ir(llvm_ir)
         # x + y = 10 + 20 = 30
         assert exit_code == 30
+
+    def test_print_integer_execution(self) -> None:
+        """Test print statement with integers."""
+        python_code = """
+def main() -> int:
+    print(42)
+    return 0
+"""
+        llvm_ir = self._convert_to_llvm(python_code)
+        # Check that LLVM IR contains printf declaration and call
+        assert "declare" in llvm_ir and "printf" in llvm_ir
+        assert "call" in llvm_ir
+        # Execute and verify it runs without error
+        import subprocess
+        with open('/tmp/test_print.ll', 'w') as f:
+            f.write(llvm_ir)
+        result = subprocess.run(['/opt/homebrew/opt/llvm/bin/lli', '/tmp/test_print.ll'],
+                              capture_output=True, text=True)
+        # Should print "42" and return 0
+        assert result.returncode == 0
+        assert "42" in result.stdout

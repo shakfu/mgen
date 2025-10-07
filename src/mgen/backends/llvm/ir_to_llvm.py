@@ -412,6 +412,32 @@ class IRToLLVMConverter(IRVisitor):
 
         return self.builder.load(var_ptr, name=node.variable.name)
 
+    def _get_or_create_builtin(self, name: str, arg_types: list[ir.Type]) -> ir.Function:
+        """Get or create a builtin function declaration.
+
+        Args:
+            name: Name of the builtin function
+            arg_types: List of argument types
+
+        Returns:
+            LLVM function declaration for the builtin
+        """
+        # Check if already declared
+        if name in self.func_symtab:
+            return self.func_symtab[name]
+
+        # Create builtin function declarations
+        if name == "print":
+            # print() uses printf internally
+            # For simplicity, we'll handle integer printing first
+            # Signature: int printf(i8*, ...)
+            printf_ty = ir.FunctionType(ir.IntType(32), [ir.IntType(8).as_pointer()], var_arg=True)
+            printf_func = ir.Function(self.module, printf_ty, name="printf")
+            self.func_symtab["printf"] = printf_func
+            return printf_func
+        else:
+            raise NotImplementedError(f"Builtin function '{name}' not implemented")
+
     def visit_function_call(self, node: IRFunctionCall) -> ir.CallInstr:
         """Convert IR function call to LLVM call instruction.
 
@@ -424,6 +450,42 @@ class IRToLLVMConverter(IRVisitor):
         if self.builder is None:
             raise RuntimeError("Builder not initialized - must be inside a function")
 
+        # Handle builtin functions
+        if node.function_name == "print":
+            # Get or create printf declaration
+            arg_types = [arg.result_type for arg in node.arguments]
+            printf_func = self._get_or_create_builtin("print", arg_types)
+
+            # Create format string based on argument type
+            if len(node.arguments) == 1:
+                arg = node.arguments[0]
+                if arg.result_type.base_type == IRDataType.INT:
+                    fmt_str = "%lld\\0A\\00"  # %lld\n\0
+                elif arg.result_type.base_type == IRDataType.FLOAT:
+                    fmt_str = "%f\\0A\\00"  # %f\n\0
+                elif arg.result_type.base_type == IRDataType.BOOL:
+                    fmt_str = "%d\\0A\\00"  # %d\n\0
+                else:
+                    raise NotImplementedError(f"Print for type {arg.result_type.base_type} not implemented")
+
+                # Create global string constant for format
+                fmt_const = ir.Constant(ir.ArrayType(ir.IntType(8), len(fmt_str.encode('utf-8').decode('unicode_escape'))),
+                                       bytearray(fmt_str.encode('utf-8').decode('unicode_escape').encode('utf-8')))
+                fmt_global = ir.GlobalVariable(self.module, fmt_const.type, name=f"fmt_{len(self.module.globals)}")
+                fmt_global.linkage = 'internal'
+                fmt_global.global_constant = True
+                fmt_global.initializer = fmt_const
+
+                # Get pointer to the format string
+                fmt_ptr = self.builder.gep(fmt_global, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)])
+
+                # Evaluate argument and call printf
+                llvm_arg = arg.accept(self)
+                return self.builder.call(printf_func, [fmt_ptr, llvm_arg], name="print_tmp")
+            else:
+                raise NotImplementedError("Print with multiple arguments not implemented")
+
+        # Regular function call
         func = self.func_symtab.get(node.function_name)
         if func is None:
             raise RuntimeError(f"Function '{node.function_name}' not found in symbol table")
