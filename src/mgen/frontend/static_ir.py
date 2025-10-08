@@ -1316,10 +1316,12 @@ class IRBuilder:
             base_type = type_mapping.get(annotation.id, IRDataType.VOID)
             return IRType(base_type)
         elif isinstance(annotation, ast.Subscript):
-            # Handle generic types like list[int]
+            # Handle generic types like list[int], list[list[int]], etc.
             if isinstance(annotation.value, ast.Name) and annotation.value.id == "list":
-                self._extract_ir_type(annotation.slice)
-                return IRType(IRDataType.POINTER, pointer_depth=1)  # Simplified
+                element_type = self._extract_ir_type(annotation.slice)
+                result = IRType(IRDataType.LIST)
+                result.element_type = element_type
+                return result
 
         return IRType(IRDataType.VOID)
 

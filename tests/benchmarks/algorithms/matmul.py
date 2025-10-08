@@ -1,11 +1,12 @@
 """Matrix multiplication benchmark - Numeric computation performance."""
+from __future__ import annotations
 
 
 def create_matrix(rows: int, cols: int, value: int) -> list:
     """Create a matrix filled with a value."""
-    matrix: list = []
+    matrix: list[list[int]] = []
     for i in range(rows):
-        row: list = []
+        row: list[int] = []
         for j in range(cols):
             row.append(value)
         matrix.append(row)

@@ -178,21 +178,43 @@ class IRToLLVMConverter(IRVisitor):
         if self.builder is None:
             raise RuntimeError("Builder not initialized - must be inside a function")
 
+        # Generate value expression first (we might need its type)
+        value = None
+        if node.value:
+            value = node.value.accept(self)
+
         # Check if it's a global variable first
         if node.target.name in self.global_symtab:
             var_ptr = self.global_symtab[node.target.name]
         elif node.target.name not in self.var_symtab:
-            # Allocate new local variable
+            # Allocate new local variable using IR type
+            # For lists, we store pointers in variables, so we alloca space for a pointer
             var_type = self._convert_type(node.target.ir_type)
             var_ptr = self.builder.alloca(var_type, name=node.target.name)
             self.var_symtab[node.target.name] = var_ptr
         else:
             var_ptr = self.var_symtab[node.target.name]
 
-        # Generate value expression if present
-        if node.value:
-            value = node.value.accept(self)
-            self.builder.store(value, var_ptr)
+        # Store the value if present
+        if value is not None:
+            # Check for list dimensionality mismatch
+            value_type_str = str(value.type)
+            var_type_str = str(var_ptr.type)
+
+            # Detect if we're trying to store wrong dimension list
+            # var_ptr for a 2D list is vec_vec_int** (alloca of vec_vec_int*)
+            # value for an empty 1D list is vec_int*
+            is_mismatch = (("vec_int" in value_type_str and "vec_vec_int" in var_type_str) or
+                          ("vec_vec_int" in value_type_str and "vec_int" in var_type_str and "vec_vec_int" not in value_type_str))
+
+            if is_mismatch:
+                # Don't store the mismatched value - it's an empty list with wrong dimension
+                # The variable will remain uninitialized, which is fine - it will be initialized
+                # on first use (e.g., append)
+                pass
+            else:
+                # Types match - normal store
+                self.builder.store(value, var_ptr)
 
     def visit_binary_operation(self, node: IRBinaryOperation) -> ir.Instruction:
         """Convert IR binary operation to LLVM instruction.
@@ -394,9 +416,18 @@ class IRToLLVMConverter(IRVisitor):
                 raise RuntimeError("Builder not initialized - must be inside a function")
 
             # Check if this is a 2D list (list of lists)
+            # First try to use element_type from the IR type
             is_2d_list = (hasattr(node.result_type, 'element_type') and
                          node.result_type.element_type and
                          node.result_type.element_type.base_type == IRDataType.LIST)
+
+            # Fallback: check the actual elements if we have a literal list
+            if not is_2d_list and isinstance(node.value, list) and len(node.value) > 0:
+                first_elem = node.value[0]
+                # Check if first element is a list literal
+                if (hasattr(first_elem, 'result_type') and
+                    first_elem.result_type.base_type == IRDataType.LIST):
+                    is_2d_list = True
 
             if is_2d_list:
                 # 2D list: vec_vec_int
@@ -425,25 +456,9 @@ class IRToLLVMConverter(IRVisitor):
                         # For 2D lists, element_val is a pointer to vec_int
                         # vec_vec_int_push takes vec_int by value, so load it
                         element_struct = self.builder.load(element_val, name="vec_int_struct")
-
-                        # Debug type checking
-                        import sys
-                        print(f"[2D] Calling {vec_push_func.name}", file=sys.stderr)
-                        print(f"  Arg 0 type: {vec_ptr.type}", file=sys.stderr)
-                        print(f"  Arg 1 type: {element_struct.type}", file=sys.stderr)
-                        print(f"  Expected: {vec_push_func.function_type}", file=sys.stderr)
-
                         self.builder.call(vec_push_func, [vec_ptr, element_struct], name="")
                     else:
                         # For 1D lists, element_val is an i64
-
-                        # Debug type checking
-                        import sys
-                        print(f"[1D] Calling {vec_push_func.name}", file=sys.stderr)
-                        print(f"  Arg 0 type: {vec_ptr.type}", file=sys.stderr)
-                        print(f"  Arg 1 type: {element_val.type}", file=sys.stderr)
-                        print(f"  Expected: {vec_push_func.function_type}", file=sys.stderr)
-
                         self.builder.call(vec_push_func, [vec_ptr, element_val], name="")
 
             # Return the pointer
@@ -860,14 +875,22 @@ class IRToLLVMConverter(IRVisitor):
                 pointee_type = list_ptr_type.pointee
                 list_is_2d = "vec_vec_int" in str(pointee_type)
 
-            # Check if value is a vec_int* (indicates 2D list append)
+            # Check if value is a vec_int* (indicates we're trying to append a list)
             value_is_vec_int_ptr = False
             if isinstance(value_type, llvm_ir.PointerType):
                 value_pointee = value_type.pointee
                 value_is_vec_int_ptr = "vec_int" in str(value_pointee) and "vec_vec_int" not in str(value_pointee)
 
-            # Use 2D list operations if either the list is declared as 2D OR we're appending a list
-            is_2d_list = list_is_2d or value_is_vec_int_ptr
+            # If we're appending a list to a 1D list, this is an error
+            if value_is_vec_int_ptr and not list_is_2d:
+                raise RuntimeError(
+                    "Attempting to append a list to a 1D list. "
+                    "The parent list should be declared as list[list[int]], not just list. "
+                    "Please add proper type annotations: e.g., 'matrix: list[list[int]] = []'"
+                )
+
+            # Use 2D list operations if the list is declared as 2D
+            is_2d_list = list_is_2d
 
             if is_2d_list:
                 # 2D list: vec_vec_int_push(list_ptr, vec_int_struct)
