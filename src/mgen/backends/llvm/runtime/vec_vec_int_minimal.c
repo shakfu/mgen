@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdio.h>
 
 #define VEC_VEC_INT_DEFAULT_CAPACITY 8
 #define VEC_VEC_INT_GROWTH_FACTOR 2
@@ -57,9 +58,12 @@ void vec_vec_int_init_ptr(vec_vec_int* out) {
 }
 
 // Append a row (vec_int) to the end
-// Note: This copies the vec_int structure by value
-void vec_vec_int_push(vec_vec_int* vec, vec_int row) {
+// Note: This DEEP copies the vec_int structure (allocates new memory for data)
+void vec_vec_int_push(vec_vec_int* vec, vec_int* row) {
     if (!vec) {
+        exit(1);
+    }
+    if (!row) {
         exit(1);
     }
 
@@ -67,8 +71,21 @@ void vec_vec_int_push(vec_vec_int* vec, vec_int row) {
         vec_vec_int_grow(vec);
     }
 
-    // Copy the row into the array
-    vec->data[vec->size++] = row;
+    // Deep copy the row - allocate new memory and copy data
+    vec_int row_copy;
+    row_copy.size = row->size;
+    row_copy.capacity = row->capacity;
+    row_copy.data = malloc(row->capacity * sizeof(long long));
+    if (!row_copy.data) {
+        exit(1);
+    }
+    // Copy the actual data elements
+    if (row->data && row->size > 0) {
+        memcpy(row_copy.data, row->data, row->size * sizeof(long long));
+    }
+
+    // Store the deep copy in the array
+    vec->data[vec->size++] = row_copy;
 }
 
 // Get pointer to row at index

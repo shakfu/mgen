@@ -5,6 +5,7 @@
 
 #include <stdlib.h>
 #include <stddef.h>
+#include <stdio.h>
 
 // Error handling placeholder
 #define MGEN_SET_ERROR(code, msg) ((void)0)

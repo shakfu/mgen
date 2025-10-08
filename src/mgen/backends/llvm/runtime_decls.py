@@ -177,9 +177,9 @@ class LLVMRuntimeDeclarations:
         func = ir.Function(self.module, func_type, name="vec_vec_int_init_ptr")
         self.function_decls["vec_vec_int_init_ptr"] = func
 
-        # void vec_vec_int_push(vec_vec_int* vec, vec_int row)
-        # Note: row is passed by value (struct copy)
-        func_type = ir.FunctionType(void, [vec_vec_int_ptr, vec_int_type])
+        # void vec_vec_int_push(vec_vec_int* vec, vec_int* row)
+        # Note: row is passed by pointer (avoids struct-by-value issues)
+        func_type = ir.FunctionType(void, [vec_vec_int_ptr, vec_int_ptr])
         func = ir.Function(self.module, func_type, name="vec_vec_int_push")
         self.function_decls["vec_vec_int_push"] = func
 

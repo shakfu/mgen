@@ -444,8 +444,20 @@ class IRToLLVMConverter(IRVisitor):
                 vec_init_ptr_func = self.runtime.get_function("vec_int_init_ptr")
                 vec_push_func = self.runtime.get_function("vec_int_push")
 
-            # Allocate space for the vec struct on stack
-            vec_ptr = self.builder.alloca(vec_type, name="list_tmp")
+            # Allocate space for the vec struct on heap (not stack!)
+            # Calculate size of struct using GEP null trick
+            i64 = ir.IntType(64)
+            i8_ptr = ir.IntType(8).as_pointer()
+            null_ptr = ir.Constant(vec_type.as_pointer(), None)
+            size_gep = self.builder.gep(null_ptr, [ir.Constant(ir.IntType(32), 1)], name="size_gep")
+            struct_size = self.builder.ptrtoint(size_gep, i64, name="struct_size")
+
+            # Get malloc function and allocate memory
+            malloc_func = self._get_or_create_c_function("malloc", i8_ptr, [i64])
+            raw_ptr = self.builder.call(malloc_func, [struct_size], name="list_malloc")
+
+            # Cast i8* to struct pointer
+            vec_ptr = self.builder.bitcast(raw_ptr, vec_type.as_pointer(), name="list_tmp")
 
             # Initialize it by calling vec_init_ptr() which takes a pointer
             self.builder.call(vec_init_ptr_func, [vec_ptr], name="")
@@ -458,9 +470,8 @@ class IRToLLVMConverter(IRVisitor):
 
                     if is_2d_list:
                         # For 2D lists, element_val is a pointer to vec_int
-                        # vec_vec_int_push takes vec_int by value, so load it
-                        element_struct = self.builder.load(element_val, name="vec_int_struct")
-                        self.builder.call(vec_push_func, [vec_ptr, element_struct], name="")
+                        # vec_vec_int_push now takes vec_int by pointer (not by value)
+                        self.builder.call(vec_push_func, [vec_ptr, element_val], name="")
                     else:
                         # For 1D lists, element_val is an i64
                         self.builder.call(vec_push_func, [vec_ptr, element_val], name="")
@@ -516,12 +527,21 @@ class IRToLLVMConverter(IRVisitor):
         if not isinstance(ast_node, ast.ListComp):
             raise NotImplementedError(f"Only list comprehensions supported, got {type(ast_node).__name__}")
 
-        # Allocate result list
+        # Allocate result list on heap
         vec_int_type = self.runtime.get_vec_int_type()
         vec_int_init_ptr_func = self.runtime.get_function("vec_int_init_ptr")
         vec_int_push_func = self.runtime.get_function("vec_int_push")
 
-        result_ptr = self.builder.alloca(vec_int_type, name="comp_result")
+        # Calculate size and malloc the struct
+        i64 = ir.IntType(64)
+        i8_ptr = ir.IntType(8).as_pointer()
+        null_ptr = ir.Constant(vec_int_type.as_pointer(), None)
+        size_gep = self.builder.gep(null_ptr, [ir.Constant(ir.IntType(32), 1)], name="size_gep")
+        struct_size = self.builder.ptrtoint(size_gep, i64, name="struct_size")
+        malloc_func = self._get_or_create_c_function("malloc", i8_ptr, [i64])
+        raw_ptr = self.builder.call(malloc_func, [struct_size], name="comp_malloc")
+        result_ptr = self.builder.bitcast(raw_ptr, vec_int_type.as_pointer(), name="comp_result")
+
         self.builder.call(vec_int_init_ptr_func, [result_ptr], name="")
 
         # Process the comprehension (only single generator supported for now)
@@ -897,15 +917,14 @@ class IRToLLVMConverter(IRVisitor):
             is_2d_list = list_is_2d
 
             if is_2d_list:
-                # 2D list: vec_vec_int_push(list_ptr, vec_int_struct)
+                # 2D list: vec_vec_int_push(list_ptr, vec_int_ptr)
                 vec_vec_int_push_func = self.runtime.get_function("vec_vec_int_push")
 
-                # value is a pointer to vec_int, but vec_vec_int_push takes vec_int by value
-                # Load the struct from the pointer
-                vec_int_struct = self.builder.load(value, name="vec_int_struct")
+                # value is already a pointer to vec_int, vec_vec_int_push now takes pointer
+                # No need to load the struct - just pass the pointer
 
                 # Call vec_vec_int_push
-                self.builder.call(vec_vec_int_push_func, [list_ptr, vec_int_struct], name="")
+                self.builder.call(vec_vec_int_push_func, [list_ptr, value], name="")
             else:
                 # 1D list: vec_int_push(list_ptr, int_value)
                 vec_int_push_func = self.runtime.get_function("vec_int_push")
