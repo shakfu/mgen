@@ -197,17 +197,21 @@ class IRToLLVMConverter(IRVisitor):
 
         # Store the value if present
         if value is not None:
-            # Check for list dimensionality mismatch
+            # Check for list dimensionality mismatch (1D vs 2D list literals only)
             value_type_str = str(value.type)
             var_type_str = str(var_ptr.type)
 
-            # Detect if we're trying to store wrong dimension list
-            # var_ptr for a 2D list is vec_vec_int** (alloca of vec_vec_int*)
-            # value for an empty 1D list is vec_int*
-            is_mismatch = (("vec_int" in value_type_str and "vec_vec_int" in var_type_str) or
-                          ("vec_vec_int" in value_type_str and "vec_int" in var_type_str and "vec_vec_int" not in value_type_str))
+            # Detect actual dimension mismatch:
+            # - value is vec_int* (1D) but variable expects vec_vec_int* (2D)
+            # - value is vec_vec_int* (2D) but variable expects vec_int* (1D)
+            value_is_1d = "vec_int" in value_type_str and "vec_vec_int" not in value_type_str
+            value_is_2d = "vec_vec_int" in value_type_str
+            var_is_1d = "vec_int" in var_type_str and "vec_vec_int" not in var_type_str
+            var_is_2d = "vec_vec_int" in var_type_str
 
-            if is_mismatch:
+            is_dimension_mismatch = (value_is_1d and var_is_2d) or (value_is_2d and var_is_1d)
+
+            if is_dimension_mismatch:
                 # Don't store the mismatched value - it's an empty list with wrong dimension
                 # The variable will remain uninitialized, which is fine - it will be initialized
                 # on first use (e.g., append)
@@ -1024,19 +1028,18 @@ class IRToLLVMConverter(IRVisitor):
             if len(node.arguments) == 1:
                 arg = node.arguments[0]
                 if arg.result_type.base_type == IRDataType.INT:
-                    fmt_str = "%lld\\0A\\00"  # %lld\n\0
+                    fmt_bytes = b"%lld\n\x00"  # %lld\n\0 as bytes
                 elif arg.result_type.base_type == IRDataType.FLOAT:
-                    fmt_str = "%f\\0A\\00"  # %f\n\0
+                    fmt_bytes = b"%f\n\x00"  # %f\n\0 as bytes
                 elif arg.result_type.base_type == IRDataType.BOOL:
-                    fmt_str = "%d\\0A\\00"  # %d\n\0
+                    fmt_bytes = b"%d\n\x00"  # %d\n\0 as bytes
                 elif arg.result_type.base_type == IRDataType.STRING:
-                    fmt_str = "%s\\0A\\00"  # %s\n\0
+                    fmt_bytes = b"%s\n\x00"  # %s\n\0 as bytes
                 else:
                     raise NotImplementedError(f"Print for type {arg.result_type.base_type} not implemented")
 
                 # Create global string constant for format
-                fmt_const = ir.Constant(ir.ArrayType(ir.IntType(8), len(fmt_str.encode('utf-8').decode('unicode_escape'))),
-                                       bytearray(fmt_str.encode('utf-8').decode('unicode_escape').encode('utf-8')))
+                fmt_const = ir.Constant(ir.ArrayType(ir.IntType(8), len(fmt_bytes)), bytearray(fmt_bytes))
                 fmt_global = ir.GlobalVariable(self.module, fmt_const.type, name=f"fmt_{len(self.module.globals)}")
                 fmt_global.linkage = 'internal'
                 fmt_global.global_constant = True

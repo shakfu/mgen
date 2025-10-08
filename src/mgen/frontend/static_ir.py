@@ -876,6 +876,16 @@ class IRBuilder:
 
             if node.value:
                 value_expr = self._build_expression(node.value)
+
+                # If the value is a list literal with no element type info,
+                # propagate element type from the variable's annotation
+                if (isinstance(value_expr, IRLiteral) and
+                    value_expr.result_type.base_type == IRDataType.LIST and
+                    (not hasattr(value_expr.result_type, 'element_type') or value_expr.result_type.element_type is None)):
+                    # Copy element type from variable annotation to literal
+                    if hasattr(var_type, 'element_type') and var_type.element_type:
+                        value_expr.result_type.element_type = var_type.element_type
+
                 return IRAssignment(var, value_expr, self._get_location(node))
             else:
                 # Create assignment with None value for declaration only
