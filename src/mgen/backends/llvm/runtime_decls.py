@@ -203,8 +203,86 @@ class LLVMRuntimeDeclarations:
         func = ir.Function(self.module, func_type, name="vec_vec_int_clear")
         self.function_decls["vec_vec_int_clear"] = func
 
+    def get_string_array_type(self) -> ir.Type:
+        """Get or create mgen_string_array_t struct type.
+
+        C struct definition:
+            typedef struct {
+                char** strings;
+                size_t count;
+                size_t capacity;
+            } mgen_string_array_t;
+
+        Returns:
+            LLVM struct type for mgen_string_array_t
+        """
+        if "string_array" in self.struct_types:
+            return self.struct_types["string_array"]
+
+        # Create named struct type
+        string_array_type = self.module.context.get_identified_type("struct.mgen_string_array_t")
+
+        if not string_array_type.is_opaque:
+            self.struct_types["string_array"] = string_array_type
+            return string_array_type
+
+        i8_ptr = ir.IntType(8).as_pointer()  # char*
+        i8_ptr_ptr = i8_ptr.as_pointer()      # char**
+
+        string_array_type.set_body(
+            i8_ptr_ptr,        # strings: char**
+            ir.IntType(64),    # count: size_t
+            ir.IntType(64),    # capacity: size_t
+        )
+
+        self.struct_types["string_array"] = string_array_type
+        return string_array_type
+
+    def declare_string_functions(self) -> None:
+        """Declare string operation C runtime functions in LLVM IR."""
+        i8_ptr = ir.IntType(8).as_pointer()  # char*
+        i64 = ir.IntType(64)
+        void = ir.VoidType()
+        string_array_type = self.get_string_array_type()
+        string_array_ptr = string_array_type.as_pointer()
+
+        # mgen_string_array_t* mgen_str_split(const char* str, const char* delimiter)
+        func_type = ir.FunctionType(string_array_ptr, [i8_ptr, i8_ptr])
+        func = ir.Function(self.module, func_type, name="mgen_str_split")
+        self.function_decls["mgen_str_split"] = func
+
+        # char* mgen_str_lower(const char* str)
+        func_type = ir.FunctionType(i8_ptr, [i8_ptr])
+        func = ir.Function(self.module, func_type, name="mgen_str_lower")
+        self.function_decls["mgen_str_lower"] = func
+
+        # char* mgen_str_strip(const char* str)
+        func_type = ir.FunctionType(i8_ptr, [i8_ptr])
+        func = ir.Function(self.module, func_type, name="mgen_str_strip")
+        self.function_decls["mgen_str_strip"] = func
+
+        # char* mgen_str_concat(const char* str1, const char* str2)
+        func_type = ir.FunctionType(i8_ptr, [i8_ptr, i8_ptr])
+        func = ir.Function(self.module, func_type, name="mgen_str_concat")
+        self.function_decls["mgen_str_concat"] = func
+
+        # const char* mgen_string_array_get(mgen_string_array_t* arr, size_t index)
+        func_type = ir.FunctionType(i8_ptr, [string_array_ptr, i64])
+        func = ir.Function(self.module, func_type, name="mgen_string_array_get")
+        self.function_decls["mgen_string_array_get"] = func
+
+        # size_t mgen_string_array_size(mgen_string_array_t* arr)
+        func_type = ir.FunctionType(i64, [string_array_ptr])
+        func = ir.Function(self.module, func_type, name="mgen_string_array_size")
+        self.function_decls["mgen_string_array_size"] = func
+
+        # void mgen_string_array_free(mgen_string_array_t* arr)
+        func_type = ir.FunctionType(void, [string_array_ptr])
+        func = ir.Function(self.module, func_type, name="mgen_string_array_free")
+        self.function_decls["mgen_string_array_free"] = func
+
     def declare_all(self) -> None:
         """Declare all runtime library functions and types."""
         self.declare_vec_int_functions()
         self.declare_vec_vec_int_functions()
-        # Future: declare map, set, string functions
+        self.declare_string_functions()

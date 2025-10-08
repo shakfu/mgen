@@ -721,6 +721,30 @@ class IRToLLVMConverter(IRVisitor):
         self.func_symtab[name] = func
         return func
 
+    def _create_string_constant(self, str_value: str) -> ir.Value:
+        """Create a string constant.
+
+        Args:
+            str_value: String value to create
+
+        Returns:
+            Pointer to the string constant (i8*)
+        """
+        if self.builder is None:
+            raise RuntimeError("Builder not initialized")
+
+        str_bytes = (str_value + '\0').encode('utf-8')
+        str_const = ir.Constant(ir.ArrayType(ir.IntType(8), len(str_bytes)), bytearray(str_bytes))
+
+        # Create global variable for the string
+        str_global = ir.GlobalVariable(self.module, str_const.type, name=f"str_{len(self.module.globals)}")
+        str_global.linkage = 'internal'
+        str_global.global_constant = True
+        str_global.initializer = str_const
+
+        # Return pointer to the string (i8*)
+        return self.builder.gep(str_global, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)])
+
     def _concat_strings(self, left: ir.Value, right: ir.Value) -> ir.Value:
         """Concatenate two strings using C library functions.
 
@@ -891,6 +915,43 @@ class IRToLLVMConverter(IRVisitor):
 
             # Call vec_int_set - it modifies the list in place
             return self.builder.call(vec_int_set_func, [list_ptr, index, value], name="")
+
+        elif node.function_name == "__method_split__":
+            # str.split(delimiter) -> mgen_str_split(str, delimiter)
+            if len(node.arguments) < 1 or len(node.arguments) > 2:
+                raise RuntimeError("split() requires 1 or 2 arguments (string and optional delimiter)")
+
+            str_ptr = node.arguments[0].accept(self)  # char* string
+
+            # Get delimiter (default to empty string for whitespace splitting)
+            if len(node.arguments) == 2:
+                delim_ptr = node.arguments[1].accept(self)
+            else:
+                # Empty string means split on whitespace
+                empty_str = self._create_string_constant("")
+                delim_ptr = empty_str
+
+            # Call mgen_str_split
+            split_func = self.runtime.get_function("mgen_str_split")
+            return self.builder.call(split_func, [str_ptr, delim_ptr], name="split_result")
+
+        elif node.function_name == "__method_lower__":
+            # str.lower() -> mgen_str_lower(str)
+            if len(node.arguments) != 1:
+                raise RuntimeError("lower() requires exactly 1 argument (string)")
+
+            str_ptr = node.arguments[0].accept(self)
+            lower_func = self.runtime.get_function("mgen_str_lower")
+            return self.builder.call(lower_func, [str_ptr], name="lower_result")
+
+        elif node.function_name == "__method_strip__":
+            # str.strip() -> mgen_str_strip(str)
+            if len(node.arguments) != 1:
+                raise RuntimeError("strip() requires exactly 1 argument (string)")
+
+            str_ptr = node.arguments[0].accept(self)
+            strip_func = self.runtime.get_function("mgen_str_strip")
+            return self.builder.call(strip_func, [str_ptr], name="strip_result")
 
         # Handle builtin functions
         elif node.function_name == "len":

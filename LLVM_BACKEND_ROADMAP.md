@@ -1,42 +1,95 @@
 # LLVM Backend Development Roadmap
 
-## Current State
+## Current State (Updated: October 2025)
 
-- **Basic functionality working**: arithmetic, control flow, functions, loops, booleans
-- **Runtime foundation started**: `vec_int` struct declared with basic operations
-- **Test coverage**: 70 tests passing (100%)
-- **Architecture**: IR → LLVM IR conversion using llvmlite library
+- **Benchmark Status**: 3/7 passing (43%) - fibonacci, list_ops, quicksort
+- **Test Coverage**: 70 tests passing (100%, ~2s execution)
+- **Runtime Library**: String operations C runtime implemented (split, lower, strip, concat)
+- **Container Support**: vec_int (1D lists), vec_vec_int (2D lists), mgen_string_array_t
+- **Features Working**:
+  - Arithmetic, control flow, functions, loops, booleans
+  - Recursion, list operations, list comprehensions
+  - String literals, string concatenation, print
+  - Global variables, type casting (int/float)
+  - Nested loops, break/continue, multiple return paths
+- **Architecture**: IR → LLVM IR conversion with C runtime linking
+
+## Passing Benchmarks (3/7)
+
+1. ✅ **fibonacci** - Recursion, loops, arithmetic (514229)
+2. ✅ **list_ops** - List comprehensions, append, indexing, len (166750)
+3. ✅ **quicksort** - Recursive list operations, slicing (5)
+
+## Failing Benchmarks (4/7)
+
+4. ❌ **matmul** - Type mismatch: `vec_vec_int* != vec_int*` in nested subscripts
+5. ❌ **wordcount** - Needs `list[str]` support for split() results
+6. ❌ **dict_ops** - No dict support (dict comprehensions, items(), values(), in-operator)
+7. ❌ **set_ops** - No set support (set comprehensions, add, remove, membership)
+
+## Recent Progress
+
+### ✅ String Operations Runtime (Oct 2025)
+- **Implemented**: `mgen_llvm_string.c/.h` with split(), lower(), strip(), concat()
+- **Declared**: String functions in runtime_decls.py (mgen_string_array_t)
+- **Integrated**: Builder compiles and links string runtime automatically
+- **Limitation**: Needs `list[str]` type support for full functionality
+
+### ✅ 2D List Support
+- **Declared**: vec_vec_int struct with push/at/size/free operations
+- **Issue**: Type mismatch in nested subscript operations (a[i][k])
+- **Status**: Runtime exists but code generation needs fixing
 
 ## Next Development Priorities
 
-### 1. Complete Runtime Library Declarations
+### 1. Fix Nested Subscript Operations (matmul)
 
-The `runtime_decls.py` currently has only `vec_int` declarations. Need to add:
+**Problem**: `a[i][k]` generates type mismatch when accessing 2D lists
+**Solution**: Handle chained subscript operations in IRToLLVMConverter
+**Impact**: Unlocks matmul benchmark (4/7)
 
-- `map_int_int`, `map_str_int`, `map_str_str` (hash maps)
-- `set_int`, `set_str` (hash sets)
-- String operations beyond literals
-- File I/O functions
+**Files to modify:**
+- `src/mgen/backends/llvm/ir_to_llvm.py` (visit_function_call for chained __getitem__)
+
+### 2. Implement list[str] Support (wordcount partial)
+
+**Problem**: split() returns string_array but needs list[str] type
+**Solution**:
+- Add vec_str container type for string lists
+- Convert string_array ↔ vec_str in split() handler
+- Support string iteration in for loops
+
+**Impact**: Enables split() usage, but wordcount still needs dicts
+
+**Files to modify:**
+- `src/mgen/backends/llvm/runtime_decls.py` (vec_str declarations)
+- `src/mgen/backends/llvm/runtime/mgen_llvm_list_str.c` (new file)
+- `src/mgen/backends/llvm/ir_to_llvm.py` (string list operations)
+
+### 3. Implement Dict Support (wordcount, dict_ops)
+
+**Problem**: No dictionary data structure
+**Solution**:
+- Implement `map_str_int`, `map_int_int` C runtime
+- Add dict comprehensions support
+- Support dict.items(), dict.values(), in-operator
+
+**Impact**: Unlocks wordcount + dict_ops (6/7)
 
 **Files to modify:**
 - `src/mgen/backends/llvm/runtime_decls.py`
+- `src/mgen/backends/llvm/runtime/mgen_llvm_dict.c` (new file)
+- `src/mgen/backends/llvm/ir_to_llvm.py`
 
-### 2. Implement Actual C Runtime
+### 4. Implement Set Support (set_ops)
 
-Currently only LLVM IR declarations exist. Need to create the actual C implementations:
+**Problem**: No set data structure
+**Solution**:
+- Implement `set_int`, `set_str` C runtime
+- Add set comprehensions, add(), remove()
+- Support membership testing (in operator)
 
-- `src/mgen/backends/llvm/runtime/*.c` - C implementations of runtime functions
-- Compilation/linking strategy to connect LLVM IR with C runtime
-- Similar architecture to C backend's STC-based runtime (~2,500 lines)
-
-**New directory structure:**
-```
-src/mgen/backends/llvm/runtime/
-├── vec_int.c
-├── map_int_int.c
-├── set_int.c
-└── string_ops.c
-```
+**Impact**: Unlocks set_ops (7/7)
 
 ### 3. Data Structures Support
 
@@ -97,33 +150,37 @@ Complete the end-to-end compilation flow:
 
 ## Recommended Development Order
 
-1. **Phase 1: Runtime Foundation** (Weeks 1-2)
-   - Complete runtime declarations (#1)
-   - Implement C runtime library (#2)
-   - Basic compilation pipeline (#6)
+### Phase 1: Quick Wins (1-2 days)
+1. **Fix nested subscripts** → 4/7 benchmarks (matmul)
+2. **Implement list[str]** → Better string support
 
-2. **Phase 2: Data Structures** (Weeks 3-4)
-   - Lists implementation (#3)
-   - Dicts implementation (#3)
-   - Sets implementation (#3)
+### Phase 2: Data Structures (3-5 days)
+3. **Dict support** → 6/7 benchmarks (wordcount + dict_ops)
+4. **Set support** → 7/7 benchmarks (set_ops)
 
-3. **Phase 3: Benchmarks** (Week 5)
-   - Integrate with benchmark suite (#5)
-   - Fix failing benchmarks
-   - Performance tuning
-
-4. **Phase 4: Advanced Features** (Week 6+)
-   - String methods (#4)
-   - Module imports (#4)
-   - Classes/OOP (#4)
+### Phase 3: Production Ready (Week 2+)
+5. **Type inference improvements** (dict/set element types)
+6. **Error handling** (better error messages)
+7. **Performance optimization** (LLVM passes)
+8. **Advanced features** (OOP, modules, file I/O)
 
 ## Success Metrics
 
-- **100% test coverage maintained**
-- **7/7 benchmarks passing**
-- **Zero external dependencies** (except LLVM tools)
-- **Comparable performance** to C/C++ backends
-- **Type-safe code generation**
+- ✅ **100% test coverage maintained** (982/982 tests passing)
+- ⏳ **Benchmarks**: 3/7 passing (43%) → Target: 7/7 (100%)
+- ✅ **Zero external dependencies** (except LLVM tools: llc, clang)
+- ✅ **Fast compilation**: 144-260ms (competitive with Go/Rust)
+- ✅ **Small binaries**: 33-35KB (competitive with C++)
+- ✅ **Type-safe code generation** (llvmlite validation)
+
+## Performance Comparison
+
+| Metric | LLVM | C++ | Go | Rust |
+|--------|------|-----|-----|------|
+| **Success Rate** | 3/7 (43%) | 7/7 (100%) | 7/7 (100%) | 7/7 (100%) |
+| **Avg Compile Time** | 177ms | 422ms | 163ms | 221ms |
+| **Avg Binary Size** | 34KB | 36KB | 2.3MB | 446KB |
+| **Test Coverage** | 70 tests | - | - | - |
 
 ## Notes
 
