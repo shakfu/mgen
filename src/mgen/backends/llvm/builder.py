@@ -99,29 +99,36 @@ run: $(TARGET)
                 print(f"LLC compilation failed: {result.stderr}")
                 return False
 
-            # Step 2: Compile string runtime library
+            # Step 2: Compile runtime libraries
             runtime_dir = Path(__file__).parent / "runtime"
-            string_runtime_c = runtime_dir / "mgen_llvm_string.c"
-            string_runtime_o = output_path / "mgen_llvm_string.o"
-
-            # Only compile runtime if it exists
             runtime_objects = []
-            if string_runtime_c.exists():
-                clang_compile_runtime_cmd = [
-                    self.clang_path,
-                    "-c",
-                    str(string_runtime_c),
-                    "-o",
-                    str(string_runtime_o),
-                    "-I", str(runtime_dir),  # Include runtime headers
-                ]
 
-                result = subprocess.run(clang_compile_runtime_cmd, capture_output=True, text=True)
-                if result.returncode != 0:
-                    print(f"Runtime compilation failed: {result.stderr}")
-                    return False
+            # Compile each runtime C file
+            runtime_sources = [
+                "vec_int_minimal.c",
+                "vec_vec_int_minimal.c",
+                "mgen_llvm_string.c",
+            ]
 
-                runtime_objects.append(str(string_runtime_o))
+            for runtime_source in runtime_sources:
+                runtime_c = runtime_dir / runtime_source
+                if runtime_c.exists():
+                    runtime_o = output_path / runtime_source.replace('.c', '.o')
+                    clang_compile_runtime_cmd = [
+                        self.clang_path,
+                        "-c",
+                        str(runtime_c),
+                        "-o",
+                        str(runtime_o),
+                        "-I", str(runtime_dir),  # Include runtime headers
+                    ]
+
+                    result = subprocess.run(clang_compile_runtime_cmd, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        print(f"Runtime compilation failed for {runtime_source}: {result.stderr}")
+                        return False
+
+                    runtime_objects.append(str(runtime_o))
 
             # Step 3: Link object files to create executable using clang
             executable_path = output_path / executable_name

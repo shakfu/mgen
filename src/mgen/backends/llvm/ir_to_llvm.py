@@ -425,9 +425,25 @@ class IRToLLVMConverter(IRVisitor):
                         # For 2D lists, element_val is a pointer to vec_int
                         # vec_vec_int_push takes vec_int by value, so load it
                         element_struct = self.builder.load(element_val, name="vec_int_struct")
+
+                        # Debug type checking
+                        import sys
+                        print(f"[2D] Calling {vec_push_func.name}", file=sys.stderr)
+                        print(f"  Arg 0 type: {vec_ptr.type}", file=sys.stderr)
+                        print(f"  Arg 1 type: {element_struct.type}", file=sys.stderr)
+                        print(f"  Expected: {vec_push_func.function_type}", file=sys.stderr)
+
                         self.builder.call(vec_push_func, [vec_ptr, element_struct], name="")
                     else:
                         # For 1D lists, element_val is an i64
+
+                        # Debug type checking
+                        import sys
+                        print(f"[1D] Calling {vec_push_func.name}", file=sys.stderr)
+                        print(f"  Arg 0 type: {vec_ptr.type}", file=sys.stderr)
+                        print(f"  Arg 1 type: {element_val.type}", file=sys.stderr)
+                        print(f"  Expected: {vec_push_func.function_type}", file=sys.stderr)
+
                         self.builder.call(vec_push_func, [vec_ptr, element_val], name="")
 
             # Return the pointer
