@@ -346,8 +346,11 @@ class IRToLLVMConverter(IRVisitor):
                 # right operand should be the container (dict)
                 right_type = node.right.result_type.base_type
                 if right_type == IRDataType.DICT:
-                    # Call map_str_int_contains(dict_ptr, key)
-                    map_contains_func = self.runtime.get_function("map_str_int_contains")
+                    # Determine dict type to select appropriate contains function
+                    if node.right.result_type.element_type and node.right.result_type.element_type.base_type == IRDataType.STRING:
+                        map_contains_func = self.runtime.get_function("map_str_int_contains")
+                    else:
+                        map_contains_func = self.runtime.get_function("map_int_int_contains")
                     result = self.builder.call(map_contains_func, [right, left], name="contains_result")
                     # Convert i32 result to i1 (bool)
                     zero = ir.Constant(ir.IntType(32), 0)
@@ -501,9 +504,13 @@ class IRToLLVMConverter(IRVisitor):
             if self.builder is None:
                 raise RuntimeError("Builder not initialized - must be inside a function")
 
-            # For now, only support dict[str, int] -> map_str_int
-            map_type = self.runtime.get_map_str_int_type()
-            map_init_ptr_func = self.runtime.get_function("map_str_int_init_ptr")
+            # Check element_type to determine key type (default to int)
+            if node.result_type.element_type and node.result_type.element_type.base_type == IRDataType.STRING:
+                map_type = self.runtime.get_map_str_int_type()
+                map_init_ptr_func = self.runtime.get_function("map_str_int_init_ptr")
+            else:
+                map_type = self.runtime.get_map_int_int_type()
+                map_init_ptr_func = self.runtime.get_function("map_int_int_init_ptr")
 
             # Allocate space for the map struct on heap
             i64 = ir.IntType(64)
@@ -561,21 +568,38 @@ class IRToLLVMConverter(IRVisitor):
         raise NotImplementedError(f"Literal type {node.result_type.base_type} not implemented (value={node.value})")
 
     def visit_comprehension(self, node: IRComprehension) -> ir.Value:
-        """Convert IR comprehension to LLVM loop with append operations.
+        """Convert IR comprehension to LLVM loop with append/insert operations.
 
-        Handles list comprehensions like [expr for var in iterable if condition]
-        by generating:
-        1. Allocate result list
+        Handles comprehensions like:
+        - List: [expr for var in iterable if condition]
+        - Dict: {key: value for var in iterable if condition}
+        - Set: {expr for var in iterable if condition}
+
+        Generates:
+        1. Allocate result container
         2. Generate for loop
         3. Add conditional if present
-        4. Append expression to result
+        4. Append/insert expression to result
         """
         if self.builder is None or self.current_function is None:
             raise RuntimeError("Builder not initialized - must be inside a function")
 
         ast_node = node.ast_node
-        if not isinstance(ast_node, ast.ListComp):
-            raise NotImplementedError(f"Only list comprehensions supported, got {type(ast_node).__name__}")
+
+        # Determine comprehension type
+        if isinstance(ast_node, ast.ListComp):
+            return self._visit_list_comprehension(node, ast_node)
+        elif isinstance(ast_node, ast.DictComp):
+            return self._visit_dict_comprehension(node, ast_node)
+        elif isinstance(ast_node, ast.SetComp):
+            return self._visit_set_comprehension(node, ast_node)
+        else:
+            raise NotImplementedError(f"Unsupported comprehension type: {type(ast_node).__name__}")
+
+    def _visit_list_comprehension(self, node: IRComprehension, ast_node: ast.ListComp) -> ir.Value:
+        """Handle list comprehension: [expr for var in iterable if condition]."""
+        if self.builder is None or self.current_function is None:
+            raise RuntimeError("Builder not initialized")
 
         # Allocate result list on heap
         vec_int_type = self.runtime.get_vec_int_type()
@@ -739,6 +763,165 @@ class IRToLLVMConverter(IRVisitor):
         self.builder.position_at_end(loop_end_block)
 
         return result_ptr
+
+    def _infer_dict_key_type(self, key_expr: ast.expr) -> str:
+        """Infer the type of a dict key expression.
+
+        Returns:
+            "int" for integer keys, "str" for string keys
+        """
+        # Integer keys: constants, variables, arithmetic operations
+        if isinstance(key_expr, ast.Constant):
+            if isinstance(key_expr.value, int):
+                return "int"
+            elif isinstance(key_expr.value, str):
+                return "str"
+        elif isinstance(key_expr, (ast.Name, ast.BinOp, ast.UnaryOp)):
+            # Assume Name and arithmetic ops are integers
+            return "int"
+        elif isinstance(key_expr, ast.Call):
+            # String operations like str()
+            if isinstance(key_expr.func, ast.Name) and key_expr.func.id == "str":
+                return "str"
+            return "int"
+
+        # Default to string for safety
+        return "str"
+
+    def _visit_dict_comprehension(self, node: IRComprehension, ast_node: ast.DictComp) -> ir.Value:
+        """Handle dict comprehension: {key_expr: value_expr for var in iterable if condition}."""
+        if self.builder is None or self.current_function is None:
+            raise RuntimeError("Builder not initialized")
+
+        # Detect key type to select appropriate map runtime
+        key_type = self._infer_dict_key_type(ast_node.key)
+
+        if key_type == "int":
+            # Use map_int_int for integer keys
+            map_type = self.runtime.get_map_int_int_type()
+            map_init_ptr_func = self.runtime.get_function("map_int_int_init_ptr")
+            map_set_func = self.runtime.get_function("map_int_int_set")
+        else:
+            # Use map_str_int for string keys
+            map_type = self.runtime.get_map_str_int_type()
+            map_init_ptr_func = self.runtime.get_function("map_str_int_init_ptr")
+            map_set_func = self.runtime.get_function("map_str_int_set")
+
+        # Calculate size and malloc the struct
+        i64 = ir.IntType(64)
+        i8_ptr = ir.IntType(8).as_pointer()
+        null_ptr = ir.Constant(map_type.as_pointer(), None)
+        size_gep = self.builder.gep(null_ptr, [ir.Constant(ir.IntType(32), 1)], name="size_gep")
+        struct_size = self.builder.ptrtoint(size_gep, i64, name="struct_size")
+        malloc_func = self._get_or_create_c_function("malloc", i8_ptr, [i64])
+        raw_ptr = self.builder.call(malloc_func, [struct_size], name="dict_comp_malloc")
+        result_ptr = self.builder.bitcast(raw_ptr, map_type.as_pointer(), name="dict_comp_result")
+
+        self.builder.call(map_init_ptr_func, [result_ptr], name="")
+
+        # Process the comprehension (only single generator supported for now)
+        if len(ast_node.generators) != 1:
+            raise NotImplementedError("Only single generator in dict comprehensions supported")
+
+        generator = ast_node.generators[0]
+
+        # Determine iteration type: range() only for now
+        is_range_iter = (isinstance(generator.iter, ast.Call) and
+                        isinstance(generator.iter.func, ast.Name) and
+                        generator.iter.func.id == "range")
+
+        if not is_range_iter:
+            raise NotImplementedError("Dict comprehensions only support range() iteration for now")
+
+        # Handle range() iteration
+        assert isinstance(generator.iter, ast.Call)
+        range_args = generator.iter.args
+        if len(range_args) == 1:
+            start_val = ir.Constant(ir.IntType(64), 0)
+            end_expr = self._convert_ast_expr(range_args[0])
+            step_val = ir.Constant(ir.IntType(64), 1)
+        elif len(range_args) == 2:
+            start_expr = self._convert_ast_expr(range_args[0])
+            end_expr = self._convert_ast_expr(range_args[1])
+            start_val = start_expr
+            step_val = ir.Constant(ir.IntType(64), 1)
+        elif len(range_args) == 3:
+            start_expr = self._convert_ast_expr(range_args[0])
+            end_expr = self._convert_ast_expr(range_args[1])
+            step_expr = self._convert_ast_expr(range_args[2])
+            start_val = start_expr
+            step_val = step_expr
+        else:
+            raise ValueError("Invalid range() arguments")
+
+        # Create loop variable
+        loop_var_name = generator.target.id if isinstance(generator.target, ast.Name) else "loop_var"
+        loop_var = self.builder.alloca(ir.IntType(64), name=loop_var_name)
+        self.builder.store(start_val, loop_var)
+
+        # Create loop blocks
+        loop_cond_block = self.current_function.append_basic_block(name="dict_loop_cond")
+        loop_body_block = self.current_function.append_basic_block(name="dict_loop_body")
+        loop_end_block = self.current_function.append_basic_block(name="dict_loop_end")
+
+        # Branch to loop condition
+        self.builder.branch(loop_cond_block)
+
+        # Loop condition: i < end
+        self.builder.position_at_end(loop_cond_block)
+        loop_var_val = self.builder.load(loop_var, name=f"{loop_var_name}_val")
+        cond = self.builder.icmp_signed("<", loop_var_val, end_expr, name="dict_loop_cond")
+        self.builder.cbranch(cond, loop_body_block, loop_end_block)
+
+        # Loop body
+        self.builder.position_at_end(loop_body_block)
+
+        # Store loop variable in symbol table
+        old_var = self.var_symtab.get(loop_var_name)
+        self.var_symtab[loop_var_name] = loop_var
+
+        # Handle optional condition
+        if generator.ifs:
+            if_cond_expr = self._convert_ast_expr(generator.ifs[0])
+            if_then_block = self.current_function.append_basic_block(name="dict_if_then")
+            if_merge_block = self.current_function.append_basic_block(name="dict_if_merge")
+
+            self.builder.cbranch(if_cond_expr, if_then_block, if_merge_block)
+
+            self.builder.position_at_end(if_then_block)
+            # Evaluate key and value, then insert
+            key_val = self._convert_ast_expr(ast_node.key)
+            value_val = self._convert_ast_expr(ast_node.value)
+            self.builder.call(map_set_func, [result_ptr, key_val, value_val], name="")
+            self.builder.branch(if_merge_block)
+
+            self.builder.position_at_end(if_merge_block)
+        else:
+            # No condition - just insert
+            key_val = self._convert_ast_expr(ast_node.key)
+            value_val = self._convert_ast_expr(ast_node.value)
+            self.builder.call(map_set_func, [result_ptr, key_val, value_val], name="")
+
+        # Increment loop variable
+        incremented = self.builder.add(loop_var_val, step_val, name="dict_inc")
+        self.builder.store(incremented, loop_var)
+        self.builder.branch(loop_cond_block)
+
+        # Restore symbol table
+        if old_var is not None:
+            self.var_symtab[loop_var_name] = old_var
+        else:
+            self.var_symtab.pop(loop_var_name, None)
+
+        # Continue after loop
+        self.builder.position_at_end(loop_end_block)
+
+        return result_ptr
+
+    def _visit_set_comprehension(self, node: IRComprehension, ast_node: ast.SetComp) -> ir.Value:
+        """Handle set comprehension: {expr for var in iterable if condition}."""
+        # For now, raise NotImplementedError - sets need a runtime implementation
+        raise NotImplementedError("Set comprehensions not yet implemented in LLVM backend")
 
     def _convert_ast_expr(self, ast_expr: ast.expr) -> ir.Value:
         """Helper to convert AST expression to LLVM value."""
@@ -986,6 +1169,10 @@ class IRToLLVMConverter(IRVisitor):
                     # Dict: map_str_int_get(dict_ptr, key) returns i64
                     map_get_func = self.runtime.get_function("map_str_int_get")
                     return self.builder.call(map_get_func, [container_ptr, key_or_index], name="dict_get")
+                elif "map_int_int" in pointee_type_str:
+                    # Dict: map_int_int_get(dict_ptr, key) returns i64
+                    map_get_func = self.runtime.get_function("map_int_int_get")
+                    return self.builder.call(map_get_func, [container_ptr, key_or_index], name="dict_get")
                 elif "vec_vec_int" in pointee_type_str:
                     # 2D list: vec_vec_int_at(list_ptr, index) returns vec_int*
                     vec_at_func = self.runtime.get_function("vec_vec_int_at")
@@ -1023,6 +1210,10 @@ class IRToLLVMConverter(IRVisitor):
                 if "map_str_int" in pointee_type_str:
                     # Dict: map_str_int_set(dict_ptr, key, value)
                     map_set_func = self.runtime.get_function("map_str_int_set")
+                    return self.builder.call(map_set_func, [container_ptr, key_or_index, value], name="")
+                elif "map_int_int" in pointee_type_str:
+                    # Dict: map_int_int_set(dict_ptr, key, value)
+                    map_set_func = self.runtime.get_function("map_int_int_set")
                     return self.builder.call(map_set_func, [container_ptr, key_or_index, value], name="")
                 elif "vec_str" in pointee_type_str:
                     # String list: vec_str_set(list_ptr, index, char* value)
@@ -1126,6 +1317,9 @@ class IRToLLVMConverter(IRVisitor):
 
                     if "map_str_int" in pointee_type_str:
                         map_size_func = self.runtime.get_function("map_str_int_size")
+                        return self.builder.call(map_size_func, [llvm_arg], name="len_tmp")
+                    elif "map_int_int" in pointee_type_str:
+                        map_size_func = self.runtime.get_function("map_int_int_size")
                         return self.builder.call(map_size_func, [llvm_arg], name="len_tmp")
                     else:
                         raise NotImplementedError(f"len() for dict type {pointee_type_str} not implemented")
@@ -1508,9 +1702,14 @@ class IRToLLVMConverter(IRVisitor):
         # Handle dict types (DICT<K, V>)
         if ir_type.base_type == IRDataType.DICT:
             # Dicts are represented as pointers to map_* structs
-            # For now, we only support dict[str, int] -> map_str_int*
-            # TODO: Add support for other dict types (map_int_int, etc.)
-            return self.runtime.get_map_str_int_type().as_pointer()
+            # Check element_type to determine key type
+            if ir_type.element_type and ir_type.element_type.base_type == IRDataType.STRING:
+                # String keys -> map_str_int*
+                return self.runtime.get_map_str_int_type().as_pointer()
+            else:
+                # Default to int keys -> map_int_int*
+                # This handles both dict[int, int] and generic dict
+                return self.runtime.get_map_int_int_type().as_pointer()
 
         # Base type mapping
         type_mapping = {

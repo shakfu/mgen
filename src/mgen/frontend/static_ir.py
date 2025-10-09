@@ -974,6 +974,12 @@ class IRBuilder:
         elif isinstance(node, ast.ListComp):
             # List comprehension - store AST node for backend expansion
             return IRComprehension(node, IRType(IRDataType.LIST), self._get_location(node))
+        elif isinstance(node, ast.DictComp):
+            # Dict comprehension - store AST node for backend expansion
+            return IRComprehension(node, IRType(IRDataType.DICT), self._get_location(node))
+        elif isinstance(node, ast.SetComp):
+            # Set comprehension - store AST node for backend expansion
+            return IRComprehension(node, IRType(IRDataType.SET), self._get_location(node))
         elif isinstance(node, ast.Subscript):
             return self._build_subscript(node)
 

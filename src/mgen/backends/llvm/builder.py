@@ -138,6 +138,7 @@ run: $(TARGET)
                 "vec_vec_int_minimal.c",
                 "vec_str_minimal.c",
                 "map_str_int_minimal.c",
+                "map_int_int_minimal.c",
                 "mgen_llvm_string.c",
             ]
 
