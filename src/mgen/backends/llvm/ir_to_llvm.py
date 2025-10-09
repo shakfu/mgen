@@ -219,6 +219,15 @@ class IRToLLVMConverter(IRVisitor):
             else:
                 # Types match - normal store
                 self.builder.store(value, var_ptr)
+        else:
+            # No value provided - initialize pointer types to NULL
+            # This handles cases like `result: dict = {}` where we defer the literal
+            var_type_str = str(var_ptr.type)
+            if "map_" in var_type_str or "vec_" in var_type_str or "set_" in var_type_str:
+                # Initialize pointer to NULL (0)
+                pointee_type = var_ptr.type.pointee
+                null_value = ir.Constant(pointee_type, None)
+                self.builder.store(null_value, var_ptr)
 
     def visit_binary_operation(self, node: IRBinaryOperation) -> ir.Instruction:
         """Convert IR binary operation to LLVM instruction.
@@ -1645,6 +1654,7 @@ class IRToLLVMConverter(IRVisitor):
 
         elif node.function_name == "__method_split__":
             # str.split(delimiter) -> mgen_str_split(str, delimiter)
+            # Returns mgen_string_array_t* which we bitcast to vec_str*
             if len(node.arguments) < 1 or len(node.arguments) > 2:
                 raise RuntimeError("split() requires 1 or 2 arguments (string and optional delimiter)")
 
@@ -1658,9 +1668,14 @@ class IRToLLVMConverter(IRVisitor):
                 empty_str = self._create_string_constant("")
                 delim_ptr = empty_str
 
-            # Call mgen_str_split
+            # Call mgen_str_split (returns mgen_string_array_t*)
             split_func = self.runtime.get_function("mgen_str_split")
-            return self.builder.call(split_func, [str_ptr, delim_ptr], name="split_result")
+            string_array_result = self.builder.call(split_func, [str_ptr, delim_ptr], name="split_result")
+
+            # Bitcast mgen_string_array_t* to vec_str* (same layout: char**, size_t, size_t)
+            vec_str_ptr_type = self.runtime.get_vec_str_type().as_pointer()
+            vec_str_result = self.builder.bitcast(string_array_result, vec_str_ptr_type, name="split_as_vec_str")
+            return vec_str_result
 
         elif node.function_name == "__method_lower__":
             # str.lower() -> mgen_str_lower(str)
