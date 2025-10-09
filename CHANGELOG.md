@@ -17,6 +17,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.75] - 2025-10-09
+
+**Multi-Backend: Nested List Type Annotation Support**
+
+Fixed critical type inference bug where nested list annotations like `list[list[int]]` were not parsed correctly, causing compilation failures in matmul benchmark across multiple backends. All type annotation handlers now recursively process subscripted types for lists, dicts, and sets.
+
+### Fixed
+
+- **Type Annotation Parsing**
+  - Flow-sensitive inference (`flow_sensitive_inference.py`) - Added recursive parsing of subscripted types in `_annotation_to_flow_type()`
+  - Type inference engine (`type_inference.py`) - Added `c_type` and `python_type` properties to `InferenceResult` for C backend compatibility
+
+- **C Backend** (`backends/c/`)
+  - Fixed `_get_type_annotation()` to handle `ast.Subscript` nodes via `ast.unparse()`
+  - Enhanced `_map_python_to_c_type()` with recursive type mapping for nested lists (e.g., `list[list[int]]` → `vec_vec_int`)
+  - Function signatures now correctly map complex types using enhanced type inference engine
+
+- **Rust Backend** (`backends/rust/converter.py`)
+  - Added recursive handling in `_map_type_annotation()` for nested lists
+  - `list[list[int]]` now correctly generates `Vec<Vec<i32>>` instead of `Vec<i32>`
+
+- **Go Backend** (`backends/go/converter.py`)
+  - Added recursive subscript handling in `_map_type_annotation()`
+  - `list[list[int]]` now correctly generates `[][]int` instead of `[]interface{}`
+
+- **Haskell Backend** (`backends/haskell/converter.py`)
+  - Complete rewrite of `_convert_type_annotation()` with full subscript support
+  - Now handles `list[int]` → `[Int]`, `list[list[int]]` → `[[Int]]`, `dict[str, int]` → `Map String Int`, `set[int]` → `Set Int`
+  - Fixed matmul compilation error: functions now use concrete types instead of generic `a`
+
+- **OCaml Backend** (`backends/ocaml/converter.py`)
+  - Complete rewrite of `_get_type_annotation()` with recursive type handling
+  - Now handles `list[int]` → `int list`, `list[list[int]]` → `int list list`, `dict[str, int]` → `(string * int) list`
+  - Added `ImportFrom` statement handling to ignore Python-specific directives like `from __future__ import annotations`
+  - Fixed matmul generation error
+
+### Results
+
+- All 1031 tests passing (100%)
+- Benchmarks: 45/49 passing (92%), up from 43/49
+- **5 backends at 100%**: C (7/7), C++ (7/7), Rust (7/7), Go (7/7), OCaml (7/7)
+- **Haskell at 86%**: 6/7 (quicksort failure expected - in-place mutations incompatible with pure Haskell)
+- **LLVM at 57%**: 4/7 (has unrelated dict/set/string type issues)
+
+### Technical Details
+
+**Root Cause**: Type annotation methods only handled simple types (`ast.Name`) and returned generic types for subscripted types (`ast.Subscript`), causing compilation failures when Python 3.9+ subscripted generics like `list[list[int]]` were used.
+
+**Pattern Applied**: All backends now follow recursive pattern:
+```python
+if isinstance(annotation.slice, ast.Subscript):
+    # Recursively handle nested types
+    element_type = self._map_type_annotation(annotation.slice)
+    return f"Container<{element_type}>"
+```
+
+**Impact**: Exposed latent bug when matmul.py was upgraded from generic `list` types to proper `list[list[int]]` annotations (commit 49c26b6). This was not a traditional regression but test quality improvement revealing missing feature support.
+
 ## [0.1.74] - 2025-10-07
 
 **LLVM Backend: List Container Support with C Runtime Integration**
