@@ -542,6 +542,81 @@ class LLVMRuntimeDeclarations:
         func = ir.Function(self.module, func_type, name="map_int_int_entry_value")
         self.function_decls["map_int_int_entry_value"] = func
 
+    def get_set_int_type(self) -> ir.Type:
+        """Get or create set_int struct type.
+
+        C struct definition:
+            typedef struct {
+                mgen_set_int_entry_t** buckets;
+                size_t bucket_count;
+                size_t size;
+            } set_int;
+
+        Returns:
+            LLVM struct type for set_int
+        """
+        if "set_int" in self.struct_types:
+            return self.struct_types["set_int"]
+
+        # Create named struct type
+        set_int_type = self.module.context.get_identified_type("struct.set_int")
+
+        if not set_int_type.is_opaque:
+            self.struct_types["set_int"] = set_int_type
+            return set_int_type
+
+        # Define the struct body to match C definition
+        # mgen_set_int_entry_t** buckets (opaque pointer)
+        i8_ptr = ir.IntType(8).as_pointer()
+
+        set_int_type.set_body(
+            i8_ptr,             # buckets: mgen_set_int_entry_t** (treated as opaque i8*)
+            ir.IntType(64),     # bucket_count: size_t
+            ir.IntType(64),     # size: size_t
+        )
+
+        self.struct_types["set_int"] = set_int_type
+        return set_int_type
+
+    def declare_set_int_functions(self) -> None:
+        """Declare set_int C runtime functions in LLVM IR."""
+        set_int_type = self.get_set_int_type()
+        set_int_ptr = set_int_type.as_pointer()
+        i64 = ir.IntType(64)
+        i32 = ir.IntType(32)  # for boolean return (in C, bool -> int)
+        i1 = ir.IntType(1)    # for bool return
+        void = ir.VoidType()
+
+        # set_int set_int_init(void)
+        func_type = ir.FunctionType(set_int_type, [])
+        func = ir.Function(self.module, func_type, name="set_int_init")
+        self.function_decls["set_int_init"] = func
+
+        # void set_int_init_ptr(set_int* out) - initialize via pointer
+        func_type = ir.FunctionType(void, [set_int_ptr])
+        func = ir.Function(self.module, func_type, name="set_int_init_ptr")
+        self.function_decls["set_int_init_ptr"] = func
+
+        # bool set_int_insert(set_int* set, int value)
+        func_type = ir.FunctionType(i1, [set_int_ptr, i64])
+        func = ir.Function(self.module, func_type, name="set_int_insert")
+        self.function_decls["set_int_insert"] = func
+
+        # bool set_int_contains(const set_int* set, int value)
+        func_type = ir.FunctionType(i1, [set_int_ptr, i64])
+        func = ir.Function(self.module, func_type, name="set_int_contains")
+        self.function_decls["set_int_contains"] = func
+
+        # size_t set_int_size(const set_int* set)
+        func_type = ir.FunctionType(i64, [set_int_ptr])
+        func = ir.Function(self.module, func_type, name="set_int_size")
+        self.function_decls["set_int_size"] = func
+
+        # void set_int_drop(set_int* set)
+        func_type = ir.FunctionType(void, [set_int_ptr])
+        func = ir.Function(self.module, func_type, name="set_int_drop")
+        self.function_decls["set_int_drop"] = func
+
     def declare_all(self) -> None:
         """Declare all runtime library functions and types."""
         self.declare_vec_int_functions()
@@ -549,4 +624,5 @@ class LLVMRuntimeDeclarations:
         self.declare_vec_str_functions()
         self.declare_map_str_int_functions()
         self.declare_map_int_int_functions()
+        self.declare_set_int_functions()
         self.declare_string_functions()

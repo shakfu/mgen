@@ -1157,7 +1157,20 @@ class IRBuilder:
 
             # Create synthetic function name for method
             func_name = f"__method_{method_name}__"
-            return_type = IRType(IRDataType.VOID)  # Most methods return void
+
+            # Determine return type based on method name
+            if method_name == "values":
+                # dict.values() returns a list of values
+                return_type = IRType(IRDataType.LIST)
+            elif method_name == "keys":
+                # dict.keys() returns a list of keys
+                return_type = IRType(IRDataType.LIST)
+            elif method_name == "split":
+                # str.split() returns a list of strings
+                return_type = IRType(IRDataType.LIST)
+            else:
+                # Most methods return void (append, etc.)
+                return_type = IRType(IRDataType.VOID)
 
             return IRFunctionCall(func_name, arguments, return_type, self._get_location(node))
         else:

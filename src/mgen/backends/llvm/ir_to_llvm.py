@@ -788,6 +788,89 @@ class IRToLLVMConverter(IRVisitor):
         # Default to string for safety
         return "str"
 
+    def _generate_dict_values_vec(self, dict_ptr: ir.Value) -> ir.Value:
+        """Generate a vec_int containing all values from a dict.
+
+        This is used to implement dict.values() which returns an iterable.
+
+        Args:
+            dict_ptr: Pointer to the dict (map_int_int*)
+
+        Returns:
+            Pointer to vec_int containing all values
+        """
+        if self.builder is None or self.current_function is None:
+            raise RuntimeError("Builder not initialized")
+
+        # Allocate vec_int on heap
+        vec_type = self.runtime.get_vec_int_type()
+        i64 = ir.IntType(64)
+        i8_ptr = ir.IntType(8).as_pointer()
+
+        # Malloc the vec_int struct
+        null_ptr = ir.Constant(vec_type.as_pointer(), None)
+        size_gep = self.builder.gep(null_ptr, [ir.Constant(ir.IntType(32), 1)], name="vec_size_gep")
+        struct_size = self.builder.ptrtoint(size_gep, i64, name="vec_struct_size")
+        malloc_func = self._get_or_create_c_function("malloc", i8_ptr, [i64])
+        raw_ptr = self.builder.call(malloc_func, [struct_size], name="values_vec_malloc")
+        vec_ptr = self.builder.bitcast(raw_ptr, vec_type.as_pointer(), name="values_vec")
+
+        # Initialize the vec
+        vec_init_func = self.runtime.get_function("vec_int_init_ptr")
+        self.builder.call(vec_init_func, [vec_ptr], name="")
+
+        # Get dict runtime functions (assume int-keyed for now)
+        capacity_func = self.runtime.get_function("map_int_int_capacity")
+        is_occupied_func = self.runtime.get_function("map_int_int_entry_is_occupied")
+        entry_value_func = self.runtime.get_function("map_int_int_entry_value")
+        vec_push_func = self.runtime.get_function("vec_int_push")
+
+        # Get dict capacity
+        capacity = self.builder.call(capacity_func, [dict_ptr], name="dict_capacity")
+
+        # Create loop to iterate through all entries
+        loop_var = self.builder.alloca(i64, name="values_iter_idx")
+        self.builder.store(ir.Constant(i64, 0), loop_var)
+
+        loop_cond_block = self.current_function.append_basic_block(name="values_loop_cond")
+        loop_body_block = self.current_function.append_basic_block(name="values_loop_body")
+        entry_check_block = self.current_function.append_basic_block(name="values_entry_check")
+        loop_inc_block = self.current_function.append_basic_block(name="values_loop_inc")
+        loop_end_block = self.current_function.append_basic_block(name="values_loop_end")
+
+        # Branch to condition
+        self.builder.branch(loop_cond_block)
+
+        # Loop condition: idx < capacity
+        self.builder.position_at_end(loop_cond_block)
+        idx_val = self.builder.load(loop_var, name="idx_val")
+        cond = self.builder.icmp_signed("<", idx_val, capacity, name="values_cond")
+        self.builder.cbranch(cond, loop_body_block, loop_end_block)
+
+        # Loop body: check if occupied
+        self.builder.position_at_end(loop_body_block)
+        is_occupied = self.builder.call(is_occupied_func, [dict_ptr, idx_val], name="is_occupied")
+        zero_i32 = ir.Constant(ir.IntType(32), 0)
+        occupied_cond = self.builder.icmp_signed("!=", is_occupied, zero_i32, name="occupied_cond")
+        self.builder.cbranch(occupied_cond, entry_check_block, loop_inc_block)
+
+        # Entry is occupied - extract value and push to vec
+        self.builder.position_at_end(entry_check_block)
+        entry_value = self.builder.call(entry_value_func, [dict_ptr, idx_val], name="entry_value")
+        self.builder.call(vec_push_func, [vec_ptr, entry_value], name="")
+        self.builder.branch(loop_inc_block)
+
+        # Increment index
+        self.builder.position_at_end(loop_inc_block)
+        incremented = self.builder.add(idx_val, ir.Constant(i64, 1), name="idx_inc")
+        self.builder.store(incremented, loop_var)
+        self.builder.branch(loop_cond_block)
+
+        # After loop, return the vec pointer
+        self.builder.position_at_end(loop_end_block)
+
+        return vec_ptr
+
     def _visit_dict_comprehension_items(
         self,
         ast_node: ast.DictComp,
@@ -1062,8 +1145,171 @@ class IRToLLVMConverter(IRVisitor):
 
     def _visit_set_comprehension(self, node: IRComprehension, ast_node: ast.SetComp) -> ir.Value:
         """Handle set comprehension: {expr for var in iterable if condition}."""
-        # For now, raise NotImplementedError - sets need a runtime implementation
-        raise NotImplementedError("Set comprehensions not yet implemented in LLVM backend")
+        if self.builder is None or self.current_function is None:
+            raise RuntimeError("Builder not initialized")
+
+        # Allocate result set on heap (like list comprehensions)
+        set_int_type = self.runtime.get_set_int_type()
+        set_int_init_ptr_func = self.runtime.get_function("set_int_init_ptr")
+        set_int_insert_func = self.runtime.get_function("set_int_insert")
+
+        # Calculate size and malloc the struct on heap
+        i64 = ir.IntType(64)
+        i8_ptr = ir.IntType(8).as_pointer()
+        null_ptr = ir.Constant(set_int_type.as_pointer(), None)
+        size_gep = self.builder.gep(null_ptr, [ir.Constant(ir.IntType(32), 1)], name="set_size_gep")
+        struct_size = self.builder.ptrtoint(size_gep, i64, name="set_struct_size")
+        malloc_func = self._get_or_create_c_function("malloc", i8_ptr, [i64])
+        raw_ptr = self.builder.call(malloc_func, [struct_size], name="set_malloc")
+        result_set = self.builder.bitcast(raw_ptr, set_int_type.as_pointer(), name="comp_set")
+
+        # Initialize the set via pointer (avoids ABI issues with large struct returns)
+        self.builder.call(set_int_init_ptr_func, [result_set], name="")
+
+        # Process the comprehension (only single generator supported for now)
+        if len(ast_node.generators) != 1:
+            raise NotImplementedError("Only single generator in set comprehensions supported")
+
+        generator = ast_node.generators[0]
+
+        # Determine iteration type: range() or set iteration
+        is_range_iter = (isinstance(generator.iter, ast.Call) and
+                        isinstance(generator.iter.func, ast.Name) and
+                        generator.iter.func.id == "range")
+
+        if is_range_iter:
+            # Handle range() iteration
+            assert isinstance(generator.iter, ast.Call)  # For mypy
+            range_args = generator.iter.args
+            if len(range_args) == 1:
+                start_val = ir.Constant(ir.IntType(64), 0)
+                end_expr = self._convert_ast_expr(range_args[0])
+                step_val = ir.Constant(ir.IntType(64), 1)
+            elif len(range_args) == 2:
+                start_expr = self._convert_ast_expr(range_args[0])
+                end_expr = self._convert_ast_expr(range_args[1])
+                start_val = start_expr
+                step_val = ir.Constant(ir.IntType(64), 1)
+            elif len(range_args) == 3:
+                start_expr = self._convert_ast_expr(range_args[0])
+                end_expr = self._convert_ast_expr(range_args[1])
+                step_expr = self._convert_ast_expr(range_args[2])
+                start_val = start_expr
+                step_val = step_expr
+            else:
+                raise ValueError("Invalid range() arguments")
+
+            # Create loop variable for range iteration
+            loop_var_name = generator.target.id if isinstance(generator.target, ast.Name) else "loop_var"
+            loop_var = self.builder.alloca(ir.IntType(64), name=loop_var_name)
+            self.builder.store(start_val, loop_var)
+
+            # Create loop blocks
+            loop_cond_block = self.current_function.append_basic_block(name="set_loop_cond")
+            loop_body_block = self.current_function.append_basic_block(name="set_loop_body")
+            loop_end_block = self.current_function.append_basic_block(name="set_loop_end")
+
+            # Branch to loop condition
+            self.builder.branch(loop_cond_block)
+
+            # Loop condition: i < end
+            self.builder.position_at_end(loop_cond_block)
+            loop_var_val = self.builder.load(loop_var, name=f"{loop_var_name}_val")
+            cond = self.builder.icmp_signed("<", loop_var_val, end_expr, name="set_loop_cond")
+            self.builder.cbranch(cond, loop_body_block, loop_end_block)
+
+            # Loop body
+            self.builder.position_at_end(loop_body_block)
+
+            # Store loop variable in symbol table
+            old_var = self.var_symtab.get(loop_var_name)
+            self.var_symtab[loop_var_name] = loop_var
+
+        else:
+            # Handle set/list iteration: for x in some_set
+            # For now, we'll treat it as list iteration since we can iterate over
+            # any collection similarly
+            iter_expr = self._convert_ast_expr(generator.iter)
+
+            # Assume it's a vec_int (list) for now
+            vec_int_size_func = self.runtime.get_function("vec_int_size")
+            iter_size = self.builder.call(vec_int_size_func, [iter_expr], name="iter_size")
+
+            # Create index variable
+            idx_var = self.builder.alloca(ir.IntType(64), name="idx")
+            self.builder.store(ir.Constant(ir.IntType(64), 0), idx_var)
+
+            # Create element variable for loop target
+            loop_var_name = generator.target.id if isinstance(generator.target, ast.Name) else "loop_var"
+            elem_var = self.builder.alloca(ir.IntType(64), name=loop_var_name)
+
+            # Create loop blocks
+            loop_cond_block = self.current_function.append_basic_block(name="set_loop_cond")
+            loop_body_block = self.current_function.append_basic_block(name="set_loop_body")
+            loop_end_block = self.current_function.append_basic_block(name="set_loop_end")
+
+            # Branch to loop condition
+            self.builder.branch(loop_cond_block)
+
+            # Loop condition: idx < size
+            self.builder.position_at_end(loop_cond_block)
+            idx_val = self.builder.load(idx_var, name="idx_val")
+            cond = self.builder.icmp_signed("<", idx_val, iter_size, name="set_loop_cond")
+            self.builder.cbranch(cond, loop_body_block, loop_end_block)
+
+            # Loop body
+            self.builder.position_at_end(loop_body_block)
+
+            # Get element at index: elem = iter[idx]
+            vec_int_at_func = self.runtime.get_function("vec_int_at")
+            elem_val = self.builder.call(vec_int_at_func, [iter_expr, idx_val], name="elem")
+            self.builder.store(elem_val, elem_var)
+
+            # Store element variable in symbol table
+            old_var = self.var_symtab.get(loop_var_name)
+            self.var_symtab[loop_var_name] = elem_var
+
+            # Store for increment
+            step_val = ir.Constant(ir.IntType(64), 1)
+            loop_var = idx_var
+            loop_var_val = idx_val
+
+        # Handle optional condition (common for both range and list iteration)
+        if generator.ifs:
+            if_cond_expr = self._convert_ast_expr(generator.ifs[0])
+            if_then_block = self.current_function.append_basic_block(name="set_if_then")
+            if_merge_block = self.current_function.append_basic_block(name="set_if_merge")
+
+            self.builder.cbranch(if_cond_expr, if_then_block, if_merge_block)
+
+            self.builder.position_at_end(if_then_block)
+            # Evaluate and insert expression
+            expr_val = self._convert_ast_expr(ast_node.elt)
+            self.builder.call(set_int_insert_func, [result_set, expr_val], name="")
+            self.builder.branch(if_merge_block)
+
+            self.builder.position_at_end(if_merge_block)
+        else:
+            # No condition - just insert
+            expr_val = self._convert_ast_expr(ast_node.elt)
+            self.builder.call(set_int_insert_func, [result_set, expr_val], name="")
+
+        # Increment loop variable
+        incremented = self.builder.add(loop_var_val, step_val, name="inc")
+        self.builder.store(incremented, loop_var)
+        self.builder.branch(loop_cond_block)
+
+        # Restore symbol table
+        loop_var_name = generator.target.id if isinstance(generator.target, ast.Name) else "loop_var"
+        if old_var is not None:
+            self.var_symtab[loop_var_name] = old_var
+        else:
+            self.var_symtab.pop(loop_var_name, None)
+
+        # Continue after loop
+        self.builder.position_at_end(loop_end_block)
+
+        return result_set
 
     def _convert_ast_expr(self, ast_expr: ast.expr) -> ir.Value:
         """Helper to convert AST expression to LLVM value."""
@@ -1434,6 +1680,18 @@ class IRToLLVMConverter(IRVisitor):
             strip_func = self.runtime.get_function("mgen_str_strip")
             return self.builder.call(strip_func, [str_ptr], name="strip_result")
 
+        elif node.function_name == "__method_values__":
+            # dict.values() -> create and return vec_int with all values
+            if len(node.arguments) != 1:
+                raise RuntimeError("values() requires exactly 1 argument (dict)")
+
+            dict_ptr = node.arguments[0].accept(self)
+            return self._generate_dict_values_vec(dict_ptr)
+
+        elif node.function_name == "__method_items__":
+            # dict.items() - not directly callable, should only be used in for loops
+            raise NotImplementedError("dict.items() can only be used in for loops or comprehensions")
+
         # Handle builtin functions
         elif node.function_name == "len":
             # len() function - use strlen for strings, vec_*_size for lists, map_*_size for dicts
@@ -1487,6 +1745,11 @@ class IRToLLVMConverter(IRVisitor):
                     vec_size_func = self.runtime.get_function("vec_int_size")
 
                 return self.builder.call(vec_size_func, [llvm_arg], name="len_tmp")
+            elif arg.result_type.base_type == IRDataType.SET:
+                # Use set_int_size function from runtime
+                # llvm_arg is already a pointer
+                set_size_func = self.runtime.get_function("set_int_size")
+                return self.builder.call(set_size_func, [llvm_arg], name="len_tmp")
             else:
                 raise NotImplementedError(f"len() for type {arg.result_type.base_type} not implemented")
 
@@ -1852,6 +2115,12 @@ class IRToLLVMConverter(IRVisitor):
                 # Default to int keys -> map_int_int*
                 # This handles both dict[int, int] and generic dict
                 return self.runtime.get_map_int_int_type().as_pointer()
+
+        # Handle set types (SET<T>)
+        if ir_type.base_type == IRDataType.SET:
+            # Sets are represented as pointers to set_* structs
+            # For now, only support int sets -> set_int*
+            return self.runtime.get_set_int_type().as_pointer()
 
         # Base type mapping
         type_mapping = {
