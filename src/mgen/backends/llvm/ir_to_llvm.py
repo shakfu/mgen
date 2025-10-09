@@ -788,6 +788,139 @@ class IRToLLVMConverter(IRVisitor):
         # Default to string for safety
         return "str"
 
+    def _visit_dict_comprehension_items(
+        self,
+        ast_node: ast.DictComp,
+        generator: ast.comprehension,
+        result_ptr: ir.Value,
+        map_set_func: ir.Function,
+        key_type: str,
+    ) -> ir.Value:
+        """Handle dict comprehension with .items() iteration.
+
+        Example: {k: v for k, v in source_dict.items() if condition}
+        """
+        if self.builder is None or self.current_function is None:
+            raise RuntimeError("Builder not initialized")
+
+        # Get the source dict being iterated over
+        # generator.iter is ast.Call to .items()
+        # generator.iter.func is ast.Attribute with .items
+        # generator.iter.func.value is the dict variable
+        assert isinstance(generator.iter, ast.Call)
+        assert isinstance(generator.iter.func, ast.Attribute)
+        source_dict_ast = generator.iter.func.value
+        source_dict_ptr = self._convert_ast_expr(source_dict_ast)
+
+        # Determine source dict type (map_int_int or map_str_int)
+        # For now, assume both source and result use same type based on key_type
+        if key_type == "int":
+            capacity_func = self.runtime.get_function("map_int_int_capacity")
+            is_occupied_func = self.runtime.get_function("map_int_int_entry_is_occupied")
+            entry_key_func = self.runtime.get_function("map_int_int_entry_key")
+            entry_value_func = self.runtime.get_function("map_int_int_entry_value")
+        else:
+            raise NotImplementedError("String-keyed dict .items() iteration not yet implemented")
+
+        # Get capacity of source dict
+        capacity = self.builder.call(capacity_func, [source_dict_ptr], name="source_capacity")
+
+        # Create loop variable for iterating through capacity
+        i64 = ir.IntType(64)
+        loop_var = self.builder.alloca(i64, name="items_iter_idx")
+        self.builder.store(ir.Constant(i64, 0), loop_var)
+
+        # Create loop blocks
+        loop_cond_block = self.current_function.append_basic_block(name="items_loop_cond")
+        loop_body_block = self.current_function.append_basic_block(name="items_loop_body")
+        entry_check_block = self.current_function.append_basic_block(name="items_entry_check")
+        loop_increment_block = self.current_function.append_basic_block(name="items_loop_inc")
+        loop_end_block = self.current_function.append_basic_block(name="items_loop_end")
+
+        # Branch to loop condition
+        self.builder.branch(loop_cond_block)
+
+        # Loop condition: idx < capacity
+        self.builder.position_at_end(loop_cond_block)
+        idx_val = self.builder.load(loop_var, name="idx_val")
+        cond = self.builder.icmp_signed("<", idx_val, capacity, name="items_cond")
+        self.builder.cbranch(cond, loop_body_block, loop_end_block)
+
+        # Loop body: check if entry is occupied
+        self.builder.position_at_end(loop_body_block)
+        is_occupied = self.builder.call(is_occupied_func, [source_dict_ptr, idx_val], name="is_occupied")
+        zero_i32 = ir.Constant(ir.IntType(32), 0)
+        occupied_cond = self.builder.icmp_signed("!=", is_occupied, zero_i32, name="occupied_cond")
+        self.builder.cbranch(occupied_cond, entry_check_block, loop_increment_block)
+
+        # Entry is occupied - extract key and value
+        self.builder.position_at_end(entry_check_block)
+        entry_key = self.builder.call(entry_key_func, [source_dict_ptr, idx_val], name="entry_key")
+        entry_value = self.builder.call(entry_value_func, [source_dict_ptr, idx_val], name="entry_value")
+
+        # Handle tuple unpacking for (k, v)
+        # generator.target should be ast.Tuple with two elements
+        if isinstance(generator.target, ast.Tuple) and len(generator.target.elts) == 2:
+            key_var_name = generator.target.elts[0].id if isinstance(generator.target.elts[0], ast.Name) else "k"
+            val_var_name = generator.target.elts[1].id if isinstance(generator.target.elts[1], ast.Name) else "v"
+
+            # Allocate and store key and value in symbol table
+            key_alloca = self.builder.alloca(i64, name=key_var_name)
+            val_alloca = self.builder.alloca(i64, name=val_var_name)
+            self.builder.store(entry_key, key_alloca)
+            self.builder.store(entry_value, val_alloca)
+
+            old_key_var = self.var_symtab.get(key_var_name)
+            old_val_var = self.var_symtab.get(val_var_name)
+            self.var_symtab[key_var_name] = key_alloca
+            self.var_symtab[val_var_name] = val_alloca
+        else:
+            raise NotImplementedError("Dict .items() requires tuple unpacking: for k, v in ...")
+
+        # Handle optional filter condition
+        if generator.ifs:
+            filter_cond_expr = self._convert_ast_expr(generator.ifs[0])
+            filter_then_block = self.current_function.append_basic_block(name="items_filter_then")
+
+            self.builder.cbranch(filter_cond_expr, filter_then_block, loop_increment_block)
+            self.builder.position_at_end(filter_then_block)
+
+            # Evaluate key and value expressions, then insert
+            result_key = self._convert_ast_expr(ast_node.key)
+            result_value = self._convert_ast_expr(ast_node.value)
+            self.builder.call(map_set_func, [result_ptr, result_key, result_value], name="")
+            self.builder.branch(loop_increment_block)
+        else:
+            # No filter - just insert
+            result_key = self._convert_ast_expr(ast_node.key)
+            result_value = self._convert_ast_expr(ast_node.value)
+            self.builder.call(map_set_func, [result_ptr, result_key, result_value], name="")
+            self.builder.branch(loop_increment_block)
+
+        # Increment loop variable
+        self.builder.position_at_end(loop_increment_block)
+        # Restore symbol table for next iteration
+        if isinstance(generator.target, ast.Tuple):
+            if old_key_var is not None:
+                self.var_symtab[key_var_name] = old_key_var
+            else:
+                self.var_symtab.pop(key_var_name, None)
+
+            if old_val_var is not None:
+                self.var_symtab[val_var_name] = old_val_var
+            else:
+                self.var_symtab.pop(val_var_name, None)
+
+        # Actually increment and loop back
+        incremented = self.builder.add(idx_val, ir.Constant(i64, 1), name="idx_inc")
+        self.builder.store(incremented, loop_var)
+        self.builder.branch(loop_cond_block)
+
+        # Continue after loop
+        self.builder.position_at_end(loop_end_block)
+
+        return result_ptr
+
     def _visit_dict_comprehension(self, node: IRComprehension, ast_node: ast.DictComp) -> ir.Value:
         """Handle dict comprehension: {key_expr: value_expr for var in iterable if condition}."""
         if self.builder is None or self.current_function is None:
@@ -825,13 +958,22 @@ class IRToLLVMConverter(IRVisitor):
 
         generator = ast_node.generators[0]
 
-        # Determine iteration type: range() only for now
+        # Determine iteration type: range() or .items()
         is_range_iter = (isinstance(generator.iter, ast.Call) and
                         isinstance(generator.iter.func, ast.Name) and
                         generator.iter.func.id == "range")
 
-        if not is_range_iter:
-            raise NotImplementedError("Dict comprehensions only support range() iteration for now")
+        is_items_iter = (isinstance(generator.iter, ast.Call) and
+                        isinstance(generator.iter.func, ast.Attribute) and
+                        generator.iter.func.attr == "items")
+
+        if is_items_iter:
+            # Handle .items() iteration: {k: v for k, v in dict.items()}
+            return self._visit_dict_comprehension_items(
+                ast_node, generator, result_ptr, map_set_func, key_type
+            )
+        elif not is_range_iter:
+            raise NotImplementedError("Dict comprehensions only support range() and .items() iteration")
 
         # Handle range() iteration
         assert isinstance(generator.iter, ast.Call)

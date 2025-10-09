@@ -181,3 +181,35 @@ void map_int_int_free(map_int_int* map) {
         map->capacity = 0;
     }
 }
+
+// Get capacity (total number of slots, including empty ones)
+size_t map_int_int_capacity(map_int_int* map) {
+    if (!map) {
+        return 0;
+    }
+    return map->capacity;
+}
+
+// Check if entry at index is occupied
+int map_int_int_entry_is_occupied(map_int_int* map, size_t index) {
+    if (!map || !map->entries || index >= map->capacity) {
+        return 0;
+    }
+    return map->entries[index].is_occupied;
+}
+
+// Get key at specific index (caller must check is_occupied first)
+long long map_int_int_entry_key(map_int_int* map, size_t index) {
+    if (!map || !map->entries || index >= map->capacity) {
+        return 0;
+    }
+    return map->entries[index].key;
+}
+
+// Get value at specific index (caller must check is_occupied first)
+long long map_int_int_entry_value(map_int_int* map, size_t index) {
+    if (!map || !map->entries || index >= map->capacity) {
+        return 0;
+    }
+    return map->entries[index].value;
+}

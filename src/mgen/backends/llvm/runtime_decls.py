@@ -522,6 +522,26 @@ class LLVMRuntimeDeclarations:
         func = ir.Function(self.module, func_type, name="map_int_int_free")
         self.function_decls["map_int_int_free"] = func
 
+        # size_t map_int_int_capacity(map_int_int* map)
+        func_type = ir.FunctionType(i64, [map_int_int_ptr])
+        func = ir.Function(self.module, func_type, name="map_int_int_capacity")
+        self.function_decls["map_int_int_capacity"] = func
+
+        # int map_int_int_entry_is_occupied(map_int_int* map, size_t index)
+        func_type = ir.FunctionType(i32, [map_int_int_ptr, i64])
+        func = ir.Function(self.module, func_type, name="map_int_int_entry_is_occupied")
+        self.function_decls["map_int_int_entry_is_occupied"] = func
+
+        # long long map_int_int_entry_key(map_int_int* map, size_t index)
+        func_type = ir.FunctionType(i64, [map_int_int_ptr, i64])
+        func = ir.Function(self.module, func_type, name="map_int_int_entry_key")
+        self.function_decls["map_int_int_entry_key"] = func
+
+        # long long map_int_int_entry_value(map_int_int* map, size_t index)
+        func_type = ir.FunctionType(i64, [map_int_int_ptr, i64])
+        func = ir.Function(self.module, func_type, name="map_int_int_entry_value")
+        self.function_decls["map_int_int_entry_value"] = func
+
     def declare_all(self) -> None:
         """Declare all runtime library functions and types."""
         self.declare_vec_int_functions()

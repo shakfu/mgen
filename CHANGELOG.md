@@ -17,6 +17,92 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.78] - 2025-10-09
+
+**LLVM Backend: Dict .items() Iteration Support**
+
+Implemented comprehensive `.items()` iteration for dictionaries in LLVM backend, enabling both dict comprehensions with `.items()` and regular for-loop iteration over dict entries. This feature completes the core dict functionality needed for data processing benchmarks.
+
+### Added
+
+- **LLVM Runtime Library** (`backends/llvm/runtime/map_int_int_minimal.c`)
+  - `map_int_int_capacity()` - Returns total capacity (including empty slots)
+  - `map_int_int_entry_is_occupied()` - Checks if entry at index is occupied
+  - `map_int_int_entry_key()` - Gets key at specific index
+  - `map_int_int_entry_value()` - Gets value at specific index
+
+- **LLVM Runtime Declarations** (`backends/llvm/runtime_decls.py`)
+  - Added declarations for 4 new entry iteration functions
+  - Enables safe iteration through dict internal storage
+
+- **LLVM Code Generator** (`backends/llvm/ir_to_llvm.py`)
+  - Added `_visit_dict_comprehension_items()` - Complete .items() iteration for dict comprehensions
+  - Enhanced iteration detection - Recognizes both `range()` and `.items()` patterns
+  - Tuple unpacking support - Handles `for k, v in dict.items()` syntax
+  - Loop generation - Creates capacity-based iteration with is_occupied checks
+  - Filter condition support - Handles `if` clauses in .items() comprehensions
+
+### Features
+
+**Dict Comprehensions with .items()**:
+```python
+{k: v for k, v in source_dict.items() if v > 20}
+```
+- Iterates through all entries in source dict
+- Unpacks keys and values into separate variables
+- Supports filter conditions
+- Generates efficient LLVM IR with skip logic for empty slots
+
+**Regular For Loops with .items()**:
+```python
+for k, v in my_dict.items():
+    total += v
+```
+- Works in both comprehensions and regular loops
+- Properly handles tuple unpacking
+- Maintains symbol table correctly
+
+### Implementation Details
+
+**Iteration Strategy**: Capacity-based iteration with occupancy checks
+- Loop from 0 to capacity (not size)
+- Call `entry_is_occupied()` for each index
+- Skip empty slots, extract key/value for occupied ones
+- O(capacity) time complexity, but simple and correct
+
+**Control Flow Generation**:
+1. Get source dict capacity
+2. Loop: `for idx in 0..capacity`
+3. Check: `if is_occupied(idx)`
+4. Extract: `key = entry_key(idx)`, `value = entry_value(idx)`
+5. Evaluate: Comprehension expressions with k, v in scope
+6. Insert: Result into output dict
+7. Cleanup: Restore symbol table
+
+### Results
+
+- All 982 tests passing (100%)
+- Simplified dict_ops benchmark compiles and runs successfully:
+  - Dict comprehensions with `.items()` ✓
+  - Regular for loops with `.items()` ✓
+  - Dict filtering with conditions ✓
+  - Produces correct output: `3725` (matches Python)
+
+### Limitations
+
+- `.values()` and `.keys()` iteration not yet implemented
+- Only int-keyed dicts support .items() (string-keyed planned)
+- Set comprehensions still not implemented
+
+### Technical Notes
+
+**Symbol Table Management**: The implementation carefully manages variable scope by:
+- Storing old variable values before loop
+- Allocating new variables for k, v
+- Restoring original scope after loop iteration
+
+**Performance**: While O(capacity) iteration includes empty slots, the hash map maintains reasonable load factor (0.75), so capacity ≈ 1.33 × size, making the overhead acceptable.
+
 ## [0.1.77] - 2025-10-09
 
 **LLVM Backend: Integer-Keyed Dict Support with map_int_int Runtime**
