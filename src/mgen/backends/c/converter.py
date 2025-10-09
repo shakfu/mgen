@@ -456,11 +456,12 @@ class MGenPythonToCConverter:
         params = []
         for arg in node.args.args:
             param_type = self._get_type_annotation(arg.annotation) if arg.annotation else "int"
-            c_type = self.type_mapping.get(param_type, param_type)
-
-            # Check if this parameter is a nested container
-            if arg.arg in self.nested_containers and param_type == "list":
-                c_type = "vec_vec_int"
+            # Use enhanced type inference for complex types like list[list[int]]
+            if param_type in self.type_mapping:
+                c_type = self.type_mapping[param_type]
+            else:
+                # Use enhanced type inference engine for complex/nested types
+                c_type = self.type_engine._map_python_to_c_type(param_type)
 
             # Special case: map_str_int uses pointer type
             if c_type == "map_str_int":
@@ -473,17 +474,12 @@ class MGenPythonToCConverter:
         return_type = "void"
         if node.returns:
             py_return_type = self._get_type_annotation(node.returns)
-            return_type = self.type_mapping.get(py_return_type, py_return_type)
-
-            # Check if this function returns a nested container
-            # by examining if any local variable that is returned is nested
-            for stmt in ast.walk(node):
-                if isinstance(stmt, ast.Return) and stmt.value:
-                    if isinstance(stmt.value, ast.Name):
-                        ret_var = stmt.value.id
-                        if ret_var in self.nested_containers and py_return_type == "list":
-                            return_type = "vec_vec_int"
-                            break
+            # Use enhanced type inference for complex types like list[list[int]]
+            if py_return_type in self.type_mapping:
+                return_type = self.type_mapping[py_return_type]
+            else:
+                # Use enhanced type inference engine for complex/nested types
+                return_type = self.type_engine._map_python_to_c_type(py_return_type)
 
             # Special case: map_str_int uses pointer type
             if return_type == "map_str_int":
@@ -1288,6 +1284,9 @@ class MGenPythonToCConverter:
             return annotation.id
         elif isinstance(annotation, ast.Constant):
             return str(annotation.value)
+        elif isinstance(annotation, ast.Subscript):
+            # Handle subscripted types like list[int], list[list[int]], dict[str, int]
+            return ast.unparse(annotation)
         else:
             return "int"  # Default fallback
 

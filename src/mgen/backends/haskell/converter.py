@@ -1193,6 +1193,34 @@ main = printValue "Generated Haskell code executed successfully"'''
             if node.value is None:
                 return "()"
             return str(node.value)
+        elif isinstance(node, ast.Subscript):
+            # Handle subscripted types like list[int], list[list[int]], dict[str, int]
+            if isinstance(node.value, ast.Name):
+                container_type = node.value.id
+                if container_type == "list":
+                    # list[int] -> [Int], list[list[int]] -> [[Int]]
+                    if isinstance(node.slice, ast.Name):
+                        element_type = self.type_map.get(node.slice.id, node.slice.id)
+                        return f"[{element_type}]"
+                    elif isinstance(node.slice, ast.Subscript):
+                        # Recursively handle nested lists like list[list[int]]
+                        element_type = self._convert_type_annotation(node.slice)
+                        return f"[{element_type}]"
+                    return "[a]"  # Default to [a]
+                elif container_type == "dict":
+                    # dict[str, int] -> Map String Int
+                    if isinstance(node.slice, ast.Tuple) and len(node.slice.elts) == 2:
+                        key_type = self._convert_type_annotation(node.slice.elts[0])
+                        value_type = self._convert_type_annotation(node.slice.elts[1])
+                        return f"Map {key_type} {value_type}"
+                    return "Map a b"  # Default
+                elif container_type == "set":
+                    # set[int] -> Set Int
+                    if isinstance(node.slice, ast.Name):
+                        element_type = self.type_map.get(node.slice.id, node.slice.id)
+                        return f"Set {element_type}"
+                    return "Set a"  # Default
+            return "a"  # Fallback
         else:
             return "a"  # Default generic type
 

@@ -219,9 +219,18 @@ class FlowSensitiveInferencer:
         annotation_type = self._annotation_to_flow_type(stmt.annotation)
         rhs_type = self._infer_expr(stmt.value, env) if stmt.value else FLOW_UNKNOWN
 
+        # Debug logging for nested list types
+        if "list[list[" in annotation_type.name:
+            self.log.debug(f"Annotated assignment: {target_name} : {annotation_type.name} (c_equiv={annotation_type.c_equivalent})")
+            self.log.debug(f"  RHS type: {rhs_type.name} (c_equiv={rhs_type.c_equivalent})")
+
         # Unify annotation with RHS type and existing type
         existing_type = env.get(target_name, FLOW_UNKNOWN)
         unified = self.unifier.unify(self.unifier.unify(existing_type, annotation_type), rhs_type)
+
+        # Debug logging for unified result
+        if "list[list[" in annotation_type.name:
+            self.log.debug(f"  Unified type: {unified.name} (c_equiv={unified.c_equivalent})")
 
         new_env = dict(env)
         new_env[target_name] = unified
@@ -441,6 +450,34 @@ class FlowSensitiveInferencer:
                 "str": FLOW_STR,
             }
             return type_map.get(annotation.id, FLOW_UNKNOWN)
+
+        # Handle subscripted types like list[int], list[list[int]], dict[str, int]
+        if isinstance(annotation, ast.Subscript):
+            if isinstance(annotation.value, ast.Name):
+                base_type = annotation.value.id
+
+                if base_type == "list":
+                    # Recursively handle element type
+                    element_type = self._annotation_to_flow_type(annotation.slice)
+
+                    # Build type name and c_equivalent
+                    if element_type == FLOW_INT:
+                        return FlowType("list[int]", "vec_int")
+                    elif element_type == FLOW_FLOAT:
+                        return FlowType("list[float]", "vec_float")
+                    elif element_type == FLOW_STR:
+                        return FlowType("list[str]", "vec_cstr")
+                    elif element_type.name.startswith("list["):
+                        # Nested list like list[list[int]]
+                        inner_c_type = element_type.c_equivalent or "unknown"
+                        return FlowType(f"list[{element_type.name}]", f"vec_{inner_c_type}")
+                    else:
+                        # Generic list type
+                        return FlowType("list", "vec_unknown")
+
+                elif base_type == "dict":
+                    # For now, just return a generic dict type
+                    return FlowType("dict", "map_unknown")
 
         return FLOW_UNKNOWN
 

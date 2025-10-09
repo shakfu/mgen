@@ -969,6 +969,8 @@ class IRBuilder:
             return self._build_function_call(node)
         elif isinstance(node, ast.List):
             return self._build_list_literal(node)
+        elif isinstance(node, ast.Dict):
+            return self._build_dict_literal(node)
         elif isinstance(node, ast.ListComp):
             # List comprehension - store AST node for backend expansion
             return IRComprehension(node, IRType(IRDataType.LIST), self._get_location(node))
@@ -1177,6 +1179,26 @@ class IRBuilder:
             elements = [self._build_expression(elt) for elt in node.elts]
             return IRLiteral(elements, ir_type, self._get_location(node))
 
+    def _build_dict_literal(self, node: ast.Dict) -> IRLiteral:
+        """Build dict literal from AST.
+
+        For empty dict {}, creates an IR literal with DICT type.
+        For non-empty dicts, key-value pairs are stored and will be initialized by backend.
+        """
+        ir_type = IRType(IRDataType.DICT)
+
+        if len(node.keys) == 0:
+            # Empty dict
+            return IRLiteral({}, ir_type, self._get_location(node))
+        else:
+            # Non-empty dict - store key-value pair expressions
+            # Backend will generate initialization code (allocate + set each pair)
+            # Store as list of (key_expr, value_expr) tuples
+            # Note: keys can be None for dict unpacking (**dict), which we don't support yet
+            pairs = [(self._build_expression(k), self._build_expression(v))
+                     for k, v in zip(node.keys, node.values) if k is not None]
+            return IRLiteral(pairs, ir_type, self._get_location(node))
+
     def _build_subscript(self, node: ast.Subscript) -> IRExpression:
         """Build subscript expression (array/list indexing).
 
@@ -1326,11 +1348,17 @@ class IRBuilder:
             base_type = type_mapping.get(annotation.id, IRDataType.VOID)
             return IRType(base_type)
         elif isinstance(annotation, ast.Subscript):
-            # Handle generic types like list[int], list[list[int]], etc.
+            # Handle generic types like list[int], list[list[int]], dict[str, int], etc.
             if isinstance(annotation.value, ast.Name) and annotation.value.id == "list":
                 element_type = self._extract_ir_type(annotation.slice)
                 result = IRType(IRDataType.LIST)
                 result.element_type = element_type
+                return result
+            elif isinstance(annotation.value, ast.Name) and annotation.value.id == "dict":
+                # Handle dict[K, V] subscripts
+                # For now, we support dict[str, int] and treat all dict types the same
+                # TODO: Extract key and value types for more specific dict handling
+                result = IRType(IRDataType.DICT)
                 return result
 
         return IRType(IRDataType.VOID)

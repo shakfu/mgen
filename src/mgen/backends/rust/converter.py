@@ -1547,9 +1547,13 @@ class MGenPythonToRustConverter:
             if isinstance(annotation.value, ast.Name):
                 container_type = annotation.value.id
                 if container_type == "list":
-                    # list[int] -> Vec<i32>
+                    # list[int] -> Vec<i32>, list[list[int]] -> Vec<Vec<i32>>
                     if isinstance(annotation.slice, ast.Name):
                         element_type = self.type_map.get(annotation.slice.id, annotation.slice.id)
+                        return f"Vec<{element_type}>"
+                    elif isinstance(annotation.slice, ast.Subscript):
+                        # Recursively handle nested lists like list[list[int]]
+                        element_type = self._map_type_annotation(annotation.slice)
                         return f"Vec<{element_type}>"
                     return "Vec<i32>"  # Default to Vec<i32>
                 elif container_type == "dict":

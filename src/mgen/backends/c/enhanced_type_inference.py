@@ -496,9 +496,28 @@ class EnhancedTypeInferenceEngine:
 
         # Container type mappings
         if python_type.startswith(("list[", "List[")):
-            # Extract element type if possible
-            # For now, default to vec_int (will be refined later)
-            return "vec_int"
+            # Extract element type and map recursively for nested lists
+            import re
+            match = re.match(r"[Ll]ist\[(.+)\]$", python_type)
+            if match:
+                element_type_str = match.group(1).strip()
+                # Recursively map element type
+                element_c_type = self._map_python_to_c_type(element_type_str)
+                # Build vec type name
+                if element_c_type.startswith("vec_"):
+                    # Nested list: vec_vec_int, vec_vec_float, etc.
+                    return f"vec_{element_c_type}"
+                elif element_c_type == "int":
+                    return "vec_int"
+                elif element_c_type == "double":
+                    return "vec_double"
+                elif element_c_type == "float":
+                    return "vec_float"
+                elif element_c_type == "char*":
+                    return "vec_cstr"
+                else:
+                    return "vec_int"  # Fallback
+            return "vec_int"  # Fallback if parsing fails
         elif python_type.startswith(("dict[", "Dict[")):
             # Parse dict[key_type, value_type] to get specific map type
             import re

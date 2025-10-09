@@ -340,6 +340,19 @@ class IRToLLVMConverter(IRVisitor):
                 elif node.operator == "!=":
                     return self.builder.icmp_signed("!=", left, right, name="cmp_tmp")
 
+            # Handle "in" operator for dict membership testing
+            # Example: "key" in dict -> map_str_int_contains(dict, key)
+            if node.operator == "in":
+                # right operand should be the container (dict)
+                right_type = node.right.result_type.base_type
+                if right_type == IRDataType.DICT:
+                    # Call map_str_int_contains(dict_ptr, key)
+                    map_contains_func = self.runtime.get_function("map_str_int_contains")
+                    result = self.builder.call(map_contains_func, [right, left], name="contains_result")
+                    # Convert i32 result to i1 (bool)
+                    zero = ir.Constant(ir.IntType(32), 0)
+                    return self.builder.icmp_signed("!=", result, zero, name="contains_bool")
+
         raise NotImplementedError(f"Binary operator '{node.operator}' not implemented for type {node.result_type.base_type}")
 
     def _visit_short_circuit_boolean(self, node: IRBinaryOperation) -> ir.Instruction:
@@ -419,27 +432,31 @@ class IRToLLVMConverter(IRVisitor):
             if self.builder is None:
                 raise RuntimeError("Builder not initialized - must be inside a function")
 
-            # Check if this is a 2D list (list of lists)
-            # First try to use element_type from the IR type
-            is_2d_list = (hasattr(node.result_type, 'element_type') and
-                         node.result_type.element_type and
-                         node.result_type.element_type.base_type == IRDataType.LIST)
-
-            # Fallback: check the actual elements if we have a literal list
-            if not is_2d_list and isinstance(node.value, list) and len(node.value) > 0:
+            # Determine element type from IR type annotation
+            elem_type = None
+            if hasattr(node.result_type, 'element_type') and node.result_type.element_type:
+                elem_type = node.result_type.element_type.base_type
+            elif isinstance(node.value, list) and len(node.value) > 0:
+                # Fallback: infer from first element
                 first_elem = node.value[0]
-                # Check if first element is a list literal
-                if (hasattr(first_elem, 'result_type') and
-                    first_elem.result_type.base_type == IRDataType.LIST):
-                    is_2d_list = True
+                if hasattr(first_elem, 'result_type'):
+                    elem_type = first_elem.result_type.base_type
 
-            if is_2d_list:
+            # Select appropriate vec_* type based on element type
+            is_2d_list = (elem_type == IRDataType.LIST)
+
+            if elem_type == IRDataType.LIST:
                 # 2D list: vec_vec_int
                 vec_type = self.runtime.get_vec_vec_int_type()
                 vec_init_ptr_func = self.runtime.get_function("vec_vec_int_init_ptr")
                 vec_push_func = self.runtime.get_function("vec_vec_int_push")
+            elif elem_type == IRDataType.STRING:
+                # String list: vec_str
+                vec_type = self.runtime.get_vec_str_type()
+                vec_init_ptr_func = self.runtime.get_function("vec_str_init_ptr")
+                vec_push_func = self.runtime.get_function("vec_str_push")
             else:
-                # 1D list: vec_int
+                # Default to integer list: vec_int
                 vec_type = self.runtime.get_vec_int_type()
                 vec_init_ptr_func = self.runtime.get_function("vec_int_init_ptr")
                 vec_push_func = self.runtime.get_function("vec_int_push")
@@ -478,6 +495,39 @@ class IRToLLVMConverter(IRVisitor):
 
             # Return the pointer
             return vec_ptr
+
+        elif node.result_type.base_type == IRDataType.DICT:
+            # Dict literal - allocate and initialize
+            if self.builder is None:
+                raise RuntimeError("Builder not initialized - must be inside a function")
+
+            # For now, only support dict[str, int] -> map_str_int
+            map_type = self.runtime.get_map_str_int_type()
+            map_init_ptr_func = self.runtime.get_function("map_str_int_init_ptr")
+
+            # Allocate space for the map struct on heap
+            i64 = ir.IntType(64)
+            i8_ptr = ir.IntType(8).as_pointer()
+            null_ptr = ir.Constant(map_type.as_pointer(), None)
+            size_gep = self.builder.gep(null_ptr, [ir.Constant(ir.IntType(32), 1)], name="size_gep")
+            struct_size = self.builder.ptrtoint(size_gep, i64, name="struct_size")
+
+            # Get malloc function and allocate memory
+            malloc_func = self._get_or_create_c_function("malloc", i8_ptr, [i64])
+            raw_ptr = self.builder.call(malloc_func, [struct_size], name="dict_malloc")
+
+            # Cast i8* to struct pointer
+            map_ptr = self.builder.bitcast(raw_ptr, map_type.as_pointer(), name="dict_tmp")
+
+            # Initialize it by calling map_init_ptr()
+            self.builder.call(map_init_ptr_func, [map_ptr], name="")
+
+            # TODO: If dict has initial key-value pairs, set them here
+            # For now, we only support empty dict literals: {}
+
+            # Return the pointer
+            return map_ptr
+
         elif node.result_type.base_type == IRDataType.INT:
             return ir.Constant(llvm_type, int(node.value))
         elif node.result_type.base_type == IRDataType.FLOAT:
@@ -881,102 +931,138 @@ class IRToLLVMConverter(IRVisitor):
 
         # Handle method calls (from IR builder)
         if node.function_name == "__method_append__":
-            # list.append(value) -> vec_int_push or vec_vec_int_push
+            # list.append(value) -> vec_int_push, vec_str_push, or vec_vec_int_push
             if len(node.arguments) != 2:
                 raise RuntimeError("append() requires exactly 2 arguments (list and value)")
 
             list_ptr = node.arguments[0].accept(self)  # Already a pointer
             value = node.arguments[1].accept(self)
 
-            # Determine if this is a 1D or 2D list based on LLVM types
+            # Determine list type based on LLVM types
             from llvmlite import ir as llvm_ir
             list_ptr_type = list_ptr.type
-            value_type = value.type
 
-            # Check if list pointer points to vec_vec_int
-            list_is_2d = False
+            # Check the pointee type to determine which vec_* type we have
             if isinstance(list_ptr_type, llvm_ir.PointerType):
-                pointee_type = list_ptr_type.pointee
-                list_is_2d = "vec_vec_int" in str(pointee_type)
+                pointee_type_str = str(list_ptr_type.pointee)
 
-            # Check if value is a vec_int* (indicates we're trying to append a list)
-            value_is_vec_int_ptr = False
-            if isinstance(value_type, llvm_ir.PointerType):
-                value_pointee = value_type.pointee
-                value_is_vec_int_ptr = "vec_int" in str(value_pointee) and "vec_vec_int" not in str(value_pointee)
-
-            # If we're appending a list to a 1D list, this is an error
-            if value_is_vec_int_ptr and not list_is_2d:
-                raise RuntimeError(
-                    "Attempting to append a list to a 1D list. "
-                    "The parent list should be declared as list[list[int]], not just list. "
-                    "Please add proper type annotations: e.g., 'matrix: list[list[int]] = []'"
-                )
-
-            # Use 2D list operations if the list is declared as 2D
-            is_2d_list = list_is_2d
-
-            if is_2d_list:
-                # 2D list: vec_vec_int_push(list_ptr, vec_int_ptr)
-                vec_vec_int_push_func = self.runtime.get_function("vec_vec_int_push")
-
-                # value is already a pointer to vec_int, vec_vec_int_push now takes pointer
-                # No need to load the struct - just pass the pointer
-
-                # Call vec_vec_int_push
-                self.builder.call(vec_vec_int_push_func, [list_ptr, value], name="")
+                if "vec_vec_int" in pointee_type_str:
+                    # 2D list: vec_vec_int_push(list_ptr, vec_int_ptr)
+                    vec_push_func = self.runtime.get_function("vec_vec_int_push")
+                    self.builder.call(vec_push_func, [list_ptr, value], name="")
+                elif "vec_str" in pointee_type_str:
+                    # String list: vec_str_push(list_ptr, char* value)
+                    vec_push_func = self.runtime.get_function("vec_str_push")
+                    self.builder.call(vec_push_func, [list_ptr, value], name="")
+                else:
+                    # Integer list (default): vec_int_push(list_ptr, int_value)
+                    vec_push_func = self.runtime.get_function("vec_int_push")
+                    self.builder.call(vec_push_func, [list_ptr, value], name="")
             else:
-                # 1D list: vec_int_push(list_ptr, int_value)
-                vec_int_push_func = self.runtime.get_function("vec_int_push")
-
-                # Call vec_int_push - it modifies the list in place
-                self.builder.call(vec_int_push_func, [list_ptr, value], name="")
+                # Fallback to vec_int
+                vec_push_func = self.runtime.get_function("vec_int_push")
+                self.builder.call(vec_push_func, [list_ptr, value], name="")
 
             # Return the pointer (unchanged, since append mutates in place)
             return list_ptr
 
         elif node.function_name == "__getitem__":
-            # list[index] -> vec_int_at or vec_vec_int_at
+            # list[index] or dict[key] -> vec_*_at or map_*_get
             if len(node.arguments) != 2:
-                raise RuntimeError("__getitem__() requires exactly 2 arguments (list and index)")
+                raise RuntimeError("__getitem__() requires exactly 2 arguments (container and index/key)")
 
-            list_ptr = node.arguments[0].accept(self)  # Already a pointer
-            index = node.arguments[1].accept(self)
+            container_ptr = node.arguments[0].accept(self)  # Already a pointer
+            key_or_index = node.arguments[1].accept(self)
 
-            # Determine if this is a 1D or 2D list based on LLVM type
+            # Determine container type based on LLVM type
             from llvmlite import ir as llvm_ir
-            list_ptr_type = list_ptr.type
+            container_type = container_ptr.type
 
-            # Check if pointer points to vec_vec_int or vec_int
-            if isinstance(list_ptr_type, llvm_ir.PointerType):
-                pointee_type = list_ptr_type.pointee
-                is_2d_list = "vec_vec_int" in str(pointee_type)
-            else:
-                is_2d_list = False
+            # Check the pointee type to determine which container we have
+            if isinstance(container_type, llvm_ir.PointerType):
+                pointee_type_str = str(container_type.pointee)
 
-            if is_2d_list:
-                # 2D list: vec_vec_int_at(list_ptr, index) returns vec_int*
-                vec_vec_int_at_func = self.runtime.get_function("vec_vec_int_at")
-                return self.builder.call(vec_vec_int_at_func, [list_ptr, index], name="list_at")
+                if "map_str_int" in pointee_type_str:
+                    # Dict: map_str_int_get(dict_ptr, key) returns i64
+                    map_get_func = self.runtime.get_function("map_str_int_get")
+                    return self.builder.call(map_get_func, [container_ptr, key_or_index], name="dict_get")
+                elif "vec_vec_int" in pointee_type_str:
+                    # 2D list: vec_vec_int_at(list_ptr, index) returns vec_int*
+                    vec_at_func = self.runtime.get_function("vec_vec_int_at")
+                    return self.builder.call(vec_at_func, [container_ptr, key_or_index], name="list_at")
+                elif "vec_str" in pointee_type_str:
+                    # String list: vec_str_at(list_ptr, index) returns char*
+                    vec_at_func = self.runtime.get_function("vec_str_at")
+                    return self.builder.call(vec_at_func, [container_ptr, key_or_index], name="list_at")
+                else:
+                    # Integer list (default): vec_int_at(list_ptr, index) returns i64
+                    vec_at_func = self.runtime.get_function("vec_int_at")
+                    return self.builder.call(vec_at_func, [container_ptr, key_or_index], name="list_at")
             else:
-                # 1D list: vec_int_at(list_ptr, index) returns i64
-                vec_int_at_func = self.runtime.get_function("vec_int_at")
-                return self.builder.call(vec_int_at_func, [list_ptr, index], name="list_at")
+                # Fallback to vec_int
+                vec_at_func = self.runtime.get_function("vec_int_at")
+                return self.builder.call(vec_at_func, [container_ptr, key_or_index], name="list_at")
 
         elif node.function_name == "__setitem__":
-            # list[index] = value -> vec_int_set(list_ptr, index, value)
+            # list[index] = value or dict[key] = value -> vec_*_set or map_*_set
             if len(node.arguments) != 3:
-                raise RuntimeError("__setitem__() requires exactly 3 arguments (list, index, value)")
+                raise RuntimeError("__setitem__() requires exactly 3 arguments (container, index/key, value)")
 
-            list_ptr = node.arguments[0].accept(self)  # Already a pointer
-            index = node.arguments[1].accept(self)
+            container_ptr = node.arguments[0].accept(self)  # Already a pointer
+            key_or_index = node.arguments[1].accept(self)
             value = node.arguments[2].accept(self)
 
-            # Get vec_int_set function
-            vec_int_set_func = self.runtime.get_function("vec_int_set")
+            # Determine container type based on LLVM type
+            from llvmlite import ir as llvm_ir
+            container_type = container_ptr.type
 
-            # Call vec_int_set - it modifies the list in place
-            return self.builder.call(vec_int_set_func, [list_ptr, index, value], name="")
+            # Check the pointee type to determine which container we have
+            if isinstance(container_type, llvm_ir.PointerType):
+                pointee_type_str = str(container_type.pointee)
+
+                if "map_str_int" in pointee_type_str:
+                    # Dict: map_str_int_set(dict_ptr, key, value)
+                    map_set_func = self.runtime.get_function("map_str_int_set")
+                    return self.builder.call(map_set_func, [container_ptr, key_or_index, value], name="")
+                elif "vec_str" in pointee_type_str:
+                    # String list: vec_str_set(list_ptr, index, char* value)
+                    vec_set_func = self.runtime.get_function("vec_str_set")
+                    return self.builder.call(vec_set_func, [container_ptr, key_or_index, value], name="")
+                else:
+                    # Integer list (default): vec_int_set(list_ptr, index, i64 value)
+                    vec_set_func = self.runtime.get_function("vec_int_set")
+                    return self.builder.call(vec_set_func, [container_ptr, key_or_index, value], name="")
+            else:
+                # Fallback to vec_int
+                vec_set_func = self.runtime.get_function("vec_int_set")
+                return self.builder.call(vec_set_func, [container_ptr, key_or_index, value], name="")
+
+        elif node.function_name == "__contains__":
+            # key in dict -> map_str_int_contains(dict_ptr, key)
+            if len(node.arguments) != 2:
+                raise RuntimeError("__contains__() requires exactly 2 arguments (container and key)")
+
+            container_ptr = node.arguments[0].accept(self)  # Container pointer
+            key = node.arguments[1].accept(self)  # Key to check
+
+            # Determine container type
+            from llvmlite import ir as llvm_ir
+            container_type = container_ptr.type
+
+            if isinstance(container_type, llvm_ir.PointerType):
+                pointee_type_str = str(container_type.pointee)
+
+                if "map_str_int" in pointee_type_str:
+                    # Dict: map_str_int_contains(dict_ptr, key) returns i32
+                    map_contains_func = self.runtime.get_function("map_str_int_contains")
+                    result = self.builder.call(map_contains_func, [container_ptr, key], name="contains_result")
+                    # Convert i32 result to i1 (bool) by comparing with 0
+                    return self.builder.icmp_signed("!=", result, ir.Constant(ir.IntType(32), 0), name="contains_bool")
+                else:
+                    # TODO: Add list contains support if needed
+                    raise NotImplementedError(f"__contains__ not implemented for type {pointee_type_str}")
+            else:
+                raise NotImplementedError("__contains__ requires a pointer type")
 
         elif node.function_name == "__method_split__":
             # str.split(delimiter) -> mgen_str_split(str, delimiter)
@@ -1017,7 +1103,7 @@ class IRToLLVMConverter(IRVisitor):
 
         # Handle builtin functions
         elif node.function_name == "len":
-            # len() function - use strlen for strings, vec_int_size for lists
+            # len() function - use strlen for strings, vec_*_size for lists, map_*_size for dicts
             if len(node.arguments) != 1:
                 raise NotImplementedError("len() requires exactly one argument")
 
@@ -1030,11 +1116,41 @@ class IRToLLVMConverter(IRVisitor):
                 i64 = ir.IntType(64)
                 strlen_func = self._get_or_create_c_function("strlen", i64, [i8_ptr])
                 return self.builder.call(strlen_func, [llvm_arg], name="len_tmp")
-            elif arg.result_type.base_type == IRDataType.LIST:
-                # Use vec_int_size function from runtime
+            elif arg.result_type.base_type == IRDataType.DICT:
+                # Use map_*_size function from runtime
                 # llvm_arg is already a pointer
-                vec_int_size_func = self.runtime.get_function("vec_int_size")
-                return self.builder.call(vec_int_size_func, [llvm_arg], name="len_tmp")
+                from llvmlite import ir as llvm_ir
+
+                if isinstance(llvm_arg.type, llvm_ir.PointerType):
+                    pointee_type_str = str(llvm_arg.type.pointee)
+
+                    if "map_str_int" in pointee_type_str:
+                        map_size_func = self.runtime.get_function("map_str_int_size")
+                        return self.builder.call(map_size_func, [llvm_arg], name="len_tmp")
+                    else:
+                        raise NotImplementedError(f"len() for dict type {pointee_type_str} not implemented")
+                else:
+                    raise NotImplementedError("len() requires a pointer type for dicts")
+            elif arg.result_type.base_type == IRDataType.LIST:
+                # Use vec_*_size function from runtime based on element type
+                # llvm_arg is already a pointer
+                from llvmlite import ir as llvm_ir
+
+                # Check the pointee type to determine which vec_* type we have
+                if isinstance(llvm_arg.type, llvm_ir.PointerType):
+                    pointee_type_str = str(llvm_arg.type.pointee)
+
+                    if "vec_vec_int" in pointee_type_str:
+                        vec_size_func = self.runtime.get_function("vec_vec_int_size")
+                    elif "vec_str" in pointee_type_str:
+                        vec_size_func = self.runtime.get_function("vec_str_size")
+                    else:
+                        vec_size_func = self.runtime.get_function("vec_int_size")
+                else:
+                    # Fallback to vec_int
+                    vec_size_func = self.runtime.get_function("vec_int_size")
+
+                return self.builder.call(vec_size_func, [llvm_arg], name="len_tmp")
             else:
                 raise NotImplementedError(f"len() for type {arg.result_type.base_type} not implemented")
 
@@ -1368,16 +1484,33 @@ class IRToLLVMConverter(IRVisitor):
         """
         # Handle list types (LIST<T>)
         if ir_type.base_type == IRDataType.LIST:
-            # Lists are represented as pointers to vec_int or vec_vec_int structs
-            # Check if element type is also a list (nested list / 2D array)
-            if (hasattr(ir_type, 'element_type') and ir_type.element_type and
-                ir_type.element_type.base_type == IRDataType.LIST):
-                # 2D list: list[list[int]] -> vec_vec_int*
-                return self.runtime.get_vec_vec_int_type().as_pointer()
+            # Lists are represented as pointers to vec_* structs
+            # Check element type to determine which vec_* type to use
+            if hasattr(ir_type, 'element_type') and ir_type.element_type:
+                elem_type = ir_type.element_type.base_type
+
+                if elem_type == IRDataType.LIST:
+                    # 2D list: list[list[int]] -> vec_vec_int*
+                    return self.runtime.get_vec_vec_int_type().as_pointer()
+                elif elem_type == IRDataType.STRING:
+                    # String list: list[str] -> vec_str*
+                    return self.runtime.get_vec_str_type().as_pointer()
+                elif elem_type == IRDataType.INT:
+                    # Integer list: list[int] -> vec_int*
+                    return self.runtime.get_vec_int_type().as_pointer()
+                else:
+                    # Default to vec_int for other types
+                    return self.runtime.get_vec_int_type().as_pointer()
             else:
-                # 1D list: list[int] -> vec_int*
-                # This allows proper mutation semantics (append modifies in place)
+                # No element type info, default to vec_int
                 return self.runtime.get_vec_int_type().as_pointer()
+
+        # Handle dict types (DICT<K, V>)
+        if ir_type.base_type == IRDataType.DICT:
+            # Dicts are represented as pointers to map_* structs
+            # For now, we only support dict[str, int] -> map_str_int*
+            # TODO: Add support for other dict types (map_int_int, etc.)
+            return self.runtime.get_map_str_int_type().as_pointer()
 
         # Base type mapping
         type_mapping = {

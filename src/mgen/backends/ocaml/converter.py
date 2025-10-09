@@ -107,6 +107,10 @@ class MGenPythonToOCamlConverter:
             return self._convert_while_statement(node)
         elif isinstance(node, ast.For):
             return self._convert_for_statement(node)
+        elif isinstance(node, ast.ImportFrom):
+            # Ignore ImportFrom statements (like "from __future__ import annotations")
+            # These are Python-specific directives that don't need translation
+            return "(* Import statement ignored *)"
         else:
             raise UnsupportedFeatureError(f"Unsupported statement: {type(node).__name__}")
 
@@ -1331,6 +1335,34 @@ class MGenPythonToOCamlConverter:
             return self.type_map.get(annotation.id, annotation.id.lower())
         elif isinstance(annotation, ast.Constant) and annotation.value is None:
             return "unit"
+        elif isinstance(annotation, ast.Subscript):
+            # Handle subscripted types like list[int], list[list[int]], dict[str, int]
+            if isinstance(annotation.value, ast.Name):
+                container_type = annotation.value.id
+                if container_type == "list":
+                    # list[int] -> int list, list[list[int]] -> int list list
+                    if isinstance(annotation.slice, ast.Name):
+                        element_type = self.type_map.get(annotation.slice.id, annotation.slice.id.lower())
+                        return f"{element_type} list"
+                    elif isinstance(annotation.slice, ast.Subscript):
+                        # Recursively handle nested lists like list[list[int]]
+                        element_type = self._get_type_annotation(annotation.slice)
+                        return f"{element_type} list"
+                    return "'a list"  # Default to 'a list
+                elif container_type == "dict":
+                    # dict[str, int] -> (string * int) list
+                    if isinstance(annotation.slice, ast.Tuple) and len(annotation.slice.elts) == 2:
+                        key_type = self._get_type_annotation(annotation.slice.elts[0])
+                        value_type = self._get_type_annotation(annotation.slice.elts[1])
+                        return f"({key_type} * {value_type}) list"
+                    return "('a * 'b) list"  # Default
+                elif container_type == "set":
+                    # set[int] -> int list (OCaml doesn't have built-in sets in basic list operations)
+                    if isinstance(annotation.slice, ast.Name):
+                        element_type = self.type_map.get(annotation.slice.id, annotation.slice.id.lower())
+                        return f"{element_type} list"
+                    return "'a list"  # Default
+            return "'a"  # Fallback
         else:
             # Complex type annotations - simplified
             return "'a"

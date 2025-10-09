@@ -1,6 +1,7 @@
 """LLVM builder for compilation and execution."""
 
 import re
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -14,8 +15,35 @@ class LLVMBuilder(AbstractBuilder):
 
     def __init__(self) -> None:
         """Initialize the LLVM builder."""
-        self.llc_path = "llc"  # LLVM static compiler
-        self.clang_path = "clang"  # Clang for linking
+        self.llc_path = self._find_llvm_tool("llc")
+        self.clang_path = self._find_llvm_tool("clang")
+
+    def _find_llvm_tool(self, tool_name: str) -> str:
+        """Find LLVM tool in common locations.
+
+        Args:
+            tool_name: Name of the tool (e.g., 'llc', 'clang')
+
+        Returns:
+            Path to the tool or just the tool name if not found
+        """
+        # First check if it's in PATH
+        tool_path = shutil.which(tool_name)
+        if tool_path:
+            return tool_path
+
+        # Check common Homebrew LLVM installation paths
+        homebrew_paths = [
+            Path("/opt/homebrew/opt/llvm/bin") / tool_name,  # Apple Silicon
+            Path("/usr/local/opt/llvm/bin") / tool_name,      # Intel Mac
+        ]
+
+        for path in homebrew_paths:
+            if path.exists():
+                return str(path)
+
+        # Fall back to just the tool name (will fail if not in PATH)
+        return tool_name
 
     def get_build_filename(self) -> str:
         """Get the build file name.
@@ -80,8 +108,9 @@ run: $(TARGET)
             True if compilation succeeded
         """
         try:
-            source_path = Path(source_file)
-            output_path = Path(output_dir)
+            # Use absolute paths to avoid cwd issues
+            source_path = Path(source_file).resolve()
+            output_path = Path(output_dir).resolve()
             executable_name = source_path.stem
 
             # Step 1: Compile LLVM IR to object file using llc
@@ -94,7 +123,7 @@ run: $(TARGET)
                 str(object_file),
             ]
 
-            result = subprocess.run(llc_cmd, capture_output=True, text=True, cwd=output_path)
+            result = subprocess.run(llc_cmd, capture_output=True, text=True)
             if result.returncode != 0:
                 print(f"LLC compilation failed: {result.stderr}")
                 return False
@@ -107,6 +136,8 @@ run: $(TARGET)
             runtime_sources = [
                 "vec_int_minimal.c",
                 "vec_vec_int_minimal.c",
+                "vec_str_minimal.c",
+                "map_str_int_minimal.c",
                 "mgen_llvm_string.c",
             ]
 

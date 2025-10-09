@@ -1,8 +1,8 @@
 # LLVM Backend Development Roadmap
 
-## Current State (Updated: October 2025)
+## Current State (Updated: October 9, 2025)
 
-- **Benchmark Status**: 3/7 passing (43%) - fibonacci, list_ops, quicksort
+- **Benchmark Status**: 4/7 passing (57%) - fibonacci, list_ops, quicksort, matmul ✨
 - **Test Coverage**: 70 tests passing (100%, ~2s execution)
 - **Runtime Library**: String operations C runtime implemented (split, lower, strip, concat)
 - **Container Support**: vec_int (1D lists), vec_vec_int (2D lists), mgen_string_array_t
@@ -12,22 +12,42 @@
   - String literals, string concatenation, print
   - Global variables, type casting (int/float)
   - Nested loops, break/continue, multiple return paths
+  - **2D arrays with nested subscript operations (a[i][k])** ✨
 - **Architecture**: IR → LLVM IR conversion with C runtime linking
+- **Tool Detection**: Auto-detects LLVM tools in PATH and Homebrew locations
 
-## Passing Benchmarks (3/7)
+## Passing Benchmarks (4/7)
 
 1. ✅ **fibonacci** - Recursion, loops, arithmetic (514229)
 2. ✅ **list_ops** - List comprehensions, append, indexing, len (166750)
 3. ✅ **quicksort** - Recursive list operations, slicing (5)
+4. ✅ **matmul** - 2D arrays, nested subscripts, matrix multiplication (120) ✨
 
-## Failing Benchmarks (4/7)
+## Failing Benchmarks (3/7)
 
-4. ❌ **matmul** - Type mismatch: `vec_vec_int* != vec_int*` in nested subscripts
 5. ❌ **wordcount** - Needs `list[str]` support for split() results
 6. ❌ **dict_ops** - No dict support (dict comprehensions, items(), values(), in-operator)
 7. ❌ **set_ops** - No set support (set comprehensions, add, remove, membership)
 
 ## Recent Progress
+
+### ✅ list[str] Support Implementation (Oct 9, 2025)
+- **Created**: `vec_str_minimal.c` runtime with full string list operations
+- **Added**: vec_str type declarations and function signatures
+- **Updated**: Type converter handles list[str] → vec_str* mapping
+- **Implemented**: append, indexing, len, setitem operations for string lists
+- **Testing**: Simple list[str] test passes, all 982 tests passing
+- **Status**: Foundation complete, ready for split() conversion
+
+### ✅ LLVM Tool Auto-Detection (Oct 9, 2025)
+- **Fixed**: LLVMBuilder now auto-detects llc and clang in common locations
+- **Supported**: PATH, Homebrew (Apple Silicon and Intel Mac)
+- **Impact**: Seamless build experience on macOS without manual PATH configuration
+
+### ✅ Nested Subscript Operations (Oct 9, 2025)
+- **Fixed**: 2D array access with chained subscripts (e.g., `a[i][k]`)
+- **Implementation**: Proper handling of vec_vec_int_at → vec_int_at chains
+- **Impact**: Unlocked matmul benchmark → **4/7 passing (57%)**
 
 ### ✅ String Operations Runtime (Oct 2025)
 - **Implemented**: `mgen_llvm_string.c/.h` with split(), lower(), strip(), concat()
@@ -37,36 +57,24 @@
 
 ### ✅ 2D List Support
 - **Declared**: vec_vec_int struct with push/at/size/free operations
-- **Issue**: Type mismatch in nested subscript operations (a[i][k])
-- **Status**: Runtime exists but code generation needs fixing
+- **Status**: Fully working with proper code generation
 
 ## Next Development Priorities
 
-### 1. Fix Nested Subscript Operations (matmul)
+### 1. ✅ Implement list[str] Support (COMPLETED)
 
-**Problem**: `a[i][k]` generates type mismatch when accessing 2D lists
-**Solution**: Handle chained subscript operations in IRToLLVMConverter
-**Impact**: Unlocks matmul benchmark (4/7)
+**Completed Features:**
+- ✅ vec_str runtime with push, at, size, set, free operations
+- ✅ Type system mapping list[str] → vec_str*
+- ✅ List operations: append, indexing, len, setitem
+- ✅ All 982 tests passing with no regressions
 
-**Files to modify:**
-- `src/mgen/backends/llvm/ir_to_llvm.py` (visit_function_call for chained __getitem__)
+**Next Steps for Full wordcount Support:**
+- TODO: Convert string_array from split() to vec_str
+- TODO: Support for-each iteration over list[str]
+- NOTE: wordcount still requires dict implementation
 
-### 2. Implement list[str] Support (wordcount partial)
-
-**Problem**: split() returns string_array but needs list[str] type
-**Solution**:
-- Add vec_str container type for string lists
-- Convert string_array ↔ vec_str in split() handler
-- Support string iteration in for loops
-
-**Impact**: Enables split() usage, but wordcount still needs dicts
-
-**Files to modify:**
-- `src/mgen/backends/llvm/runtime_decls.py` (vec_str declarations)
-- `src/mgen/backends/llvm/runtime/mgen_llvm_list_str.c` (new file)
-- `src/mgen/backends/llvm/ir_to_llvm.py` (string list operations)
-
-### 3. Implement Dict Support (wordcount, dict_ops)
+### 2. Implement Dict Support (wordcount, dict_ops)
 
 **Problem**: No dictionary data structure
 **Solution**:
@@ -81,7 +89,7 @@
 - `src/mgen/backends/llvm/runtime/mgen_llvm_dict.c` (new file)
 - `src/mgen/backends/llvm/ir_to_llvm.py`
 
-### 4. Implement Set Support (set_ops)
+### 3. Implement Set Support (set_ops)
 
 **Problem**: No set data structure
 **Solution**:
@@ -90,19 +98,6 @@
 - Support membership testing (in operator)
 
 **Impact**: Unlocks set_ops (7/7)
-
-### 3. Data Structures Support
-
-Implement Python data structures in LLVM backend:
-
-- **Lists**: Comprehensions, append, indexing, slicing
-- **Dicts**: Creation, get/set, iteration, dict literals
-- **Sets**: Add, remove, membership testing, set literals
-- Nested containers (2D arrays, list of dicts, etc.)
-
-**Files to modify:**
-- `src/mgen/backends/llvm/ir_to_llvm.py` (code generation)
-- `src/mgen/backends/llvm/emitter.py` (emit support)
 
 ### 4. Advanced Python Features
 
@@ -150,9 +145,9 @@ Complete the end-to-end compilation flow:
 
 ## Recommended Development Order
 
-### Phase 1: Quick Wins (1-2 days)
-1. **Fix nested subscripts** → 4/7 benchmarks (matmul)
-2. **Implement list[str]** → Better string support
+### Phase 1: Quick Wins (COMPLETED ✨)
+1. ✅ **Fixed nested subscripts** → 4/7 benchmarks (matmul)
+2. **Implement list[str]** → Better string support (IN PROGRESS)
 
 ### Phase 2: Data Structures (3-5 days)
 3. **Dict support** → 6/7 benchmarks (wordcount + dict_ops)
@@ -167,19 +162,20 @@ Complete the end-to-end compilation flow:
 ## Success Metrics
 
 - ✅ **100% test coverage maintained** (982/982 tests passing)
-- ⏳ **Benchmarks**: 3/7 passing (43%) → Target: 7/7 (100%)
+- ✨ **Benchmarks**: 4/7 passing (57%) → Target: 7/7 (100%)
 - ✅ **Zero external dependencies** (except LLVM tools: llc, clang)
-- ✅ **Fast compilation**: 144-260ms (competitive with Go/Rust)
-- ✅ **Small binaries**: 33-35KB (competitive with C++)
-- ✅ **Type-safe code generation** (llvmlite validation)
+- ✅ **Fast compilation**: ~180ms (competitive with Go)
+- ✅ **Small binaries**: ~35KB (competitive with C++)
+- ✅ **Type-safe code generation** (proper type handling)
+- ✅ **Auto-detection**: LLVM tools found automatically
 
 ## Performance Comparison
 
 | Metric | LLVM | C++ | Go | Rust |
 |--------|------|-----|-----|------|
-| **Success Rate** | 3/7 (43%) | 7/7 (100%) | 7/7 (100%) | 7/7 (100%) |
-| **Avg Compile Time** | 177ms | 422ms | 163ms | 221ms |
-| **Avg Binary Size** | 34KB | 36KB | 2.3MB | 446KB |
+| **Success Rate** | 4/7 (57%) ✨ | 7/7 (100%) | 7/7 (100%) | 7/7 (100%) |
+| **Avg Compile Time** | ~180ms | 422ms | 163ms | 221ms |
+| **Avg Binary Size** | ~35KB | 36KB | 2.3MB | 446KB |
 | **Test Coverage** | 70 tests | - | - | - |
 
 ## Notes

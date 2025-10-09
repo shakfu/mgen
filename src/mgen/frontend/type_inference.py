@@ -39,6 +39,16 @@ class InferenceResult:
     evidence: list[str] = field(default_factory=list)
     alternatives: list[TypeInfo] = field(default_factory=list)
 
+    @property
+    def c_type(self) -> str:
+        """Get C type equivalent from type_info."""
+        return self.type_info.c_equivalent or "void*"
+
+    @property
+    def python_type(self) -> str:
+        """Get Python type name from type_info."""
+        return self.type_info.name
+
 
 @dataclass
 class TypeConstraint:
@@ -405,6 +415,8 @@ class TypeInferenceEngine:
                 base_type = annotation.value.id
                 if base_type == "list":
                     return TypeInfo("list", c_equivalent="*")
+                elif base_type == "dict":
+                    return TypeInfo("dict", c_equivalent="*")
                 elif base_type == "Optional":
                     inner_type = self._extract_type_from_annotation(annotation.slice)
                     inner_type.is_nullable = True

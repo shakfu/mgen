@@ -1743,9 +1743,13 @@ class MGenPythonToGoConverter:
             if isinstance(annotation.value, ast.Name):
                 container_type = annotation.value.id
                 if container_type == "list":
-                    # list[int] -> []int
+                    # list[int] -> []int, list[list[int]] -> [][]int
                     if isinstance(annotation.slice, ast.Name):
                         element_type = self.type_map.get(annotation.slice.id, annotation.slice.id)
+                        return f"[]{element_type}"
+                    elif isinstance(annotation.slice, ast.Subscript):
+                        # Recursively handle nested lists like list[list[int]]
+                        element_type = self._map_type_annotation(annotation.slice)
                         return f"[]{element_type}"
                     return "[]interface{}"
                 elif container_type == "dict":
