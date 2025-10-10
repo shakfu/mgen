@@ -73,6 +73,11 @@ The LLVM backend has reached feature parity with other backends, passing all 7/7
   - Detects set vs list iteration in comprehensions (lines 1241-1254)
   - Uses appropriate size and element access functions
 
+- **Benchmark Script** (`scripts/benchmark.py`)
+  - Fixed LLVM runtime linking - now includes all required C runtime files (lines 321-330)
+  - Added: `vec_str_minimal.c`, `map_int_int_minimal.c`, `map_str_int_minimal.c`, `set_int_minimal.c`, `mgen_llvm_string.c`
+  - Fixes linking errors for dict, set, and string operations
+
 ### Metrics
 
 - **Test Coverage**: 982 tests passing (100%, ~16s execution)

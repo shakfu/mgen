@@ -318,10 +318,15 @@ class BenchmarkRunner:
                 project_root = Path(__file__).parent.parent
                 runtime_path = project_root / "src" / "mgen" / "backends" / "llvm" / "runtime"
 
-                # Runtime C files
+                # Runtime C files - include all required runtime libraries
                 runtime_c_files = [
                     runtime_path / "vec_int_minimal.c",
                     runtime_path / "vec_vec_int_minimal.c",
+                    runtime_path / "vec_str_minimal.c",
+                    runtime_path / "map_int_int_minimal.c",
+                    runtime_path / "map_str_int_minimal.c",
+                    runtime_path / "set_int_minimal.c",
+                    runtime_path / "mgen_llvm_string.c",
                 ]
 
                 # Find llc (try Homebrew path first, then system)
