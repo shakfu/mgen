@@ -22,6 +22,7 @@ These systems directly address MGen C backend's current failures in benchmarks.
 ### 1. Type Inference Quality
 
 **CGen**: Sophisticated multi-pass analysis
+
 ```python
 class EnhancedTypeInferenceEngine:
     def analyze_module(self, module: ast.Module) -> Dict[str, InferredType]:
@@ -36,6 +37,7 @@ class EnhancedTypeInferenceEngine:
 ```
 
 **Key Features**:
+
 - Data flow graph tracking variable relationships
 - Usage pattern analysis (indexed_access, keyed_access, membership_test)
 - Operation-based inference (detects list methods → infers list type)
@@ -43,6 +45,7 @@ class EnhancedTypeInferenceEngine:
 - Confidence scoring (0.0-1.0) for each inference
 
 **MGen**: Basic single-pass inference
+
 ```python
 def _infer_expression_type(self, expr: ast.expr) -> str:
     if isinstance(expr, ast.Constant):
@@ -59,6 +62,7 @@ def _infer_expression_type(self, expr: ast.expr) -> str:
 ### 2. Nested Container Support
 
 **CGen**: Dedicated NestedContainerManager
+
 ```python
 class NestedContainerManager:
     """Manages complex nested container type generation."""
@@ -76,6 +80,7 @@ class NestedContainerManager:
 ```
 
 **Example**:
+
 ```python
 # Input: matrix: List[List[int]]
 type_info = manager.parse_nested_type("List[List[int]]")
@@ -90,9 +95,10 @@ order = manager.get_instantiation_order()
 ```
 
 **MGen**: No nested container support
+
 ```python
 # Current: matrix: list = []
-# Generates: vec_int matrix = /* Unsupported expression List */;  ❌
+# Generates: vec_int matrix = /* Unsupported expression List */;  [X]
 ```
 
 **Gap**: MGen fails on all nested containers (matmul, quicksort benchmarks)
@@ -102,6 +108,7 @@ order = manager.get_instantiation_order()
 ### 3. Usage Pattern Detection
 
 **CGen**: Comprehensive pattern analysis
+
 ```python
 def _analyze_usage_patterns(self, node: ast.AST):
     """Analyze how variables are used to infer their types."""
@@ -126,6 +133,7 @@ def _analyze_usage_patterns(self, node: ast.AST):
 ```
 
 **Usage Example**:
+
 ```python
 # Python code:
 data: list = []
@@ -142,9 +150,10 @@ if 5 in data:
 ```
 
 **MGen**: No usage pattern analysis
+
 ```python
 # Same code generates:
-# vec_int data = /* Unsupported expression List */;  ❌
+# vec_int data = /* Unsupported expression List */;  [X]
 ```
 
 **Gap**: MGen can't distinguish list/dict/set based on usage
@@ -154,6 +163,7 @@ if 5 in data:
 ### 4. Method-Based Type Inference
 
 **CGen**: Method usage → type inference
+
 ```python
 def _infer_from_method_usage(self, obj_name: str, method_name: str) -> InferredType:
     """Infer container type from method usage patterns."""
@@ -180,6 +190,7 @@ def _infer_from_method_usage(self, obj_name: str, method_name: str) -> InferredT
 ```
 
 **MGen**: Partial method support
+
 ```python
 def _convert_list_method(self, obj: str, method_name: str, args: list[str]) -> str:
     if method_name == "append":
@@ -194,6 +205,7 @@ def _convert_list_method(self, obj: str, method_name: str, args: list[str]) -> s
 ### 5. String-Keyed Dictionary Detection
 
 **CGen**: Sophisticated key type analysis
+
 ```python
 def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
     """Infer key and value types of a dictionary."""
@@ -205,7 +217,7 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
                 if isinstance(elem.value, int):
                     element_types.add("int")
                 elif isinstance(elem.value, str):
-                    element_types.add("str")  # ✅ Detects string keys
+                    element_types.add("str")  # [x] Detects string keys
         return most_specific_type(element_types)
 
     key_type = _infer_list_element_type(keys)
@@ -214,6 +226,7 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
 ```
 
 **MGen**: No key type inference
+
 ```python
 # Python: word_counts: dict = {}
 # MGen generates: map_str_int (hardcoded default)
@@ -234,18 +247,21 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
 ### Why CGen Systems Would Fix Failures
 
 #### Issue #1: Empty Container Initialization (5/7 benchmarks)
+
 ```python
 # Python: data: list = []
-# Current MGen: vec_int data = /* Unsupported expression List */;  ❌
+# Current MGen: vec_int data = /* Unsupported expression List */;  [X]
 ```
 
 **CGen Solution**: EnhancedTypeInferenceEngine detects:
+
 1. Empty list literal `[]`
 2. Analyzes subsequent usage (append, indexing)
 3. Infers element type with HIGH confidence
-4. Generates: `vec_int data = {0};`  ✅
+4. Generates: `vec_int data = {0};`  [x]
 
 #### Issue #2: Nested Containers (2/7 benchmarks)
+
 ```python
 # Python: matrix: list = []
 #         row: list = []
@@ -254,9 +270,11 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
 ```
 
 **CGen Solution**: NestedContainerManager:
+
 1. Detects `matrix.append(row)` where `row` is `vec_int`
 2. Infers `matrix` must be `vec_vec_int`
 3. Generates proper STC template order:
+
    ```c
    #define i_type vec_int
    #define i_key int
@@ -268,26 +286,29 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
    ```
 
 #### Issue #3: Dictionary Key Type Detection (1/7 benchmarks)
+
 ```python
 # Python: counts: dict = {}
 #         counts[word] = 1  # word is a string variable
 ```
 
 **CGen Solution**: Usage pattern analysis:
+
 1. Detects subscript with string variable
 2. Marks as "keyed_access" with str type
-3. Generates: `hmap_cstr_int counts = {0};`  ✅
+3. Generates: `hmap_cstr_int counts = {0};`  [x]
 
 ---
 
 ## Recommended Integration Path
 
-### Phase 1: Enhanced Type Inference (HIGHEST IMPACT) 🎯
+### Phase 1: Enhanced Type Inference (HIGHEST IMPACT)
 
 **Estimate**: 6-8 hours
 **Expected Improvement**: 2/7 → 5/7 (71% success rate)
 
 **Action Items**:
+
 1. Port `EnhancedTypeInferenceEngine` to MGen
    - File: `/Users/sa/projects/cgen/src/cgen/ext/stc/enhanced_type_inference.py` (527 lines)
    - Integrate into `MGenPythonToCConverter.__init__`
@@ -304,6 +325,7 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
    - Detect list/dict/set methods → infer container type
 
 4. Update `_convert_annotated_assignment()`:
+
    ```python
    def _convert_annotated_assignment(self, stmt: ast.AnnAssign) -> str:
        var_name = stmt.target.id
@@ -318,26 +340,29 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
    ```
 
 **Files to Modify**:
+
 - `/Users/sa/projects/mgen/src/mgen/backends/c/converter.py` (1,548 lines)
   - Add `self.type_inference_engine = EnhancedTypeInferenceEngine()`
   - Replace `_infer_expression_type()` with enhanced version
   - Update `_convert_annotated_assignment()` to use inference results
 
 **Expected Fixes**:
-- ✅ list_ops: Empty list initialization detected
-- ✅ dict_ops: Dict key type properly inferred
-- ✅ set_ops: Set methods detected → correct type
-- ❌ matmul: Still needs nested container support
-- ❌ quicksort: Still needs nested container support
+
+- [x] list_ops: Empty list initialization detected
+- [x] dict_ops: Dict key type properly inferred
+- [x] set_ops: Set methods detected → correct type
+- [X] matmul: Still needs nested container support
+- [X] quicksort: Still needs nested container support
 
 ---
 
-### Phase 2: Nested Container Support (HIGH IMPACT) 🎯
+### Phase 2: Nested Container Support (HIGH IMPACT)
 
 **Estimate**: 8-10 hours
 **Expected Improvement**: 5/7 → 7/7 (100% success rate)
 
 **Action Items**:
+
 1. Port `NestedContainerManager` to MGen
    - File: `/Users/sa/projects/cgen/src/cgen/ext/stc/nested_containers.py` (356 lines)
    - Create new file: `/Users/sa/projects/mgen/src/mgen/backends/c/nested_containers.py`
@@ -353,6 +378,7 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
    - `get_instantiation_order()` - 25 lines (topological sort)
 
 4. Integrate into converter:
+
    ```python
    def _convert_module(self, node: ast.Module) -> str:
        # Phase 1: Type inference (including nested detection)
@@ -370,17 +396,20 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
    ```
 
 **Files to Create**:
+
 - `/Users/sa/projects/mgen/src/mgen/backends/c/nested_containers.py` (356 lines)
 
 **Files to Modify**:
+
 - `/Users/sa/projects/mgen/src/mgen/backends/c/converter.py`
   - Add `self.nested_manager = NestedContainerManager()`
   - Update `_generate_container_declarations()` to use nested manager
   - Add nested container type detection in type inference
 
 **Expected Fixes**:
-- ✅ matmul: Nested vectors properly generated
-- ✅ quicksort: 2D array operations work
+
+- [x] matmul: Nested vectors properly generated
+- [x] quicksort: 2D array operations work
 
 ---
 
@@ -390,6 +419,7 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
 **Impact**: Code quality improvements, edge case handling
 
 **Action Items**:
+
 1. String key inference from subscript operations
 2. Confidence-based type selection
 3. Type propagation across assignments
@@ -400,12 +430,14 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
 ## Implementation Priority
 
 ### Week 1: Enhanced Type Inference
+
 - **Days 1-2**: Port EnhancedTypeInferenceEngine class
 - **Days 3-4**: Integrate into MGenPythonToCConverter
 - **Day 5**: Test on list_ops, dict_ops, set_ops benchmarks
 - **Target**: 5/7 passing (71%)
 
 ### Week 2: Nested Container Support
+
 - **Days 1-2**: Port NestedContainerManager class
 - **Days 3-4**: Implement template generation order
 - **Days 5-6**: Test on matmul, quicksort benchmarks
@@ -419,6 +451,7 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
 ### Direct Ports (Minimal Changes)
 
 **Can be copied almost verbatim**:
+
 1. `EnhancedTypeInferenceEngine` - Only needs MGen's TypeInfo adaptation
 2. `NestedContainerManager` - Architecture-agnostic, works as-is
 3. `_analyze_usage_patterns()` - Pure AST analysis
@@ -427,6 +460,7 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
 ### Requires Adaptation
 
 **Need MGen-specific changes**:
+
 1. Type mapping (`c_type` field) - CGen uses `cstr`, MGen uses `char*`
 2. STC template generation - CGen has separate template_manager
 3. Variable context tracking - MGen's `variable_context` dict
@@ -434,6 +468,7 @@ def _infer_dict_types(self, keys: List[ast.expr], values: List[ast.expr]):
 ### Integration Points
 
 **Where to hook into MGen**:
+
 ```python
 class MGenPythonToCConverter:
     def __init__(self):
@@ -460,15 +495,18 @@ class MGenPythonToCConverter:
 ## Risk Assessment
 
 ### Low Risk
-- ✅ EnhancedTypeInferenceEngine is isolated, doesn't modify existing code
-- ✅ NestedContainerManager is standalone utility
-- ✅ Both have comprehensive error handling
+
+- [x] EnhancedTypeInferenceEngine is isolated, doesn't modify existing code
+- [x] NestedContainerManager is standalone utility
+- [x] Both have comprehensive error handling
 
 ### Medium Risk
-- ⚠️ Integration with existing `variable_context` tracking
-- ⚠️ STC template generation order changes
+
+- [!] Integration with existing `variable_context` tracking
+- [!] STC template generation order changes
 
 ### Mitigation
+
 - Run full 790-test suite after each phase
 - Keep existing code paths as fallback
 - Use confidence thresholds (only apply if confidence >= 0.8)
@@ -478,11 +516,13 @@ class MGenPythonToCConverter:
 ## Expected Outcomes
 
 ### Quantitative
+
 - **Benchmark Success**: 2/7 (28.6%) → 7/7 (100%)
 - **Type Inference Accuracy**: ~40% → 90%+
 - **Nested Container Support**: 0% → 100%
 
 ### Qualitative
+
 - **Code Quality**: Idiomatic C code generation
 - **Error Messages**: Better diagnostics (confidence scores, inference sources)
 - **Maintainability**: Cleaner separation of concerns

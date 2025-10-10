@@ -10,10 +10,10 @@ Major Improvements Implemented
 
 Current Benchmark Status
 
-- ✅ quicksort - Compiles and runs successfully
-- ✅ fibonacci, list_ops, dict_ops, set_ops - Already working (4/7)
-- ⚠️ matmul - Has Rust ownership issues (needs read-only references)
-- ❓ wordcount - Not yet tested
+- [x] quicksort - Compiles and runs successfully
+- [x] fibonacci, list_ops, dict_ops, set_ops - Already working (4/7)
+- [!] matmul - Has Rust ownership issues (needs read-only references)
+- wordcount - Not yet tested
 
 Progress: From 1/7 (14%) to 5/7 (71%) confirmed working
 
@@ -35,6 +35,7 @@ Explicit Type-Based Signals
 1. Immutable Collections
 
 # Strong signals
+
 tuple[int, ...]      # vs list[int]
 frozenset[str]       # vs set[str]
 
@@ -104,11 +105,13 @@ MAX_SIZE: int = 100  # Convention signals immutability
 
   You could use these heuristics:
 
-  # Strong immutability signals → use &Vec<T> or &[T]
+# Strong immutability signals → use &Vec<T> or &[T]
+
   def process(data: tuple[int, ...]) -> int:  # tuple → &[i32]
   def read_config(cfg: Sequence[str]):         # Sequence → &Vec<String>
 
-  # Weak/no signals → use &mut Vec<T> if modified, & if only read
+# Weak/no signals → use &mut Vec<T> if modified, & if only read
+
   def analyze(data: list[int]) -> int:         # list → analyze usage
       total = sum(data)  # Only read → &Vec<i32>
       return total

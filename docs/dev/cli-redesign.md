@@ -1,8 +1,6 @@
 # cli-redesign
 
-
 ## Basic
-
 
 ```sh
 
@@ -15,9 +13,7 @@ mgen build -t rust app.py
 mgen build --to rust app.py
 ```
 
-
 ## Project
-
 
 ```sh
 

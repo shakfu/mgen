@@ -109,18 +109,21 @@ Major improvements to LLVM backend with set comprehension support and significan
 ### Technical Notes
 
 **Set Implementation Strategy**:
+
 - Hash table with separate chaining for collision resolution
 - 16 buckets by default (configurable)
 - Simple modulo hash function
 - Linked list chains for collisions
 
 **Type Inference Architecture**:
+
 - Single-pass IR building with opportunistic inference
 - Propagates types bidirectionally (variable ↔ value)
 - Updates both IRVariable.ir_type and IRExpression.result_type
 - Handles 5 inference scenarios: list literals, dict literals, function returns, loop variables, regular assignments
 
 **Performance**:
+
 - Set operations: O(1) average, O(n) worst case
 - Type inference: Zero runtime overhead (compile-time only)
 - Binary sizes remain small (~35KB)
@@ -164,19 +167,23 @@ Implemented comprehensive `.items()` iteration for dictionaries in LLVM backend,
 ### Features
 
 **Dict Comprehensions with .items()**:
+
 ```python
 {k: v for k, v in source_dict.items() if v > 20}
 ```
+
 - Iterates through all entries in source dict
 - Unpacks keys and values into separate variables
 - Supports filter conditions
 - Generates efficient LLVM IR with skip logic for empty slots
 
 **Regular For Loops with .items()**:
+
 ```python
 for k, v in my_dict.items():
     total += v
 ```
+
 - Works in both comprehensions and regular loops
 - Properly handles tuple unpacking
 - Maintains symbol table correctly
@@ -184,12 +191,14 @@ for k, v in my_dict.items():
 ### Implementation Details
 
 **Iteration Strategy**: Capacity-based iteration with occupancy checks
+
 - Loop from 0 to capacity (not size)
 - Call `entry_is_occupied()` for each index
 - Skip empty slots, extract key/value for occupied ones
 - O(capacity) time complexity, but simple and correct
 
 **Control Flow Generation**:
+
 1. Get source dict capacity
 2. Loop: `for idx in 0..capacity`
 3. Check: `if is_occupied(idx)`
@@ -216,6 +225,7 @@ for k, v in my_dict.items():
 ### Technical Notes
 
 **Symbol Table Management**: The implementation carefully manages variable scope by:
+
 - Storing old variable values before loop
 - Allocating new variables for k, v
 - Restoring original scope after loop iteration
@@ -245,7 +255,7 @@ Implemented comprehensive support for integer-keyed dictionaries in LLVM backend
 - **LLVM Code Generator** (`backends/llvm/ir_to_llvm.py`)
   - Added `_infer_dict_key_type()` - Detects int vs string keys from AST expressions
   - Enhanced `_visit_dict_comprehension()` - Selects map type based on key type
-  - Enhanced `_convert_type()` - Returns map_int_int* or map_str_int* based on element_type
+  - Enhanced `_convert_type()` - Returns map_int_int*or map_str_int* based on element_type
   - Enhanced dict literal creation - Detects key type and uses appropriate map runtime
   - Enhanced `in` operator - Calls map_int_int_contains or map_str_int_contains
   - Enhanced `len()` function - Calls map_int_int_size or map_str_int_size
@@ -293,6 +303,7 @@ Implemented comprehensive support for integer-keyed dictionaries in LLVM backend
 **Implementation Strategy**: Created parallel infrastructure for int-keyed dicts alongside existing string-keyed support, with runtime dispatch based on type detection.
 
 **Type Detection Heuristic**:
+
 - Integer keys: `ast.Constant(int)`, `ast.Name`, `ast.BinOp`, `ast.UnaryOp`
 - String keys: `ast.Constant(str)`, `ast.Call` to `str()`
 - Default: Integer (matches benchmark usage patterns)
@@ -376,6 +387,7 @@ Fixed critical type inference bug where nested list annotations like `list[list[
 **Root Cause**: Type annotation methods only handled simple types (`ast.Name`) and returned generic types for subscripted types (`ast.Subscript`), causing compilation failures when Python 3.9+ subscripted generics like `list[list[int]]` were used.
 
 **Pattern Applied**: All backends now follow recursive pattern:
+
 ```python
 if isinstance(annotation.slice, ast.Subscript):
     # Recursively handle nested types
@@ -465,6 +477,7 @@ Major advancement in LLVM backend with full list (dynamic array) support, includ
 ### Technical Details
 
 **List Implementation Architecture**:
+
 ```
 Python:       data: list = []
 IR:           IRLiteral([], IRType(IRDataType.LIST))
@@ -476,6 +489,7 @@ Storage:      store %"struct.vec_int"* %list_tmp, %"struct.vec_int"** %data
 ```
 
 **Operation Flow**:
+
 ```
 Python:       data.append(42)
 IR:           IRFunctionCall("__method_append__", [data_ref, literal_42])
@@ -484,6 +498,7 @@ LLVM:         %ptr = load %"struct.vec_int"*, %"struct.vec_int"** %data
 ```
 
 **Verified Working**:
+
 - Empty list creation and initialization
 - Multiple append operations maintaining state
 - Index access returning correct values
@@ -493,12 +508,14 @@ LLVM:         %ptr = load %"struct.vec_int"*, %"struct.vec_int"** %data
 - Test: `3 appends; return len(data)` → Returns 3 ✓
 
 **Performance**:
+
 - Runtime: 130 lines C, compiles to 2KB object file
 - Compilation: ~200ms (clang LLVM IR + runtime linking)
 - No memory leaks in simple tests
 - Growth strategy: O(1) amortized append
 
 **Known Limitations**:
+
 - List iteration (`for x in list:`) not yet implemented
 - List comprehensions not yet supported
 - Only `list[int]` (integer elements) currently supported
@@ -517,16 +534,19 @@ LLVM:         %ptr = load %"struct.vec_int"*, %"struct.vec_int"** %data
 ### Files Changed
 
 **New Files**:
+
 - `src/mgen/backends/llvm/runtime_decls.py` (118 lines)
 - `src/mgen/backends/llvm/runtime/vec_int_minimal.c` (130 lines)
 - `src/mgen/backends/llvm/runtime/` (symlinks to C runtime)
 
 **Modified Files**:
+
 - `src/mgen/frontend/static_ir.py` - Added LIST/DICT/SET types, list literal/subscript/method handling
 - `src/mgen/backends/llvm/ir_to_llvm.py` - List operations, type conversion, runtime integration
 - `src/mgen/backends/llvm/backend.py` - Updated for container system
 
 **Lines of Code**:
+
 - Added: ~600 lines (IR handling, runtime, declarations)
 - Runtime: 130 lines C (reusable across backends)
 - Architecture: Clean separation, minimal coupling
@@ -612,6 +632,7 @@ Major advancement of the LLVM backend with global variables, string support, I/O
 ### Technical Details
 
 **LLVM IR Optimization (via llvmlite)**:
+
 - Uses New Pass Manager API (`PipelineTuningOptions`, `PassBuilder`)
 - Optimization levels: O0 (debug) through O3 (aggressive)
 - Automatic pass selection: dead code elimination, constant folding, function attribute inference
@@ -620,6 +641,7 @@ Major advancement of the LLVM backend with global variables, string support, I/O
 - Example: 14-line unoptimized → 3-line optimized function
 
 **C Library Integration**:
+
 ```c
 declare i64 @strlen(i8*)
 declare i8* @malloc(i64)
@@ -629,6 +651,7 @@ declare i32 @printf(i8*, ...)
 ```
 
 **Compilation Pipeline**:
+
 1. Python → Static IR (frontend)
 2. Static IR → LLVM IR (ir_to_llvm.py)
 3. LLVM IR → Optimized IR (optional, via PassBuilder)
@@ -645,6 +668,7 @@ declare i32 @printf(i8*, ...)
 ### Current Capabilities
 
 The LLVM backend now supports:
+
 - ✅ Data types: int (i64), float (double), bool (i1), str (i8*)
 - ✅ Arithmetic: +, -, *, /, //, % (Python semantics)
 - ✅ Boolean: and/or (short-circuit), not, comparisons
@@ -729,6 +753,7 @@ Completed comprehensive feature implementation for LLVM backend, adding full con
 ### Verified Algorithms
 
 Successfully compiled and executed:
+
 - ✅ Fibonacci (iterative with for loops)
 - ✅ Factorial (iterative with range and augmented assignment)
 - ✅ Prime number checking (while loops with early returns)
@@ -1367,6 +1392,7 @@ Completely redesigned CLI workflow based on comprehensive usability analysis. Th
 ### Migration Guide
 
 **Before (v0.1.61 and earlier)**:
+
 ```bash
 mgen --target rust convert app.py
 mgen --target go build app.py
@@ -1374,6 +1400,7 @@ mgen --target c batch -s src/
 ```
 
 **After (v0.1.62)**:
+
 ```bash
 mgen convert -t rust app.py                    # Single file
 mgen convert -t c app1.py app2.py              # Multiple files
@@ -1455,11 +1482,13 @@ Implemented automatic type inference for local variables, significantly reducing
 ### Impact
 
 **Developer Experience:**
+
 - Reduces boilerplate by ~30-50% for typical functions
 - Matches Python developer expectations
 - Maintains type safety while reducing verbosity
 
 **Example Before/After:**
+
 ```python
 # Before (v0.1.60)
 def process() -> int:
@@ -1580,6 +1609,7 @@ Implemented comprehensive error message improvements with source location tracki
 ### Backward Compatibility
 
 [x] **100% backward compatible** - All existing code continues to work:
+
 - Simple `raise UnsupportedFeatureError("message")` still works
 - Can catch errors as `Exception`
 - Error messages accessible via `str(error)`
@@ -1636,6 +1666,7 @@ After comprehensive analysis, determined that code sharing across backends has r
 ### Analysis Findings
 
 **Current Code Sharing Mechanisms**:
+
 1. **Shared Utilities** (`converter_utils.py`):
    - `get_standard_binary_operator()` - Used 37+ times across all backends
    - `get_standard_unary_operator()` - Used by all backends
@@ -1653,6 +1684,7 @@ After comprehensive analysis, determined that code sharing across backends has r
    - Common validation and helper methods
 
 **Why Expression Conversion Should NOT Be Refactored**:
+
 - Dispatch logic is trivial (isinstance chain, ~20-34 lines per backend)
 - All backends already use shared operator mapping functions
 - Real complexity is in language-specific methods (cannot be shared)
@@ -1970,12 +2002,14 @@ This release focuses on code quality, safety, and documentation improvements bas
 ### Code Review Compliance
 
 Addresses all **10.1 Immediate Actions** from CODE_REVIEW.md:
+
 1. [x] Auto-fixes applied (113 issues)
 2. [x] Bare except clauses eliminated (5 → 0)
 3. [x] Error handling TODO comments replaced with exceptions (15 instances)
 4. [x] Docstrings added to all public APIs (93 total, 100% coverage)
 
 **Impact Summary**:
+
 - **High**: Safety improvements (no bare excepts, proper exception handling)
 - **High**: Correctness (no silent failures in code generation)
 - **Medium**: Documentation (complete API coverage)
@@ -2081,6 +2115,7 @@ This release achieves perfect 7/7 (100%) benchmark success for the OCaml backend
 ### Production Readiness Status
 
 **5/6 backends now production-ready (83%)**:
+
 - [x] C++: 7/7 (100%)
 - [x] C: 7/7 (100%)
 - [x] Rust: 7/7 (100%)
@@ -2287,6 +2322,7 @@ This release achieves perfect 7/7 (100%) benchmark success for the Go backend, u
 ### Technical Details
 
 **Multi-Pass Type Inference Flow**:
+
 ```python
 # Pass 1: Base types
 variable_types = {"arr": "[]int", "dict": "map[int]int"}
@@ -2305,12 +2341,14 @@ dict[i] = True  # dict: map[int]int → map[int]bool
 ```
 
 **Pattern Detection Examples**:
+
 - Nested subscripts: `result[row][col]` → Detect `result` as 2D array
 - Append operations: `outer.append(inner)` → Detect `outer` as vector-of-vectors
 - String keys: `map["literal"]` or `map[str_var]` → Detect string-keyed map
 - Bool values: `set[i] = True` → Detect set (map with bool values)
 
 **Code Generation Improvements**:
+
 - Smart lambda generation with unused variable elimination
 - Type-aware comprehension function selection
 - Pre-computed variable context prevents type mismatches
@@ -2318,6 +2356,7 @@ dict[i] = True  # dict: map[int]int → map[int]bool
 - Automatic unused variable marking with `_ = variable` pattern
 
 **Unused Variable Detection Algorithm**:
+
 ```python
 # Step 1: Collect declared variables
 declared = {"data", "temp_dict", "length"}
@@ -2335,6 +2374,7 @@ return found_count
 ```
 
 **Architecture Improvements**:
+
 - **Converter (src/mgen/backends/go/converter.py)**: ~2800 lines
   - 6 pattern detection methods
   - 5-pass type inference system
@@ -2352,6 +2392,7 @@ return found_count
 **Go Backend Achievement**: This marks the Go backend as the **fourth production-ready backend** to achieve 100% benchmark success, joining C, C++, and Rust. All four backends now demonstrate complete feature coverage for real-world Python-to-X code generation, with Haskell and OCaml backends in progress.
 
 **Production-Ready Backend Status**:
+
 ```
 Backend   | Benchmarks | Compile (s) | Execute (s) | Binary (KB) | Status
 ----------|-----------|-------------|-------------|-------------|------------------
@@ -2364,6 +2405,7 @@ OCaml     | 1/7 (14%)  | 0.211      | 0.248      | 789.2      | [ ] In Progress
 ```
 
 **Go Backend Highlights**:
+
 - **Fastest compilation**: 0.072s avg (3.4x faster than C++, 5.1x faster than C)
 - **Fastest execution**: 0.048s avg (1.3x faster than Rust, 5.6x faster than C++)
 - **Largest binaries**: 2.4MB avg (includes Go runtime and garbage collector)
@@ -2436,6 +2478,7 @@ This release refactors all C backend container libraries from dual-file (.h + .c
 ### Technical Details
 
 **Single-Header Pattern** (all containers):
+
 ```c
 // Declarations
 typedef struct { ... } container_t;
@@ -2448,11 +2491,13 @@ static container_t* container_new(void) {
 ```
 
 **ContainerCodeGenerator Changes** (src/mgen/backends/c/container_codegen.py):
+
 - Before: Load `.h` + `.c`, merge, strip headers
 - After: Load single `.h`, strip headers once
 - Template generation: Include implementation section for parameterized types
 
 **Benchmark Compilation** (scripts/benchmark.py):
+
 ```python
 # Find non-container runtime .c files (containers are header-only)
 runtime_c_files = [
@@ -2512,7 +2557,7 @@ This release achieves 100% benchmark success rate for the Rust backend, marking 
 
 ### Statistics
 
-- **Rust Backend Success Rate**: 7/7 (100%) - **PRODUCTION READY** 
+- **Rust Backend Success Rate**: 7/7 (100%) - **PRODUCTION READY**
 - **Total Benchmarks Passing**: 21/42 (50%)
   - C++: 7/7 (100%)
   - C: 7/7 (100%)
@@ -2526,16 +2571,19 @@ This release achieves 100% benchmark success rate for the Rust backend, marking 
 ### Technical Details
 
 **Type Inference Enhancements** (converter.py):
+
 - Lines 1889-1909: Function call reassignment detection in `_infer_dict_types_from_usage()`
 - Lines 1901-1905: Temporary function context setting for pre-analysis type inference
 - Lines 2001-2031: Generic Box<dyn> type handling in return type inference
 
 **Ownership Management** (converter.py):
+
 - Line 1129: Dereferenced HashMap access (`*value.get(...).unwrap_or(&0)`)
 - Lines 799-804: Automatic key cloning for insert operations
 - Lines 1257-1260: Read-only String parameter cloning in function calls
 
 **Parameter Handling** (converter.py):
+
 - Lines 606-615: Collections-only immutability analysis (Vec, HashMap, HashSet)
 - Lines 1247-1262: Collection references and String cloning in function call arguments
 
@@ -2941,6 +2989,7 @@ This release completes the parameterized template system, achieving full integra
 ### Technical Details
 
 **Hash Table Implementation**:
+
 ```c
 // Clean API without macro magic
 mgen_str_int_map_t* map = mgen_str_int_map_new();
@@ -2951,6 +3000,7 @@ mgen_str_int_map_free(map);
 ```
 
 **STC Replacement Comparison**:
+
 - **Before (STC)**: `map_str_int_get(&map, key)->second` with `cstr_raw` non-owning pointers
 - **After (Vanilla C)**: `*mgen_str_int_map_get(map, key)` with owned `strdup` strings
 - **Lines of Code**: ~300 lines of readable C vs opaque macro expansion
@@ -3069,6 +3119,7 @@ mgen_str_int_map_free(map);
 ### Technical Details
 
 **New Files**:
+
 - `benchmarks/algorithms/fibonacci.py`: Recursive algorithm benchmark
 - `benchmarks/algorithms/quicksort.py`: Array manipulation benchmark
 - `benchmarks/algorithms/matmul.py`: Matrix multiplication benchmark
@@ -3081,9 +3132,11 @@ mgen_str_int_map_free(map);
 - `benchmarks/README.md`: Comprehensive documentation
 
 **Modified Files**:
+
 - `Makefile`: Added 5 benchmarking targets
 
 **Metrics Collected**:
+
 1. Compilation time (wall clock)
 2. Execution time (wall clock)
 3. Binary size (bytes)
@@ -3091,6 +3144,7 @@ mgen_str_int_map_free(map);
 5. Success rate (compilations/executions)
 
 **Output Formats**:
+
 - JSON: Detailed results with per-benchmark metrics
 - Markdown: Human-readable report with rankings and comparisons
 
@@ -3148,6 +3202,7 @@ mgen_str_int_map_free(map);
 ### Technical Details
 
 **Files Modified**:
+
 - `src/mgen/backends/haskell/emitter.py`: Main function generation, qualified method calls
 - `src/mgen/backends/haskell/runtime/MGenRuntime.hs`: Added OVERLAPPING pragma
 - `src/mgen/backends/ocaml/emitter.py`: Type-aware print, docstring handling, type annotations
@@ -3163,6 +3218,7 @@ mgen_str_int_map_free(map);
 - `tests/test_backends.py`: Go module name test
 
 **Test Results**:
+
 - Unit tests: 717/717 passing
 - Compilation tests: 24/24 passing (all 6 backends × 2 test cases × 2 consistency tests)
 - Type checking: 89/89 source files passing strict mypy
@@ -3179,41 +3235,49 @@ mgen_str_int_map_free(map);
 #### File I/O Operations (C Backend Runtime)
 
 **New Runtime Libraries**:
+
 - `mgen_file_ops.h` / `mgen_file_ops.c`: Complete file I/O implementation
 
 **Core File Operations**:
+
 - `mgen_open()`, `mgen_close()`: Python `open()` and `close()` equivalents
 - `mgen_read()`, `mgen_readline()`, `mgen_readlines()`: File reading operations
 - `mgen_write()`, `mgen_writelines()`: File writing operations
 - Context manager support: `mgen_with_file()` for automatic cleanup
 
 **Path Operations** (os.path equivalents):
+
 - `mgen_exists()`, `mgen_isfile()`, `mgen_isdir()`: Path validation
 - `mgen_getsize()`: File size queries
 - `mgen_basename()`, `mgen_dirname()`: Path manipulation
 - `mgen_path_join()`: Platform-aware path joining
 
 **Convenience Functions**:
+
 - `mgen_read_file()`: Read entire file in one call
 - `mgen_write_file()`, `mgen_append_file()`: Quick file operations
 
 #### Advanced Container Operations (C Backend Runtime)
 
 **New Runtime Libraries**:
+
 - `mgen_container_ops.h` / `mgen_container_ops.c`: Container helper operations
 
 **Python-Style Operations**:
+
 - `mgen_vec_enumerate()`: Python `enumerate()` for vectors with index
 - `mgen_hmap_items()`: Python `dict.items()` for hashmaps
 - `mgen_in_vec()`, `mgen_in_hmap()`: Python `in` operator support
 - `mgen_len()`, `mgen_bool_container()`: Python len() and bool() for containers
 
 **Container Management**:
+
 - Container registry: `mgen_container_registry_new()`, `mgen_register_container()`, `mgen_cleanup_containers()`
 - Automatic cleanup for registered containers
 - Safe bounds checking: `mgen_vec_bounds_check()`, `mgen_vec_at_safe()`
 
 **Container Utilities**:
+
 - `mgen_vec_equal()`, `mgen_hmap_equal()`: Deep equality comparison
 - `mgen_vec_repr()`, `mgen_hmap_repr()`: Python-style string representation
 - `mgen_string_array_to_vec_cstr()`, `mgen_vec_cstr_to_string_array()`: Container conversions
@@ -3221,20 +3285,24 @@ mgen_str_int_map_free(map);
 #### Module Import System
 
 **New Common Module**:
+
 - `mgen/common/module_system.py`: Complete module resolution and import handling
 
 **Module Resolution**:
+
 - `ModuleResolver`: Discovers and analyzes Python modules
 - `ModuleInfo`: Tracks module functions, imports, and dependencies
 - `StandardLibraryModule`: Maps stdlib functions to target language equivalents
 
 **Import Support**:
+
 - Local module imports: `import mymodule`, `from mymodule import function`
 - Standard library modules: `math`, `typing`, `dataclasses`
 - Cross-module function resolution and dependency analysis
 - Topological sort for correct compilation order
 
 **Import Handler**:
+
 - `ImportHandler`: Processes import statements during code generation
 - Generates appropriate include directives for target language
 - Resolves function calls to correct module or stdlib equivalents
@@ -3243,12 +3311,14 @@ mgen_str_int_map_free(map);
 #### Enhanced String Operations (C Backend Runtime)
 
 **String Array Support**:
+
 - `mgen_string_array_t`: Dynamic string array structure
 - `mgen_string_array_new()`, `mgen_string_array_free()`: Array lifecycle
 - `mgen_string_array_add()`, `mgen_string_array_get()`, `mgen_string_array_size()`: Array operations
 - `mgen_join()`: Python `str.join()` equivalent for string arrays
 
 **Integration**:
+
 - All string array functions integrated with file I/O operations
 - Used by `mgen_readlines()` and `mgen_writelines()`
 - Container operations use string arrays for representation
@@ -3256,12 +3326,14 @@ mgen_str_int_map_free(map);
 ### Technical Details
 
 **Runtime Integration**:
+
 - All new runtime files automatically included via builder's `glob("*.c")` pattern
 - Platform-aware implementations (Windows/Unix path separators)
 - Consistent error handling using mgen_error_handling system
 - Zero external dependencies - pure C99 standard library
 
 **Files Added**:
+
 - `src/mgen/backends/c/runtime/mgen_file_ops.h` (148 lines)
 - `src/mgen/backends/c/runtime/mgen_file_ops.c` (384 lines)
 - `src/mgen/backends/c/runtime/mgen_container_ops.h` (215 lines)
@@ -3269,6 +3341,7 @@ mgen_str_int_map_free(map);
 - `src/mgen/common/module_system.py` (316 lines)
 
 **Files Modified**:
+
 - `src/mgen/backends/c/runtime/mgen_string_ops.h`: Added string array type and operations
 - `src/mgen/backends/c/runtime/mgen_string_ops.c`: Implemented string array functions
 - `src/mgen/common/__init__.py`: Exported module_system
@@ -3285,6 +3358,7 @@ mgen_str_int_map_free(map);
 ### Migration from CGen
 
 **MGen now supports everything CGen has, plus:**
+
 - Multi-backend architecture (C, C++, Rust, Go, Haskell, OCaml)
 - Fallback container system for environments without STC
 - More comprehensive testing (717 vs 663 tests)
@@ -3328,6 +3402,7 @@ mgen_str_int_map_free(map);
 **Development Priority 2 Progress**: All 6 backends refactored
 
 **Completed**:
+
 - [x] **C++ Backend**: 7 operator mappings eliminated
   - 3× binop_map dictionaries → get_standard_binary_operator()
   - 2× cmpop_map dictionaries → get_standard_comparison_operator()
@@ -3361,6 +3436,7 @@ mgen_str_int_map_free(map);
   - Comparison operators → get_standard_comparison_operator()
 
 **Total Impact**:
+
 - **30 operator mapping dictionaries eliminated** across all 6 backends
 - **~540-900 lines of duplicated code removed**
 - **Single source of truth** for operator mappings in converter_utils
@@ -3656,6 +3732,7 @@ mgen_str_int_map_free(map);
 ### Purpose
 
 These modules provide:
+
 1. **BaseConverter**: Blueprint for consistent converter architecture across languages
 2. **converter_utils**: Shared utilities that can be incrementally adopted by existing backends
 3. **Pattern for Future Work**: Clear path for backend refactoring and new language support

@@ -35,7 +35,7 @@ This code passes verification::
 
 Verification output::
 
-   ✓ Array access arr[i] is SAFE
+   [x] Array access arr[i] is SAFE
      Proof: 0 <= i < len(arr) for all iterations
 
 Example - Unsafe Code
@@ -51,7 +51,7 @@ This code fails verification::
 
 Verification output::
 
-   ✗ Array access arr[i] is UNSAFE
+    Array access arr[i] is UNSAFE
      Counterexample: i=5, arr_len=5
      Error: Index out of bounds
 
@@ -79,12 +79,12 @@ When verification runs, you see::
 
    Function: sum_array
    -------------------
-   ✓ Memory Safety: VERIFIED
+   [x] Memory Safety: VERIFIED
      - Array bounds: SAFE (3 accesses verified)
 
    Function: matrix_multiply
    -------------------------
-   ✓ Memory Safety: VERIFIED
+   [x] Memory Safety: VERIFIED
      - Array bounds: SAFE (2 accesses verified)
 
    Overall Status: ALL CHECKS PASSED

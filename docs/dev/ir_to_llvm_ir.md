@@ -9,23 +9,26 @@
 Using MGen's existing Static Python IR (`static_ir.py`) to target LLVM IR is **strategically sound** and architecturally aligned with the project. Recommendation: Implement as a **7th backend** alongside existing C/C++/Rust/Go/Haskell/OCaml backends, rather than replacing them.
 
 **Key Benefits:**
-- ✅ Leverages existing well-designed IR infrastructure
-- ✅ Industry-standard LLVM optimization pipeline
-- ✅ Multiple target architectures from single implementation
-- ✅ Potential for JIT compilation
-- ✅ Future-proof architecture
+
+- [x] Leverages existing well-designed IR infrastructure
+- [x] Industry-standard LLVM optimization pipeline
+- [x] Multiple target architectures from single implementation
+- [x] Potential for JIT compilation
+- [x] Future-proof architecture
 
 **Key Challenges:**
-- ❌ Large dependency (~100MB+ LLVM)
-- ❌ Learning curve for LLVM IR generation
-- ❌ Python-LLVM impedance mismatch (GC, strings)
-- ❌ 2-3 month development timeline
+
+- [X] Large dependency (~100MB+ LLVM)
+- [X] Learning curve for LLVM IR generation
+- [X] Python-LLVM impedance mismatch (GC, strings)
+- [X] 2-3 month development timeline
 
 ## Current State Assessment
 
 ### What We Have
 
 **Static Python IR** (`src/mgen/frontend/static_ir.py` - 922 lines)
+
 - Well-designed visitor pattern architecture
 - Type system mapping (Python → C types via `IRDataType`)
 - Comprehensive IR nodes:
@@ -39,11 +42,13 @@ Using MGen's existing Static Python IR (`static_ir.py`) to target LLVM IR is **s
 - `IRBuilder` for AST → IR conversion
 
 **Current Usage:** Defined but **not actively used** in pipeline. Current flow:
+
 ```
 Python AST → Backend-specific code generation (6 backends)
 ```
 
 **Proposed Flow:**
+
 ```
 Python AST → Static IR → LLVM IR → Native binary/WebAssembly/etc.
 ```
@@ -51,6 +56,7 @@ Python AST → Static IR → LLVM IR → Native binary/WebAssembly/etc.
 ### Existing Backends Performance
 
 For reference, current backend status (v0.1.52):
+
 - **C++**: 7/7 benchmarks (100%) - 422ms compile, 236ms execute, 36KB binary
 - **C**: 7/7 benchmarks (100%) - 658ms compile, 238ms execute, 82KB binary
 - **Rust**: 7/7 benchmarks (100%) - Production-ready
@@ -63,6 +69,7 @@ For reference, current backend status (v0.1.52):
 ### Why This Makes Sense
 
 #### 1. Architectural Alignment
+
 MGen's Static IR was designed to bridge Python AST and code generation. LLVM IR serves the same purpose but with industrial-strength optimization and multiple backend targets.
 
 ```
@@ -71,6 +78,7 @@ Proposed: Python AST → Static IR → LLVM IR → Multiple targets
 ```
 
 #### 2. Multiple Targets from One Implementation
+
 ```
 Python AST → Static IR → LLVM IR → {
     - x86_64 native binary
@@ -82,11 +90,13 @@ Python AST → Static IR → LLVM IR → {
 ```
 
 #### 3. LLVM Optimization Advantage
+
 - Industry-proven optimization passes (inlining, dead code elimination, constant folding)
 - Often produces code faster than hand-written C
 - Continuous improvement from LLVM community
 
 #### 4. Reduced Long-term Maintenance
+
 - One IR → many targets (vs maintaining 6+ separate backends)
 - LLVM handles architecture-specific optimizations
 - Focus effort on Python → IR quality, not code generation details
@@ -94,23 +104,27 @@ Python AST → Static IR → LLVM IR → {
 ### Why This Could Be Challenging
 
 #### 1. LLVM Dependency Size
+
 - LLVM libraries: ~100MB+
 - May not be suitable for minimal deployments
 - Solution: Keep existing backends for lightweight use cases
 
 #### 2. Python-LLVM Impedance Mismatch
+
 - **Garbage Collection**: Python has GC, LLVM doesn't (need runtime support)
 - **Strings**: Python strings are complex objects, LLVM has char arrays
 - **Dynamic Features**: Python's dynamism doesn't map cleanly to static LLVM
 - Solution: Runtime library for Python semantics (similar to current C runtime)
 
 #### 3. Learning Curve
+
 - LLVM IR is verbose and low-level
 - Requires understanding SSA form, phi nodes, basic blocks
 - Debugging LLVM IR is harder than C code
 - Solution: Start small, iterate, comprehensive tests
 
 #### 4. Development Timeline
+
 - Estimated 2-3 months to reach feature parity with C backend
 - Additional time for optimization tuning
 - Ongoing maintenance as LLVM evolves
@@ -411,6 +425,7 @@ IRDataType.ARRAY     → ir.ArrayType(<elem_type>, <size>)
 ### Phase 1: Proof of Concept (Weeks 1-3)
 
 **Week 1: Setup & Infrastructure**
+
 - [x] Install llvmlite: `uv add llvmlite`
 - [ ] Create `src/mgen/backends/llvm/` directory structure
 - [ ] Implement basic `IRToLLVMConverter` skeleton
@@ -418,6 +433,7 @@ IRDataType.ARRAY     → ir.ArrayType(<elem_type>, <size>)
 - [ ] Test: Convert simple IR to LLVM IR text
 
 **Week 2: Basic Functions**
+
 - [ ] Implement `visit_function()` - function generation
 - [ ] Implement `visit_literal()` - constants
 - [ ] Implement `visit_binary_operation()` - arithmetic
@@ -426,6 +442,7 @@ IRDataType.ARRAY     → ir.ArrayType(<elem_type>, <size>)
 - [ ] Verify: Can generate LLVM IR that compiles
 
 **Week 3: Control Flow**
+
 - [ ] Implement `visit_if()` - conditional branches with phi nodes
 - [ ] Implement `visit_while()` - loop basic blocks
 - [ ] Implement `visit_for()` - range-based loops
@@ -437,6 +454,7 @@ IRDataType.ARRAY     → ir.ArrayType(<elem_type>, <size>)
 ### Phase 2: Language Features (Weeks 4-8)
 
 **Week 4-5: Variables & Assignments**
+
 - [ ] Implement `visit_assignment()` - alloca + store
 - [ ] Implement `visit_variable_reference()` - load
 - [ ] Handle local variables properly
@@ -444,6 +462,7 @@ IRDataType.ARRAY     → ir.ArrayType(<elem_type>, <size>)
 - [ ] Benchmark: Fibonacci iterative (should pass)
 
 **Week 6-7: Function Calls**
+
 - [ ] Implement `visit_function_call()` - call instruction
 - [ ] Handle parameter passing
 - [ ] Support recursive calls
@@ -451,6 +470,7 @@ IRDataType.ARRAY     → ir.ArrayType(<elem_type>, <size>)
 - [ ] Benchmark: Should pass quicksort test
 
 **Week 8: Integration**
+
 - [ ] Add LLVM backend to pipeline
 - [ ] Support `mgen --target llvm convert file.py`
 - [ ] Create `LLVMBuilder` for native compilation
@@ -461,6 +481,7 @@ IRDataType.ARRAY     → ir.ArrayType(<elem_type>, <size>)
 ### Phase 3: Advanced Features (Weeks 9-12)
 
 **Week 9-10: Strings**
+
 - [ ] Design string representation (char* + length? or struct?)
 - [ ] Implement string operations via runtime library
 - [ ] Support string concatenation, comparison
@@ -468,6 +489,7 @@ IRDataType.ARRAY     → ir.ArrayType(<elem_type>, <size>)
 - [ ] Benchmark: Wordcount (should pass with runtime support)
 
 **Week 11-12: Containers**
+
 - [ ] Design container representation (pointers to runtime structs)
 - [ ] Implement list operations via runtime
 - [ ] Implement dict operations via runtime
@@ -480,18 +502,21 @@ IRDataType.ARRAY     → ir.ArrayType(<elem_type>, <size>)
 ### Phase 4: Optimization & Polish (Ongoing)
 
 **Optimization Passes**
+
 - [ ] Enable LLVM optimization levels (-O1, -O2, -O3)
 - [ ] Measure performance vs C/C++/Rust backends
 - [ ] Tune optimization flags for best results
 - [ ] Document performance characteristics
 
 **Quality & Testing**
+
 - [ ] Add comprehensive unit tests
 - [ ] Add integration tests
 - [ ] Performance regression tests
 - [ ] Documentation and examples
 
 **Advanced Features (Future)**
+
 - [ ] JIT compilation support (execute without file output)
 - [ ] WebAssembly target
 - [ ] Debug info generation (DWARF)
@@ -521,6 +546,7 @@ mgen --target llvm build fibonacci.py --opt-level 3
 ### Example Output
 
 **Python Input:**
+
 ```python
 def add(x: int, y: int) -> int:
     result: int = x + y
@@ -528,6 +554,7 @@ def add(x: int, y: int) -> int:
 ```
 
 **Generated LLVM IR:**
+
 ```llvm
 ; ModuleID = "mgen_module"
 target triple = "unknown-unknown-unknown"
@@ -543,6 +570,7 @@ entry:
 ```
 
 **With Optimization (-O2):**
+
 ```llvm
 define i64 @add(i64 %x, i64 %y) {
 entry:
@@ -554,17 +582,20 @@ entry:
 ## Performance Expectations
 
 ### Compilation Time
+
 - **LLVM IR generation:** ~10-50ms per module
 - **LLVM optimization:** ~50-200ms (depends on -O level)
 - **Native compilation:** ~100-500ms
 - **Total:** ~200-750ms (competitive with C++ at ~422ms)
 
 ### Execution Performance
+
 - **-O0 (no optimization):** Similar to C -O0
 - **-O2 (default):** Within 5-10% of C -O2
 - **-O3 (aggressive):** Often matches or beats hand-written C
 
 ### Binary Size
+
 - **Without optimization:** Larger than C (debug info)
 - **With optimization + strip:** Similar to C (30-100KB range)
 
@@ -587,24 +618,27 @@ entry:
 ### When to Use LLVM Backend
 
 **Use LLVM when:**
-- ✅ Need multiple target architectures (x86, ARM, RISC-V)
-- ✅ Want maximum optimization potential
-- ✅ Need WebAssembly output
-- ✅ Want JIT compilation capability
-- ✅ Long-term maintainability is priority
-- ✅ Binary size < 500KB is acceptable
+
+- [x] Need multiple target architectures (x86, ARM, RISC-V)
+- [x] Want maximum optimization potential
+- [x] Need WebAssembly output
+- [x] Want JIT compilation capability
+- [x] Long-term maintainability is priority
+- [x] Binary size < 500KB is acceptable
 
 **Use C/C++ backends when:**
-- ✅ Need minimal binary size (<50KB)
-- ✅ Need very fast compilation (<100ms)
-- ✅ Need specific C library integration
-- ✅ Need to inspect/modify generated code
-- ✅ LLVM dependency is too large
+
+- [x] Need minimal binary size (<50KB)
+- [x] Need very fast compilation (<100ms)
+- [x] Need specific C library integration
+- [x] Need to inspect/modify generated code
+- [x] LLVM dependency is too large
 
 **Use Rust backend when:**
-- ✅ Need memory safety guarantees in output
-- ✅ Want Rust ecosystem integration
-- ✅ Ownership semantics are important
+
+- [x] Need memory safety guarantees in output
+- [x] Want Rust ecosystem integration
+- [x] Ownership semantics are important
 
 ## Risk Assessment
 
@@ -632,22 +666,22 @@ entry:
 ### LLVM Learning Resources
 
 1. **llvmlite Documentation**
-   - Official docs: https://llvmlite.readthedocs.io/
-   - IR Builder guide: https://llvmlite.readthedocs.io/en/latest/user-guide/ir/ir-builder.html
-   - Type system: https://llvmlite.readthedocs.io/en/latest/user-guide/ir/types.html
-   - Examples: https://llvmlite.readthedocs.io/en/latest/user-guide/ir/examples.html
+   - Official docs: <https://llvmlite.readthedocs.io/>
+   - IR Builder guide: <https://llvmlite.readthedocs.io/en/latest/user-guide/ir/ir-builder.html>
+   - Type system: <https://llvmlite.readthedocs.io/en/latest/user-guide/ir/types.html>
+   - Examples: <https://llvmlite.readthedocs.io/en/latest/user-guide/ir/examples.html>
 
 2. **PyKaleidoscope Tutorial**
-   - GitHub: https://github.com/eliben/pykaleidoscope
+   - GitHub: <https://github.com/eliben/pykaleidoscope>
    - Complete working example of Python → LLVM IR
    - Updated for llvmlite 0.45.0 (2025)
 
 3. **LLVM Language Reference**
-   - Official LLVM IR reference: https://llvm.org/docs/LangRef.html
-   - SSA form explained: https://llvm.org/docs/tutorial/
+   - Official LLVM IR reference: <https://llvm.org/docs/LangRef.html>
+   - SSA form explained: <https://llvm.org/docs/tutorial/>
 
 4. **llvmlite on PyPI**
-   - Package page: https://pypi.org/project/llvmlite/
+   - Package page: <https://pypi.org/project/llvmlite/>
    - Version 0.45.0+ requires LLVM 20.x
    - Supports Python 3.10-3.13
 
@@ -669,6 +703,7 @@ entry:
 ## Success Criteria
 
 ### Minimum Viable Product (MVP)
+
 - [ ] Compiles simple arithmetic functions
 - [ ] Supports int, float types
 - [ ] Supports if/else, while, for loops
@@ -677,6 +712,7 @@ entry:
 - [ ] Passes 2-3 benchmark tests
 
 ### Feature Parity with C Backend
+
 - [ ] All 7 benchmarks passing
 - [ ] String support
 - [ ] Container support (list, dict, set)
@@ -685,6 +721,7 @@ entry:
 - [ ] Comparable performance to C backend
 
 ### Production Ready
+
 - [ ] Comprehensive test coverage (>90%)
 - [ ] Documentation complete
 - [ ] Performance within 10% of C
@@ -694,24 +731,28 @@ entry:
 ## Next Steps
 
 ### Immediate (This Week)
+
 1. Install llvmlite: `uv add llvmlite`
 2. Create directory structure: `src/mgen/backends/llvm/`
 3. Implement basic `IRToLLVMConverter` skeleton
 4. Write first test: Convert IR for `add(x, y)` function
 
 ### Short Term (This Month)
+
 1. Complete Phase 1 (Proof of Concept)
 2. Get simple functions working end-to-end
 3. Pass first benchmark (fibonacci)
 4. Document progress and learnings
 
 ### Medium Term (3 Months)
+
 1. Complete Phase 2 (Language Features)
 2. Pass 5-7 benchmarks
 3. Achieve feature parity with C backend
 4. Write comprehensive documentation
 
 ### Long Term (6+ Months)
+
 1. Optimize performance
 2. Add advanced features (JIT, WebAssembly)
 3. Gather community feedback
@@ -722,6 +763,7 @@ entry:
 Using `static_ir.py` to target LLVM IR is a **strategically sound decision** that aligns with MGen's architecture and goals. The existing Static IR infrastructure provides an excellent foundation, and LLVM offers industrial-strength optimization with multiple target architectures.
 
 **Recommendation:** Proceed with **Phase 1 (Proof of Concept)** as a 7th backend alongside existing C/C++/Rust/Go/Haskell/OCaml backends. This approach:
+
 - Minimizes risk (existing backends remain)
 - Enables learning and iteration
 - Provides future-proof architecture
