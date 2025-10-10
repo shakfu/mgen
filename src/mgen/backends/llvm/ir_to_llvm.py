@@ -544,6 +544,35 @@ class IRToLLVMConverter(IRVisitor):
             # Return the pointer
             return map_ptr
 
+        elif node.result_type.base_type == IRDataType.SET:
+            # Set literal - allocate and initialize (typically empty set from set())
+            if self.builder is None:
+                raise RuntimeError("Builder not initialized - must be inside a function")
+
+            # Get set_int type and init function
+            set_type = self.runtime.get_set_int_type()
+            set_init_ptr_func = self.runtime.get_function("set_int_init_ptr")
+
+            # Allocate space for the set struct on heap
+            i64 = ir.IntType(64)
+            i8_ptr = ir.IntType(8).as_pointer()
+            null_ptr = ir.Constant(set_type.as_pointer(), None)
+            size_gep = self.builder.gep(null_ptr, [ir.Constant(ir.IntType(32), 1)], name="size_gep")
+            struct_size = self.builder.ptrtoint(size_gep, i64, name="struct_size")
+
+            # Get malloc function and allocate memory
+            malloc_func = self._get_or_create_c_function("malloc", i8_ptr, [i64])
+            raw_ptr = self.builder.call(malloc_func, [struct_size], name="set_malloc")
+
+            # Cast i8* to struct pointer
+            set_ptr = self.builder.bitcast(raw_ptr, set_type.as_pointer(), name="set_tmp")
+
+            # Initialize it by calling set_init_ptr()
+            self.builder.call(set_init_ptr_func, [set_ptr], name="")
+
+            # Return the pointer
+            return set_ptr
+
         elif node.result_type.base_type == IRDataType.INT:
             return ir.Constant(llvm_type, int(node.value))
         elif node.result_type.base_type == IRDataType.FLOAT:
@@ -1236,13 +1265,23 @@ class IRToLLVMConverter(IRVisitor):
 
         else:
             # Handle set/list iteration: for x in some_set
-            # For now, we'll treat it as list iteration since we can iterate over
-            # any collection similarly
             iter_expr = self._convert_ast_expr(generator.iter)
 
-            # Assume it's a vec_int (list) for now
-            vec_int_size_func = self.runtime.get_function("vec_int_size")
-            iter_size = self.builder.call(vec_int_size_func, [iter_expr], name="iter_size")
+            # Detect if we're iterating over a set or list based on LLVM type
+            is_set_iter = False
+            if hasattr(iter_expr, 'type') and isinstance(iter_expr.type, ir.PointerType):
+                pointee_type_str = str(iter_expr.type.pointee)
+                is_set_iter = "set_int" in pointee_type_str
+
+            # Get size and element access functions based on type
+            if is_set_iter:
+                size_func = self.runtime.get_function("set_int_size")
+                get_nth_func = self.runtime.get_function("set_int_get_nth_element")
+            else:
+                size_func = self.runtime.get_function("vec_int_size")
+                get_nth_func = self.runtime.get_function("vec_int_at")
+
+            iter_size = self.builder.call(size_func, [iter_expr], name="iter_size")
 
             # Create index variable
             idx_var = self.builder.alloca(ir.IntType(64), name="idx")
@@ -1269,9 +1308,8 @@ class IRToLLVMConverter(IRVisitor):
             # Loop body
             self.builder.position_at_end(loop_body_block)
 
-            # Get element at index: elem = iter[idx]
-            vec_int_at_func = self.runtime.get_function("vec_int_at")
-            elem_val = self.builder.call(vec_int_at_func, [iter_expr, idx_val], name="elem")
+            # Get element at index: elem = iter[idx] or set_get_nth_element(iter, idx)
+            elem_val = self.builder.call(get_nth_func, [iter_expr, idx_val], name="elem")
             self.builder.store(elem_val, elem_var)
 
             # Store element variable in symbol table
@@ -1586,6 +1624,18 @@ class IRToLLVMConverter(IRVisitor):
                 # Fallback to vec_int
                 vec_at_func = self.runtime.get_function("vec_int_at")
                 return self.builder.call(vec_at_func, [container_ptr, key_or_index], name="list_at")
+
+        elif node.function_name == "__set_get_nth__":
+            # set_get_nth_element(set, index) -> element
+            if len(node.arguments) != 2:
+                raise RuntimeError("__set_get_nth__() requires exactly 2 arguments (set and index)")
+
+            set_ptr = node.arguments[0].accept(self)  # Already a pointer
+            index = node.arguments[1].accept(self)
+
+            # Call set_int_get_nth_element(set_ptr, index) returns i64
+            get_nth_func = self.runtime.get_function("set_int_get_nth_element")
+            return self.builder.call(get_nth_func, [set_ptr, index], name="set_get_nth")
 
         elif node.function_name == "__setitem__":
             # list[index] = value or dict[key] = value -> vec_*_set or map_*_set

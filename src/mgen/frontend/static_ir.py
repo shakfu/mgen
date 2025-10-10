@@ -1165,6 +1165,12 @@ class IRBuilder:
         if isinstance(node.func, ast.Name):
             func_name = node.func.id
 
+            # Check if this is a set() constructor with no args (empty set)
+            if func_name == "set" and len(node.args) == 0:
+                # set() creates an empty set - return a literal like empty dict/list
+                ir_type = IRType(IRDataType.SET)
+                return IRLiteral({}, ir_type, self._get_location(node))
+
             # Check if this is a type cast function
             if func_name in ("int", "float", "bool", "str") and len(node.args) == 1:
                 value = self._build_expression(node.args[0])
@@ -1363,17 +1369,22 @@ class IRBuilder:
 
                     return IRFor(loop_var, start, end, step, body, self._get_location(node))
 
-        # Handle list iteration: for item in list:
-        # Convert to: for __idx in range(len(list)): item = list[__idx]
+        # Handle list/set iteration: for item in container:
+        # For lists: Convert to: for __idx in range(len(list)): item = list[__idx]
+        # For sets: Convert to: for __idx in range(len(set)): item = set_get_nth_element(set, __idx)
         if isinstance(node.target, ast.Name):
             item_name = node.target.id
 
-            # Build expression for the iterable (list)
+            # Build expression for the iterable (list or set)
             iter_expr = self._build_expression(node.iter)
             if iter_expr is None:
                 return None
 
-            # Create: len(list) call
+            # Check if we're iterating over a set
+            is_set_iteration = (hasattr(iter_expr.result_type, 'base_type') and
+                               iter_expr.result_type.base_type == IRDataType.SET)
+
+            # Create: len(container) call
             len_call = IRFunctionCall(
                 "len",
                 [iter_expr],
@@ -1386,7 +1397,7 @@ class IRBuilder:
             idx_var = IRVariable(idx_var_name, IRType(IRDataType.INT), self._get_location(node))
             self.symbol_table[idx_var_name] = idx_var
 
-            # Infer item type from the list's element type
+            # Infer item type from the container's element type
             item_type = IRType(IRDataType.INT)  # Default to INT for backward compatibility
             if hasattr(iter_expr.result_type, 'element_type') and iter_expr.result_type.element_type:
                 item_type = iter_expr.result_type.element_type
@@ -1396,15 +1407,26 @@ class IRBuilder:
             self.symbol_table[item_name] = item_var
 
             # Build body with item assignment prepended
-            # item = list[__idx]
             index_ref = IRVariableReference(idx_var, self._get_location(node))
-            subscript_call = IRFunctionCall(
-                "__getitem__",
-                [iter_expr, index_ref],
-                item_type,  # Use inferred item type
-                self._get_location(node)
-            )
-            item_assignment = IRAssignment(item_var, subscript_call, self._get_location(node))
+
+            if is_set_iteration:
+                # For sets: item = __set_get_nth__(set, __idx)
+                get_nth_call = IRFunctionCall(
+                    "__set_get_nth__",
+                    [iter_expr, index_ref],
+                    item_type,
+                    self._get_location(node)
+                )
+                item_assignment = IRAssignment(item_var, get_nth_call, self._get_location(node))
+            else:
+                # For lists: item = list[__idx]
+                subscript_call = IRFunctionCall(
+                    "__getitem__",
+                    [iter_expr, index_ref],
+                    item_type,  # Use inferred item type
+                    self._get_location(node)
+                )
+                item_assignment = IRAssignment(item_var, subscript_call, self._get_location(node))
 
             # Build original body statements
             body_raw = [self._build_statement(stmt) for stmt in node.body]
@@ -1413,7 +1435,7 @@ class IRBuilder:
             # Prepend item assignment to body
             body = [item_assignment] + body_stmts
 
-            # Create for loop: for __idx in range(len(list))
+            # Create for loop: for __idx in range(len(container))
             start = IRLiteral(0, IRType(IRDataType.INT))
             end = len_call
             step = IRLiteral(1, IRType(IRDataType.INT))

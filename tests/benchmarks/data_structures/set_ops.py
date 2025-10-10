@@ -23,7 +23,7 @@ def set_operations() -> int:
     # Add operations (simulated - using dict as workaround)
     temp_dict: dict = {}
     for i in range(100):
-        temp_dict[i] = True
+        temp_dict[i] = 1  # Use 1 instead of True for LLVM backend compatibility
 
     # Membership testing
     found_count: int = 0

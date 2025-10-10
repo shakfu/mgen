@@ -612,6 +612,11 @@ class LLVMRuntimeDeclarations:
         func = ir.Function(self.module, func_type, name="set_int_size")
         self.function_decls["set_int_size"] = func
 
+        # long long set_int_get_nth_element(const set_int* set, size_t n)
+        func_type = ir.FunctionType(i64, [set_int_ptr, i64])
+        func = ir.Function(self.module, func_type, name="set_int_get_nth_element")
+        self.function_decls["set_int_get_nth_element"] = func
+
         # void set_int_drop(set_int* set)
         func_type = ir.FunctionType(void, [set_int_ptr])
         func = ir.Function(self.module, func_type, name="set_int_drop")

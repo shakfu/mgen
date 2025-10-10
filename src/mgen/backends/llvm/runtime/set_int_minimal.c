@@ -130,6 +130,36 @@ size_t set_int_size(const set_int* set) {
     return set ? set->size : 0;
 }
 
+// Get the Nth element in iteration order (0-indexed)
+// Used for set iteration in for loops
+// Returns the value of the Nth element
+// Note: O(n) complexity - iterates through buckets/chains to find it
+long long set_int_get_nth_element(const set_int* set, size_t n) {
+    if (!set || !set->buckets || n >= set->size) {
+        // Return 0 for invalid index (should not happen in correct code)
+        return 0;
+    }
+
+    size_t count = 0;
+
+    // Iterate through buckets
+    for (size_t bucket_idx = 0; bucket_idx < set->bucket_count; bucket_idx++) {
+        mgen_set_int_entry_t* entry = set->buckets[bucket_idx];
+
+        // Iterate through chain in this bucket
+        while (entry) {
+            if (count == n) {
+                return entry->value;
+            }
+            count++;
+            entry = entry->next;
+        }
+    }
+
+    // Should not reach here if n < set->size
+    return 0;
+}
+
 // Free all memory
 void set_int_drop(set_int* set) {
     if (!set) {
