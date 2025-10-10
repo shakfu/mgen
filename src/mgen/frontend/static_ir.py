@@ -1468,9 +1468,16 @@ class IRBuilder:
                 return result
             elif isinstance(annotation.value, ast.Name) and annotation.value.id == "dict":
                 # Handle dict[K, V] subscripts
-                # For now, we support dict[str, int] and treat all dict types the same
-                # TODO: Extract key and value types for more specific dict handling
                 result = IRType(IRDataType.DICT)
+
+                # Extract key type (element_type) from subscript
+                # For dict[K, V], the slice is a Tuple with (K, V)
+                if isinstance(annotation.slice, ast.Tuple) and len(annotation.slice.elts) >= 1:
+                    # Get the key type (first element)
+                    key_type = self._extract_ir_type(annotation.slice.elts[0])
+                    result.element_type = key_type
+                    # Note: value type is always int for now (map_*_int)
+
                 return result
 
         return IRType(IRDataType.VOID)

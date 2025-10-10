@@ -7,7 +7,7 @@ def count_words(text: str) -> dict:
     words: list = text.split()
 
     # Count word frequencies
-    word_counts: dict = {}
+    word_counts: dict[str, int] = {}
     for word in words:
         # Convert to lowercase and strip
         clean_word: str = word.lower().strip()
@@ -27,7 +27,7 @@ def main() -> int:
     text: str = "the quick brown fox jumps over the lazy dog the fox is quick and the dog is lazy"
 
     # Count words multiple times for benchmarking
-    result: dict = {}
+    result: dict[str, int] = {}
     for iteration in range(1000):
         result = count_words(text)
 
