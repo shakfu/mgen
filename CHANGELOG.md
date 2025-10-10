@@ -17,6 +17,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.81] - 2025-10-10
+
+**LLVM Backend: JIT Compilation Mode Added**
+
+The LLVM backend now supports two compilation modes: AOT (ahead-of-time) for production and JIT (just-in-time) for development. JIT mode provides 7.7x faster total time for rapid iteration.
+
+### Added
+
+- **JIT Executor** (`backends/llvm/jit_executor.py`)
+  - `LLVMJITExecutor` class for in-memory LLVM IR execution
+  - Uses llvmlite's MCJIT compiler instead of llc/clang
+  - `jit_compile_and_run()` convenience function for quick execution
+  - Support for executing arbitrary functions via `execute_function()`
+  - Proper cleanup and resource management
+
+- **JIT Tests** (`tests/test_jit_executor.py`)
+  - Test suite for JIT compilation functionality
+  - Simple function tests (add, main)
+  - Benchmark tests (fibonacci)
+  - Error handling tests (invalid IR, missing functions)
+
+- **JIT Demo Script** (`examples/llvm_jit_demo.py`)
+  - Performance comparison between JIT and AOT modes
+  - Shows 4.85x faster compile time, 7.72x faster total time
+  - Demonstrates use cases for each mode
+
+### Changed
+
+- **LLVM Roadmap Documentation** (`LLVM_BACKEND_ROADMAP.md`)
+  - Added "Compilation Modes" section explaining AOT vs JIT
+  - Updated status to "Production-ready - 7/7 benchmarks (100%)"
+  - Added JIT compilation to technical debt/future work
+
+- **Production Roadmap** (`PRODUCTION_ROADMAP.md`)
+  - Updated LLVM backend from "EXPERIMENTAL" to "PRODUCTION READY"
+  - Changed backend readiness to "6/7 Production + 1 Functionally Complete"
+
+### Performance
+
+**JIT vs AOT Comparison** (fibonacci benchmark):
+- JIT compile time: 150ms vs AOT 730ms (4.85x faster)
+- JIT execution time: 11ms vs AOT 519ms (45x faster - in-memory, no subprocess)
+- JIT total time: 162ms vs AOT 1249ms (7.72x faster)
+
+**Recommendations**:
+- Use JIT for development, testing, rapid iteration
+- Use AOT for production deployment (standalone executables)
+
 ## [0.1.80] - 2025-10-10
 
 **LLVM Backend: 100% Benchmarks Complete! 🎉**
