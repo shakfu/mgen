@@ -9,6 +9,7 @@
 ## Executive Summary
 
 MGen supports **7 backends** with varying levels of maturity:
+
 - **6 Production-Ready**: C++, C, Rust, Go, OCaml, LLVM (all 7/7 benchmarks)
 - **1 Functionally Complete**: Haskell (6/7 benchmarks, 86%)
 
@@ -43,6 +44,7 @@ MGen supports **7 backends** with varying levels of maturity:
 | **LLVM** | ✅ `vec_int_push()` | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ `vec_int_at()` | ⚠️ Limited | ✅ `vec_int_size()` |
 
 ### Missing List Methods (All Backends)
+
 - `insert(index, item)` - Insert at position
 - `extend(other)` - Append multiple items
 - `remove(item)` - Remove first occurrence
@@ -64,6 +66,7 @@ MGen supports **7 backends** with varying levels of maturity:
 | **LLVM** | ✅ `map_KV_get()` | ✅ `map_KV_insert()` | ✅ `map_KV_get()` | ✅ `map_KV_contains()` | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ### Missing Dict Methods (Most Backends)
+
 - `keys()` - Returns list of keys (only Haskell)
 - `values()` - Returns list of values (C++, Go, Haskell)
 - `items()` - Returns key-value pairs (Go, Haskell)
@@ -85,6 +88,7 @@ MGen supports **7 backends** with varying levels of maturity:
 | **LLVM** | ✅ `set_int_insert()` | ❌ | ❌ | ❌ | ✅ `set_int_contains()` | ❌ | ❌ | ❌ |
 
 ### Missing Set Methods (Most Backends)
+
 - `remove(item)` - Remove with error if missing (only C)
 - `discard(item)` - Remove without error (C, Go)
 - `clear()` - Remove all elements (only C)
@@ -105,6 +109,7 @@ MGen supports **7 backends** with varying levels of maturity:
 | **LLVM** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 
 ### Missing String Methods (All Backends)
+
 - `startswith(prefix)` - Prefix check
 - `endswith(suffix)` - Suffix check
 - `join()` - Join strings with separator (except C, LLVM)
@@ -124,6 +129,7 @@ MGen supports **7 backends** with varying levels of maturity:
 | **LLVM** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
 
 ### Missing Built-in Functions (Most Backends)
+
 - `enumerate(iterable)` - Only C backend
 - `zip(*iterables)` - Only C backend
 - `sorted(iterable)` - All backends
@@ -202,7 +208,9 @@ MGen supports **7 backends** with varying levels of maturity:
 ## Special Features & Characteristics
 
 ### C++ Backend
+
 **Strengths:**
+
 - ✅ STL integration (best library support)
 - ✅ Multi-pass type inference (most sophisticated)
 - ✅ Lambda-based comprehensions (clean code)
@@ -210,6 +218,7 @@ MGen supports **7 backends** with varying levels of maturity:
 - ✅ Header-only runtime (357 lines)
 
 **Weaknesses:**
+
 - ❌ Slower compilation (396ms)
 - ❌ Missing dict methods (keys, items)
 - ❌ No list operations (insert, remove)
@@ -219,7 +228,9 @@ MGen supports **7 backends** with varying levels of maturity:
 ---
 
 ### C Backend
+
 **Strengths:**
+
 - ✅ Template system (6 templates → 9+ types)
 - ✅ Most complete runtime (2,500 lines)
 - ✅ Strategy pattern for operations
@@ -228,6 +239,7 @@ MGen supports **7 backends** with varying levels of maturity:
 - ✅ Most container methods (pop, clear, erase)
 
 **Weaknesses:**
+
 - ❌ Slowest compilation (384ms)
 - ❌ Largest source code (75 LOC avg)
 - ❌ Manual memory management
@@ -237,7 +249,9 @@ MGen supports **7 backends** with varying levels of maturity:
 ---
 
 ### Rust Backend
+
 **Strengths:**
+
 - ✅ Ownership-aware generation
 - ✅ HashMap type inference (function call detection)
 - ✅ Auto dereferencing/cloning
@@ -245,6 +259,7 @@ MGen supports **7 backends** with varying levels of maturity:
 - ✅ Fast compilation (218ms)
 
 **Weaknesses:**
+
 - ❌ Larger binaries (446KB)
 - ❌ Missing container methods
 - ❌ No dict.keys/values/items
@@ -254,7 +269,9 @@ MGen supports **7 backends** with varying levels of maturity:
 ---
 
 ### Go Backend
+
 **Strengths:**
+
 - ✅ **Fastest execution** (64.5ms average) 🏆
 - ✅ **Fastest compilation** (82ms) 🏆
 - ✅ Generics (Go 1.18+)
@@ -263,6 +280,7 @@ MGen supports **7 backends** with varying levels of maturity:
 - ✅ dict.values() and dict.items()
 
 **Weaknesses:**
+
 - ❌ **Largest binaries** (2.3MB)
 - ❌ No bool conversion
 - ❌ Sets via maps (not true sets)
@@ -272,7 +290,9 @@ MGen supports **7 backends** with varying levels of maturity:
 ---
 
 ### Haskell Backend
+
 **Strengths:**
+
 - ✅ Pure functional semantics
 - ✅ Visitor pattern (main vs pure functions)
 - ✅ Strongest type system
@@ -281,6 +301,7 @@ MGen supports **7 backends** with varying levels of maturity:
 - ✅ Most concise code (27 LOC)
 
 **Weaknesses:**
+
 - ❌ **Largest binaries** (19.3MB)
 - ❌ Slowest compilation (536ms)
 - ❌ 6/7 benchmarks (quicksort fails on mutation)
@@ -291,7 +312,9 @@ MGen supports **7 backends** with varying levels of maturity:
 ---
 
 ### OCaml Backend
+
 **Strengths:**
+
 - ✅ **Most concise code** (27 LOC) 🏆
 - ✅ **Fastest compile time** among functional languages (258ms)
 - ✅ Mutable references system with smart scoping
@@ -300,6 +323,7 @@ MGen supports **7 backends** with varying levels of maturity:
 - ✅ Functional + imperative hybrid
 
 **Weaknesses:**
+
 - ❌ Uses association lists (not hash tables)
 - ❌ Limited nested container support
 - ❌ No dict.keys/values/items
@@ -310,7 +334,9 @@ MGen supports **7 backends** with varying levels of maturity:
 ---
 
 ### LLVM Backend
+
 **Strengths:**
+
 - ✅ **2nd fastest execution** (152.9ms)
 - ✅ **2nd smallest binaries** (37KB)
 - ✅ Direct IR generation (no intermediate C/C++)
@@ -319,6 +345,7 @@ MGen supports **7 backends** with varying levels of maturity:
 - ✅ Index-based set iteration
 
 **Weaknesses:**
+
 - ❌ Verbose IR (310 LOC average)
 - ❌ Manual memory management (800 lines C runtime)
 - ❌ Newest backend (less mature)
@@ -383,6 +410,7 @@ MGen supports **7 backends** with varying levels of maturity:
 | **Template Method** | ❌ | ✅ Parameterized templates | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 **Design Pattern Impact:**
+
 - C++/Rust/Go: 53→8 complexity (85% reduction) via Strategy
 - C: 66→10 complexity (85% reduction) via Strategy
 - Haskell: 69→15 complexity (78% reduction) via Visitor + 40→8 (80%) via Strategy
@@ -421,6 +449,7 @@ MGen supports **7 backends** with varying levels of maturity:
 ## Common Limitations (All Backends)
 
 ### Not Implemented
+
 - ❌ Exception handling (try/except/finally)
 - ❌ Generators and yield statements
 - ❌ Context managers (with statement)
@@ -431,6 +460,7 @@ MGen supports **7 backends** with varying levels of maturity:
 - ❌ Operator overloading (user-defined)
 
 ### Partially Implemented
+
 - ⚠️ Slicing (basic support, not full Python semantics)
 - ⚠️ List methods (append only, no insert/remove/pop in most)
 - ⚠️ Dict methods (no keys/values/items in most)
@@ -441,42 +471,54 @@ MGen supports **7 backends** with varying levels of maturity:
 ## Recommendations by Use Case
 
 ### For Production Deployments
+
 **Best Choice: C++ or LLVM**
+
 - Smallest binaries (36-37KB)
 - Good performance
 - No runtime dependencies
 - Mature ecosystems
 
 ### For Development Speed
+
 **Best Choice: Go**
+
 - Fastest compilation (82ms)
 - Fastest execution (64ms)
 - Simple code generation
 - Large binaries acceptable in cloud
 
 ### For Safety-Critical Systems
+
 **Best Choice: Rust**
+
 - Memory safety guarantees
 - Ownership tracking
 - No null pointer errors
 - Moderate binary size
 
 ### For Functional Programming
+
 **Best Choice: Haskell or OCaml**
+
 - Pure functional semantics (Haskell)
 - Hybrid functional/imperative (OCaml)
 - Concise code (27 LOC)
 - Strong type systems
 
 ### For Embedded/Systems
+
 **Best Choice: C**
+
 - Most complete runtime
 - Full control over memory
 - Template system
 - No external dependencies
 
 ### For Research/Experimentation
+
 **Best Choice: LLVM**
+
 - Direct IR access
 - JIT compilation (7.7x faster dev)
 - Cross-platform targets
@@ -489,6 +531,7 @@ MGen supports **7 backends** with varying levels of maturity:
 ### Near Term (v0.1.x - v0.2.x)
 
 **Priority 1: Missing Container Methods**
+
 - [ ] `list.insert(index, item)` - All backends
 - [ ] `list.remove(item)` - All backends
 - [ ] `list.extend(other)` - All backends
@@ -499,11 +542,13 @@ MGen supports **7 backends** with varying levels of maturity:
 - [ ] `set.clear()` - C++, Rust, Go, Haskell, OCaml, LLVM
 
 **Priority 2: String Methods**
+
 - [ ] `str.join(iterable)` - Most backends
 - [ ] `str.startswith(prefix)` - All backends
 - [ ] `str.endswith(suffix)` - All backends
 
 **Priority 3: Built-in Functions**
+
 - [ ] `enumerate(iterable)` - All except C
 - [ ] `zip(*iterables)` - All except C
 - [ ] `sorted(iterable)` - All backends

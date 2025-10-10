@@ -50,9 +50,7 @@ def convert_function_with_visitor(converter: "MGenPythonToHaskellConverter", nod
     return _convert_pure_function(converter, node, func_name)
 
 
-def _mutates_array_parameter(
-    converter: "MGenPythonToHaskellConverter", node: ast.FunctionDef
-) -> tuple[bool, set[str]]:
+def _mutates_array_parameter(converter: "MGenPythonToHaskellConverter", node: ast.FunctionDef) -> tuple[bool, set[str]]:
     """Check if function mutates array parameters.
 
     Args:
@@ -140,9 +138,7 @@ def _convert_main_function(converter: "MGenPythonToHaskellConverter", node: ast.
     return f"{signature}\n{body}"
 
 
-def _convert_pure_function(
-    converter: "MGenPythonToHaskellConverter", node: ast.FunctionDef, func_name: str
-) -> str:
+def _convert_pure_function(converter: "MGenPythonToHaskellConverter", node: ast.FunctionDef, func_name: str) -> str:
     """Convert pure (non-main) function.
 
     Args:
@@ -196,7 +192,9 @@ def _convert_pure_function(
     filtered_body = [
         stmt
         for stmt in node.body
-        if not (isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str))
+        if not (
+            isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str)
+        )
     ]
 
     # Check for early return pattern

@@ -34,19 +34,19 @@ Explicit Type-Based Signals
 
 1. Immutable Collections
 
-# Strong signals
+## Strong signals
 
 tuple[int, ...]      # vs list[int]
 frozenset[str]       # vs set[str]
 
-2. Type Annotations with Final
+1. Type Annotations with Final
 
 from typing import Final
 
 CONSTANT: Final[int] = 42
 config: Final[dict] = {"key": "value"}  # Intent: don't reassign
 
-3. Frozen Dataclasses
+1. Frozen Dataclasses
 
 from dataclasses import dataclass
 
@@ -55,7 +55,7 @@ class Point:
     x: int
     y: int
 
-4. NamedTuple
+1. NamedTuple
 
 from typing import NamedTuple
 
@@ -63,7 +63,7 @@ class Coordinate(NamedTuple):  # Always immutable
     x: int
     y: int
 
-5. ABC Type Hints (collections.abc)
+1. ABC Type Hints (collections.abc)
 
 from collections.abc import Sequence, MutableSequence
 
@@ -75,29 +75,29 @@ def mutating(data: MutableSequence[int]):   # Signals mutation
 
 Naming Convention Signals
 
-6. ALL_CAPS Constants
+1. ALL_CAPS Constants
 
 MAX_SIZE: int = 100  # Convention signals immutability
 
-7. Leading Underscore (Private)
+1. Leading Underscore (Private)
 
   def _internal_helper(data: list) -> int:  # Often read-only
       return len(data)
 
   Structural/Behavioral Signals
 
-  8. Read-only Properties
+  1. Read-only Properties
 
   @property
   def value(self) -> int:  # No setter = immutable
       return self._value
 
-  9. Function Return Type Annotations
+  1. Function Return Type Annotations
 
   def get_config() -> tuple[str, ...]:  # Returns immutable
       return ("a", "b", "c")
 
-  10. Primitive Types
+  1. Primitive Types
 
   str, int, float, bool, None, bytes  # Always immutable
 
@@ -105,12 +105,12 @@ MAX_SIZE: int = 100  # Convention signals immutability
 
   You could use these heuristics:
 
-# Strong immutability signals → use &Vec<T> or &[T]
+## Strong immutability signals → use &Vec<T> or &[T]
 
   def process(data: tuple[int, ...]) -> int:  # tuple → &[i32]
   def read_config(cfg: Sequence[str]):         # Sequence → &Vec<String>
 
-# Weak/no signals → use &mut Vec<T> if modified, & if only read
+## Weak/no signals → use &mut Vec<T> if modified, & if only read
 
   def analyze(data: list[int]) -> int:         # list → analyze usage
       total = sum(data)  # Only read → &Vec<i32>
@@ -121,18 +121,18 @@ MAX_SIZE: int = 100  # Convention signals immutability
 
   Detection Strategy for MGen
 
-  1. Check annotation:
-    - tuple, frozenset → always immutable reference
-    - Sequence, Mapping (ABC) → immutable reference
-    - Final → immutable
-  2. Check parameter usage:
-    - Only reads (subscript, iteration, methods like .index()) → immutable ref
-    - Modifications (.append(), subscript assignment) → mutable ref
-  3. Check naming:
-    - ALL_CAPS → treat as constant/immutable
-  4. Function context:
-    - Pure functions (no side effects) → prefer immutable refs
-    - Return type same as input type → likely mutating
+1. Check annotation:
+   - tuple, frozenset → always immutable reference
+   - Sequence, Mapping (ABC) → immutable reference
+   - Final → immutable
+2. Check parameter usage:
+   - Only reads (subscript, iteration, methods like .index()) → immutable ref
+   - Modifications (.append(), subscript assignment) → mutable ref
+3. Check naming:
+   - ALL_CAPS → treat as constant/immutable
+4. Function context:
+   - Pure functions (no side effects) → prefer immutable refs
+   - Return type same as input type → likely mutating
 
   This would solve the matmul problem: if matrix_multiply(a, b, size) only reads a and b
   (subscript access, no mutations), use &Vec<Vec<i32>> instead of Vec<Vec<i32>> (which takes

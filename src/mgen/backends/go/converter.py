@@ -917,6 +917,7 @@ class MGenPythonToGoConverter:
 
     def _pre_infer_variable_types(self, stmts: list[ast.stmt]) -> None:
         """Pre-pass to infer all variable types before code generation."""
+
         # First pass: collect base types from annotations and initializations
         def collect_types(stmts: list[ast.stmt]) -> None:
             for stmt in stmts:
@@ -1051,7 +1052,9 @@ class MGenPythonToGoConverter:
                             # Check if this variable has a vector appended to it
                             if hasattr(self, "append_map") and target.id in self.append_map:
                                 appended_var = self.append_map[target.id]
-                                if appended_var in self.variable_types and self.variable_types[appended_var].startswith("[]"):
+                                if appended_var in self.variable_types and self.variable_types[appended_var].startswith(
+                                    "[]"
+                                ):
                                     var_type = f"[]{self.variable_types[appended_var]}"
                             self.variable_types[target.id] = var_type
 
@@ -1625,7 +1628,9 @@ class MGenPythonToGoConverter:
 
             key_transform = self._convert_expression(key_expr)
             value_transform = self._convert_expression(value_expr)
-            transform_lambda = f"func({target_name} int) ({key_type}, {value_type}) {{ return {key_transform}, {value_transform} }}"
+            transform_lambda = (
+                f"func({target_name} int) ({key_type}, {value_type}) {{ return {key_transform}, {value_transform} }}"
+            )
 
             return f"mgen.DictComprehensionFromRange[{key_type}, {value_type}]({range_call}, {transform_lambda})"
         else:
@@ -1699,17 +1704,23 @@ class MGenPythonToGoConverter:
             if source_type.startswith("[]"):
                 # Slice type: []int → int
                 source_element_type = source_type[2:]
-                transform_lambda = f"func({target_name} {source_element_type}) {element_type} {{ return {transform_expr} }}"
+                transform_lambda = (
+                    f"func({target_name} {source_element_type}) {element_type} {{ return {transform_expr} }}"
+                )
                 return f"mgen.SetComprehension[{source_element_type}, {element_type}]({container_expr}, {transform_lambda})"
             elif source_type.startswith("map[") and source_type.endswith("]bool"):
                 # Set type: map[int]bool → int - use SetComprehensionFromSet
                 source_element_type = source_type[4:-5]  # Remove "map[" prefix and "]bool" suffix
-                transform_lambda = f"func({target_name} {source_element_type}) {element_type} {{ return {transform_expr} }}"
+                transform_lambda = (
+                    f"func({target_name} {source_element_type}) {element_type} {{ return {transform_expr} }}"
+                )
 
                 # Check if there's a filter condition
                 if expr.generators[0].ifs:
                     # Has filter - use SetComprehensionFromSetWithFilter
-                    filter_conditions = " && ".join([self._convert_expression(if_expr) for if_expr in expr.generators[0].ifs])
+                    filter_conditions = " && ".join(
+                        [self._convert_expression(if_expr) for if_expr in expr.generators[0].ifs]
+                    )
                     filter_lambda = f"func({target_name} {source_element_type}) bool {{ return {filter_conditions} }}"
                     return f"mgen.SetComprehensionFromSetWithFilter[{source_element_type}, {element_type}]({container_expr}, {filter_lambda}, {transform_lambda})"
                 else:
@@ -1717,7 +1728,9 @@ class MGenPythonToGoConverter:
                     return f"mgen.SetComprehensionFromSet[{source_element_type}, {element_type}]({container_expr}, {transform_lambda})"
             else:
                 source_element_type = "interface{}"
-                transform_lambda = f"func({target_name} {source_element_type}) {element_type} {{ return {transform_expr} }}"
+                transform_lambda = (
+                    f"func({target_name} {source_element_type}) {element_type} {{ return {transform_expr} }}"
+                )
                 return f"mgen.SetComprehension[{source_element_type}, {element_type}]({container_expr}, {transform_lambda})"
 
     def _convert_subscript(self, expr: ast.Subscript) -> str:
@@ -1799,7 +1812,11 @@ class MGenPythonToGoConverter:
         loop_var_types = {}
         if isinstance(target, ast.Name):
             # Infer type from iterator
-            if isinstance(iter_expr, ast.Call) and isinstance(iter_expr.func, ast.Name) and iter_expr.func.id == "range":
+            if (
+                isinstance(iter_expr, ast.Call)
+                and isinstance(iter_expr.func, ast.Name)
+                and iter_expr.func.id == "range"
+            ):
                 loop_var_types[target.id] = "int"
             else:
                 # Iterating over a container

@@ -109,7 +109,7 @@ class PythonConstraintChecker:
                                     message=f"Type mismatch: {left_type} and {right_type} in binary operation",
                                     line=node.lineno,
                                     severity="error",
-                                    suggestion="Ensure both operands have compatible types"
+                                    suggestion="Ensure both operands have compatible types",
                                 )
                             )
 
@@ -121,7 +121,7 @@ class PythonConstraintChecker:
                 for target in node.targets:
                     if isinstance(target, ast.Name):
                         # If target has annotation, check compatibility
-                        if hasattr(target, 'annotation') and target.annotation:
+                        if hasattr(target, "annotation") and target.annotation:
                             target_type = self._extract_type_from_annotation(target.annotation)
                             value_type = self._infer_expression_type(node.value)
 
@@ -132,10 +132,10 @@ class PythonConstraintChecker:
                                         PythonConstraintViolation(
                                             category=ConstraintCategory.TYPE_SAFETY,
                                             rule_id="TS002",
-                                            message=f"Implicit float-to-int conversion loses precision",
+                                            message="Implicit float-to-int conversion loses precision",
                                             line=node.lineno,
                                             severity="warning",
-                                            suggestion="Use explicit int() conversion"
+                                            suggestion="Use explicit int() conversion",
                                         )
                                     )
 
@@ -152,7 +152,7 @@ class PythonConstraintChecker:
                                 rule_id="TS003",
                                 message="Division by zero",
                                 line=node.lineno,
-                                severity="error"
+                                severity="error",
                             )
                         )
 
@@ -164,10 +164,10 @@ class PythonConstraintChecker:
                                     PythonConstraintViolation(
                                         category=ConstraintCategory.TYPE_SAFETY,
                                         rule_id="TS003",
-                                        message=f"Potential division by zero: divisor is (x - x)",
+                                        message="Potential division by zero: divisor is (x - x)",
                                         line=node.lineno,
                                         severity="warning",
-                                        suggestion="Add zero check before division"
+                                        suggestion="Add zero check before division",
                                     )
                                 )
 
@@ -187,7 +187,7 @@ class PythonConstraintChecker:
                                 message=f"Integer literal {node.value} exceeds 32-bit range (C/Go/Rust i32)",
                                 line=node.lineno,
                                 severity="warning",
-                                suggestion="Use explicit 64-bit type or check target language limits"
+                                suggestion="Use explicit 64-bit type or check target language limits",
                             )
                         )
 
@@ -212,7 +212,7 @@ class PythonConstraintChecker:
                         message="Unreachable code after return statement",
                         line=stmt.lineno,
                         severity="warning",
-                        suggestion="Remove unreachable code"
+                        suggestion="Remove unreachable code",
                     )
                 )
                 break
@@ -223,7 +223,7 @@ class PythonConstraintChecker:
             # Recursively check nested blocks
             if isinstance(stmt, (ast.If, ast.While, ast.For)):
                 self._check_unreachable_in_block(stmt.body)
-                if hasattr(stmt, 'orelse'):
+                if hasattr(stmt, "orelse"):
                     self._check_unreachable_in_block(stmt.orelse)
 
     def _check_unused_variables(self, tree: ast.AST) -> None:
@@ -261,7 +261,7 @@ class PythonConstraintChecker:
                                             message=f"Variable '{var}' is assigned but never used",
                                             line=subnode.lineno,
                                             severity="info",
-                                            suggestion="Remove unused variable or use it"
+                                            suggestion="Remove unused variable or use it",
                                         )
                                     )
                                     break
@@ -270,11 +270,36 @@ class PythonConstraintChecker:
         """Detect potentially uninitialized variables (SA003)."""
         # Built-in functions and types that are always available
         builtins = {
-            'int', 'float', 'str', 'bool', 'list', 'dict', 'set', 'tuple',
-            'len', 'range', 'min', 'max', 'sum', 'abs', 'print', 'open',
-            'enumerate', 'zip', 'map', 'filter', 'sorted', 'reversed',
-            'isinstance', 'type', 'hasattr', 'getattr', 'setattr',
-            'True', 'False', 'None'
+            "int",
+            "float",
+            "str",
+            "bool",
+            "list",
+            "dict",
+            "set",
+            "tuple",
+            "len",
+            "range",
+            "min",
+            "max",
+            "sum",
+            "abs",
+            "print",
+            "open",
+            "enumerate",
+            "zip",
+            "map",
+            "filter",
+            "sorted",
+            "reversed",
+            "isinstance",
+            "type",
+            "hasattr",
+            "getattr",
+            "setattr",
+            "True",
+            "False",
+            "None",
         }
 
         # Collect module-level function and class names
@@ -304,10 +329,10 @@ class PythonConstraintChecker:
                                     category=ConstraintCategory.CODE_QUALITY,
                                     rule_id="SA005",
                                     message=f"Parameter '{param}' in '{func_name}' is never modified. "
-                                            f"Consider using immutable type (tuple, Sequence) for better type safety",
+                                    f"Consider using immutable type (tuple, Sequence) for better type safety",
                                     line=node.lineno,
                                     severity="info",
-                                    suggestion="Use tuple[T] or Sequence[T] instead of list[T]"
+                                    suggestion="Use tuple[T] or Sequence[T] instead of list[T]",
                                 )
                             )
                             break
@@ -327,7 +352,7 @@ class PythonConstraintChecker:
                             message=f"Function '{node.name}' has high cyclomatic complexity ({complexity})",
                             line=node.lineno,
                             severity="warning",
-                            suggestion=f"Consider refactoring (threshold: {COMPLEXITY_THRESHOLD})"
+                            suggestion=f"Consider refactoring (threshold: {COMPLEXITY_THRESHOLD})",
                         )
                     )
 
@@ -383,8 +408,7 @@ class PythonConstraintChecker:
                 return True
 
         # list + int is incompatible
-        if (type1 == "list" and type2 in ["int", "float"]) or \
-           (type2 == "list" and type1 in ["int", "float"]):
+        if (type1 == "list" and type2 in ["int", "float"]) or (type2 == "list" and type1 in ["int", "float"]):
             return True
 
         return False

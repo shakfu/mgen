@@ -248,9 +248,7 @@ class FunctionBodyAnalyzer:
         return None
 
     @staticmethod
-    def eliminate_duplicate_bindings(
-        body_stmts: list[Optional[str]], var_init_values: dict[str, str]
-    ) -> list[str]:
+    def eliminate_duplicate_bindings(body_stmts: list[Optional[str]], var_init_values: dict[str, str]) -> list[str]:
         """Eliminate duplicate bindings (Haskell doesn't allow variable redefinition).
 
         Args:

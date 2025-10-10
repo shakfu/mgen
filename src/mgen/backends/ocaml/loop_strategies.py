@@ -38,9 +38,7 @@ class OCamlSimpleAssignmentStrategy(ForLoopStrategy):
             return False
 
         stmt = node.body[0]
-        return (isinstance(stmt, ast.Assign) and
-                len(stmt.targets) == 1 and
-                isinstance(stmt.targets[0], ast.Name))
+        return isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name)
 
     def convert(self, node: ast.For, context: LoopContext) -> str:
         """Convert simple assignment to List.fold_left."""

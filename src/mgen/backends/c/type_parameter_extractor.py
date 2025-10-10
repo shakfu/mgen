@@ -25,6 +25,7 @@ class ContainerTypeInfo:
         type_properties: List of TypeProperties for each parameter
         is_nested: Whether this is a nested container (e.g., vec_vec_int)
     """
+
     family: str
     full_name: str
     type_params: list[str]

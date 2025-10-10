@@ -422,8 +422,7 @@ class StaticPythonSubsetValidator:
         for arg in node.args.args:
             if not arg.annotation:
                 self.last_validation_error = (
-                    f"Function '{node.name}' at line {node.lineno}: "
-                    f"parameter '{arg.arg}' is missing type annotation"
+                    f"Function '{node.name}' at line {node.lineno}: parameter '{arg.arg}' is missing type annotation"
                 )
                 return False
 
@@ -433,8 +432,7 @@ class StaticPythonSubsetValidator:
             if isinstance(decorator, ast.Name):
                 if decorator.id not in allowed_decorators:
                     self.last_validation_error = (
-                        f"Function '{node.name}' at line {node.lineno}: "
-                        f"decorator '@{decorator.id}' is not allowed"
+                        f"Function '{node.name}' at line {node.lineno}: decorator '@{decorator.id}' is not allowed"
                     )
                     return False
 

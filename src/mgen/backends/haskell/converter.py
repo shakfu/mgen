@@ -393,6 +393,7 @@ main = printValue "Generated Haskell code executed successfully"'''
         Delegates to convert_function_with_visitor for cleaner, more maintainable code.
         """
         return convert_function_with_visitor(self, node)
+
     def _convert_statement(self, node: ast.stmt) -> str:
         """Convert Python statement to Haskell."""
         if isinstance(node, ast.Return):
@@ -847,8 +848,9 @@ main = printValue "Generated Haskell code executed successfully"'''
         # Handle tuple unpacking in target: (k, v) in items()
         if isinstance(gen.target, ast.Tuple):
             # Tuple target - create pattern for each element
-            tuple_vars = [self._to_haskell_var_name(elt.id) if isinstance(elt, ast.Name) else "x"
-                          for elt in gen.target.elts]
+            tuple_vars = [
+                self._to_haskell_var_name(elt.id) if isinstance(elt, ast.Name) else "x" for elt in gen.target.elts
+            ]
             target = f"({', '.join(tuple_vars)})"
             target_pattern = target  # For pattern matching
         elif isinstance(gen.target, ast.Name):
@@ -971,11 +973,12 @@ main = printValue "Generated Haskell code executed successfully"'''
 
         # Special case: if cond: var = expr (no else) in main function
         # Convert to: let var = if cond then expr else initial_value
-        if (self.current_function == "main" and
-            len(node.body) == 1 and
-            isinstance(node.body[0], ast.Assign) and
-            not node.orelse):
-
+        if (
+            self.current_function == "main"
+            and len(node.body) == 1
+            and isinstance(node.body[0], ast.Assign)
+            and not node.orelse
+        ):
             assign_stmt = node.body[0]
             if len(assign_stmt.targets) == 1 and isinstance(assign_stmt.targets[0], ast.Name):
                 var_name = self._to_haskell_var_name(assign_stmt.targets[0].id)
@@ -1055,16 +1058,15 @@ main = printValue "Generated Haskell code executed successfully"'''
             #                  for k in range(size):
             #                      sum_val += expr
             #                  result[i][j] = sum_val
-            if (len(node.body) == 1 and
-                isinstance(node.body[0], ast.For)):
-
+            if len(node.body) == 1 and isinstance(node.body[0], ast.For):
                 j_loop = node.body[0]
-                if (isinstance(j_loop.target, ast.Name) and
-                    len(j_loop.body) == 3 and
-                    isinstance(j_loop.body[0], (ast.Assign, ast.AnnAssign)) and
-                    isinstance(j_loop.body[1], ast.For) and
-                    isinstance(j_loop.body[2], ast.Assign)):
-
+                if (
+                    isinstance(j_loop.target, ast.Name)
+                    and len(j_loop.body) == 3
+                    and isinstance(j_loop.body[0], (ast.Assign, ast.AnnAssign))
+                    and isinstance(j_loop.body[1], ast.For)
+                    and isinstance(j_loop.body[2], ast.Assign)
+                ):
                     sum_init = j_loop.body[0]
                     k_loop = j_loop.body[1]
                     result_assign = j_loop.body[2]
@@ -1072,32 +1074,38 @@ main = printValue "Generated Haskell code executed successfully"'''
                     # Check if sum_val is initialized to 0
                     sum_var = None
                     if isinstance(sum_init, ast.Assign):
-                        if (len(sum_init.targets) == 1 and
-                            isinstance(sum_init.targets[0], ast.Name) and
-                            isinstance(sum_init.value, ast.Constant) and
-                            sum_init.value.value == 0):
+                        if (
+                            len(sum_init.targets) == 1
+                            and isinstance(sum_init.targets[0], ast.Name)
+                            and isinstance(sum_init.value, ast.Constant)
+                            and sum_init.value.value == 0
+                        ):
                             sum_var = sum_init.targets[0].id
                     elif isinstance(sum_init, ast.AnnAssign):
-                        if (isinstance(sum_init.target, ast.Name) and
-                            isinstance(sum_init.value, ast.Constant) and
-                            sum_init.value.value == 0):
+                        if (
+                            isinstance(sum_init.target, ast.Name)
+                            and isinstance(sum_init.value, ast.Constant)
+                            and sum_init.value.value == 0
+                        ):
                             sum_var = sum_init.target.id
 
                     # Check if k_loop accumulates into sum_var
-                    if (sum_var and
-                        isinstance(k_loop.target, ast.Name) and
-                        len(k_loop.body) == 1 and
-                        isinstance(k_loop.body[0], ast.AugAssign) and
-                        isinstance(k_loop.body[0].target, ast.Name) and
-                        k_loop.body[0].target.id == sum_var):
-
+                    if (
+                        sum_var
+                        and isinstance(k_loop.target, ast.Name)
+                        and len(k_loop.body) == 1
+                        and isinstance(k_loop.body[0], ast.AugAssign)
+                        and isinstance(k_loop.body[0].target, ast.Name)
+                        and k_loop.body[0].target.id == sum_var
+                    ):
                         # Check if result[i][j] = sum_val
-                        if (isinstance(result_assign.targets[0], ast.Subscript) and
-                            isinstance(result_assign.targets[0].value, ast.Subscript) and
-                            isinstance(result_assign.targets[0].value.value, ast.Name) and
-                            isinstance(result_assign.value, ast.Name) and
-                            result_assign.value.id == sum_var):
-
+                        if (
+                            isinstance(result_assign.targets[0], ast.Subscript)
+                            and isinstance(result_assign.targets[0].value, ast.Subscript)
+                            and isinstance(result_assign.targets[0].value.value, ast.Name)
+                            and isinstance(result_assign.value, ast.Name)
+                            and result_assign.value.id == sum_var
+                        ):
                             # Extract all variables
                             j_var = self._to_haskell_var_name(j_loop.target.id)
                             k_var = self._to_haskell_var_name(k_loop.target.id)
@@ -1115,10 +1123,11 @@ main = printValue "Generated Haskell code executed successfully"'''
                                 return f"{result_var} <- foldM (\\acc {var_name} -> return (acc ++ [[sum' [{accum_expr} | {k_var} <- {k_iterable}] | {j_var} <- {j_iterable}]])) {result_var} ({iterable})"
 
             # Detect word count pattern: for item in list: transform, then update dict
-            if (len(node.body) == 2 and
-                isinstance(node.body[0], (ast.Assign, ast.AnnAssign)) and
-                isinstance(node.body[1], ast.If)):
-
+            if (
+                len(node.body) == 2
+                and isinstance(node.body[0], (ast.Assign, ast.AnnAssign))
+                and isinstance(node.body[1], ast.If)
+            ):
                 # Extract transformation variable and expression
                 transform_stmt = node.body[0]
                 if isinstance(transform_stmt, ast.Assign):
@@ -1144,25 +1153,32 @@ main = printValue "Generated Haskell code executed successfully"'''
                 dict_var = None
 
                 # Pattern: if key in dict: dict[key] = dict[key] + 1 else: dict[key] = 1
-                if (isinstance(if_stmt.test, ast.Compare) and
-                    len(if_stmt.test.ops) == 1 and isinstance(if_stmt.test.ops[0], ast.In) and
-                    len(if_stmt.body) == 1 and isinstance(if_stmt.body[0], ast.Assign) and
-                    len(if_stmt.orelse) == 1 and isinstance(if_stmt.orelse[0], ast.Assign)):
-
+                if (
+                    isinstance(if_stmt.test, ast.Compare)
+                    and len(if_stmt.test.ops) == 1
+                    and isinstance(if_stmt.test.ops[0], ast.In)
+                    and len(if_stmt.body) == 1
+                    and isinstance(if_stmt.body[0], ast.Assign)
+                    and len(if_stmt.orelse) == 1
+                    and isinstance(if_stmt.orelse[0], ast.Assign)
+                ):
                     then_stmt = if_stmt.body[0]
                     if_stmt.orelse[0]
 
                     # Extract dictionary variable from the assignments
-                    if (isinstance(then_stmt.targets[0], ast.Subscript) and
-                        isinstance(then_stmt.targets[0].value, ast.Name)):
+                    if isinstance(then_stmt.targets[0], ast.Subscript) and isinstance(
+                        then_stmt.targets[0].value, ast.Name
+                    ):
                         dict_var = self._to_haskell_var_name(then_stmt.targets[0].value.id)
 
                     # Generate fold for word count pattern
                     if dict_var and key_var and self.current_function != "main":
                         # Pure context - use foldl with Map operations
                         # Use Map.empty as initial accumulator (assuming dict was initialized to empty)
-                        return (f"{dict_var} = foldl (\\acc {var_name} -> let {key_var} = {key_expr} in "
-                                f"Map.insertWith (+) {key_var} 1 acc) Map.empty ({iterable})")
+                        return (
+                            f"{dict_var} = foldl (\\acc {var_name} -> let {key_var} = {key_expr} in "
+                            f"Map.insertWith (+) {key_var} 1 acc) Map.empty ({iterable})"
+                        )
 
             body_stmts = []
             for body_stmt in node.body:
@@ -1253,16 +1269,20 @@ main = printValue "Generated Haskell code executed successfully"'''
                     for assign_stmt in ast.walk(func_node):
                         if isinstance(assign_stmt, (ast.Assign, ast.AnnAssign)):
                             if isinstance(assign_stmt, ast.Assign):
-                                if (len(assign_stmt.targets) == 1 and
-                                    isinstance(assign_stmt.targets[0], ast.Name) and
-                                    assign_stmt.targets[0].id == var_name):
+                                if (
+                                    len(assign_stmt.targets) == 1
+                                    and isinstance(assign_stmt.targets[0], ast.Name)
+                                    and assign_stmt.targets[0].id == var_name
+                                ):
                                     if isinstance(assign_stmt.value, ast.ListComp):
                                         if isinstance(assign_stmt.value.elt, ast.ListComp):
                                             return True
                             elif isinstance(assign_stmt, ast.AnnAssign):
-                                if (isinstance(assign_stmt.target, ast.Name) and
-                                    assign_stmt.target.id == var_name and
-                                    assign_stmt.value):
+                                if (
+                                    isinstance(assign_stmt.target, ast.Name)
+                                    and assign_stmt.target.id == var_name
+                                    and assign_stmt.value
+                                ):
                                     if isinstance(assign_stmt.value, ast.ListComp):
                                         if isinstance(assign_stmt.value.elt, ast.ListComp):
                                             return True
@@ -1271,9 +1291,11 @@ main = printValue "Generated Haskell code executed successfully"'''
             # Pattern: for i in range: row = []; for j in range: row.append(...); matrix.append(row)
             if isinstance(stmt, ast.For):
                 if len(stmt.body) == 3:
-                    if (isinstance(stmt.body[0], (ast.Assign, ast.AnnAssign)) and
-                        isinstance(stmt.body[1], ast.For) and
-                        isinstance(stmt.body[2], ast.Expr)):
+                    if (
+                        isinstance(stmt.body[0], (ast.Assign, ast.AnnAssign))
+                        and isinstance(stmt.body[1], ast.For)
+                        and isinstance(stmt.body[2], ast.Expr)
+                    ):
                         # This is a 2D list building pattern
                         return True
                 # Also check for triple-nested loop pattern (matrix multiplication)
@@ -1281,9 +1303,11 @@ main = printValue "Generated Haskell code executed successfully"'''
                 if len(stmt.body) == 1 and isinstance(stmt.body[0], ast.For):
                     j_loop = stmt.body[0]
                     if len(j_loop.body) == 3:
-                        if (isinstance(j_loop.body[0], (ast.Assign, ast.AnnAssign)) and
-                            isinstance(j_loop.body[1], ast.For) and
-                            isinstance(j_loop.body[2], ast.Assign)):
+                        if (
+                            isinstance(j_loop.body[0], (ast.Assign, ast.AnnAssign))
+                            and isinstance(j_loop.body[1], ast.For)
+                            and isinstance(j_loop.body[2], ast.Assign)
+                        ):
                             # This is a triple-nested loop building a 2D result
                             return True
 
@@ -1315,7 +1339,9 @@ main = printValue "Generated Haskell code executed successfully"'''
                     if isinstance(then_stmt, ast.Assign) and len(then_stmt.targets) == 1:
                         if isinstance(then_stmt.targets[0], ast.Subscript):
                             if isinstance(then_stmt.value, ast.BinOp):
-                                if isinstance(then_stmt.value.right, ast.Constant) and isinstance(then_stmt.value.right.value, int):
+                                if isinstance(then_stmt.value.right, ast.Constant) and isinstance(
+                                    then_stmt.value.right.value, int
+                                ):
                                     return "Int"
                 # Check the else branch
                 for else_stmt in stmt.orelse:

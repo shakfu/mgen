@@ -221,7 +221,9 @@ class FlowSensitiveInferencer:
 
         # Debug logging for nested list types
         if "list[list[" in annotation_type.name:
-            self.log.debug(f"Annotated assignment: {target_name} : {annotation_type.name} (c_equiv={annotation_type.c_equivalent})")
+            self.log.debug(
+                f"Annotated assignment: {target_name} : {annotation_type.name} (c_equiv={annotation_type.c_equivalent})"
+            )
             self.log.debug(f"  RHS type: {rhs_type.name} (c_equiv={rhs_type.c_equivalent})")
 
         # Unify annotation with RHS type and existing type

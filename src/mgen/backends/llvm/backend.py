@@ -1,6 +1,5 @@
 """LLVM backend implementation for MGen."""
 
-from pathlib import Path
 from typing import Optional
 
 from ..base import AbstractBuilder, AbstractContainerSystem, AbstractEmitter, AbstractFactory, LanguageBackend

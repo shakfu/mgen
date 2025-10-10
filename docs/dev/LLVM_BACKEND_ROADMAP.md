@@ -81,6 +81,7 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 **Status**: Resolved - All benchmarks passing
 
 **Solution Implemented**:
+
 - Added `set_int_get_nth_element()` for index-based iteration
 - Modified `_build_for()` to detect and handle set iteration
 - Updated set comprehension generation to use correct iteration functions
@@ -90,6 +91,7 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 **Status**: Resolved - wordcount benchmark passing
 
 **Solution Implemented**:
+
 - Fixed `_extract_ir_type()` to parse `dict[K, V]` subscript annotations
 - Extracts key type from annotations (e.g., `dict[str, int]` → `map_str_int`)
 - Users can now specify dict types explicitly with Python 3.9+ syntax
@@ -213,6 +215,7 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 **Pipeline**: Python → LLVM IR → llc (machine code) → clang (linking) → Executable
 
 **Characteristics**:
+
 - llvmlite constructs LLVM IR in memory
 - llc (LLVM static compiler) generates machine code from .ll files
 - clang links object files with runtime libraries
@@ -221,6 +224,7 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 - Binary size: ~37KB (compact, no runtime overhead)
 
 **Benefits**:
+
 - Optimal runtime performance (152.9ms avg)
 - No runtime dependencies
 - Cross-platform deployment
@@ -231,18 +235,21 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 **Pipeline**: Python → LLVM IR → Execution Engine (in-memory execution)
 
 **Potential Approach** (using llvmlite execution engine):
+
 - Generate LLVM IR as currently done
 - Use `llvmlite.binding.create_mcjit_compiler()` instead of writing .ll files
 - Execute functions directly in memory
 - No intermediate object files or executables
 
 **Benefits**:
+
 - Faster development cycle (no llc/clang overhead)
 - Useful for REPL or interactive debugging
 - Simpler build process for testing
 - Could enable runtime code generation
 
 **Tradeoffs**:
+
 - Runtime dependency on llvmlite
 - Cannot produce standalone executables
 - Memory overhead for JIT infrastructure

@@ -4,7 +4,7 @@ This directory contains benchmarks for evaluating the performance of MGen-genera
 
 ## Structure
 
-```
+```text
 benchmarks/
 ├── algorithms/          # Algorithm implementations
 │   ├── fibonacci.py    # Recursive algorithm performance
@@ -147,6 +147,7 @@ Results are saved as JSON in `benchmark_results/benchmark_results.json`:
 ### Markdown Report
 
 A human-readable Markdown report is generated showing:
+
 - Summary statistics
 - Backend comparison table
 - Detailed results per benchmark
@@ -188,6 +189,7 @@ def main() -> int:
 **Phase 2: Performance Benchmarking Framework - IN PROGRESS**
 
 ✅ Completed:
+
 - Benchmark directory structure
 - 7 benchmark programs (4 algorithms, 3 data structures)
 - Automated benchmark runner script
@@ -196,13 +198,14 @@ def main() -> int:
 - Makefile targets
 
 ⚠️ Pending:
+
 - Full pipeline integration for all backends
 - Memory usage profiling
 - Automated performance regression detection
 - CI/CD integration
 - Benchmark result history tracking
 
-##Notes
+## Notes
 
 - Benchmarks are designed to use only MGen-supported Python features
 - Each benchmark includes expected output for verification

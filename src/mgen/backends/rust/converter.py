@@ -627,7 +627,11 @@ class MGenPythonToRustConverter:
 
             # Rust-specific reference type selection based on mutability
             # Apply to collections only (Vec, HashMap, HashSet)
-            if param_type.startswith("Vec<") or param_type.startswith("std::collections::HashMap<") or param_type.startswith("std::collections::HashSet<"):
+            if (
+                param_type.startswith("Vec<")
+                or param_type.startswith("std::collections::HashMap<")
+                or param_type.startswith("std::collections::HashSet<")
+            ):
                 if arg.arg in mut_params:
                     # Mutable reference for parameters that are modified
                     param_type = f"&mut {param_type}"
@@ -695,7 +699,11 @@ class MGenPythonToRustConverter:
             param_type = self._infer_parameter_type(arg, node)
 
             # Store the parameter type with appropriate reference qualifier
-            if param_type.startswith("Vec<") or param_type.startswith("std::collections::HashMap<") or param_type.startswith("std::collections::HashSet<"):
+            if (
+                param_type.startswith("Vec<")
+                or param_type.startswith("std::collections::HashMap<")
+                or param_type.startswith("std::collections::HashSet<")
+            ):
                 if arg.arg in mut_params:
                     self.variable_types[arg.arg] = f"&mut {param_type}"
                 elif arg.arg in readonly_params:
@@ -795,7 +803,9 @@ class MGenPythonToRustConverter:
                     base_container = self._convert_expression(target.value.value)
                     first_index = self._convert_expression(target.value.slice)
                     second_index = self._convert_expression(target.slice)
-                    statements.append(f"    {base_container}[{first_index} as usize][{second_index} as usize] = {value_expr};")
+                    statements.append(
+                        f"    {base_container}[{first_index} as usize][{second_index} as usize] = {value_expr};"
+                    )
                 else:
                     # Single subscript
                     container_expr = self._convert_expression(target.value)
@@ -842,13 +852,19 @@ class MGenPythonToRustConverter:
             if var_type == "Vec<i32>" and isinstance(stmt.value, ast.List) and not stmt.value.elts:
                 if isinstance(stmt.target, ast.Name) and self.current_function_node:
                     # We have an empty list - analyze what's appended to it
-                    element_type = self._infer_list_element_type_from_appends(stmt.target.id, self.current_function_node)
+                    element_type = self._infer_list_element_type_from_appends(
+                        stmt.target.id, self.current_function_node
+                    )
                     if element_type:
                         var_type = f"Vec<{element_type}>"
 
             # Special case: If we inferred HashMap<i32, i32> from an empty dict but annotation is 'dict',
             # check if we're in a function and analyze usage to detect key/value types
-            if var_type == "std::collections::HashMap<i32, i32>" and isinstance(stmt.value, ast.Dict) and not stmt.value.keys:
+            if (
+                var_type == "std::collections::HashMap<i32, i32>"
+                and isinstance(stmt.value, ast.Dict)
+                and not stmt.value.keys
+            ):
                 if isinstance(stmt.target, ast.Name) and self.current_function_node:
                     # We have an empty dict - analyze how it's used
                     dict_types = self._infer_dict_types_from_usage(stmt.target.id, self.current_function_node)
@@ -1278,7 +1294,10 @@ class MGenPythonToRustConverter:
                                         else:
                                             # UNKNOWN or already a reference - pass as is
                                             modified_args.append(arg)
-                                    elif var_type == "String" and mutability in (MutabilityClass.READ_ONLY, MutabilityClass.IMMUTABLE):
+                                    elif var_type == "String" and mutability in (
+                                        MutabilityClass.READ_ONLY,
+                                        MutabilityClass.IMMUTABLE,
+                                    ):
                                         # For read-only String parameters, clone to avoid move issues in loops
                                         # This is needed because we can't use &String without breaking literals/method calls
                                         modified_args.append(f"{arg}.clone()")
@@ -1699,7 +1718,10 @@ class MGenPythonToRustConverter:
                             # Scan earlier in function for type annotation of this variable
                             for earlier_stmt in func.body:
                                 if isinstance(earlier_stmt, ast.AnnAssign):
-                                    if isinstance(earlier_stmt.target, ast.Name) and earlier_stmt.target.id == target_id:
+                                    if (
+                                        isinstance(earlier_stmt.target, ast.Name)
+                                        and earlier_stmt.target.id == target_id
+                                    ):
                                         return self._map_type_annotation(earlier_stmt.annotation)
                                 if earlier_stmt == stmt:
                                     break
@@ -1773,8 +1795,9 @@ class MGenPythonToRustConverter:
                         # Only check empty LITERALS, not function calls or other expressions
                         if isinstance(stmt.value, ast.Dict) and len(stmt.value.keys) == 0:
                             # Empty dict literal - check if it has a generic type
-                            if ("std::collections::HashMap<" in base_type
-                                and ("Box<dyn" in base_type or base_type.endswith("<i32, i32>"))):
+                            if "std::collections::HashMap<" in base_type and (
+                                "Box<dyn" in base_type or base_type.endswith("<i32, i32>")
+                            ):
                                 # Generic or default dict type - infer from usage
                                 return None  # Signal caller to do deeper inference
                         elif isinstance(stmt.value, ast.List) and len(stmt.value.elts) == 0:
@@ -1835,6 +1858,7 @@ class MGenPythonToRustConverter:
                             if func_type and "HashMap" in func_type:
                                 # Extract key and value types from HashMap<K, V>
                                 import re
+
                                 match = re.search(r"HashMap<(.+),\s*(.+)>", func_type)
                                 if match:
                                     key_type = match.group(1).strip()
@@ -1911,10 +1935,12 @@ class MGenPythonToRustConverter:
             # Look for list.append(value) calls
             if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
                 if isinstance(stmt.value.func, ast.Attribute):
-                    if (isinstance(stmt.value.func.value, ast.Name) and
-                        stmt.value.func.value.id == var_name and
-                        stmt.value.func.attr == "append" and
-                        stmt.value.args):
+                    if (
+                        isinstance(stmt.value.func.value, ast.Name)
+                        and stmt.value.func.value.id == var_name
+                        and stmt.value.func.attr == "append"
+                        and stmt.value.args
+                    ):
                         # Found an append - analyze the argument
                         append_arg = stmt.value.args[0]
 
@@ -1928,15 +1954,24 @@ class MGenPythonToRustConverter:
                             # Look for the declaration of this variable (search all descendants, not just func.body)
                             for earlier_stmt in ast.walk(func):
                                 if isinstance(earlier_stmt, ast.AnnAssign):
-                                    if isinstance(earlier_stmt.target, ast.Name) and earlier_stmt.target.id == appended_var_name:
+                                    if (
+                                        isinstance(earlier_stmt.target, ast.Name)
+                                        and earlier_stmt.target.id == appended_var_name
+                                    ):
                                         # Found the declaration - infer its type
                                         if earlier_stmt.value:
                                             # If it has a value, infer from the value
                                             inferred_type = self._infer_type_from_value(earlier_stmt.value)
                                             # If it's an empty list, recursively infer its element type
-                                            if inferred_type == "Vec<i32>" and isinstance(earlier_stmt.value, ast.List) and not earlier_stmt.value.elts:
+                                            if (
+                                                inferred_type == "Vec<i32>"
+                                                and isinstance(earlier_stmt.value, ast.List)
+                                                and not earlier_stmt.value.elts
+                                            ):
                                                 # Recursively check what's appended to this list
-                                                nested_element_type = self._infer_list_element_type_from_appends(appended_var_name, func)
+                                                nested_element_type = self._infer_list_element_type_from_appends(
+                                                    appended_var_name, func
+                                                )
                                                 if nested_element_type:
                                                     return f"Vec<{nested_element_type}>"
                                                 else:

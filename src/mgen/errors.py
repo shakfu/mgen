@@ -5,12 +5,9 @@ and helpful suggestions to improve the developer experience.
 """
 
 import ast
-import sys
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
-from typing import Optional, TypeVar, Union
-
+from typing import Optional, TypeVar
 
 # TypeVar for class methods that return the same type as the class
 T_MGenError = TypeVar("T_MGenError", bound="MGenError")

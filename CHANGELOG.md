@@ -57,11 +57,13 @@ The LLVM backend now supports two compilation modes: AOT (ahead-of-time) for pro
 ### Performance
 
 **JIT vs AOT Comparison** (fibonacci benchmark):
+
 - JIT compile time: 150ms vs AOT 730ms (4.85x faster)
 - JIT execution time: 11ms vs AOT 519ms (45x faster - in-memory, no subprocess)
 - JIT total time: 162ms vs AOT 1249ms (7.72x faster)
 
 **Recommendations**:
+
 - Use JIT for development, testing, rapid iteration
 - Use AOT for production deployment (standalone executables)
 
@@ -603,7 +605,7 @@ Major advancement in LLVM backend with full list (dynamic array) support, includ
 
 **List Implementation Architecture**:
 
-```
+```text
 Python:       data: list = []
 IR:           IRLiteral([], IRType(IRDataType.LIST))
 LLVM Type:    %"struct.vec_int"*
@@ -615,7 +617,7 @@ Storage:      store %"struct.vec_int"* %list_tmp, %"struct.vec_int"** %data
 
 **Operation Flow**:
 
-```
+```text
 Python:       data.append(42)
 IR:           IRFunctionCall("__method_append__", [data_ref, literal_42])
 LLVM:         %ptr = load %"struct.vec_int"*, %"struct.vec_int"** %data
@@ -1742,7 +1744,7 @@ Implemented comprehensive error message improvements with source location tracki
 
 ### Error Message Example
 
-```
+```text
 error[E1001]: Generator expressions are not supported
   --> example.py:42:10
    |
@@ -2518,7 +2520,7 @@ return found_count
 
 **Production-Ready Backend Status**:
 
-```
+```text
 Backend   | Benchmarks | Compile (s) | Execute (s) | Binary (KB) | Status
 ----------|-----------|-------------|-------------|-------------|------------------
 C         | 7/7 (100%) | 0.368      | 0.284      | 67.2       | [x] Production

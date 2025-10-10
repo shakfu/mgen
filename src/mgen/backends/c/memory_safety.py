@@ -85,7 +85,7 @@ class MemorySafetyChecker:
                             message=f"Array access with variable index '{node.slice.id}' - ensure bounds checking",
                             line=node.lineno,
                             severity="warning",
-                            suggestion="Add explicit bounds check before array access"
+                            suggestion="Add explicit bounds check before array access",
                         )
                     )
 
@@ -100,7 +100,7 @@ class MemorySafetyChecker:
                                     message="Array index equals length (off-by-one error)",
                                     line=node.lineno,
                                     severity="error",
-                                    suggestion="Use len(arr) - 1 for last element"
+                                    suggestion="Use len(arr) - 1 for last element",
                                 )
                             )
 
@@ -118,7 +118,7 @@ class MemorySafetyChecker:
                             message="Attribute access on function return value - may be None",
                             line=node.lineno,
                             severity="warning",
-                            suggestion="Add None check before attribute access"
+                            suggestion="Add None check before attribute access",
                         )
                     )
 
@@ -135,8 +135,9 @@ class MemorySafetyChecker:
                     if isinstance(subnode, (ast.List, ast.Dict, ast.ListComp, ast.DictComp)):
                         if isinstance(subnode, (ast.List, ast.Dict)):
                             # Only flag non-empty allocations
-                            if (isinstance(subnode, ast.List) and subnode.elts) or \
-                               (isinstance(subnode, ast.Dict) and subnode.keys):
+                            if (isinstance(subnode, ast.List) and subnode.elts) or (
+                                isinstance(subnode, ast.Dict) and subnode.keys
+                            ):
                                 has_allocation = True
                         else:
                             has_allocation = True
@@ -153,7 +154,7 @@ class MemorySafetyChecker:
                             message=f"Function '{node.name}' allocates memory without explicit cleanup",
                             line=node.lineno,
                             severity="warning",
-                            suggestion="Add explicit cleanup or ensure caller handles cleanup"
+                            suggestion="Add explicit cleanup or ensure caller handles cleanup",
                         )
                     )
 
@@ -176,7 +177,7 @@ class MemorySafetyChecker:
                                             message=f"Function '{node.name}' returns local container - use heap allocation",
                                             line=subnode.lineno,
                                             severity="warning",
-                                            suggestion="Allocate on heap or use output parameter"
+                                            suggestion="Allocate on heap or use output parameter",
                                         )
                                     )
 
@@ -184,9 +185,19 @@ class MemorySafetyChecker:
         """Check if subscript is a type annotation, not array access."""
         if isinstance(node.value, ast.Name):
             type_names = {
-                "list", "dict", "set", "tuple",
-                "List", "Dict", "Set", "Tuple",
-                "Optional", "Union", "Callable", "Sequence", "Mapping"
+                "list",
+                "dict",
+                "set",
+                "tuple",
+                "List",
+                "Dict",
+                "Set",
+                "Tuple",
+                "Optional",
+                "Union",
+                "Callable",
+                "Sequence",
+                "Mapping",
             }
             return node.value.id in type_names
 

@@ -37,8 +37,7 @@ class CppDictInferenceStrategy(DictInferenceStrategy):
     def _format_dict_type(self, key_type: str, value_type: str, context: InferenceContext) -> str:
         """Format as std::unordered_map<K,V> if types are concrete."""
         # C++ specific: avoid auto in key/value types
-        if (key_type and key_type not in ["auto", ""] and
-            value_type and value_type not in ["auto", ""]):
+        if key_type and key_type not in ["auto", ""] and value_type and value_type not in ["auto", ""]:
             return f"std::unordered_map<{key_type}, {value_type}>"
         return "auto"
 
@@ -69,7 +68,14 @@ class CppCallInferenceStrategy(CallInferenceStrategy):
         elif func_name == "range":
             return "Range"
         # C++ specific: pattern-based inference
-        elif func_name.endswith("_int") or func_name in ["factorial", "calculate", "compute", "add", "subtract", "multiply"]:
+        elif func_name.endswith("_int") or func_name in [
+            "factorial",
+            "calculate",
+            "compute",
+            "add",
+            "subtract",
+            "multiply",
+        ]:
             return "int"
         elif func_name.endswith("_str") or func_name in ["format", "get_name", "to_string"]:
             return "std::string"

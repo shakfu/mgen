@@ -59,6 +59,7 @@ class LLVMJITExecutor:
 ```
 
 **Key Features**:
+
 - MCJIT-based execution engine
 - Module verification before execution
 - ctypes-based function calls
@@ -81,6 +82,7 @@ def jit_compile_and_run(llvm_ir_file: str, verbose: bool = False) -> int:
 #### 3. Test Suite (`tests/test_jit_executor.py`)
 
 Five comprehensive tests:
+
 1. `test_jit_simple_function` - Basic arithmetic function
 2. `test_jit_fibonacci` - Real benchmark execution
 3. `test_jit_main_function` - Main function execution
@@ -90,6 +92,7 @@ Five comprehensive tests:
 #### 4. Demo Script (`examples/llvm_jit_demo.py`)
 
 Performance comparison script showing:
+
 - AOT vs JIT compile time
 - AOT vs JIT execution time
 - Total time comparison
@@ -99,12 +102,13 @@ Performance comparison script showing:
 
 **Pipeline Comparison**:
 
-```
+```text
 AOT: Python → LLVM IR → llc (machine code) → clang (link) → Executable
 JIT: Python → LLVM IR → Execution Engine (in-memory)
 ```
 
 **LLVM Components Used**:
+
 - `llvm.initialize_native_target()` - Initialize host target
 - `llvm.initialize_native_asmprinter()` - Initialize ASM printer
 - `llvm.Target.from_default_triple()` - Get host target
@@ -113,6 +117,7 @@ JIT: Python → LLVM IR → Execution Engine (in-memory)
 - `engine.get_function_address()` - Get compiled function pointer
 
 **ctypes Integration**:
+
 - Use `CFUNCTYPE` to create callable Python wrapper
 - Supports arbitrary function signatures with type hints
 - Automatic conversion between Python and C types
@@ -204,7 +209,7 @@ uv run python examples/llvm_jit_demo.py
 
 ### Test Results
 
-```
+```text
 tests/test_jit_executor.py .s...                                   [100%]
 
 ======================== 4 passed, 1 skipped in 0.23s ===================
@@ -212,7 +217,7 @@ tests/test_jit_executor.py .s...                                   [100%]
 
 ### Full Suite
 
-```
+```text
 ======================= 986 passed, 1 skipped in 18.62s ==================
 ```
 

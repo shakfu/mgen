@@ -34,24 +34,30 @@ class HaskellNestedListBuildingStrategy(ForLoopStrategy):
             return False
 
         # Check structure: assignment, inner loop, append
-        if not (isinstance(node.body[0], (ast.Assign, ast.AnnAssign)) and
-                isinstance(node.body[1], ast.For) and
-                isinstance(node.body[2], ast.Expr)):
+        if not (
+            isinstance(node.body[0], (ast.Assign, ast.AnnAssign))
+            and isinstance(node.body[1], ast.For)
+            and isinstance(node.body[2], ast.Expr)
+        ):
             return False
 
         # Check if first statement initializes empty list
         init_stmt = node.body[0]
         if isinstance(init_stmt, ast.Assign):
-            if not (len(init_stmt.targets) == 1 and
-                    isinstance(init_stmt.targets[0], ast.Name) and
-                    isinstance(init_stmt.value, ast.List) and
-                    len(init_stmt.value.elts) == 0):
+            if not (
+                len(init_stmt.targets) == 1
+                and isinstance(init_stmt.targets[0], ast.Name)
+                and isinstance(init_stmt.value, ast.List)
+                and len(init_stmt.value.elts) == 0
+            ):
                 return False
             row_var = init_stmt.targets[0].id
         elif isinstance(init_stmt, ast.AnnAssign):
-            if not (isinstance(init_stmt.target, ast.Name) and
-                    isinstance(init_stmt.value, ast.List) and
-                    len(init_stmt.value.elts) == 0):
+            if not (
+                isinstance(init_stmt.target, ast.Name)
+                and isinstance(init_stmt.value, ast.List)
+                and len(init_stmt.value.elts) == 0
+            ):
                 return False
             row_var = init_stmt.target.id
         else:
@@ -59,28 +65,34 @@ class HaskellNestedListBuildingStrategy(ForLoopStrategy):
 
         # Check if inner loop appends to row
         inner_loop = node.body[1]
-        if not (len(inner_loop.body) == 1 and
-                isinstance(inner_loop.body[0], ast.Expr) and
-                isinstance(inner_loop.body[0].value, ast.Call)):
+        if not (
+            len(inner_loop.body) == 1
+            and isinstance(inner_loop.body[0], ast.Expr)
+            and isinstance(inner_loop.body[0].value, ast.Call)
+        ):
             return False
 
         inner_call = inner_loop.body[0].value
-        if not (isinstance(inner_call.func, ast.Attribute) and
-                inner_call.func.attr == "append" and
-                isinstance(inner_call.func.value, ast.Name) and
-                inner_call.func.value.id == row_var and
-                len(inner_call.args) == 1):
+        if not (
+            isinstance(inner_call.func, ast.Attribute)
+            and inner_call.func.attr == "append"
+            and isinstance(inner_call.func.value, ast.Name)
+            and inner_call.func.value.id == row_var
+            and len(inner_call.args) == 1
+        ):
             return False
 
         # Check if outer append adds row to matrix
         outer_append = node.body[2]
-        if not (isinstance(outer_append.value, ast.Call) and
-                isinstance(outer_append.value.func, ast.Attribute) and
-                outer_append.value.func.attr == "append" and
-                isinstance(outer_append.value.func.value, ast.Name) and
-                len(outer_append.value.args) == 1 and
-                isinstance(outer_append.value.args[0], ast.Name) and
-                outer_append.value.args[0].id == row_var):
+        if not (
+            isinstance(outer_append.value, ast.Call)
+            and isinstance(outer_append.value.func, ast.Attribute)
+            and outer_append.value.func.attr == "append"
+            and isinstance(outer_append.value.func.value, ast.Name)
+            and len(outer_append.value.args) == 1
+            and isinstance(outer_append.value.args[0], ast.Name)
+            and outer_append.value.args[0].id == row_var
+        ):
             return False
 
         return True
@@ -102,7 +114,9 @@ class HaskellNestedListBuildingStrategy(ForLoopStrategy):
         inner_call = inner_stmt.value
 
         matrix_var = converter._to_haskell_var_name(outer_append.value.func.value.id)  # type: ignore
-        inner_var = converter._to_haskell_var_name(inner_loop.target.id) if isinstance(inner_loop.target, ast.Name) else "j"
+        inner_var = (
+            converter._to_haskell_var_name(inner_loop.target.id) if isinstance(inner_loop.target, ast.Name) else "j"
+        )
         inner_iterable = converter._convert_expression(inner_loop.iter)
         assert len(inner_call.args) > 0
         append_expr = converter._convert_expression(inner_call.args[0])
@@ -137,10 +151,12 @@ class HaskellListAppendStrategy(ForLoopStrategy):
             return False
 
         call = stmt.value
-        return (isinstance(call.func, ast.Attribute) and
-                call.func.attr == "append" and
-                isinstance(call.func.value, ast.Name) and
-                len(call.args) == 1)
+        return (
+            isinstance(call.func, ast.Attribute)
+            and call.func.attr == "append"
+            and isinstance(call.func.value, ast.Name)
+            and len(call.args) == 1
+        )
 
     def convert(self, node: ast.For, context: LoopContext) -> str:
         """Convert list append to foldl/foldM."""
@@ -221,9 +237,7 @@ class HaskellAssignmentInMainStrategy(ForLoopStrategy):
             return False
 
         stmt = node.body[0]
-        return (isinstance(stmt, ast.Assign) and
-                len(stmt.targets) == 1 and
-                isinstance(stmt.targets[0], ast.Name))
+        return isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name)
 
     def convert(self, node: ast.For, context: LoopContext) -> str:
         """Convert assignment to foldM."""

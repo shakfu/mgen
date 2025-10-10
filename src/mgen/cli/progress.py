@@ -2,8 +2,9 @@
 
 import sys
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator, Optional
+from typing import Optional
 
 
 class ProgressIndicator:
@@ -59,7 +60,7 @@ class ProgressIndicator:
         # Format progress bar
         bar_width = 30
         filled = int(bar_width * self._current_step / self._total_steps) if self._total_steps > 0 else 0
-        bar = '█' * filled + '░' * (bar_width - filled)
+        bar = "█" * filled + "░" * (bar_width - filled)
 
         # Print progress
         sys.stderr.write(f"\r[{bar}] {progress_pct:5.1f}% | {message}")
@@ -97,7 +98,9 @@ class ProgressIndicator:
 
 
 @contextmanager
-def progress_context(title: str, enabled: bool = True, verbose: bool = False) -> Generator[ProgressIndicator, None, None]:
+def progress_context(
+    title: str, enabled: bool = True, verbose: bool = False
+) -> Generator[ProgressIndicator, None, None]:
     """Context manager for simple progress tracking.
 
     Args:
@@ -134,7 +137,7 @@ def progress_context(title: str, enabled: bool = True, verbose: bool = False) ->
 class Spinner:
     """Simple spinner for indeterminate progress."""
 
-    FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+    FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
     def __init__(self, message: str = "Working", enabled: bool = True):
         """Initialize spinner.

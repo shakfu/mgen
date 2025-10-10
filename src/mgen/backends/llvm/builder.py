@@ -3,7 +3,6 @@
 import re
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -35,7 +34,7 @@ class LLVMBuilder(AbstractBuilder):
         # Check common Homebrew LLVM installation paths
         homebrew_paths = [
             Path("/opt/homebrew/opt/llvm/bin") / tool_name,  # Apple Silicon
-            Path("/usr/local/opt/llvm/bin") / tool_name,      # Intel Mac
+            Path("/usr/local/opt/llvm/bin") / tool_name,  # Intel Mac
         ]
 
         for path in homebrew_paths:
@@ -146,14 +145,15 @@ run: $(TARGET)
             for runtime_source in runtime_sources:
                 runtime_c = runtime_dir / runtime_source
                 if runtime_c.exists():
-                    runtime_o = output_path / runtime_source.replace('.c', '.o')
+                    runtime_o = output_path / runtime_source.replace(".c", ".o")
                     clang_compile_runtime_cmd = [
                         self.clang_path,
                         "-c",
                         str(runtime_c),
                         "-o",
                         str(runtime_o),
-                        "-I", str(runtime_dir),  # Include runtime headers
+                        "-I",
+                        str(runtime_dir),  # Include runtime headers
                     ]
 
                     result = subprocess.run(clang_compile_runtime_cmd, capture_output=True, text=True)

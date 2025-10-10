@@ -70,8 +70,10 @@ from .base import (
     VerificationResult,
 )
 
-# Static Constraint Checking (DEPRECATED - replaced by python_constraints.py and backend-specific checkers)
+# Immutability Analysis
+from .immutability_analyzer import ImmutabilityAnalyzer, MutabilityClass
 
+# Static Constraint Checking (DEPRECATED - replaced by python_constraints.py and backend-specific checkers)
 # Optimization Analysis
 from .optimizers import (
     CompileTimeEvaluator,
@@ -94,6 +96,15 @@ from .optimizers import (
     VectorizationType,
 )
 
+# Python Constraint Checking
+from .python_constraints import (
+    ConstraintCategory as PythonConstraintCategory,
+)
+from .python_constraints import (
+    PythonConstraintChecker,
+    PythonConstraintViolation,
+)
+
 # Static IR
 from .static_ir import (
     IRBuilder,
@@ -112,16 +123,6 @@ from .subset_validator import FeatureRule, FeatureStatus, StaticPythonSubsetVali
 
 # Type Inference System
 from .type_inference import InferenceMethod, InferenceResult, TypeConstraint, TypeInferenceEngine
-
-# Immutability Analysis
-from .immutability_analyzer import ImmutabilityAnalyzer, MutabilityClass
-
-# Python Constraint Checking
-from .python_constraints import (
-    ConstraintCategory as PythonConstraintCategory,
-    PythonConstraintChecker,
-    PythonConstraintViolation,
-)
 
 # Formal Verification
 from .verifiers import (

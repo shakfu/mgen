@@ -3,7 +3,7 @@
 import ast
 from typing import Any, Optional
 
-from ...frontend.static_ir import IRModule, build_ir_from_code
+from ...frontend.static_ir import build_ir_from_code
 from ..base import AbstractEmitter
 from ..preferences import BackendPreferences
 from .ir_to_llvm import IRToLLVMConverter

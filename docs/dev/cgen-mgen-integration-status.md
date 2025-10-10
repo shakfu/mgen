@@ -10,26 +10,26 @@ Based on CLAUDE.md v0.1.31, CGen Feature Parity is Complete:
 - Path operations: exists(), isfile(), isdir(), getsize(), basename(), dirname(), join()
 - Context manager support
 
-2. [x] Advanced Container Operations - All integrated
+1. [x] Advanced Container Operations - All integrated
 
 - enumerate() for vectors, items() for hashmaps
 - Container equality, representation, conversion utilities
 - Container registry for automatic cleanup
 
-3. [x] Module Import System - All integrated
+1. [x] Module Import System - All integrated
 
 - Module resolution and dependency analysis
 - import/from...import support
 - Standard library mapping (math, typing, dataclasses)
 - Cross-module function resolution with topological sort
 
-4. [x] Enhanced String Operations - All integrated
+1. [x] Enhanced String Operations - All integrated
 
 - Dynamic string arrays with add/get/size operations
 - join() for combining string arrays
 - Integration with file I/O
 
-5. [x] NestedContainerManager - Just integrated in current session
+1. [x] NestedContainerManager - Just integrated in current session
 
 - Partial integration for 2D lists (vec_vec_int)
 
@@ -51,7 +51,7 @@ What's Missing:
 
 Estimated Work: 4-6 hours
 
-2. Advanced Type System Features
+1. Advanced Type System Features
 
 CGen Has:
 
@@ -61,7 +61,7 @@ CGen Has:
 
 Estimated Work: 6-8 hours
 
-3. Memory Safety Features
+1. Memory Safety Features
 
 CGen Has:
 
@@ -71,7 +71,7 @@ CGen Has:
 
 Estimated Work: 4-6 hours
 
-4. Error Handling & Diagnostics
+1. Error Handling & Diagnostics
 
 CGen Has:
 
@@ -81,7 +81,7 @@ CGen Has:
 
 Estimated Work: 3-4 hours
 
-5. Optimization Passes
+1. Optimization Passes
 
 CGen Has:
 
@@ -100,17 +100,17 @@ Given the current state:
 - Fix function parameter type inference for nested containers (30 min - 1 hour)
 - Test matmul benchmark to completion
 
-2. High Priority (next session):
+1. High Priority (next session):
 
 - Complete nested container support for all types
 - Fix remaining benchmark failures (dict_ops, set_ops need comprehensions)
 
-3. Medium Priority:
+1. Medium Priority:
 
 - Enhanced error messages
 - Memory safety improvements
 
-4. Low Priority:
+1. Low Priority:
 
 - Optimization passes (work but don't add core functionality)
 

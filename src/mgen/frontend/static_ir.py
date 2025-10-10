@@ -879,26 +879,39 @@ class IRBuilder:
 
                 # Type inference: propagate element type between variable and value
                 # Case 1: list literal with no element type -> use variable's annotation
-                if (isinstance(value_expr, IRLiteral) and
-                    value_expr.result_type.base_type == IRDataType.LIST and
-                    (not hasattr(value_expr.result_type, 'element_type') or value_expr.result_type.element_type is None)):
+                if (
+                    isinstance(value_expr, IRLiteral)
+                    and value_expr.result_type.base_type == IRDataType.LIST
+                    and (
+                        not hasattr(value_expr.result_type, "element_type")
+                        or value_expr.result_type.element_type is None
+                    )
+                ):
                     # Copy element type from variable annotation to literal
-                    if hasattr(var_type, 'element_type') and var_type.element_type:
+                    if hasattr(var_type, "element_type") and var_type.element_type:
                         value_expr.result_type.element_type = var_type.element_type
 
                 # Case 1b: dict literal with no element type -> use variable's annotation
-                elif (isinstance(value_expr, IRLiteral) and
-                      value_expr.result_type.base_type == IRDataType.DICT and
-                      (not hasattr(value_expr.result_type, 'element_type') or value_expr.result_type.element_type is None)):
+                elif (
+                    isinstance(value_expr, IRLiteral)
+                    and value_expr.result_type.base_type == IRDataType.DICT
+                    and (
+                        not hasattr(value_expr.result_type, "element_type")
+                        or value_expr.result_type.element_type is None
+                    )
+                ):
                     # Copy element type from variable annotation to literal
-                    if hasattr(var_type, 'element_type') and var_type.element_type:
+                    if hasattr(var_type, "element_type") and var_type.element_type:
                         value_expr.result_type.element_type = var_type.element_type
 
                 # Case 2: generic variable annotation (e.g., `list`) but value has specific type (e.g., `list[str]`)
                 # Infer the variable's element type from the value
-                elif (var_type.base_type == IRDataType.LIST and
-                      (not hasattr(var_type, 'element_type') or var_type.element_type is None) and
-                      hasattr(value_expr.result_type, 'element_type') and value_expr.result_type.element_type):
+                elif (
+                    var_type.base_type == IRDataType.LIST
+                    and (not hasattr(var_type, "element_type") or var_type.element_type is None)
+                    and hasattr(value_expr.result_type, "element_type")
+                    and value_expr.result_type.element_type
+                ):
                     # Propagate element type from value to variable
                     var_type.element_type = value_expr.result_type.element_type
 
@@ -930,19 +943,31 @@ class IRBuilder:
 
                     # Type inference: propagate element type from value to variable if needed
                     # If variable has generic LIST/DICT type and value has specific element_type, propagate it
-                    if hasattr(value_expr, 'result_type') and value_expr.result_type:
+                    if hasattr(value_expr, "result_type") and value_expr.result_type:
                         # For LIST
-                        if (target_var.ir_type.base_type == IRDataType.LIST and
-                            value_expr.result_type.base_type == IRDataType.LIST and
-                            (not hasattr(target_var.ir_type, 'element_type') or target_var.ir_type.element_type is None) and
-                            hasattr(value_expr.result_type, 'element_type') and value_expr.result_type.element_type):
+                        if (
+                            target_var.ir_type.base_type == IRDataType.LIST
+                            and value_expr.result_type.base_type == IRDataType.LIST
+                            and (
+                                not hasattr(target_var.ir_type, "element_type")
+                                or target_var.ir_type.element_type is None
+                            )
+                            and hasattr(value_expr.result_type, "element_type")
+                            and value_expr.result_type.element_type
+                        ):
                             target_var.ir_type.element_type = value_expr.result_type.element_type
 
                         # For DICT
-                        elif (target_var.ir_type.base_type == IRDataType.DICT and
-                              value_expr.result_type.base_type == IRDataType.DICT and
-                              (not hasattr(target_var.ir_type, 'element_type') or target_var.ir_type.element_type is None) and
-                              hasattr(value_expr.result_type, 'element_type') and value_expr.result_type.element_type):
+                        elif (
+                            target_var.ir_type.base_type == IRDataType.DICT
+                            and value_expr.result_type.base_type == IRDataType.DICT
+                            and (
+                                not hasattr(target_var.ir_type, "element_type")
+                                or target_var.ir_type.element_type is None
+                            )
+                            and hasattr(value_expr.result_type, "element_type")
+                            and value_expr.result_type.element_type
+                        ):
                             target_var.ir_type.element_type = value_expr.result_type.element_type
 
                     return IRAssignment(target_var, value_expr, self._get_location(node))
@@ -957,11 +982,14 @@ class IRBuilder:
                 # Type inference for dict: infer key type from first assignment
                 # If base is a dict variable reference with no element_type, infer from index type
                 from .static_ir import IRVariableReference
-                if (isinstance(base, IRVariableReference) and
-                    base.result_type.base_type == IRDataType.DICT and
-                    (not hasattr(base.result_type, 'element_type') or base.result_type.element_type is None)):
+
+                if (
+                    isinstance(base, IRVariableReference)
+                    and base.result_type.base_type == IRDataType.DICT
+                    and (not hasattr(base.result_type, "element_type") or base.result_type.element_type is None)
+                ):
                     # Infer dict key type from the index being used
-                    if hasattr(index, 'result_type') and index.result_type:
+                    if hasattr(index, "result_type") and index.result_type:
                         # Update both the variable reference's result_type AND the underlying variable's ir_type
                         base.result_type.element_type = index.result_type
                         base.variable.ir_type.element_type = index.result_type
@@ -969,7 +997,9 @@ class IRBuilder:
                 # Create synthetic function call for subscript assignment
                 # This will be translated to vec_int_set or similar by backend
                 return_type = IRType(IRDataType.VOID)
-                setitem_call = IRFunctionCall("__setitem__", [base, index, value], return_type, self._get_location(node))
+                setitem_call = IRFunctionCall(
+                    "__setitem__", [base, index, value], return_type, self._get_location(node)
+                )
                 return IRExpressionStatement(setitem_call, self._get_location(node))
 
         return None
@@ -1266,8 +1296,11 @@ class IRBuilder:
             # Backend will generate initialization code (allocate + set each pair)
             # Store as list of (key_expr, value_expr) tuples
             # Note: keys can be None for dict unpacking (**dict), which we don't support yet
-            pairs = [(self._build_expression(k), self._build_expression(v))
-                     for k, v in zip(node.keys, node.values) if k is not None]
+            pairs = [
+                (self._build_expression(k), self._build_expression(v))
+                for k, v in zip(node.keys, node.values)
+                if k is not None
+            ]
             return IRLiteral(pairs, ir_type, self._get_location(node))
 
     def _build_subscript(self, node: ast.Subscript) -> IRExpression:
@@ -1293,20 +1326,26 @@ class IRBuilder:
         # Type inference: update function return type from returned value
         # If function return type is generic (list/dict with no element_type) and
         # the returned value has a more specific type, propagate it
-        if value and self.current_function and hasattr(value, 'result_type'):
+        if value and self.current_function and hasattr(value, "result_type"):
             func_ret_type = self.current_function.return_type
             val_type = value.result_type
 
             # For LIST: propagate element_type if function return type lacks it
-            if (func_ret_type.base_type == IRDataType.LIST and
-                (not hasattr(func_ret_type, 'element_type') or func_ret_type.element_type is None) and
-                hasattr(val_type, 'element_type') and val_type.element_type):
+            if (
+                func_ret_type.base_type == IRDataType.LIST
+                and (not hasattr(func_ret_type, "element_type") or func_ret_type.element_type is None)
+                and hasattr(val_type, "element_type")
+                and val_type.element_type
+            ):
                 func_ret_type.element_type = val_type.element_type
 
             # For DICT: propagate element_type (key type) if function return type lacks it
-            elif (func_ret_type.base_type == IRDataType.DICT and
-                  (not hasattr(func_ret_type, 'element_type') or func_ret_type.element_type is None) and
-                  hasattr(val_type, 'element_type') and val_type.element_type):
+            elif (
+                func_ret_type.base_type == IRDataType.DICT
+                and (not hasattr(func_ret_type, "element_type") or func_ret_type.element_type is None)
+                and hasattr(val_type, "element_type")
+                and val_type.element_type
+            ):
                 func_ret_type.element_type = val_type.element_type
 
         return IRReturn(value, self._get_location(node))
@@ -1381,16 +1420,12 @@ class IRBuilder:
                 return None
 
             # Check if we're iterating over a set
-            is_set_iteration = (hasattr(iter_expr.result_type, 'base_type') and
-                               iter_expr.result_type.base_type == IRDataType.SET)
+            is_set_iteration = (
+                hasattr(iter_expr.result_type, "base_type") and iter_expr.result_type.base_type == IRDataType.SET
+            )
 
             # Create: len(container) call
-            len_call = IRFunctionCall(
-                "len",
-                [iter_expr],
-                IRType(IRDataType.INT),
-                self._get_location(node)
-            )
+            len_call = IRFunctionCall("len", [iter_expr], IRType(IRDataType.INT), self._get_location(node))
 
             # Create index variable: __idx_<item_name>
             idx_var_name = f"__idx_{item_name}"
@@ -1399,7 +1434,7 @@ class IRBuilder:
 
             # Infer item type from the container's element type
             item_type = IRType(IRDataType.INT)  # Default to INT for backward compatibility
-            if hasattr(iter_expr.result_type, 'element_type') and iter_expr.result_type.element_type:
+            if hasattr(iter_expr.result_type, "element_type") and iter_expr.result_type.element_type:
                 item_type = iter_expr.result_type.element_type
 
             # Create item variable with inferred type
@@ -1412,10 +1447,7 @@ class IRBuilder:
             if is_set_iteration:
                 # For sets: item = __set_get_nth__(set, __idx)
                 get_nth_call = IRFunctionCall(
-                    "__set_get_nth__",
-                    [iter_expr, index_ref],
-                    item_type,
-                    self._get_location(node)
+                    "__set_get_nth__", [iter_expr, index_ref], item_type, self._get_location(node)
                 )
                 item_assignment = IRAssignment(item_var, get_nth_call, self._get_location(node))
             else:
@@ -1424,7 +1456,7 @@ class IRBuilder:
                     "__getitem__",
                     [iter_expr, index_ref],
                     item_type,  # Use inferred item type
-                    self._get_location(node)
+                    self._get_location(node),
                 )
                 item_assignment = IRAssignment(item_var, subscript_call, self._get_location(node))
 

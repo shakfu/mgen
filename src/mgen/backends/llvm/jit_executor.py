@@ -4,7 +4,7 @@ This module provides an alternative to AOT (ahead-of-time) compilation
 using llvmlite's MCJIT compiler for in-memory execution.
 """
 
-from ctypes import CFUNCTYPE, c_int64, c_void_p
+from ctypes import CFUNCTYPE, c_int64
 from pathlib import Path
 from typing import Any, Optional
 

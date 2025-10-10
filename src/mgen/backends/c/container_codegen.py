@@ -153,12 +153,8 @@ class ContainerCodeGenerator:
         impl_template = self._load_generic_template(impl_template_name)
 
         # Substitute placeholders with actual types
-        header_code = self.substitution_engine.substitute_from_container_info(
-            header_template, info
-        )
-        impl_code = self.substitution_engine.substitute_from_container_info(
-            impl_template, info
-        )
+        header_code = self.substitution_engine.substitute_from_container_info(header_template, info)
+        impl_code = self.substitution_engine.substitute_from_container_info(impl_template, info)
 
         # Strip includes from implementation
         impl_code = self._strip_includes_and_headers(impl_code)
@@ -183,11 +179,13 @@ class ContainerCodeGenerator:
                 continue
 
             # Skip includes, extern C
-            if (stripped.startswith("#include")
+            if (
+                stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
                 or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
-                or stripped == "}"):
+                or stripped == "}"
+            ):
                 continue
 
             clean_lines.append(line)
@@ -246,10 +244,12 @@ class ContainerCodeGenerator:
                 continue
 
             # Skip extern C wrappers
-            if (stripped.startswith("#ifdef __cplusplus")
+            if (
+                stripped.startswith("#ifdef __cplusplus")
                 or stripped.startswith('extern "C"')
                 or (stripped.startswith("#endif") and not in_header_guard)
-                or (stripped == "}" and not in_header_guard)):
+                or (stripped == "}" and not in_header_guard)
+            ):
                 continue
 
             clean_lines.append(line)
@@ -302,11 +302,13 @@ class ContainerCodeGenerator:
                 continue
 
             # Skip includes, extern C
-            if (stripped.startswith("#include")
+            if (
+                stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
                 or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
-                or stripped == "}"):
+                or stripped == "}"
+            ):
                 continue
 
             clean_lines.append(line)
@@ -359,11 +361,13 @@ class ContainerCodeGenerator:
                 continue
 
             # Skip includes, extern C
-            if (stripped.startswith("#include")
+            if (
+                stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
                 or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
-                or stripped == "}"):
+                or stripped == "}"
+            ):
                 continue
 
             clean_lines.append(line)
@@ -416,11 +420,13 @@ class ContainerCodeGenerator:
                 continue
 
             # Skip includes, extern C
-            if (stripped.startswith("#include")
+            if (
+                stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
                 or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
-                or stripped == "}"):
+                or stripped == "}"
+            ):
                 continue
 
             clean_lines.append(line)
@@ -473,11 +479,13 @@ class ContainerCodeGenerator:
                 continue
 
             # Skip includes, extern C
-            if (stripped.startswith("#include")
+            if (
+                stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
                 or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
-                or stripped == "}"):
+                or stripped == "}"
+            ):
                 continue
 
             clean_lines.append(line)
@@ -530,11 +538,13 @@ class ContainerCodeGenerator:
                 continue
 
             # Skip includes, extern C
-            if (stripped.startswith("#include")
+            if (
+                stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
                 or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
-                or stripped == "}"):
+                or stripped == "}"
+            ):
                 continue
 
             clean_lines.append(line)
@@ -585,11 +595,13 @@ class ContainerCodeGenerator:
                 in_header_guard = False
                 continue
 
-            if (stripped.startswith("#include")
+            if (
+                stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
                 or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
-                or stripped == "}"):
+                or stripped == "}"
+            ):
                 continue
 
             clean_lines.append(line)
@@ -639,11 +651,13 @@ class ContainerCodeGenerator:
                 in_header_guard = False
                 continue
 
-            if (stripped.startswith("#include")
+            if (
+                stripped.startswith("#include")
                 or stripped.startswith("#ifdef __cplusplus")
                 or stripped.startswith('extern "C"')
                 or stripped.startswith("#endif")
-                or stripped == "}"):
+                or stripped == "}"
+            ):
                 continue
 
             clean_lines.append(line)
@@ -695,7 +709,11 @@ class ContainerCodeGenerator:
             # Skip includes and extern C
             if stripped.startswith("#include"):
                 continue
-            if stripped.startswith("#ifdef __cplusplus") or stripped.startswith('extern "C"') or stripped.startswith("{"):
+            if (
+                stripped.startswith("#ifdef __cplusplus")
+                or stripped.startswith('extern "C"')
+                or stripped.startswith("{")
+            ):
                 continue
             if stripped.startswith("#endif"):
                 continue
@@ -747,7 +765,11 @@ class ContainerCodeGenerator:
             # Skip includes and extern C
             if stripped.startswith("#include"):
                 continue
-            if stripped.startswith("#ifdef __cplusplus") or stripped.startswith('extern "C"') or stripped.startswith("{"):
+            if (
+                stripped.startswith("#ifdef __cplusplus")
+                or stripped.startswith('extern "C"')
+                or stripped.startswith("{")
+            ):
                 continue
             if stripped.startswith("#endif"):
                 continue
@@ -850,4 +872,3 @@ if __name__ == "__main__":
     lines = code.split("\n")
     for _i, _line in enumerate(lines[:50], 1):
         pass
-

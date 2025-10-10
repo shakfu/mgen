@@ -175,7 +175,7 @@ class MGenPythonToCConverter:
                         self.container_variables[var_name] = {
                             "type": type_annotation,
                             "element_type": "int",  # Default to int
-                            "c_type": self.type_mapping.get(type_annotation, type_annotation)
+                            "c_type": self.type_mapping.get(type_annotation, type_annotation),
                         }
 
     def _detect_nested_containers(self, node: ast.AST) -> None:
@@ -335,14 +335,16 @@ class MGenPythonToCConverter:
             if c_type.startswith("vec_"):
                 # Extract element type
                 element_type = c_type[4:]  # Remove "vec_"
-                declarations.extend([
-                    f"#define i_type {c_type}",
-                    f"#define i_key {element_type}",
-                    '#include "ext/stc/include/stc/vec.h"',
-                    "#undef i_type",
-                    "#undef i_key",
-                    "",
-                ])
+                declarations.extend(
+                    [
+                        f"#define i_type {c_type}",
+                        f"#define i_key {element_type}",
+                        '#include "ext/stc/include/stc/vec.h"',
+                        "#undef i_type",
+                        "#undef i_key",
+                        "",
+                    ]
+                )
             elif c_type.startswith("map_"):
                 # Parse key and value types from "map_key_val" format
                 parts = c_type[4:].split("_", 1)  # Remove "map_" and split
@@ -354,27 +356,31 @@ class MGenPythonToCConverter:
                         # The type mapping and includes are handled elsewhere
                         pass
                     else:
-                        declarations.extend([
-                            f"#define i_type {c_type}",
-                            f"#define i_key {key_type}",
-                            f"#define i_val {val_type}",
-                            '#include "ext/stc/include/stc/hmap.h"',
-                            "#undef i_type",
-                            "#undef i_key",
-                            "#undef i_val",
-                            "",
-                        ])
+                        declarations.extend(
+                            [
+                                f"#define i_type {c_type}",
+                                f"#define i_key {key_type}",
+                                f"#define i_val {val_type}",
+                                '#include "ext/stc/include/stc/hmap.h"',
+                                "#undef i_type",
+                                "#undef i_key",
+                                "#undef i_val",
+                                "",
+                            ]
+                        )
             elif c_type.startswith("set_"):
                 # Extract element type
                 element_type = c_type[4:]  # Remove "set_"
-                declarations.extend([
-                    f"#define i_type {c_type}",
-                    f"#define i_key {element_type}",
-                    '#include "ext/stc/include/stc/hset.h"',
-                    "#undef i_type",
-                    "#undef i_key",
-                    "",
-                ])
+                declarations.extend(
+                    [
+                        f"#define i_type {c_type}",
+                        f"#define i_key {element_type}",
+                        '#include "ext/stc/include/stc/hset.h"',
+                        "#undef i_type",
+                        "#undef i_key",
+                        "",
+                    ]
+                )
 
         return declarations
 
@@ -437,7 +443,18 @@ class MGenPythonToCConverter:
 
             # Generate supported container types
             # Note: vec_int must be generated before vec_vec_int (dependency)
-            if c_type in ["map_str_int", "vec_int", "set_int", "map_int_int", "vec_vec_int", "vec_cstr", "vec_float", "vec_double", "map_str_str", "set_str"]:
+            if c_type in [
+                "map_str_int",
+                "vec_int",
+                "set_int",
+                "map_int_int",
+                "vec_vec_int",
+                "vec_cstr",
+                "vec_float",
+                "vec_double",
+                "map_str_str",
+                "set_str",
+            ]:
                 generated_code = self.container_generator.generate_container(c_type)
                 if generated_code:
                     code_lines.append(generated_code)
@@ -587,7 +604,9 @@ class MGenPythonToCConverter:
                         return f"vec_vec_int_at(&{var_name}, {inner_index})->data[{index}] = {value_expr};"
                     else:
                         # Variable not properly typed as nested container
-                        raise UnsupportedFeatureError(f"2D subscript assignment requires variable '{var_name}' to be vec_vec_int, got: {c_type}")
+                        raise UnsupportedFeatureError(
+                            f"2D subscript assignment requires variable '{var_name}' to be vec_vec_int, got: {c_type}"
+                        )
                 else:
                     raise UnsupportedFeatureError("Nested subscript assignment only supported for simple variables")
 
@@ -690,7 +709,12 @@ class MGenPythonToCConverter:
                     is_empty_literal = True
                 elif isinstance(stmt.value, ast.Set) and len(stmt.value.elts) == 0:
                     is_empty_literal = True
-                elif isinstance(stmt.value, ast.Call) and isinstance(stmt.value.func, ast.Name) and stmt.value.func.id == "set" and len(stmt.value.args) == 0:
+                elif (
+                    isinstance(stmt.value, ast.Call)
+                    and isinstance(stmt.value.func, ast.Name)
+                    and stmt.value.func.id == "set"
+                    and len(stmt.value.args) == 0
+                ):
                     # set() constructor call is also an empty literal
                     is_empty_literal = True
 
@@ -744,7 +768,7 @@ class MGenPythonToCConverter:
                     self.container_variables[var_name] = {
                         "type": type_annotation,
                         "element_type": "int",
-                        "c_type": c_type
+                        "c_type": c_type,
                     }
 
             if stmt.value:
@@ -1533,11 +1557,12 @@ class MGenPythonToCConverter:
             return result
 
         # Handle dict.values(), dict.keys(), dict.items() iteration
-        elif (isinstance(stmt.iter, ast.Call)
-              and isinstance(stmt.iter.func, ast.Attribute)
-              and stmt.iter.func.attr in ("values", "keys", "items")
-              and isinstance(stmt.iter.func.value, ast.Name)):
-
+        elif (
+            isinstance(stmt.iter, ast.Call)
+            and isinstance(stmt.iter.func, ast.Attribute)
+            and stmt.iter.func.attr in ("values", "keys", "items")
+            and isinstance(stmt.iter.func.value, ast.Name)
+        ):
             dict_name = stmt.iter.func.value.id
             method = stmt.iter.func.attr
 
@@ -1590,9 +1615,12 @@ class MGenPythonToCConverter:
 
             else:  # items
                 # for k, v in dict.items() - tuple unpacking
-                if (not isinstance(stmt.target, ast.Tuple) or len(stmt.target.elts) != 2
+                if (
+                    not isinstance(stmt.target, ast.Tuple)
+                    or len(stmt.target.elts) != 2
                     or not isinstance(stmt.target.elts[0], ast.Name)
-                    or not isinstance(stmt.target.elts[1], ast.Name)):
+                    or not isinstance(stmt.target.elts[1], ast.Name)
+                ):
                     raise UnsupportedFeatureError("dict.items() requires 2-tuple unpacking (for k, v in ...)")
 
                 key_var = stmt.target.elts[0].id
@@ -1662,7 +1690,9 @@ class MGenPythonToCConverter:
                 result += "}"
             else:
                 # Default: vec_int iteration (var_name already set above)
-                result = f"for (size_t {index_var} = 0; {index_var} < vec_int_size(&{container_name}); {index_var}++) {{\n"
+                result = (
+                    f"for (size_t {index_var} = 0; {index_var} < vec_int_size(&{container_name}); {index_var}++) {{\n"
+                )
                 result += f"    int {var_name} = *vec_int_at(&{container_name}, {index_var});\n"
                 for line in body:
                     result += f"    {line}\n"
@@ -2131,19 +2161,19 @@ class MGenPythonToCConverter:
         if isinstance(generator.target, ast.Tuple):
             if len(generator.target.elts) != 2:
                 raise UnsupportedFeatureError("Only 2-element tuple unpacking supported in comprehensions")
-            if (not isinstance(generator.target.elts[0], ast.Name)
-                or not isinstance(generator.target.elts[1], ast.Name)):
+            if not isinstance(generator.target.elts[0], ast.Name) or not isinstance(generator.target.elts[1], ast.Name):
                 raise UnsupportedFeatureError("Only simple names in tuple unpacking supported")
 
             key_var = generator.target.elts[0].id
             value_var = generator.target.elts[1].id
 
             # Must be iterating over .items() method
-            if (isinstance(generator.iter, ast.Call)
+            if (
+                isinstance(generator.iter, ast.Call)
                 and isinstance(generator.iter.func, ast.Attribute)
                 and generator.iter.func.attr == "items"
-                and isinstance(generator.iter.func.value, ast.Name)):
-
+                and isinstance(generator.iter.func.value, ast.Name)
+            ):
                 dict_name = generator.iter.func.value.id
                 dict_type = self.variable_context.get(dict_name, "map_int_int")
 

@@ -18,4 +18,4 @@ mgen build --to rust app.py
 ```sh
 
 mgen init -t rust 
-
+```

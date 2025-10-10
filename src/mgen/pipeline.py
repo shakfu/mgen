@@ -126,7 +126,9 @@ class PipelineConfig:
     enable_advanced_analysis: bool = True
     enable_optimizations: bool = True
     enable_formal_verification: bool = False  # Z3-based formal verification (optional)
-    strict_verification: bool = False  # Halt code generation on verification failures (requires enable_formal_verification)
+    strict_verification: bool = (
+        False  # Halt code generation on verification failures (requires enable_formal_verification)
+    )
     backend_preferences: Optional[BackendPreferences] = None
     progress_callback: Optional[Callable[[PipelinePhase, str], None]] = None
 
@@ -236,8 +238,7 @@ class MGenPipeline:
             if self.config.enable_formal_verification:
                 if not Z3_AVAILABLE:
                     self.log.warning(
-                        "Formal verification requested but Z3 not available. "
-                        "Install with: pip install mgen[z3]"
+                        "Formal verification requested but Z3 not available. Install with: pip install mgen[z3]"
                     )
                     if self.config.strict_verification:
                         self.log.error(
@@ -334,7 +335,9 @@ class MGenPipeline:
 
             # Phase 5: Target Optimization
             self.log.debug("Starting target optimization phase")
-            self._report_progress(PipelinePhase.TARGET_OPTIMIZATION, f"Optimizing {self.config.target_language.upper()} code")
+            self._report_progress(
+                PipelinePhase.TARGET_OPTIMIZATION, f"Optimizing {self.config.target_language.upper()} code"
+            )
             target_optimized = self._target_optimization_phase(mapped_result, result)
 
             # Phase 6: Generation
@@ -386,9 +389,13 @@ class MGenPipeline:
                     # Add memory safety warnings/errors
                     for warning in memory_warnings:
                         if warning.severity == "error":
-                            result.errors.append(f"[{warning.violation_type.value}] {warning.message} (line {warning.line})")
+                            result.errors.append(
+                                f"[{warning.violation_type.value}] {warning.message} (line {warning.line})"
+                            )
                         else:
-                            result.warnings.append(f"[{warning.violation_type.value}] {warning.message} (line {warning.line})")
+                            result.warnings.append(
+                                f"[{warning.violation_type.value}] {warning.message} (line {warning.line})"
+                            )
 
                     # Fail if there are critical memory safety errors
                     critical_errors = [w for w in memory_warnings if w.severity == "error"]

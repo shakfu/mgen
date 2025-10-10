@@ -9,13 +9,15 @@ The LLVM backend now supports **two compilation modes**:
 
 ## When to Use Each Mode
 
-### Use JIT Mode For:
+### Use JIT Mode For
+
 - **Development and testing** - 7.7x faster total time
 - **Rapid iteration** - No intermediate files (*.o, executables)
 - **Interactive debugging** - Execute code directly from IR
 - **Quick prototyping** - Faster compile-test cycles
 
-### Use AOT Mode For:
+### Use AOT Mode For
+
 - **Production deployment** - Standalone executables
 - **Distribution** - No llvmlite runtime dependency
 - **Cross-platform builds** - Target different architectures
@@ -32,6 +34,7 @@ Benchmark: `fibonacci.py` (fibonacci(29))
 | Total Time | 162ms | 1249ms | **7.7x faster** |
 
 **Note**: JIT execution is faster because:
+
 - No subprocess overhead for running executable
 - Code already "warm" in memory
 - No disk I/O for executable creation
@@ -129,10 +132,12 @@ Main class for JIT compilation and execution.
 Convenience function to compile and execute LLVM IR file.
 
 **Args:**
+
 - `llvm_ir_file`: Path to .ll file
 - `verbose`: Print debug information
 
 **Returns:**
+
 - Return value from main() function
 
 ## Limitations
@@ -215,7 +220,7 @@ uv run pytest tests/test_jit_executor.py -v
 
 ### Architecture
 
-```
+```text
 Python AST → Static IR → LLVM IR → Execution Engine (JIT)
                                  ↘ llc → clang → Executable (AOT)
 ```

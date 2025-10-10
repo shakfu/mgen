@@ -51,8 +51,8 @@ class LLVMRuntimeDeclarations:
 
         vec_int_type.set_body(
             ir.IntType(64).as_pointer(),  # data
-            ir.IntType(64),                # size
-            ir.IntType(64),                # capacity
+            ir.IntType(64),  # size
+            ir.IntType(64),  # capacity
         )
 
         self.struct_types["vec_int"] = vec_int_type
@@ -155,9 +155,9 @@ class LLVMRuntimeDeclarations:
             return vec_vec_int_type
 
         vec_vec_int_type.set_body(
-            vec_int_ptr,       # data: vec_int* (pointer to array of vec_int)
-            ir.IntType(64),    # size
-            ir.IntType(64),    # capacity
+            vec_int_ptr,  # data: vec_int* (pointer to array of vec_int)
+            ir.IntType(64),  # size
+            ir.IntType(64),  # capacity
         )
 
         self.struct_types["vec_vec_int"] = vec_vec_int_type
@@ -227,12 +227,12 @@ class LLVMRuntimeDeclarations:
             return string_array_type
 
         i8_ptr = ir.IntType(8).as_pointer()  # char*
-        i8_ptr_ptr = i8_ptr.as_pointer()      # char**
+        i8_ptr_ptr = i8_ptr.as_pointer()  # char**
 
         string_array_type.set_body(
-            i8_ptr_ptr,        # strings: char**
-            ir.IntType(64),    # count: size_t
-            ir.IntType(64),    # capacity: size_t
+            i8_ptr_ptr,  # strings: char**
+            ir.IntType(64),  # count: size_t
+            ir.IntType(64),  # capacity: size_t
         )
 
         self.struct_types["string_array"] = string_array_type
@@ -262,12 +262,12 @@ class LLVMRuntimeDeclarations:
             return vec_str_type
 
         i8_ptr = ir.IntType(8).as_pointer()  # char*
-        i8_ptr_ptr = i8_ptr.as_pointer()      # char**
+        i8_ptr_ptr = i8_ptr.as_pointer()  # char**
 
         vec_str_type.set_body(
-            i8_ptr_ptr,        # data: char**
-            ir.IntType(64),    # size
-            ir.IntType(64),    # capacity
+            i8_ptr_ptr,  # data: char**
+            ir.IntType(64),  # size
+            ir.IntType(64),  # capacity
         )
 
         self.struct_types["vec_str"] = vec_str_type
@@ -278,7 +278,7 @@ class LLVMRuntimeDeclarations:
         vec_str_type = self.get_vec_str_type()
         vec_str_ptr = vec_str_type.as_pointer()
         i8_ptr = ir.IntType(8).as_pointer()  # char*
-        i8_ptr_ptr = i8_ptr.as_pointer()      # char**
+        i8_ptr_ptr = i8_ptr.as_pointer()  # char**
         i64 = ir.IntType(64)
         void = ir.VoidType()
 
@@ -400,9 +400,9 @@ class LLVMRuntimeDeclarations:
         i8_ptr = ir.IntType(8).as_pointer()
 
         map_str_int_type.set_body(
-            i8_ptr,             # entries: map_entry* (treated as opaque i8*)
-            ir.IntType(64),     # size: size_t
-            ir.IntType(64),     # capacity: size_t
+            i8_ptr,  # entries: map_entry* (treated as opaque i8*)
+            ir.IntType(64),  # size: size_t
+            ir.IntType(64),  # capacity: size_t
         )
 
         self.struct_types["map_str_int"] = map_str_int_type
@@ -476,9 +476,9 @@ class LLVMRuntimeDeclarations:
         i8_ptr = ir.IntType(8).as_pointer()
 
         map_int_int_type.set_body(
-            i8_ptr,             # entries: map_int_entry* (treated as opaque i8*)
-            ir.IntType(64),     # size: size_t
-            ir.IntType(64),     # capacity: size_t
+            i8_ptr,  # entries: map_int_entry* (treated as opaque i8*)
+            ir.IntType(64),  # size: size_t
+            ir.IntType(64),  # capacity: size_t
         )
 
         self.struct_types["map_int_int"] = map_int_int_type
@@ -570,9 +570,9 @@ class LLVMRuntimeDeclarations:
         i8_ptr = ir.IntType(8).as_pointer()
 
         set_int_type.set_body(
-            i8_ptr,             # buckets: mgen_set_int_entry_t** (treated as opaque i8*)
-            ir.IntType(64),     # bucket_count: size_t
-            ir.IntType(64),     # size: size_t
+            i8_ptr,  # buckets: mgen_set_int_entry_t** (treated as opaque i8*)
+            ir.IntType(64),  # bucket_count: size_t
+            ir.IntType(64),  # size: size_t
         )
 
         self.struct_types["set_int"] = set_int_type
@@ -584,7 +584,7 @@ class LLVMRuntimeDeclarations:
         set_int_ptr = set_int_type.as_pointer()
         i64 = ir.IntType(64)
         i32 = ir.IntType(32)  # for boolean return (in C, bool -> int)
-        i1 = ir.IntType(1)    # for bool return
+        i1 = ir.IntType(1)  # for bool return
         void = ir.VoidType()
 
         # set_int set_int_init(void)

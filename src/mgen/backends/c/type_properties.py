@@ -23,6 +23,7 @@ class TypeProperties:
         compare_op: Comparison operator/function (e.g., "==", "strcmp")
         hash_fn: Hash function name (e.g., "hash_int", "hash_string")
     """
+
     name: str
     c_type: str
     suffix: str
@@ -49,7 +50,6 @@ TYPE_REGISTRY: dict[str, TypeProperties] = {
         compare_op="==",
         hash_fn="hash_int",
     ),
-
     "float": TypeProperties(
         name="float",
         c_type="float",
@@ -62,7 +62,6 @@ TYPE_REGISTRY: dict[str, TypeProperties] = {
         compare_op="==",  # Note: float equality is tricky, but we use == for now
         hash_fn="hash_float",
     ),
-
     "double": TypeProperties(
         name="double",
         c_type="double",
@@ -75,7 +74,6 @@ TYPE_REGISTRY: dict[str, TypeProperties] = {
         compare_op="==",
         hash_fn="hash_double",
     ),
-
     "bool": TypeProperties(
         name="bool",
         c_type="bool",
@@ -88,7 +86,6 @@ TYPE_REGISTRY: dict[str, TypeProperties] = {
         compare_op="==",
         hash_fn="hash_int",  # Reuse int hash for bool (0 or 1)
     ),
-
     "char": TypeProperties(
         name="char",
         c_type="char",
@@ -101,20 +98,18 @@ TYPE_REGISTRY: dict[str, TypeProperties] = {
         compare_op="==",
         hash_fn="hash_int",  # Reuse int hash for char
     ),
-
     "str": TypeProperties(
         name="str",
         c_type="char*",
         suffix="str",
         is_pointer=True,
-        needs_drop=True,   # Needs free()
-        needs_copy=True,   # Needs strdup()
+        needs_drop=True,  # Needs free()
+        needs_copy=True,  # Needs strdup()
         printf_fmt="%s",
         zero_value="NULL",
         compare_op="strcmp",
         hash_fn="hash_string",
     ),
-
     "cstr": TypeProperties(
         name="cstr",
         c_type="char*",

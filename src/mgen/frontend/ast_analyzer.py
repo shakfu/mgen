@@ -220,14 +220,16 @@ class ASTAnalyzer(ast.NodeVisitor):
                             name=var_name,
                             type_info=None,  # Will be inferred
                             is_parameter=False,
-                            scope="local"
+                            scope="local",
                         )
                         var_info.is_modified = True
                         var_info.usage_count = 1
                         self.result.functions[self.current_function].local_variables[var_name] = var_info
                     else:
                         # Global variables still require explicit annotation
-                        self.result.errors.append(f"Global variable '{var_name}' used without type annotation declaration")
+                        self.result.errors.append(
+                            f"Global variable '{var_name}' used without type annotation declaration"
+                        )
                         self.result.convertible = False
                 else:
                     var_info.is_modified = True

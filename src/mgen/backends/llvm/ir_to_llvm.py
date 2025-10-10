@@ -5,7 +5,7 @@ and generate corresponding LLVM IR instructions.
 """
 
 import ast
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 from llvmlite import ir  # type: ignore[import-untyped]
 
@@ -356,7 +356,10 @@ class IRToLLVMConverter(IRVisitor):
                 right_type = node.right.result_type.base_type
                 if right_type == IRDataType.DICT:
                     # Determine dict type to select appropriate contains function
-                    if node.right.result_type.element_type and node.right.result_type.element_type.base_type == IRDataType.STRING:
+                    if (
+                        node.right.result_type.element_type
+                        and node.right.result_type.element_type.base_type == IRDataType.STRING
+                    ):
                         map_contains_func = self.runtime.get_function("map_str_int_contains")
                     else:
                         map_contains_func = self.runtime.get_function("map_int_int_contains")
@@ -365,7 +368,9 @@ class IRToLLVMConverter(IRVisitor):
                     zero = ir.Constant(ir.IntType(32), 0)
                     return self.builder.icmp_signed("!=", result, zero, name="contains_bool")
 
-        raise NotImplementedError(f"Binary operator '{node.operator}' not implemented for type {node.result_type.base_type}")
+        raise NotImplementedError(
+            f"Binary operator '{node.operator}' not implemented for type {node.result_type.base_type}"
+        )
 
     def _visit_short_circuit_boolean(self, node: IRBinaryOperation) -> ir.Instruction:
         """Handle short-circuit evaluation for 'and' and 'or' operators.
@@ -446,16 +451,16 @@ class IRToLLVMConverter(IRVisitor):
 
             # Determine element type from IR type annotation
             elem_type = None
-            if hasattr(node.result_type, 'element_type') and node.result_type.element_type:
+            if hasattr(node.result_type, "element_type") and node.result_type.element_type:
                 elem_type = node.result_type.element_type.base_type
             elif isinstance(node.value, list) and len(node.value) > 0:
                 # Fallback: infer from first element
                 first_elem = node.value[0]
-                if hasattr(first_elem, 'result_type'):
+                if hasattr(first_elem, "result_type"):
                     elem_type = first_elem.result_type.base_type
 
             # Select appropriate vec_* type based on element type
-            is_2d_list = (elem_type == IRDataType.LIST)
+            is_2d_list = elem_type == IRDataType.LIST
 
             if elem_type == IRDataType.LIST:
                 # 2D list: vec_vec_int
@@ -583,12 +588,12 @@ class IRToLLVMConverter(IRVisitor):
             # String literals are stored as global constants
             # Create a null-terminated string
             str_value = str(node.value)
-            str_bytes = (str_value + '\0').encode('utf-8')
+            str_bytes = (str_value + "\0").encode("utf-8")
             str_const = ir.Constant(ir.ArrayType(ir.IntType(8), len(str_bytes)), bytearray(str_bytes))
 
             # Create global variable for the string
             str_global = ir.GlobalVariable(self.module, str_const.type, name=f"str_{len(self.module.globals)}")
-            str_global.linkage = 'internal'
+            str_global.linkage = "internal"
             str_global.global_constant = True
             str_global.initializer = str_const
 
@@ -663,9 +668,11 @@ class IRToLLVMConverter(IRVisitor):
         generator = ast_node.generators[0]
 
         # Determine iteration type: range() or list iteration
-        is_range_iter = (isinstance(generator.iter, ast.Call) and
-                        isinstance(generator.iter.func, ast.Name) and
-                        generator.iter.func.id == "range")
+        is_range_iter = (
+            isinstance(generator.iter, ast.Call)
+            and isinstance(generator.iter.func, ast.Name)
+            and generator.iter.func.id == "range"
+        )
 
         if is_range_iter:
             # Handle range() iteration
@@ -1080,19 +1087,21 @@ class IRToLLVMConverter(IRVisitor):
         generator = ast_node.generators[0]
 
         # Determine iteration type: range() or .items()
-        is_range_iter = (isinstance(generator.iter, ast.Call) and
-                        isinstance(generator.iter.func, ast.Name) and
-                        generator.iter.func.id == "range")
+        is_range_iter = (
+            isinstance(generator.iter, ast.Call)
+            and isinstance(generator.iter.func, ast.Name)
+            and generator.iter.func.id == "range"
+        )
 
-        is_items_iter = (isinstance(generator.iter, ast.Call) and
-                        isinstance(generator.iter.func, ast.Attribute) and
-                        generator.iter.func.attr == "items")
+        is_items_iter = (
+            isinstance(generator.iter, ast.Call)
+            and isinstance(generator.iter.func, ast.Attribute)
+            and generator.iter.func.attr == "items"
+        )
 
         if is_items_iter:
             # Handle .items() iteration: {k: v for k, v in dict.items()}
-            return self._visit_dict_comprehension_items(
-                ast_node, generator, result_ptr, map_set_func, key_type
-            )
+            return self._visit_dict_comprehension_items(ast_node, generator, result_ptr, map_set_func, key_type)
         elif not is_range_iter:
             raise NotImplementedError("Dict comprehensions only support range() and .items() iteration")
 
@@ -1211,9 +1220,11 @@ class IRToLLVMConverter(IRVisitor):
         generator = ast_node.generators[0]
 
         # Determine iteration type: range() or set iteration
-        is_range_iter = (isinstance(generator.iter, ast.Call) and
-                        isinstance(generator.iter.func, ast.Name) and
-                        generator.iter.func.id == "range")
+        is_range_iter = (
+            isinstance(generator.iter, ast.Call)
+            and isinstance(generator.iter.func, ast.Name)
+            and generator.iter.func.id == "range"
+        )
 
         if is_range_iter:
             # Handle range() iteration
@@ -1269,7 +1280,7 @@ class IRToLLVMConverter(IRVisitor):
 
             # Detect if we're iterating over a set or list based on LLVM type
             is_set_iter = False
-            if hasattr(iter_expr, 'type') and isinstance(iter_expr.type, ir.PointerType):
+            if hasattr(iter_expr, "type") and isinstance(iter_expr.type, ir.PointerType):
                 pointee_type_str = str(iter_expr.type.pointee)
                 is_set_iter = "set_int" in pointee_type_str
 
@@ -1424,7 +1435,9 @@ class IRToLLVMConverter(IRVisitor):
 
         return self.builder.load(var_ptr, name=node.variable.name)
 
-    def _get_or_create_c_function(self, name: str, ret_type: ir.Type, arg_types: list[ir.Type], var_arg: bool = False) -> ir.Function:
+    def _get_or_create_c_function(
+        self, name: str, ret_type: ir.Type, arg_types: list[ir.Type], var_arg: bool = False
+    ) -> ir.Function:
         """Get or create a C library function declaration.
 
         Args:
@@ -1456,12 +1469,12 @@ class IRToLLVMConverter(IRVisitor):
         if self.builder is None:
             raise RuntimeError("Builder not initialized")
 
-        str_bytes = (str_value + '\0').encode('utf-8')
+        str_bytes = (str_value + "\0").encode("utf-8")
         str_const = ir.Constant(ir.ArrayType(ir.IntType(8), len(str_bytes)), bytearray(str_bytes))
 
         # Create global variable for the string
         str_global = ir.GlobalVariable(self.module, str_const.type, name=f"str_{len(self.module.globals)}")
-        str_global.linkage = 'internal'
+        str_global.linkage = "internal"
         str_global.global_constant = True
         str_global.initializer = str_const
 
@@ -1558,6 +1571,7 @@ class IRToLLVMConverter(IRVisitor):
 
             # Determine list type based on LLVM types
             from llvmlite import ir as llvm_ir
+
             list_ptr_type = list_ptr.type
 
             # Check the pointee type to determine which vec_* type we have
@@ -1594,6 +1608,7 @@ class IRToLLVMConverter(IRVisitor):
 
             # Determine container type based on LLVM type
             from llvmlite import ir as llvm_ir
+
             container_type = container_ptr.type
 
             # Check the pointee type to determine which container we have
@@ -1648,6 +1663,7 @@ class IRToLLVMConverter(IRVisitor):
 
             # Determine container type based on LLVM type
             from llvmlite import ir as llvm_ir
+
             container_type = container_ptr.type
 
             # Check the pointee type to determine which container we have
@@ -1685,6 +1701,7 @@ class IRToLLVMConverter(IRVisitor):
 
             # Determine container type
             from llvmlite import ir as llvm_ir
+
             container_type = container_ptr.type
 
             if isinstance(container_type, llvm_ir.PointerType):
@@ -1840,7 +1857,7 @@ class IRToLLVMConverter(IRVisitor):
                 # Create global string constant for format
                 fmt_const = ir.Constant(ir.ArrayType(ir.IntType(8), len(fmt_bytes)), bytearray(fmt_bytes))
                 fmt_global = ir.GlobalVariable(self.module, fmt_const.type, name=f"fmt_{len(self.module.globals)}")
-                fmt_global.linkage = 'internal'
+                fmt_global.linkage = "internal"
                 fmt_global.global_constant = True
                 fmt_global.initializer = fmt_const
 
@@ -2150,7 +2167,7 @@ class IRToLLVMConverter(IRVisitor):
         if ir_type.base_type == IRDataType.LIST:
             # Lists are represented as pointers to vec_* structs
             # Check element type to determine which vec_* type to use
-            if hasattr(ir_type, 'element_type') and ir_type.element_type:
+            if hasattr(ir_type, "element_type") and ir_type.element_type:
                 elem_type = ir_type.element_type.base_type
 
                 if elem_type == IRDataType.LIST:

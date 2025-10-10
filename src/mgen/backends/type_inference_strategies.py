@@ -161,8 +161,12 @@ class DictInferenceStrategy(TypeInferenceStrategy):
         value_types = [context.infer_recursively(v) for v in value.values if v]
 
         # Check if all keys have the same type AND all values have the same type
-        if (key_types and all(t == key_types[0] for t in key_types) and
-            value_types and all(t == value_types[0] for t in value_types)):
+        if (
+            key_types
+            and all(t == key_types[0] for t in key_types)
+            and value_types
+            and all(t == value_types[0] for t in value_types)
+        ):
             # Homogeneous dict - use specific key/value types
             key_type = key_types[0]
             value_type = value_types[0]

@@ -498,6 +498,7 @@ class EnhancedTypeInferenceEngine:
         if python_type.startswith(("list[", "List[")):
             # Extract element type and map recursively for nested lists
             import re
+
             match = re.match(r"[Ll]ist\[(.+)\]$", python_type)
             if match:
                 element_type_str = match.group(1).strip()
@@ -521,6 +522,7 @@ class EnhancedTypeInferenceEngine:
         elif python_type.startswith(("dict[", "Dict[")):
             # Parse dict[key_type, value_type] to get specific map type
             import re
+
             match = re.match(r"[Dd]ict\[([^,]+),\s*([^\]]+)\]", python_type)
             if match:
                 key_type = match.group(1).strip()

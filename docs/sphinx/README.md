@@ -46,7 +46,7 @@ make clean
 
 ## Documentation Structure
 
-```
+```text
 source/
 ├── index.rst              # Main index page
 ├── conf.py                # Sphinx configuration
@@ -72,6 +72,7 @@ source/
 
 1. Create `.rst` file in `source/guide/`
 2. Add to `index.rst` toctree:
+
    ```rst
    .. toctree::
       :maxdepth: 2
@@ -84,6 +85,7 @@ source/
 
 1. Create `.rst` file in `source/api/`
 2. Use autodoc directives:
+
    ```rst
    .. automodule:: mgen.your_module
       :members:

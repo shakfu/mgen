@@ -27,7 +27,7 @@ from ..errors import MGenError
 
 # Import the pipeline and backends
 from ..pipeline import BuildMode, MGenPipeline, OptimizationLevel, PipelineConfig, PipelinePhase
-from .progress import progress_context, spinner_context
+from .progress import progress_context
 
 BUILD_DIR = "build"
 
@@ -83,16 +83,9 @@ Build Directory Structure:
         # Convert command
         convert_parser = subparsers.add_parser("convert", help="Convert Python to target language")
         convert_parser.add_argument(
-            "-t", "--to",
-            type=str,
-            default="c",
-            help=f"Target language (default: c, available: {backends_str})"
+            "-t", "--to", type=str, default="c", help=f"Target language (default: c, available: {backends_str})"
         )
-        convert_parser.add_argument(
-            "input_files",
-            nargs="+",
-            help="Python file(s) to convert"
-        )
+        convert_parser.add_argument("input_files", nargs="+", help="Python file(s) to convert")
         convert_parser.add_argument(
             "-O",
             "--optimization",
@@ -108,14 +101,10 @@ Build Directory Structure:
             help="Set backend preferences (e.g., --prefer use_native_comprehensions=true)",
         )
         convert_parser.add_argument(
-            "--dry-run",
-            action="store_true",
-            help="Show what would be generated without actually writing files"
+            "--dry-run", action="store_true", help="Show what would be generated without actually writing files"
         )
         convert_parser.add_argument(
-            "--progress",
-            action="store_true",
-            help="Show progress indicators during conversion"
+            "--progress", action="store_true", help="Show progress indicators during conversion"
         )
 
         # Build command
@@ -123,16 +112,9 @@ Build Directory Structure:
             "build", help="Convert Python to target language and build (compile directly or generate build file)"
         )
         build_parser.add_argument(
-            "-t", "--to",
-            type=str,
-            default="c",
-            help=f"Target language (default: c, available: {backends_str})"
+            "-t", "--to", type=str, default="c", help=f"Target language (default: c, available: {backends_str})"
         )
-        build_parser.add_argument(
-            "input_files",
-            nargs="+",
-            help="Python file(s) to build"
-        )
+        build_parser.add_argument("input_files", nargs="+", help="Python file(s) to build")
         build_parser.add_argument(
             "-m", "--makefile", action="store_true", help="Generate Makefile instead of compiling directly"
         )
@@ -152,15 +134,9 @@ Build Directory Structure:
         )
         build_parser.add_argument("--compiler", help="Compiler to use (uses backend default if not specified)")
         build_parser.add_argument(
-            "--dry-run",
-            action="store_true",
-            help="Show what would be built without actually compiling"
+            "--dry-run", action="store_true", help="Show what would be built without actually compiling"
         )
-        build_parser.add_argument(
-            "--progress",
-            action="store_true",
-            help="Show progress indicators during build"
-        )
+        build_parser.add_argument("--progress", action="store_true", help="Show progress indicators during build")
 
         # Clean command
         subparsers.add_parser("clean", help="Clean build directory")
@@ -175,10 +151,7 @@ Build Directory Structure:
             description="Translate all Python files in a directory to target language in build/src",
         )
         batch_parser.add_argument(
-            "--to", "-t",
-            type=str,
-            default="c",
-            help=f"Target language (default: c, available: {backends_str})"
+            "--to", "-t", type=str, default="c", help=f"Target language (default: c, available: {backends_str})"
         )
         batch_parser.add_argument(
             "-s",
@@ -215,9 +188,7 @@ Build Directory Structure:
         batch_parser.add_argument("-b", "--build", action="store_true", help="Build (compile) files after translation")
         batch_parser.add_argument("--compiler", help="Compiler to use (uses backend default if not specified)")
         batch_parser.add_argument(
-            "--progress",
-            action="store_true",
-            help="Show progress indicators during batch conversion"
+            "--progress", action="store_true", help="Show progress indicators during batch conversion"
         )
 
         return parser
@@ -343,7 +314,7 @@ Build Directory Structure:
             return 1
 
         # Parse backend preferences
-        preferences = self.parse_preferences(target, getattr(args, 'prefer', None))
+        preferences = self.parse_preferences(target, getattr(args, "prefer", None))
 
         build_dir = Path(args.build_dir)
 
@@ -357,7 +328,7 @@ Build Directory Structure:
                 return 1
 
         # Dry-run mode
-        if hasattr(args, 'dry_run') and args.dry_run:
+        if hasattr(args, "dry_run") and args.dry_run:
             for input_path in input_files:
                 self.log.info(f"[DRY RUN] Would convert {input_path} to {target.upper()}")
             self.log.info(f"[DRY RUN] Output directory: {build_dir / 'src'}")
@@ -378,7 +349,7 @@ Build Directory Structure:
         )
 
         # Progress tracking
-        show_progress = hasattr(args, 'progress') and args.progress
+        show_progress = hasattr(args, "progress") and args.progress
 
         # Process each file
         failed_files = []
@@ -454,7 +425,7 @@ Build Directory Structure:
             return 1
 
         # Parse backend preferences
-        preferences = self.parse_preferences(target, getattr(args, 'prefer', None))
+        preferences = self.parse_preferences(target, getattr(args, "prefer", None))
 
         # Get input files
         input_files = [Path(f) for f in args.input_files]
@@ -484,11 +455,11 @@ Build Directory Structure:
             mode_desc = "compile directly"
 
         # Dry-run mode
-        if hasattr(args, 'dry_run') and args.dry_run:
+        if hasattr(args, "dry_run") and args.dry_run:
             self.log.info(f"[DRY RUN] Would convert {input_path} to {target.upper()} and {mode_desc}")
             self.log.info(f"[DRY RUN] Build directory: {build_dir}")
             self.log.info(f"[DRY RUN] Optimization level: {args.optimization}")
-            if hasattr(args, 'compiler') and args.compiler:
+            if hasattr(args, "compiler") and args.compiler:
                 self.log.info(f"[DRY RUN] Compiler: {args.compiler}")
             if preferences:
                 self.log.info(f"[DRY RUN] Backend preferences: {preferences}")
@@ -515,7 +486,7 @@ Build Directory Structure:
         )
 
         # Progress tracking
-        show_progress = hasattr(args, 'progress') and args.progress
+        show_progress = hasattr(args, "progress") and args.progress
 
         # Run MGen pipeline
         try:
@@ -638,7 +609,7 @@ Build Directory Structure:
             return 1
 
         # Parse backend preferences
-        preferences = self.parse_preferences(target, getattr(args, 'prefer', None))
+        preferences = self.parse_preferences(target, getattr(args, "prefer", None))
 
         source_dir = args.source_dir
         output_dir = args.output_dir
@@ -685,7 +656,7 @@ Build Directory Structure:
         self.log.info(f"Batch processing {len(python_files)} files from {source_dir} to {output_dir}")
 
         # Progress tracking
-        show_progress = hasattr(args, 'progress') and args.progress
+        show_progress = hasattr(args, "progress") and args.progress
 
         # Process each file
         successful_translations = 0

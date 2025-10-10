@@ -856,8 +856,12 @@ class MGenPythonToOCamlConverter:
         if isinstance(gen.target, ast.Tuple):
             # For dict comprehensions with unpacking, we expect (k, v) pattern
             if len(gen.target.elts) == 2:
-                key_var = self._to_ocaml_var_name(gen.target.elts[0].id) if isinstance(gen.target.elts[0], ast.Name) else "k"
-                value_var = self._to_ocaml_var_name(gen.target.elts[1].id) if isinstance(gen.target.elts[1], ast.Name) else "v"
+                key_var = (
+                    self._to_ocaml_var_name(gen.target.elts[0].id) if isinstance(gen.target.elts[0], ast.Name) else "k"
+                )
+                value_var = (
+                    self._to_ocaml_var_name(gen.target.elts[1].id) if isinstance(gen.target.elts[1], ast.Name) else "v"
+                )
                 target = f"({key_var}, {value_var})"
             else:
                 raise UnsupportedFeatureError("Dict comprehension with tuple unpacking requires exactly 2 elements")
@@ -1093,10 +1097,12 @@ class MGenPythonToOCamlConverter:
             return ""  # Ignore docstrings
 
         # Special handling for .append() method calls - treat as assignment
-        if (isinstance(node.value, ast.Call) and
-            isinstance(node.value.func, ast.Attribute) and
-            node.value.func.attr == "append" and
-            isinstance(node.value.func.value, ast.Name)):
+        if (
+            isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Attribute)
+            and node.value.func.attr == "append"
+            and isinstance(node.value.func.value, ast.Name)
+        ):
             var_name = self._to_ocaml_var_name(node.value.func.value.id)
             args = [self._convert_expression(arg) for arg in node.value.args]
             if args:
@@ -1215,6 +1221,7 @@ class MGenPythonToOCamlConverter:
         """Lazily initialize and return the loop converter."""
         if self._loop_converter is None:
             from .loop_strategies import create_ocaml_loop_converter
+
             self._loop_converter = create_ocaml_loop_converter()
         return self._loop_converter
 

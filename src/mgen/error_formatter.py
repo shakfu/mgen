@@ -7,9 +7,9 @@ like Rust's rustc or TypeScript's tsc.
 import os
 import sys
 from pathlib import Path
-from typing import IO, Any, Optional
+from typing import IO, Optional
 
-from .errors import ErrorCode, ErrorContext, MGenError, SourceLocation
+from .errors import MGenError, SourceLocation
 
 # ANSI color codes
 RESET = "\033[0m"
@@ -102,9 +102,7 @@ class ErrorFormatter:
 
             # Source snippet
             if error.context.source_line:
-                snippet = self._format_source_snippet(
-                    error.context.location, error.context.source_line
-                )
+                snippet = self._format_source_snippet(error.context.location, error.context.source_line)
                 lines.append(snippet)
 
         # Suggestion

@@ -11,13 +11,13 @@ STC (Smart Template Containers) is a modern, header-only C99 container library t
 - **Memory management**: RAII-style automatic cleanup and memory safety
 - **Modern C design**: Clean API that rivals C++ STL performance
 
-**Repository**: https://github.com/stclib/STC
+**Repository**: <https://github.com/stclib/STC>
 **License**: MIT
 **Language**: C99/C11 compatible
 
 ## Directory Structure
 
-```
+```text
 src/cgen/ext/stc/
 ├── include/           # STC header files
 │   ├── stc/          # Core STC headers (vec.h, hmap.h, etc.)
@@ -44,6 +44,7 @@ src/cgen/ext/stc/
 ## Usage Examples
 
 ### Python Code
+
 ```python
 def process_numbers(data: List[int]) -> Dict[int, int]:
     numbers = []
@@ -57,6 +58,7 @@ def process_numbers(data: List[int]) -> Dict[int, int]:
 ```
 
 ### Generated C Code (with STC)
+
 ```c
 #define T NumbersVec, int
 #include <stc/vec.h>
@@ -82,21 +84,25 @@ ResultMap process_numbers(int* data, size_t data_len) {
 ## Benefits
 
 ### 1. Performance
+
 - **Zero runtime overhead**: Template-based approach with compile-time specialization
 - **Cache-friendly**: Contiguous memory allocation for better performance
 - **Optimized algorithms**: Hand-tuned implementations that outperform many alternatives
 
 ### 2. Safety
+
 - **Type safety**: Compile-time type checking prevents many runtime errors
 - **Memory safety**: Automatic cleanup prevents memory leaks
 - **Bounds checking**: Available in debug builds
 
 ### 3. Readability
+
 - **High-level operations**: Generated code uses container operations instead of raw pointers
 - **Standard patterns**: Familiar to C developers who know modern container libraries
 - **Self-documenting**: Container types and operations are explicit
 
 ### 4. Maintainability
+
 - **Less error-prone**: Eliminates manual memory management bugs
 - **Easier debugging**: Clear container operations vs. complex pointer arithmetic
 - **Standard API**: Consistent interface across all container types
@@ -106,18 +112,22 @@ ResultMap process_numbers(int* data, size_t data_len) {
 The STC integration enhances CGen's Python-to-C translation in several ways:
 
 ### 1. Enhanced SimplePythonToCTranslator
+
 The `STCPythonToCTranslator` class extends the basic translator with:
+
 - Automatic detection of Python container types
 - Generation of appropriate STC type definitions
 - Translation of Python container operations to STC calls
 - Automatic cleanup code generation
 
 ### 2. Type System Integration
+
 - Maps Python type annotations to STC container types
 - Supports complex nested types (e.g., `List[Dict[str, int]]`)
 - Provides fallback to traditional C for unsupported types
 
 ### 3. Memory Management
+
 - Automatic generation of container initialization
 - RAII-style cleanup for all containers
 - No manual malloc/free required
@@ -125,6 +135,7 @@ The `STCPythonToCTranslator` class extends the basic translator with:
 ## API Reference
 
 ### Container Code Generation
+
 ```python
 from cgen.ext.stc.containers import STCCodeGenerator
 
@@ -140,6 +151,7 @@ operation = generator.generate_operation_translation("append", "NumbersVec", ["&
 ```
 
 ### Translator Integration
+
 ```python
 from cgen.ext.stc.translator import STCPythonToCTranslator
 
@@ -160,6 +172,7 @@ includes, type_defs = translator.generate_stc_includes_and_types(type_info)
 The STC library is already integrated into CGen. To use it:
 
 1. **Import the STC modules**:
+
    ```python
    from cgen.ext.stc import get_stc_include_path, get_stc_headers
    from cgen.ext.stc.translator import STCPythonToCTranslator
@@ -169,6 +182,7 @@ The STC library is already integrated into CGen. To use it:
    The STC translator can be integrated into existing CGen pipelines to automatically enhance container operations.
 
 3. **Compile generated code**:
+
    ```bash
    # Include STC headers in compilation
    gcc -I$(python -c "from cgen.ext.stc import get_stc_include_path; print(get_stc_include_path())") \
@@ -178,6 +192,7 @@ The STC library is already integrated into CGen. To use it:
 ## Performance Benchmarks
 
 STC containers have been benchmarked to be:
+
 - **Significantly faster** than C++ STL for hash-based operations
 - **Competitive** with hand-optimized C code
 - **More cache-friendly** than many alternatives due to better memory layout
@@ -207,6 +222,7 @@ To contribute to STC integration:
 ## Support
 
 For STC-related issues:
+
 - Check the [STC documentation](https://github.com/stclib/STC)
 - Review CGen's STC integration tests
 - Consult the container mapping tables in `containers.py`

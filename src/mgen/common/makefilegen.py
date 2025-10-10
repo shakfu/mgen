@@ -100,6 +100,7 @@ class Builder:
             if backends_dir.exists():
                 sys.path.insert(0, str(backends_dir.parent))
                 from stc import get_stc_include_path  # type: ignore[import-not-found]
+
                 return get_stc_include_path()
         except ImportError:
             pass
@@ -291,6 +292,7 @@ class MakefileGenerator:
             if backends_dir.exists():
                 sys.path.insert(0, str(backends_dir.parent))
                 from stc import get_stc_include_path  # type: ignore[import-not-found]
+
                 return get_stc_include_path()
         except ImportError:
             pass

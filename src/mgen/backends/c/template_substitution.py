@@ -91,7 +91,6 @@ class TemplateSubstitutionEngine:
             "K_NEEDS_DROP": key_props.needs_drop,
             "K_NEEDS_COPY": key_props.needs_copy,
             "K_IS_POINTER": key_props.is_pointer,
-
             # Value properties
             "V": val_props.c_type,
             "V_SUFFIX": val_props.suffix,
@@ -102,7 +101,6 @@ class TemplateSubstitutionEngine:
             "V_NEEDS_DROP": val_props.needs_drop,
             "V_NEEDS_COPY": val_props.needs_copy,
             "V_IS_POINTER": val_props.is_pointer,
-
             # Combined suffix for type name
             "KV_SUFFIX": f"{key_props.suffix}_{val_props.suffix}",
         }
@@ -172,6 +170,7 @@ class TemplateSubstitutionEngine:
         Returns:
             Template with placeholders substituted
         """
+
         def replace_placeholder(match: re.Match) -> str:
             var_name = match.group(1)
             if var_name in context:
@@ -208,7 +207,7 @@ class TemplateSubstitutionEngine:
                 break
 
             # Append text before conditional
-            result.append(template[pos:start_match.start()])
+            result.append(template[pos : start_match.start()])
 
             # Find matching end tag
             var_name = start_match.group(1)
@@ -222,7 +221,7 @@ class TemplateSubstitutionEngine:
                 continue
 
             # Extract conditional block content
-            block_content = template[start_match.end():end_match.start()]
+            block_content = template[start_match.end() : end_match.start()]
 
             # Evaluate condition
             if var_name in context and context[var_name]:

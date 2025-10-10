@@ -14,6 +14,7 @@ This directory contains real-world example applications demonstrating MGen's cap
 ### CLI Tools
 
 **wordcount.py** - Word frequency counter
+
 - Demonstrates: File I/O, string processing, dictionaries
 - Use case: Text analysis, content analytics
 - Backends: C, C++, Rust, Go, Haskell, OCaml
@@ -21,6 +22,7 @@ This directory contains real-world example applications demonstrating MGen's cap
 ### Data Processing
 
 **csv_stats.py** - CSV statistics calculator
+
 - Demonstrates: Data parsing, numerical computations, aggregations
 - Use case: Data analysis, statistical reporting
 - Backends: C, C++, Rust, Go, Haskell, OCaml
@@ -28,6 +30,7 @@ This directory contains real-world example applications demonstrating MGen's cap
 ### Algorithms
 
 **merge_sort.py** - Merge sort implementation
+
 - Demonstrates: Recursive algorithms, list manipulation
 - Use case: Sorting, algorithm study
 - Backends: C, C++, Rust, Go, Haskell, OCaml
@@ -35,6 +38,7 @@ This directory contains real-world example applications demonstrating MGen's cap
 ### Games
 
 **number_guess.py** - Number guessing game
+
 - Demonstrates: Game logic, conditional flow, user interaction
 - Use case: Interactive applications, learning
 - Backends: C, C++, Rust, Go, Haskell, OCaml
@@ -72,6 +76,7 @@ cd build/src && cargo build --release && ./target/release/merge_sort
 ## Example Features
 
 Each example demonstrates:
+
 - ✅ Type annotations and type inference
 - ✅ Container operations (lists, dicts, sets)
 - ✅ Control flow (loops, conditionals)

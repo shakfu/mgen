@@ -11,11 +11,13 @@ A working prototype demonstrating **inline container code generation** - an alte
 ## Key Concept
 
 Instead of:
+
 ```c
 #include "mgen_str_int_map.h"  // External dependency
 ```
 
 Generate:
+
 ```c
 // ========== Generated Container: str_int_map ==========
 typedef struct mgen_str_int_entry { ... } mgen_str_int_entry_t;
@@ -39,6 +41,7 @@ code = generator.generate_str_int_map()
 ```
 
 **Features**:
+
 - Loads existing runtime library as template
 - Strips includes and header guards
 - Removes error handling macros for self-containment
@@ -48,18 +51,21 @@ code = generator.generate_str_int_map()
 ### 2. Demonstration Program (`demo_generated_containers.py`)
 
 Complete end-to-end example:
+
 1. Generates C program with inline container
 2. Compiles with gcc
 3. Executes and validates output
 4. Single self-contained file
 
 **Run it**:
+
 ```bash
 uv run python examples/generated_containers/demo_generated_containers.py
 ```
 
 **Output**:
-```
+
+```text
 ✅ Generated: wordcount_generated.c (330 lines, 8.3KB)
 ✅ Compilation successful
 ✅ Program executed successfully!
@@ -105,21 +111,25 @@ int main(void) {
 ## Benefits Validated
 
 ✅ **Zero External Dependencies**
+
 - No `#include "mgen_*.h"`
 - Single `.c` file
 - Fully portable
 
 ✅ **Standard C Compilation**
+
 - Works with `gcc -std=c99`
 - No special flags needed
 - Clean compilation, no warnings
 
 ✅ **Self-Contained Programs**
+
 - All code visible in one file
 - Easy to understand and debug
 - No linking complexity
 
 ✅ **Template-Based Generation**
+
 - Reuses existing runtime library code
 - Clean separation: library as template source
 - Foundation for parameterized generation
@@ -148,7 +158,7 @@ examples/generated_containers/
 
 ### Code Size
 
-```
+```text
 Generated file: 330 lines, 8.3KB
   ├── Includes: 4 lines
   ├── Container implementation: ~220 lines
@@ -188,6 +198,7 @@ Generated file: 330 lines, 8.3KB
    - `map_int_int` - Integer-keyed map
 
 2. **Parameterized Generation**:
+
    ```python
    generator.generate_map(key_type="char*", value_type="int")
    generator.generate_map(key_type="int", value_type="int")
@@ -202,19 +213,19 @@ Generated file: 330 lines, 8.3KB
 
 ### Medium Term
 
-4. **Tree-Shaking**: Only generate methods actually used
-5. **Optimization Profiles**: Different implementations for different sizes
-6. **Type-Specific Optimizations**:
+1. **Tree-Shaking**: Only generate methods actually used
+2. **Optimization Profiles**: Different implementations for different sizes
+3. **Type-Specific Optimizations**:
    - String keys: intern common strings
    - Integer keys: perfect hashing for small sets
    - Dense keys: use arrays instead of hash tables
 
 ### Long Term
 
-7. **Generic Templates**: Support arbitrary user types
-8. **Custom Allocators**: Pluggable memory allocation
-9. **Thread Safety**: Generated thread-safe versions when needed
-10. **Complete STC Replacement**: Eliminate all STC dependencies
+1. **Generic Templates**: Support arbitrary user types
+2. **Custom Allocators**: Pluggable memory allocation
+3. **Thread Safety**: Generated thread-safe versions when needed
+4. **Complete STC Replacement**: Eliminate all STC dependencies
 
 ## Documentation References
 
@@ -238,6 +249,7 @@ Generated file: 330 lines, 8.3KB
 ## Conclusion
 
 The prototype **validates the approach**: generating container code inline is:
+
 - ✅ **Feasible** - working implementation
 - ✅ **Clean** - readable generated code
 - ✅ **Practical** - compiles and runs correctly

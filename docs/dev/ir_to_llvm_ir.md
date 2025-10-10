@@ -43,13 +43,13 @@ Using MGen's existing Static Python IR (`static_ir.py`) to target LLVM IR is **s
 
 **Current Usage:** Defined but **not actively used** in pipeline. Current flow:
 
-```
+```text
 Python AST → Backend-specific code generation (6 backends)
 ```
 
 **Proposed Flow:**
 
-```
+```text
 Python AST → Static IR → LLVM IR → Native binary/WebAssembly/etc.
 ```
 
@@ -72,14 +72,14 @@ For reference, current backend status (v0.1.52):
 
 MGen's Static IR was designed to bridge Python AST and code generation. LLVM IR serves the same purpose but with industrial-strength optimization and multiple backend targets.
 
-```
+```text
 Current:  Python AST → [Static IR (unused)] → 6 separate backends
 Proposed: Python AST → Static IR → LLVM IR → Multiple targets
 ```
 
 #### 2. Multiple Targets from One Implementation
 
-```
+```text
 Python AST → Static IR → LLVM IR → {
     - x86_64 native binary
     - ARM native binary
@@ -133,7 +133,7 @@ Python AST → Static IR → LLVM IR → {
 
 ### LLVM Backend Structure
 
-```
+```text
 src/mgen/backends/llvm/
 ├── __init__.py
 ├── backend.py              # LLVMBackend(LanguageBackend)
