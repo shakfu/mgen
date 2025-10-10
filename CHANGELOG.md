@@ -65,6 +65,15 @@ The LLVM backend now supports two compilation modes: AOT (ahead-of-time) for pro
 - Use JIT for development, testing, rapid iteration
 - Use AOT for production deployment (standalone executables)
 
+### Documentation
+
+- **Backend Comparison Guide** (`docs/BACKEND_COMPARISON.md`)
+  - Comprehensive comparison of all 7 backends
+  - Feature coverage analysis (containers, strings, built-ins)
+  - Missing methods documented for each backend
+  - Performance metrics and recommendations
+  - 40+ comparison tables across all dimensions
+
 ## [0.1.80] - 2025-10-10
 
 **LLVM Backend: 100% Benchmarks Complete! 🎉**
