@@ -67,4 +67,33 @@ char* mgen_str_concat(const char* str1, const char* str2);
  */
 char* mgen_strdup(const char* str);
 
+/**
+ * Python str.join() equivalent
+ * Joins strings in array with separator
+ * Example: mgen_str_join(", ", ["a", "b", "c"]) -> "a, b, c"
+ */
+char* mgen_str_join(const char* separator, mgen_string_array_t* strings);
+
+/**
+ * Python str.replace() equivalent
+ * Replaces all occurrences of old with new
+ * Example: mgen_str_replace("hello world", "world", "python") -> "hello python"
+ */
+char* mgen_str_replace(const char* str, const char* old, const char* new_str);
+
+/**
+ * Python str.upper() equivalent
+ */
+char* mgen_str_upper(const char* str);
+
+/**
+ * Python str.startswith() equivalent
+ */
+int mgen_str_startswith(const char* str, const char* prefix);
+
+/**
+ * Python str.endswith() equivalent
+ */
+int mgen_str_endswith(const char* str, const char* suffix);
+
 #endif // MGEN_LLVM_STRING_H

@@ -1762,6 +1762,66 @@ class IRToLLVMConverter(IRVisitor):
             strip_func = self.runtime.get_function("mgen_str_strip")
             return self.builder.call(strip_func, [str_ptr], name="strip_result")
 
+        elif node.function_name == "__method_upper__":
+            # str.upper() -> mgen_str_upper(str)
+            if len(node.arguments) != 1:
+                raise RuntimeError("upper() requires exactly 1 argument (string)")
+
+            str_ptr = node.arguments[0].accept(self)
+            upper_func = self.runtime.get_function("mgen_str_upper")
+            return self.builder.call(upper_func, [str_ptr], name="upper_result")
+
+        elif node.function_name == "__method_replace__":
+            # str.replace(old, new) -> mgen_str_replace(str, old, new)
+            if len(node.arguments) != 3:
+                raise RuntimeError("replace() requires exactly 3 arguments (string, old, new)")
+
+            str_ptr = node.arguments[0].accept(self)
+            old_ptr = node.arguments[1].accept(self)
+            new_ptr = node.arguments[2].accept(self)
+            replace_func = self.runtime.get_function("mgen_str_replace")
+            return self.builder.call(replace_func, [str_ptr, old_ptr, new_ptr], name="replace_result")
+
+        elif node.function_name == "__method_startswith__":
+            # str.startswith(prefix) -> mgen_str_startswith(str, prefix) returns i32
+            if len(node.arguments) != 2:
+                raise RuntimeError("startswith() requires exactly 2 arguments (string, prefix)")
+
+            str_ptr = node.arguments[0].accept(self)
+            prefix_ptr = node.arguments[1].accept(self)
+            startswith_func = self.runtime.get_function("mgen_str_startswith")
+            result = self.builder.call(startswith_func, [str_ptr, prefix_ptr], name="startswith_result")
+            # Convert i32 result to i1 (bool) by comparing with 0
+            return self.builder.icmp_signed("!=", result, ir.Constant(ir.IntType(32), 0), name="startswith_bool")
+
+        elif node.function_name == "__method_endswith__":
+            # str.endswith(suffix) -> mgen_str_endswith(str, suffix) returns i32
+            if len(node.arguments) != 2:
+                raise RuntimeError("endswith() requires exactly 2 arguments (string, suffix)")
+
+            str_ptr = node.arguments[0].accept(self)
+            suffix_ptr = node.arguments[1].accept(self)
+            endswith_func = self.runtime.get_function("mgen_str_endswith")
+            result = self.builder.call(endswith_func, [str_ptr, suffix_ptr], name="endswith_result")
+            # Convert i32 result to i1 (bool) by comparing with 0
+            return self.builder.icmp_signed("!=", result, ir.Constant(ir.IntType(32), 0), name="endswith_bool")
+
+        elif node.function_name == "__method_join__":
+            # separator.join(list) -> mgen_str_join(separator, list)
+            # Note: list should be vec_str* which has same layout as mgen_string_array_t*
+            if len(node.arguments) != 2:
+                raise RuntimeError("join() requires exactly 2 arguments (separator, list)")
+
+            sep_ptr = node.arguments[0].accept(self)
+            list_ptr = node.arguments[1].accept(self)
+
+            # Bitcast vec_str* to mgen_string_array_t* (same layout: char**, size_t, size_t)
+            string_array_ptr_type = self.runtime.get_string_array_type().as_pointer()
+            string_array_ptr = self.builder.bitcast(list_ptr, string_array_ptr_type, name="list_as_string_array")
+
+            join_func = self.runtime.get_function("mgen_str_join")
+            return self.builder.call(join_func, [sep_ptr, string_array_ptr], name="join_result")
+
         elif node.function_name == "__method_values__":
             # dict.values() -> create and return vec_int with all values
             if len(node.arguments) != 1:

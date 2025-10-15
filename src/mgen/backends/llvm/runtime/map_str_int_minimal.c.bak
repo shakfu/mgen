@@ -64,7 +64,7 @@ static void map_str_int_grow(map_str_int* map) {
     map_entry* new_entries = calloc(new_capacity, sizeof(map_entry));
 
     if (!new_entries) {
-        fprintf(stderr, "map_str_int error: Memory allocation failed\n"); exit(1);
+        exit(1);
     }
 
     // Rehash all existing entries
@@ -96,7 +96,7 @@ map_str_int map_str_int_init(void) {
 
     if (!map.entries) {
         map.capacity = 0;
-        fprintf(stderr, "map_str_int error: Memory allocation failed\n"); exit(1);
+        exit(1);
     }
 
     return map;
@@ -105,7 +105,7 @@ map_str_int map_str_int_init(void) {
 // Initialize via pointer (for LLVM calling convention)
 void map_str_int_init_ptr(map_str_int* out) {
     if (!out) {
-        fprintf(stderr, "map_str_int error: NULL pointer passed to map_str_int_init_ptr\n"); exit(1);
+        exit(1);
     }
     *out = map_str_int_init();
 }
@@ -113,7 +113,7 @@ void map_str_int_init_ptr(map_str_int* out) {
 // Set or update key-value pair
 void map_str_int_set(map_str_int* map, const char* key, long long value) {
     if (!map || !key) {
-        fprintf(stderr, "map_str_int error: NULL pointer passed to map_str_int_set\n"); exit(1);
+        exit(1);
     }
 
     // Check if we need to grow
@@ -133,7 +133,7 @@ void map_str_int_set(map_str_int* map, const char* key, long long value) {
         // Allocate and copy key
         entry->key = strdup(key);
         if (!entry->key) {
-            fprintf(stderr, "map_str_int error: Memory allocation failed\n"); exit(1);
+            exit(1);
         }
         entry->is_occupied = 1;
         map->size++;

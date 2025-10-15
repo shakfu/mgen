@@ -17,6 +17,74 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.83] - 2025-10-15
+
+**LLVM Backend: Advanced String Methods & Better Error Messages! 🎉**
+
+The LLVM backend now includes 5 additional string methods (join, replace, upper, startswith, endswith) with comprehensive tests, plus improved error messages across all runtime libraries for better debugging.
+
+### Added
+
+- **String Methods** (`backends/llvm/runtime/mgen_llvm_string.c`)
+  - `mgen_str_join()` - joins string array with separator (~43 lines)
+  - `mgen_str_replace()` - replaces all occurrences of substring (~52 lines)
+  - `mgen_str_upper()` - converts string to uppercase (~11 lines)
+  - `mgen_str_startswith()` - checks if string starts with prefix (~9 lines)
+  - `mgen_str_endswith()` - checks if string ends with suffix (~9 lines)
+  - All methods handle edge cases (empty strings, NULL pointers, etc.)
+
+- **String Method Tests** (`tests/test_llvm_string_methods.py` - NEW, ~420 lines)
+  - TestStringJoin: 4 test methods (basic, empty separator, single element, empty array)
+  - TestStringReplace: 5 test methods (basic, multiple occurrences, no match, longer string, deletion)
+  - TestStringUpper: 3 test methods (basic, mixed case, numbers/special chars)
+  - TestStringStartsWith: 3 test methods (match, no match, empty prefix)
+  - TestStringEndsWith: 3 test methods (match, no match, full string)
+  - TestStringIntegration: 2 test methods combining multiple methods
+  - All 20 tests pass (100% pass rate)
+
+- **LLVM IR Integration** (`backends/llvm/ir_to_llvm.py`)
+  - `__method_upper__` handler with runtime call
+  - `__method_replace__` handler with 3 arguments
+  - `__method_startswith__` handler with i32→i1 conversion
+  - `__method_endswith__` handler with i32→i1 conversion
+  - `__method_join__` handler with vec_str* → mgen_string_array_t* bitcast
+
+- **Runtime Declarations** (`backends/llvm/runtime_decls.py`)
+  - LLVM IR function declarations for all 5 new string methods
+  - Proper type signatures (i8* for char*, i32 for bool returns)
+
+### Changed
+
+- **Better Error Messages** (Runtime Libraries)
+  - `vec_int_minimal.c`: Replaced 5 `exit(1)` calls with descriptive fprintf messages
+    - NULL pointer checks with function names
+    - Index out of bounds with index/size context
+    - Memory allocation failures with capacity context
+  - `map_int_int_minimal.c`: Replaced 4 `exit(1)` calls with descriptive messages
+    - NULL pointer checks with function names
+    - Memory allocation failures with capacity context
+    - Map full errors with detailed context
+  - `map_str_int_minimal.c`: Replaced 6 `exit(1)` calls with descriptive messages
+    - NULL pointer checks for map and key parameters
+    - Memory allocation failures with context
+  - `set_int_minimal.c`: Replaced 4 `exit(1)` calls with descriptive messages
+    - NULL pointer checks with function names
+    - Entry allocation failures with value context
+    - Lazy initialization failures with context
+  - All error messages follow format: `{container} error: {specific message}\n`
+
+### Testing
+
+- **1006 tests passing** (1 skipped, 100% pass rate)
+- **107 LLVM backend tests** (13 in test_backend_llvm_basic.py, 74 in test_backend_llvm_basics.py, 20 in test_llvm_string_methods.py)
+- **9 string operations** now available: split, lower, strip, concat, join, replace, upper, startswith, endswith
+
+### Documentation Impact
+
+- String method count: 4 → 9 (+125% increase)
+- Test count: 13 → 107 (+723% increase, far exceeding roadmap target of 50+)
+- Error message quality: Basic exit(1) → Descriptive context-aware messages
+
 ## [0.1.82] - 2025-10-15
 
 **LLVM Backend: Memory Safety Verification Complete! 🎉**

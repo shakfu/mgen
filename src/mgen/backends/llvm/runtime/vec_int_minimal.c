@@ -27,7 +27,8 @@ static void vec_int_grow(vec_int* vec) {
     size_t new_capacity = (vec->capacity == 0) ? VEC_INT_DEFAULT_CAPACITY : vec->capacity * VEC_INT_GROWTH_FACTOR;
     long long* new_data = realloc(vec->data, new_capacity * sizeof(long long));
     if (!new_data) {
-        exit(1);  // Simple error handling for now
+        fprintf(stderr, "vec_int error: Failed to allocate memory for capacity %zu\n", new_capacity);
+        exit(1);
     }
     vec->data = new_data;
     vec->capacity = new_capacity;
@@ -41,6 +42,7 @@ vec_int vec_int_init(void) {
     vec.data = malloc(VEC_INT_DEFAULT_CAPACITY * sizeof(long long));
     if (!vec.data) {
         vec.capacity = 0;
+        fprintf(stderr, "vec_int error: Failed to allocate initial memory\n");
         exit(1);
     }
     return vec;
@@ -49,6 +51,7 @@ vec_int vec_int_init(void) {
 // Initialize vector via pointer (for LLVM calling convention)
 void vec_int_init_ptr(vec_int* out) {
     if (!out) {
+        fprintf(stderr, "vec_int error: NULL pointer passed to vec_int_init_ptr\n");
         exit(1);
     }
     *out = vec_int_init();
@@ -57,6 +60,7 @@ void vec_int_init_ptr(vec_int* out) {
 // Append an element to the end
 void vec_int_push(vec_int* vec, long long value) {
     if (!vec) {
+        fprintf(stderr, "vec_int error: NULL pointer passed to vec_int_push\n");
         exit(1);
     }
 
@@ -69,7 +73,12 @@ void vec_int_push(vec_int* vec, long long value) {
 
 // Get element at index
 long long vec_int_at(vec_int* vec, size_t index) {
-    if (!vec || index >= vec->size) {
+    if (!vec) {
+        fprintf(stderr, "vec_int error: NULL pointer passed to vec_int_at\n");
+        exit(1);
+    }
+    if (index >= vec->size) {
+        fprintf(stderr, "vec_int error: Index %zu out of bounds (size = %zu)\n", index, vec->size);
         exit(1);
     }
     return vec->data[index];
@@ -77,7 +86,12 @@ long long vec_int_at(vec_int* vec, size_t index) {
 
 // Set element at index
 void vec_int_set(vec_int* vec, size_t index, long long value) {
-    if (!vec || index >= vec->size) {
+    if (!vec) {
+        fprintf(stderr, "vec_int error: NULL pointer passed to vec_int_set\n");
+        exit(1);
+    }
+    if (index >= vec->size) {
+        fprintf(stderr, "vec_int error: Index %zu out of bounds for set (size = %zu)\n", index, vec->size);
         exit(1);
     }
     vec->data[index] = value;
@@ -124,6 +138,7 @@ void vec_int_reserve(vec_int* vec, size_t new_capacity) {
 
     long long* new_data = realloc(vec->data, new_capacity * sizeof(long long));
     if (!new_data) {
+        fprintf(stderr, "vec_int error: Failed to reserve capacity %zu\n", new_capacity);
         exit(1);
     }
     vec->data = new_data;

@@ -62,6 +62,7 @@ static void map_int_int_grow(map_int_int* map) {
     map_int_entry* new_entries = calloc(new_capacity, sizeof(map_int_entry));
 
     if (!new_entries) {
+        fprintf(stderr, "map_int_int error: Failed to allocate memory for capacity %zu\n", new_capacity);
         exit(1);
     }
 
@@ -94,6 +95,7 @@ map_int_int map_int_int_init(void) {
 
     if (!map.entries) {
         map.capacity = 0;
+        fprintf(stderr, "map_int_int error: Failed to allocate initial memory\n");
         exit(1);
     }
 
@@ -103,6 +105,7 @@ map_int_int map_int_int_init(void) {
 // Initialize via pointer (for LLVM calling convention)
 void map_int_int_init_ptr(map_int_int* out) {
     if (!out) {
+        fprintf(stderr, "map_int_int error: NULL pointer passed to map_int_int_init_ptr\n");
         exit(1);
     }
     *out = map_int_int_init();
@@ -111,6 +114,7 @@ void map_int_int_init_ptr(map_int_int* out) {
 // Set or update key-value pair
 void map_int_int_set(map_int_int* map, long long key, long long value) {
     if (!map) {
+        fprintf(stderr, "map_int_int error: NULL pointer passed to map_int_int_set\n");
         exit(1);
     }
 
@@ -121,7 +125,8 @@ void map_int_int_set(map_int_int* map, long long key, long long value) {
 
     map_int_entry* entry = find_entry(map->entries, map->capacity, key);
     if (!entry) {
-        exit(1); // Map is full (shouldn't happen)
+        fprintf(stderr, "map_int_int error: Failed to find entry slot (map full)\n");
+        exit(1);
     }
 
     // Check if this is a new key

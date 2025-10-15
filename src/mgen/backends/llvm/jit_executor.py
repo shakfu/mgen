@@ -8,7 +8,7 @@ from ctypes import CFUNCTYPE, c_int64
 from pathlib import Path
 from typing import Any, Optional
 
-import llvmlite.binding as llvm
+import llvmlite.binding as llvm  # type: ignore[import-untyped]
 
 
 class LLVMJITExecutor:
@@ -83,6 +83,7 @@ class LLVMJITExecutor:
             raise RuntimeError(f"LLVM IR verification failed: {e}") from e
 
         # Add module to execution engine
+        assert self.engine is not None, "Execution engine should be initialized"
         self.engine.add_module(mod)
         self.engine.finalize_object()
         self.engine.run_static_constructors()

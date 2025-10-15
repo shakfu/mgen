@@ -370,6 +370,31 @@ class LLVMRuntimeDeclarations:
         func = ir.Function(self.module, func_type, name="mgen_string_array_free")
         self.function_decls["mgen_string_array_free"] = func
 
+        # char* mgen_str_join(const char* separator, mgen_string_array_t* strings)
+        func_type = ir.FunctionType(i8_ptr, [i8_ptr, string_array_ptr])
+        func = ir.Function(self.module, func_type, name="mgen_str_join")
+        self.function_decls["mgen_str_join"] = func
+
+        # char* mgen_str_replace(const char* str, const char* old, const char* new_str)
+        func_type = ir.FunctionType(i8_ptr, [i8_ptr, i8_ptr, i8_ptr])
+        func = ir.Function(self.module, func_type, name="mgen_str_replace")
+        self.function_decls["mgen_str_replace"] = func
+
+        # char* mgen_str_upper(const char* str)
+        func_type = ir.FunctionType(i8_ptr, [i8_ptr])
+        func = ir.Function(self.module, func_type, name="mgen_str_upper")
+        self.function_decls["mgen_str_upper"] = func
+
+        # int mgen_str_startswith(const char* str, const char* prefix)
+        func_type = ir.FunctionType(ir.IntType(32), [i8_ptr, i8_ptr])
+        func = ir.Function(self.module, func_type, name="mgen_str_startswith")
+        self.function_decls["mgen_str_startswith"] = func
+
+        # int mgen_str_endswith(const char* str, const char* suffix)
+        func_type = ir.FunctionType(ir.IntType(32), [i8_ptr, i8_ptr])
+        func = ir.Function(self.module, func_type, name="mgen_str_endswith")
+        self.function_decls["mgen_str_endswith"] = func
+
     def get_map_str_int_type(self) -> ir.Type:
         """Get or create map_str_int struct type.
 

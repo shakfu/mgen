@@ -163,3 +163,137 @@ char* mgen_str_concat(const char* str1, const char* str2) {
 
     return result;
 }
+
+char* mgen_str_join(const char* separator, mgen_string_array_t* strings) {
+    if (!strings || strings->count == 0) {
+        return mgen_strdup("");
+    }
+
+    if (strings->count == 1) {
+        return mgen_strdup(strings->strings[0]);
+    }
+
+    const char* sep = separator ? separator : "";
+    size_t sep_len = strlen(sep);
+
+    // Calculate total length needed
+    size_t total_len = 0;
+    for (size_t i = 0; i < strings->count; i++) {
+        total_len += strlen(strings->strings[i]);
+        if (i < strings->count - 1) {
+            total_len += sep_len;
+        }
+    }
+
+    // Allocate result
+    char* result = malloc(total_len + 1);
+    if (!result) return NULL;
+
+    // Build joined string
+    char* ptr = result;
+    for (size_t i = 0; i < strings->count; i++) {
+        const char* str = strings->strings[i];
+        size_t str_len = strlen(str);
+
+        memcpy(ptr, str, str_len);
+        ptr += str_len;
+
+        // Add separator (except after last string)
+        if (i < strings->count - 1 && sep_len > 0) {
+            memcpy(ptr, sep, sep_len);
+            ptr += sep_len;
+        }
+    }
+    *ptr = '\0';
+
+    return result;
+}
+
+char* mgen_str_replace(const char* str, const char* old, const char* new_str) {
+    if (!str || !old || !new_str) return mgen_strdup(str);
+    if (old[0] == '\0') return mgen_strdup(str);
+
+    size_t old_len = strlen(old);
+    size_t new_len = strlen(new_str);
+
+    // Count occurrences of old in str
+    size_t count = 0;
+    const char* p = str;
+    while ((p = strstr(p, old)) != NULL) {
+        count++;
+        p += old_len;
+    }
+
+    if (count == 0) {
+        return mgen_strdup(str);
+    }
+
+    // Calculate new string length
+    size_t str_len = strlen(str);
+    size_t result_len = str_len + count * (new_len - old_len);
+
+    // Allocate result
+    char* result = malloc(result_len + 1);
+    if (!result) return NULL;
+
+    // Build result string
+    char* dst = result;
+    const char* src = str;
+    while (*src) {
+        const char* match = strstr(src, old);
+        if (match) {
+            // Copy text before match
+            size_t prefix_len = match - src;
+            memcpy(dst, src, prefix_len);
+            dst += prefix_len;
+
+            // Copy replacement
+            memcpy(dst, new_str, new_len);
+            dst += new_len;
+
+            // Move past matched text
+            src = match + old_len;
+        } else {
+            // Copy remaining text
+            strcpy(dst, src);
+            break;
+        }
+    }
+
+    return result;
+}
+
+char* mgen_str_upper(const char* str) {
+    if (!str) return NULL;
+
+    char* result = mgen_strdup(str);
+    if (!result) return NULL;
+
+    for (char* p = result; *p; p++) {
+        *p = toupper((unsigned char)*p);
+    }
+
+    return result;
+}
+
+int mgen_str_startswith(const char* str, const char* prefix) {
+    if (!str || !prefix) return 0;
+
+    size_t str_len = strlen(str);
+    size_t prefix_len = strlen(prefix);
+
+    if (prefix_len > str_len) return 0;
+
+    return strncmp(str, prefix, prefix_len) == 0;
+}
+
+int mgen_str_endswith(const char* str, const char* suffix) {
+    if (!str || !suffix) return 0;
+
+    size_t str_len = strlen(str);
+    size_t suffix_len = strlen(suffix);
+
+    if (suffix_len > str_len) return 0;
+
+    return strcmp(str + str_len - suffix_len, suffix) == 0;
+}

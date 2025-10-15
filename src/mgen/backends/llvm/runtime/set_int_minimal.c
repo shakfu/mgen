@@ -33,6 +33,7 @@ static size_t set_int_hash(long long value, size_t bucket_count) {
 static mgen_set_int_entry_t* set_int_entry_new(long long value) {
     mgen_set_int_entry_t* entry = malloc(sizeof(mgen_set_int_entry_t));
     if (!entry) {
+        fprintf(stderr, "set_int error: Failed to allocate entry for value %lld\n", value);
         exit(1);
     }
     entry->value = value;
@@ -57,6 +58,7 @@ set_int set_int_init(void) {
     set.buckets = calloc(SET_INT_DEFAULT_BUCKET_COUNT, sizeof(mgen_set_int_entry_t*));
     if (!set.buckets) {
         set.bucket_count = 0;
+        fprintf(stderr, "set_int error: Failed to allocate initial memory\n");
         exit(1);
     }
     return set;
@@ -65,6 +67,7 @@ set_int set_int_init(void) {
 // Initialize set via pointer (for LLVM calling convention)
 void set_int_init_ptr(set_int* out) {
     if (!out) {
+        fprintf(stderr, "set_int error: NULL pointer passed to set_int_init_ptr\n");
         exit(1);
     }
     *out = set_int_init();
@@ -73,6 +76,7 @@ void set_int_init_ptr(set_int* out) {
 // Insert an element
 bool set_int_insert(set_int* set, long long value) {
     if (!set) {
+        fprintf(stderr, "set_int error: NULL pointer passed to set_int_insert\n");
         exit(1);
     }
 
@@ -82,6 +86,7 @@ bool set_int_insert(set_int* set, long long value) {
         set->buckets = calloc(SET_INT_DEFAULT_BUCKET_COUNT, sizeof(mgen_set_int_entry_t*));
         if (!set->buckets) {
             set->bucket_count = 0;
+            fprintf(stderr, "set_int error: Failed to allocate buckets during lazy initialization\n");
             exit(1);
         }
     }
