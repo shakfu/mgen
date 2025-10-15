@@ -9,12 +9,12 @@
 MGen can successfully generate LLVM IR that compiles to WebAssembly. This investigation confirms that **WebAssembly is a viable eighth backend target** for MGen, enabling Python-to-WASM compilation via the existing LLVM infrastructure.
 
 **Key Findings:**
-- ✅ LLVM 21.1.3 (Homebrew) has full WebAssembly support (wasm32, wasm64)
-- ✅ llvmlite can target WebAssembly and generate object files
-- ✅ MGen-generated LLVM IR compiles successfully to WebAssembly objects
-- ✅ Pure functions (no runtime dependencies) work out-of-the-box
-- ⚠️ Runtime library integration requires additional work
-- ⚠️ Linking step needs external tooling (wasm-ld, Emscripten, or WASI SDK)
+- [x] LLVM 21.1.3 (Homebrew) has full WebAssembly support (wasm32, wasm64)
+- [x] llvmlite can target WebAssembly and generate object files
+- [x] MGen-generated LLVM IR compiles successfully to WebAssembly objects
+- [x] Pure functions (no runtime dependencies) work out-of-the-box
+- [!] Runtime library integration requires additional work
+- [!] Linking step needs external tooling (wasm-ld, Emscripten, or WASI SDK)
 
 ## Investigation Methodology
 
@@ -62,7 +62,7 @@ target_machine = target.create_target_machine(opt=2)
 obj_code = target_machine.emit_object(llvm_module)
 ```
 
-**Result:** ✅ Successfully generated 257-byte WebAssembly object file
+**Result:** [x] Successfully generated 257-byte WebAssembly object file
 
 ### 3. MGen-Generated IR Compilation
 
@@ -91,7 +91,7 @@ uv run mgen build fibonacci.py -t llvm
 - Generated WASM object: 616 bytes
 - WebAssembly text (WAT): 2,510 bytes
 
-**Result:** ✅ Successfully compiled MGen IR to WebAssembly
+**Result:** [x] Successfully compiled MGen IR to WebAssembly
 
 ### 4. WebAssembly Output Analysis
 
@@ -154,10 +154,10 @@ declare i64 @vec_int_at(%struct.vec_int* %".1", i64 %".2")
 - Start function
 
 **Current Tools:**
-- `llc` (LLVM): Generates `.wasm` object files ✅
-- `wasm-ld` (LLVM): Links WASM objects → runnable module ❌ (not installed)
-- `emcc` (Emscripten): Complete LLVM→WASM toolchain ❌ (not installed)
-- `wasi-sdk`: Standalone WASM compilation ❌ (not installed)
+- `llc` (LLVM): Generates `.wasm` object files [x]
+- `wasm-ld` (LLVM): Links WASM objects → runnable module [X] (not installed)
+- `emcc` (Emscripten): Complete LLVM→WASM toolchain [X] (not installed)
+- `wasi-sdk`: Standalone WASM compilation [X] (not installed)
 
 **Solution Options:**
 1. **Add wasm-ld dependency** (`brew install llvm` includes it on some platforms)
@@ -191,10 +191,10 @@ declare i64 @vec_int_at(%struct.vec_int* %".1", i64 %".2")
 - print() statements
 
 **Capabilities:**
-- Arithmetic operations ✅
-- Control flow (if/else, for/while) ✅
-- Function calls and recursion ✅
-- Integer/float types ✅
+- Arithmetic operations [x]
+- Control flow (if/else, for/while) [x]
+- Function calls and recursion [x]
+- Integer/float types [x]
 
 **Implementation:**
 1. Add `wasm32` target to LLVM backend
@@ -297,10 +297,10 @@ Path("fibonacci.wasm").write_bytes(wasm_obj)
 ```
 
 **Results:**
-- ✅ Python → LLVM IR: 5,363 bytes
-- ✅ LLVM IR → WASM object: 616 bytes
-- ✅ Module verifies successfully
-- ✅ Functions: `fibonacci(i64) -> i64`, `main() -> i64`
+- [x] Python → LLVM IR: 5,363 bytes
+- [x] LLVM IR → WASM object: 616 bytes
+- [x] Module verifies successfully
+- [x] Functions: `fibonacci(i64) -> i64`, `main() -> i64`
 
 **Limitation:** Generated object file needs linking to be runnable.
 
@@ -366,7 +366,7 @@ All modern browsers support WebAssembly:
 
 ### Immediate (v0.1.85)
 
-1. **Document findings** ✅ (this report)
+1. **Document findings** [x] (this report)
 2. **Add wasm32 target flag** to LLVM backend
 3. **Implement IR extraction** for pure functions
 4. **Test compilation** with more benchmarks

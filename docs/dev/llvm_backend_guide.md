@@ -339,12 +339,12 @@ common.ret:
 ```
 
 **Optimizations Applied**:
-- ✅ Tail call optimization (`tail call`)
-- ✅ Control flow restructuring
-- ✅ Function attributes (`nofree`, `nosync`, `nounwind`)
-- ✅ Loop transformations
-- ✅ Dead code elimination
-- ✅ Constant propagation
+- [x] Tail call optimization (`tail call`)
+- [x] Control flow restructuring
+- [x] Function attributes (`nofree`, `nosync`, `nounwind`)
+- [x] Loop transformations
+- [x] Dead code elimination
+- [x] Constant propagation
 
 ### Performance Impact
 
@@ -361,7 +361,7 @@ common.ret:
 - O0 (baseline): 85.6ms
 - O1: 83.9ms (+2.0% faster)
 - O2: 84.8ms (+0.9% faster)
-- O3: 54.3ms (**+36.5% faster** 🚀)
+- O3: 54.3ms (**+36.5% faster** )
 
 **IR Size**:
 - Original: 6.0KB
