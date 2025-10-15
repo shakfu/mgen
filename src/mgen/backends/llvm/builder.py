@@ -4,7 +4,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from ..base import AbstractBuilder
 
@@ -96,29 +96,44 @@ run: $(TARGET)
 """
         return makefile
 
-    def compile_direct(self, source_file: str, output_dir: str, enable_asan: bool = False) -> bool:
+    def compile_direct(self, source_file: str, output_dir: str, **kwargs: Any) -> bool:
         """Compile LLVM IR directly to native binary.
 
         Args:
             source_file: Path to LLVM IR (.ll) file
             output_dir: Directory for output files
-            enable_asan: Enable AddressSanitizer for memory error detection
+            **kwargs: Additional options:
+                - enable_asan (bool): Enable AddressSanitizer for memory error detection
+                - opt_level (int): Optimization level (0=O0, 1=O1, 2=O2, 3=O3, default=2)
 
         Returns:
             True if compilation succeeded
         """
+        enable_asan = kwargs.get("enable_asan", False)
+        opt_level = kwargs.get("opt_level", 2)
         try:
             # Use absolute paths to avoid cwd issues
             source_path = Path(source_file).resolve()
             output_path = Path(output_dir).resolve()
             executable_name = source_path.stem
 
-            # Step 1: Compile LLVM IR to object file using llc
+            # Step 0: Apply LLVM optimization passes to IR
+            from .optimizer import LLVMOptimizer
+
+            llvm_ir = source_path.read_text()
+            optimizer = LLVMOptimizer(opt_level=opt_level)
+            optimized_ir = optimizer.optimize(llvm_ir)
+
+            # Write optimized IR to a new file
+            optimized_path = output_path / f"{executable_name}.opt.ll"
+            optimized_path.write_text(optimized_ir)
+
+            # Step 1: Compile optimized LLVM IR to object file using llc
             object_file = output_path / f"{executable_name}.o"
             llc_cmd = [
                 self.llc_path,
                 "-filetype=obj",
-                str(source_path),
+                str(optimized_path),  # Use optimized IR instead of original
                 "-o",
                 str(object_file),
             ]

@@ -95,8 +95,17 @@ class AbstractBuilder(ABC):
         """Get build file name (Makefile, Cargo.toml, etc.)."""
 
     @abstractmethod
-    def compile_direct(self, source_file: str, output_path: str) -> bool:
-        """Compile source directly using language tools."""
+    def compile_direct(self, source_file: str, output_dir: str, **kwargs: Any) -> bool:
+        """Compile source directly using language tools.
+
+        Args:
+            source_file: Path to source file
+            output_dir: Path to output directory
+            **kwargs: Additional backend-specific arguments (e.g., opt_level for LLVM)
+
+        Returns:
+            True if compilation succeeded
+        """
 
     @abstractmethod
     def get_compile_flags(self) -> list[str]:

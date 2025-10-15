@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from ...common.makefilegen import MakefileGenerator
 from ..base import AbstractBuilder
@@ -52,7 +52,7 @@ class CppBuilder(AbstractBuilder):
 
         return generator.generate_makefile()
 
-    def compile_direct(self, source_file: str, output_dir: str) -> bool:
+    def compile_direct(self, source_file: str, output_dir: str, **kwargs: Any) -> bool:
         """Compile C++ source directly to executable."""
         try:
             source_path = Path(source_file)

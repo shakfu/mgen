@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from ..base import AbstractBuilder
 from ..preferences import BackendPreferences, OCamlPreferences
@@ -166,7 +166,7 @@ class OCamlBuilder(AbstractBuilder):
         """Get build file name for OCaml."""
         return "dune-project"
 
-    def compile_direct(self, source_file: str, output_dir: str) -> bool:
+    def compile_direct(self, source_file: str, output_dir: str, **kwargs: Any) -> bool:
         """Compile OCaml source directly using ocamlc via opam."""
         base_path = Path(output_dir)
         source_path = Path(source_file)

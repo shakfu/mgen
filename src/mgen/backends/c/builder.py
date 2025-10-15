@@ -2,6 +2,7 @@
 
 import subprocess
 from pathlib import Path
+from typing import Any
 
 from ...common.makefilegen import MakefileGenerator
 from ..base import AbstractBuilder
@@ -51,11 +52,11 @@ class CBuilder(AbstractBuilder):
 
         return generator.generate_makefile()
 
-    def compile_direct(self, source_file: str, output_path: str) -> bool:
+    def compile_direct(self, source_file: str, output_dir: str, **kwargs: Any) -> bool:
         """Compile C source directly using gcc with MGen runtime support."""
         try:
             source_path = Path(source_file)
-            output_dir = Path(output_path)
+            out_dir = Path(output_dir)
             executable_name = source_path.stem
 
             # Build gcc command with base flags
@@ -80,7 +81,7 @@ class CBuilder(AbstractBuilder):
                 cmd.extend(self.get_runtime_sources())
 
             # Add main source file and output
-            cmd.extend([str(source_path), "-o", str(output_dir / executable_name)])
+            cmd.extend([str(source_path), "-o", str(out_dir / executable_name)])
 
             # Run compilation
             result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)

@@ -101,8 +101,8 @@
 
 **Remaining for Enhancement**:
 
-- [ ] Performance benchmarking vs other backends
-- [ ] LLVM optimization pass tuning
+- [x] Performance benchmarking vs other backends
+- [x] LLVM optimization pass tuning
 - [ ] WebAssembly target exploration
 
 **Effort**: 1-2 weeks (lower priority, backend is production-ready)

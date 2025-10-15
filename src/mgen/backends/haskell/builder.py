@@ -3,6 +3,7 @@
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
 
 from ..base import AbstractBuilder
 
@@ -51,17 +52,17 @@ executable {target_name}
 """
         return cabal_content
 
-    def compile_direct(self, source_file: str, output_path: str) -> bool:
+    def compile_direct(self, source_file: str, output_dir: str, **kwargs: Any) -> bool:
         """Compile Haskell source directly using GHC."""
         try:
             source_path = Path(source_file)
-            output_dir = Path(output_path)
+            out_dir = Path(output_dir)
             executable_name = source_path.stem
 
             # Copy runtime module if it exists
             runtime_src = Path(__file__).parent / "runtime" / "MGenRuntime.hs"
             if runtime_src.exists():
-                runtime_dst = output_dir / "MGenRuntime.hs"
+                runtime_dst = out_dir / "MGenRuntime.hs"
                 shutil.copy2(runtime_src, runtime_dst)
 
             # Build GHC command
@@ -69,14 +70,14 @@ executable {target_name}
                 "ghc",
                 str(source_path),
                 "-o",
-                str(output_dir / executable_name),
+                str(out_dir / executable_name),
                 "-XOverloadedStrings",
                 "-XFlexibleInstances",
                 "-XTypeSynonymInstances",
             ]
 
             # Add runtime if it was copied
-            runtime_path = output_dir / "MGenRuntime.hs"
+            runtime_path = out_dir / "MGenRuntime.hs"
             if runtime_path.exists():
                 cmd.extend([str(runtime_path)])
 

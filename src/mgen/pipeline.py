@@ -732,7 +732,26 @@ class MGenPipeline:
 
             elif self.config.build_mode == BuildMode.DIRECT:
                 # Direct compilation using backend
-                success = self.builder.compile_direct(str(source_file_path), str(output_dir))
+                # Pass optimization level to builder (LLVM backend uses this)
+                opt_level_map = {
+                    OptimizationLevel.NONE: 0,
+                    OptimizationLevel.BASIC: 1,
+                    OptimizationLevel.MODERATE: 2,
+                    OptimizationLevel.AGGRESSIVE: 3,
+                }
+                opt_level = opt_level_map.get(self.config.optimization_level, 2)
+
+                # Check if builder supports opt_level parameter (LLVM does)
+                import inspect
+
+                sig = inspect.signature(self.builder.compile_direct)
+                if "opt_level" in sig.parameters:
+                    success = self.builder.compile_direct(
+                        str(source_file_path), str(output_dir), opt_level=opt_level
+                    )
+                else:
+                    success = self.builder.compile_direct(str(source_file_path), str(output_dir))
+
                 if success:
                     executable_path = output_dir / source_file_path.stem
                     result.executable_path = str(executable_path)
