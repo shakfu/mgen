@@ -96,12 +96,13 @@ run: $(TARGET)
 """
         return makefile
 
-    def compile_direct(self, source_file: str, output_dir: str) -> bool:
+    def compile_direct(self, source_file: str, output_dir: str, enable_asan: bool = False) -> bool:
         """Compile LLVM IR directly to native binary.
 
         Args:
             source_file: Path to LLVM IR (.ll) file
             output_dir: Directory for output files
+            enable_asan: Enable AddressSanitizer for memory error detection
 
         Returns:
             True if compilation succeeded
@@ -156,6 +157,10 @@ run: $(TARGET)
                         str(runtime_dir),  # Include runtime headers
                     ]
 
+                    # Add ASAN flags if requested
+                    if enable_asan:
+                        clang_compile_runtime_cmd.extend(["-fsanitize=address", "-g"])
+
                     result = subprocess.run(clang_compile_runtime_cmd, capture_output=True, text=True)
                     if result.returncode != 0:
                         print(f"Runtime compilation failed for {runtime_source}: {result.stderr}")
@@ -172,6 +177,10 @@ run: $(TARGET)
                 "-o",
                 str(executable_path),
             ]
+
+            # Add ASAN flags to linker if requested
+            if enable_asan:
+                clang_cmd.extend(["-fsanitize=address", "-g"])
 
             result = subprocess.run(clang_cmd, capture_output=True, text=True)
             if result.returncode != 0:

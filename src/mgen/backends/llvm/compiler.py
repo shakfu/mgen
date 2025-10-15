@@ -54,6 +54,7 @@ class LLVMCompiler:
         output_path: str,
         linker: str = "clang",
         link_args: Optional[list[str]] = None,
+        enable_asan: bool = False,
     ) -> bool:
         """Compile LLVM IR to executable.
 
@@ -62,6 +63,7 @@ class LLVMCompiler:
             output_path: Path to output executable
             linker: Linker to use (default: clang)
             link_args: Additional linker arguments
+            enable_asan: Enable AddressSanitizer for memory error detection
 
         Returns:
             True if successful, False otherwise
@@ -74,6 +76,11 @@ class LLVMCompiler:
         try:
             # Link to executable
             cmd = [linker, obj_path, "-o", output_path]
+
+            # Add ASAN flags if requested
+            if enable_asan:
+                cmd.extend(["-fsanitize=address", "-g"])
+
             if link_args:
                 cmd.extend(link_args)
 

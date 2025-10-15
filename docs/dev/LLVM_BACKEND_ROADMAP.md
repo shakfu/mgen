@@ -2,7 +2,7 @@
 
 ## Current Status (Updated: October 10, 2025)
 
-**Benchmark Progress: 7/7 (100%)** 🎉
+**Benchmark Progress: 7/7 (100%)** 
 
 The LLVM backend generates LLVM IR from Python code and compiles to native executables using `llc` and `clang`. Currently supports most Python features with minimal runtime dependencies.
 
@@ -11,21 +11,21 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 - **Features Working**: Full recursion, lists, dicts, sets, strings, comprehensions, set iteration
 - **Architecture**: Python AST → Static IR → LLVM IR → Object File → Executable
 
-## Passing Benchmarks (7/7) ✅
+## Passing Benchmarks (7/7) [x]
 
-1. ✅ **fibonacci** - Recursion, loops, arithmetic → **514229**
-2. ✅ **matmul** - 2D arrays, nested subscripts, matrix multiplication → **120**
-3. ✅ **quicksort** - Recursive list operations, slicing → **5**
-4. ✅ **list_ops** - List comprehensions, append, indexing, len → **166750**
-5. ✅ **dict_ops** - Dictionary operations with int keys → **6065**
-6. ✅ **set_ops** - Set comprehensions with range and set iteration → **234**
-7. ✅ **wordcount** - String operations, dict with string keys → **4**
+1. [x] **fibonacci** - Recursion, loops, arithmetic → **514229**
+2. [x] **matmul** - 2D arrays, nested subscripts, matrix multiplication → **120**
+3. [x] **quicksort** - Recursive list operations, slicing → **5**
+4. [x] **list_ops** - List comprehensions, append, indexing, len → **166750**
+5. [x] **dict_ops** - Dictionary operations with int keys → **6065**
+6. [x] **set_ops** - Set comprehensions with range and set iteration → **234**
+7. [x] **wordcount** - String operations, dict with string keys → **4**
 
 ---
 
 ## Recent Progress (v0.1.52+)
 
-### ✅ LLVM Backend Reaches 100% Benchmarks (Oct 10, 2025)
+### [x] LLVM Backend Reaches 100% Benchmarks (Oct 10, 2025)
 
 - **Set Iteration**: Implemented full set iteration in comprehensions and for loops
   - Added `set_int_get_nth_element()` runtime function for index-based iteration
@@ -36,17 +36,17 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
   - Enables proper `map_str_int` vs `map_int_int` selection
 - **Set Constructor**: Added `set()` empty constructor support
 - **Benchmark Fix**: Updated `set_ops.py` to use int values instead of bool for compatibility
-- **Status**: All 7/7 benchmarks passing! 🎉
+- **Status**: All 7/7 benchmarks passing! 
 
-### ✅ Set Comprehensions Implemented (Oct 9, 2025)
+### [x] Set Comprehensions Implemented (Oct 9, 2025)
 
 - **Created**: `set_int_minimal.c` runtime with hash set operations (182 lines)
 - **Implemented**: Hash table with separate chaining, bucket-based storage
 - **Fixed**: ARM64 ABI issue - changed from by-value return to pointer-based initialization
-- **Working**: `{x for x in range(100) if x % 3 == 0}` ✓
+- **Working**: `{x for x in range(100) if x % 3 == 0}` [x]
 - **Status**: Range-based set comprehensions fully functional
 
-### ✅ Comprehensive Type Inference (Oct 9, 2025)
+### [x] Comprehensive Type Inference (Oct 9, 2025)
 
 - **List element types**: `words: list = text.split()` now correctly infers `list[str]`
 - **Dict key types**: `word_counts[string_key] = value` now infers `dict[str, int]`
@@ -55,19 +55,19 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 - **Regular assignments**: Element types propagate through all assignment forms
 - **Impact**: Major improvement in type correctness, fewer manual annotations needed
 
-### ✅ String Operations Fixed (Oct 9, 2025)
+### [x] String Operations Fixed (Oct 9, 2025)
 
 - **Fixed**: `split()` now returns `vec_str*` via bitcast from `mgen_string_array_t*`
 - **Working**: String list iteration, indexing, all string methods
 - **Runtime**: Full string runtime with split, lower, strip, concat
 
-### ✅ Nested Subscript Operations (Oct 2025)
+### [x] Nested Subscript Operations (Oct 2025)
 
 - **Fixed**: 2D array access with chained subscripts (e.g., `a[i][k]`)
 - **Implementation**: Proper handling of vec_vec_int_at → vec_int_at chains
 - **Impact**: Unlocked matmul benchmark
 
-### ✅ LLVM Tool Auto-Detection (Oct 2025)
+### [x] LLVM Tool Auto-Detection (Oct 2025)
 
 - **Fixed**: LLVMBuilder now auto-detects llc and clang in common locations
 - **Supported**: PATH, Homebrew (Apple Silicon and Intel Mac)
@@ -76,7 +76,7 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 
 ## Known Limitations (Resolved)
 
-### 1. ~~Set Iteration in Comprehensions~~ ✅ FIXED (Oct 10, 2025)
+### 1. ~~Set Iteration in Comprehensions~~ [x] FIXED (Oct 10, 2025)
 
 **Status**: Resolved - All benchmarks passing
 
@@ -86,7 +86,7 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 - Modified `_build_for()` to detect and handle set iteration
 - Updated set comprehension generation to use correct iteration functions
 
-### 2. ~~Dict Type Inference for Empty Literals~~ ✅ FIXED (Oct 10, 2025)
+### 2. ~~Dict Type Inference for Empty Literals~~ [x] FIXED (Oct 10, 2025)
 
 **Status**: Resolved - wordcount benchmark passing
 
@@ -100,7 +100,7 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 
 ## Supported Python Features
 
-### Core Language ✅
+### Core Language [x]
 
 - Functions (parameters, return values, recursion)
 - Variables (local, global)
@@ -108,23 +108,23 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 - Operators (arithmetic, comparison, logical, augmented assignment)
 - Type annotations (used for code generation)
 
-### Data Structures ✅
+### Data Structures [x]
 
 - Lists (`list[int]`, `list[str]`, `list[list[int]]`)
 - Dictionaries (`dict[str, int]`, `dict[int, int]`)
 - Sets (`set[int]` - partial support)
 - List comprehensions: `[expr for var in iterable if condition]`
 - Set comprehensions (range-based): `{expr for var in range(n) if condition}`
-- ⚠️ Set comprehensions (set iteration): NOT YET
+- [!] Set comprehensions (set iteration): NOT YET
 
-### Built-in Functions ✅
+### Built-in Functions [x]
 
 - `len()` - Lists, dicts, sets, strings
 - `range()` - Integer ranges
 - `print()` - Integer and string output
 - `min()`, `max()`, `sum()` - Numeric operations
 
-### String Operations ✅
+### String Operations [x]
 
 - `str.split()` - Whitespace or delimiter splitting
 - `str.lower()` - Lowercase conversion
@@ -133,16 +133,16 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 
 ### Container Operations
 
-- ✅ List: `append()`, indexing, slicing (limited), iteration
-- ✅ Dict: indexing, `in` operator, iteration over keys
-- ✅ Set: `insert()` (internal), `in` operator, comprehensions (range), `len()`
-- ⚠️ Set: iteration NOT YET
+- [x] List: `append()`, indexing, slicing (limited), iteration
+- [x] Dict: indexing, `in` operator, iteration over keys
+- [x] Set: `insert()` (internal), `in` operator, comprehensions (range), `len()`
+- [!] Set: iteration NOT YET
 
 ---
 
 ## Missing Container Methods
 
-### Set Operations ❌
+### Set Operations [X]
 
 - `set.add(item)` - Currently uses internal `insert()` only
 - `set.remove(item)` - Remove with error if missing
@@ -150,7 +150,7 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 - `set.clear()` - Remove all elements
 - Set operators: `|` (union), `&` (intersection), `-` (difference)
 
-### Dict Operations ❌
+### Dict Operations [X]
 
 - `dict.keys()` - Returns `list[K]`
 - `dict.values()` - Returns `list[V]`
@@ -158,7 +158,7 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 - `dict.get(key, default)` - Safe access with default
 - `dict.clear()` - Remove all items
 
-### List Operations ❌
+### List Operations [X]
 
 - `list.extend(other)` - Append multiple items
 - `list.insert(index, item)` - Insert at position
@@ -167,7 +167,7 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 - `list.reverse()` - Reverse in-place
 - `list.sort()` - Sort in-place
 
-### String Operations ❌
+### String Operations [X]
 
 - `str.join(list)` - Join strings with separator
 - `str.replace(old, new)` - Replace substring
@@ -201,7 +201,7 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 
 | Metric | LLVM | C++ | Go | Rust | C |
 |--------|------|-----|-----|------|---|
-| **Benchmarks** | 7/7 (100%) ✅ | 7/7 (100%) | 7/7 (100%) | 7/7 (100%) | 7/7 (100%) |
+| **Benchmarks** | 7/7 (100%) [x] | 7/7 (100%) | 7/7 (100%) | 7/7 (100%) | 7/7 (100%) |
 | **Compile Time** | ~180ms | 422ms | 163ms | 221ms | 658ms |
 | **Binary Size** | ~35KB | 36KB | 2.3MB | 446KB | 82KB |
 | **Runtime** | ~236ms | 236ms | 42ms | - | 238ms |
@@ -261,7 +261,7 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 
 ## Development Roadmap
 
-### v0.1.53 (Completed - October 10, 2025) ✅
+### v0.1.53 (Completed - October 10, 2025) [x]
 
 **Goal**: Fix set iteration → 7/7 benchmarks passing
 
@@ -278,9 +278,9 @@ The LLVM backend generates LLVM IR from Python code and compiles to native execu
 
 **Deliverables**:
 
-- ✅ 7/7 benchmarks passing (100%)
-- ✅ All 982 tests passing
-- ✅ Updated roadmap documentation
+- [x] 7/7 benchmarks passing (100%)
+- [x] All 982 tests passing
+- [x] Updated roadmap documentation
 
 ### v0.1.54 (Target: 2 weeks)
 

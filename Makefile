@@ -3,7 +3,7 @@ BENCHMARK_RESULTS_DIR := build/benchmark_results
 # Makefile for MGen development
 
 .PHONY: help install test test-unit test-integration test-translation \
-		test-py2c test-benchmark test-build clean lint format type-check \
+		test-py2c test-benchmark test-build test-memory-llvm clean lint format type-check \
 		build docs docs-clean docs-serve benchmark benchmark-algorithms \
 		benchmark-data-structures benchmark-report benchmark-clean check snap
 
@@ -24,6 +24,7 @@ help:
 	@echo "  test-integration  Run integration tests only"
 	@echo "  test-py2c     Run Python-to-C conversion tests"
 	@echo "  test-benchmark    Run performance benchmarks"
+	@echo "  test-memory-llvm  Run LLVM memory leak tests (AddressSanitizer)"
 	@echo "  test-coverage Run tests with coverage report"
 	@echo "  test-legacy   Display info about legacy unittest conversion"
 	@echo ""
@@ -81,6 +82,11 @@ test-py2c:
 test-benchmark:
 	uv run pytest -m "benchmark" tests/ -v
 	uv run python tests/benchmarks.py
+
+test-memory-llvm:
+	@echo "Running LLVM memory leak tests with AddressSanitizer..."
+	@chmod +x scripts/test_llvm_memory.sh
+	@./scripts/test_llvm_memory.sh
 
 test-coverage:
 	uv run pytest --cov=src/mgen --cov-branch --cov-report=html --cov-report=term-missing --ignore=tests/test_demos.py --ignore=tests/translation tests/

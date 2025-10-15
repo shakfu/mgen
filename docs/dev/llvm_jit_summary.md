@@ -131,7 +131,7 @@ JIT: Python → LLVM IR → Execution Engine (in-memory)
 | **Compile Time** | 150.5 ms | 729.8 ms | **4.85x** |
 | **Execution Time** | 11.4 ms | 519.3 ms | **45.36x** |
 | **Total Time** | 161.9 ms | 1249.1 ms | **7.72x** |
-| **Output** | Correct | Correct | ✓ |
+| **Output** | Correct | Correct | [x] |
 
 ### Why JIT Execution is Faster
 
