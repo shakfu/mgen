@@ -1,7 +1,7 @@
 # MGen Backend Comprehensive Comparison
 
-**Last Updated**: October 10, 2025
-**Version**: v0.1.81
+**Last Updated**: October 15, 2025
+**Version**: v0.1.83
 **Backends**: 7 (C, C++, Rust, Go, Haskell, OCaml, LLVM)
 
 ---
@@ -106,13 +106,13 @@ MGen supports **7 backends** with varying levels of maturity:
 | **Go** | [x] | [x] | [x] | [x] | [X] | [x] | [x] | [X] | [X] |
 | **Haskell** | [x] | [x] | [x] | [x] | [X] | [x] | [x] | [X] | [X] |
 | **OCaml** | [x] | [x] | [x] | [x] | [X] | [x] | [x] | [X] | [X] |
-| **LLVM** | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [X] | [X] |
+| **LLVM** | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] |
 
-### Missing String Methods (All Backends)
+### Missing String Methods (Most Backends)
 
-- `startswith(prefix)` - Prefix check
-- `endswith(suffix)` - Suffix check
-- `join()` - Join strings with separator (except C, LLVM)
+- `startswith(prefix)` - All except LLVM (v0.1.83)
+- `endswith(suffix)` - All except LLVM (v0.1.83)
+- `join()` - C++, Rust, Go, Haskell, OCaml (C and LLVM have it)
 
 ---
 
@@ -343,16 +343,20 @@ MGen supports **7 backends** with varying levels of maturity:
 - [x] Dual compilation modes (AOT + JIT)
 - [x] JIT: 7.7x faster development cycle
 - [x] Index-based set iteration
+- [x] **Most complete string operations** (9 methods including join, startswith, endswith) - v0.1.83
+- [x] **Better error messages** (descriptive runtime errors) - v0.1.83
+- [x] **Memory-safe** (ASAN verified, 0 leaks) - v0.1.82
+- [x] **107 comprehensive tests** (723% increase) - v0.1.83
 
 **Weaknesses:**
 
 - [X] Verbose IR (310 LOC average)
-- [X] Manual memory management (800 lines C runtime)
+- [X] Manual memory management (~8,300 lines C runtime)
 - [X] Newest backend (less mature)
 - [X] Limited OOP support
 - [X] No dict.keys/values/items
 
-**Best For:** Research, compiler development, cross-platform targets, fast iteration (JIT)
+**Best For:** Research, compiler development, cross-platform targets, fast iteration (JIT), string-heavy applications
 
 ---
 
@@ -543,9 +547,9 @@ MGen supports **7 backends** with varying levels of maturity:
 
 **Priority 2: String Methods**
 
-- [ ] `str.join(iterable)` - Most backends
-- [ ] `str.startswith(prefix)` - All backends
-- [ ] `str.endswith(suffix)` - All backends
+- [ ] `str.join(iterable)` - C++, Rust, Go, Haskell, OCaml ([x] C, [x] LLVM have it as of v0.1.83)
+- [ ] `str.startswith(prefix)` - C++, C, Rust, Go, Haskell, OCaml ([x] LLVM has it as of v0.1.83)
+- [ ] `str.endswith(suffix)` - C++, C, Rust, Go, Haskell, OCaml ([x] LLVM has it as of v0.1.83)
 
 **Priority 3: Built-in Functions**
 
