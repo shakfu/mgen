@@ -13,6 +13,28 @@ if TYPE_CHECKING:
     from .converter import MGenPythonToHaskellConverter
 
 
+def _detect_needed_constraints(node: ast.FunctionDef) -> set[str]:
+    """Detect which type constraints are needed for a function.
+
+    Returns:
+        Set of constraint names (e.g., {'Ord', 'Num'})
+    """
+    constraints = set()
+
+    class ConstraintVisitor(ast.NodeVisitor):
+        def visit_Compare(self, node: ast.Compare) -> None:
+            # Comparison operators require Ord or Eq
+            for op in node.ops:
+                if isinstance(op, (ast.Lt, ast.LtE, ast.Gt, ast.GtE)):
+                    constraints.add("Ord")
+                # Note: Eq is implied by Ord, so we don't need to add it separately
+            self.generic_visit(node)
+
+    visitor = ConstraintVisitor()
+    visitor.visit(node)
+    return constraints
+
+
 def convert_function_with_visitor(converter: "MGenPythonToHaskellConverter", node: ast.FunctionDef) -> str:
     """Convert Python function to Haskell using visitor pattern.
 
@@ -180,9 +202,22 @@ def _convert_pure_function(converter: "MGenPythonToHaskellConverter", node: ast.
     if params:
         param_types = [param[1] for param in params]
         all_types = param_types + [return_type]
-        signature = f"{func_name} :: " + " -> ".join(all_types)
+        base_signature = " -> ".join(all_types)
     else:
-        signature = f"{func_name} :: {return_type}"
+        base_signature = return_type
+
+    # Detect needed type constraints
+    constraints = _detect_needed_constraints(node)
+
+    # Add constraints if function uses polymorphic types ([a], a, etc.)
+    has_polymorphic = any("a" in t for t in ([return_type] + ([p[1] for p in params] if params else [])))
+
+    if constraints and has_polymorphic:
+        constraint_list = [f"{c} a" for c in sorted(constraints)]
+        constraint_str = ", ".join(constraint_list)
+        signature = f"{func_name} :: ({constraint_str}) => {base_signature}"
+    else:
+        signature = f"{func_name} :: {base_signature}"
 
     # Convert function body
     converter.current_function = func_name
@@ -210,7 +245,22 @@ def _convert_pure_function(converter: "MGenPythonToHaskellConverter", node: ast.
         if then_expr is not None and else_expr is not None:
             then_value = converter._convert_expression(then_expr)
             else_value = converter._convert_expression(else_expr)
+
+            # Handle bindings between the if and final return
+            bindings: list[str] = []
+            if len(filtered_body) > 2:
+                # Convert the middle statements (bindings)
+                visitor = PureFunctionVisitor(converter)
+                for stmt in filtered_body[1:-1]:
+                    converted_stmt = visitor.visit(stmt)
+                    if converted_stmt:
+                        bindings.append(converted_stmt)
+
+            # Build function body with conditional
             body = f"if {condition} then {then_value} else {else_value}"
+            if bindings:
+                body = f"{body}\n  where\n    " + "\n    ".join(bindings)
+
             param_names = " ".join([p[0] for p in params])
             converter.current_function = None
             converter.declared_vars = set()

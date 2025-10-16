@@ -521,6 +521,15 @@ main = printValue "Generated Haskell code executed successfully"'''
         left = self._convert_expression(node.left)
         right = self._convert_expression(node.right)
 
+        # Handle list concatenation: use ++ instead of + for lists
+        if isinstance(node.op, ast.Add):
+            # Check if either operand is a list
+            left_type = self._infer_type_from_node(node.left)
+            right_type = self._infer_type_from_node(node.right)
+
+            if left_type.startswith("[") or right_type.startswith("["):
+                return f"({left} ++ {right})"
+
         # Handle Haskell-specific operators
         if isinstance(node.op, ast.FloorDiv):
             return f"({left} `div` {right})"
@@ -1434,5 +1443,19 @@ main = printValue "Generated Haskell code executed successfully"'''
             return "Dict String a"
         elif isinstance(node, ast.Set):
             return "Set a"
+        elif isinstance(node, ast.BinOp):
+            # If it's a BinOp with Add, recursively check operands
+            if isinstance(node.op, ast.Add):
+                left_type = self._infer_type_from_node(node.left)
+                right_type = self._infer_type_from_node(node.right)
+                # If either side is a list, the result is a list
+                if left_type.startswith("[") or right_type.startswith("["):
+                    return "[a]"
+        elif isinstance(node, ast.Call):
+            # Check if the function name suggests it returns a list
+            if isinstance(node.func, ast.Name):
+                # Functions like quicksort, filter, map typically return lists
+                if node.func.id in ("quicksort", "filter", "map", "sorted"):
+                    return "[a]"
 
         return "a"  # Default generic type

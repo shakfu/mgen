@@ -96,13 +96,22 @@ class MainFunctionVisitor(HaskellStatementVisitor):
         return None
 
     def visit_ann_assign(self, node: ast.AnnAssign) -> Optional[str]:
-        """Convert annotated assignment to let binding."""
+        """Convert annotated assignment to let binding with optional type annotation."""
         if not isinstance(node.target, ast.Name):
             return None
 
         var_name = self.converter._to_haskell_var_name(node.target.id)
         if node.value:
             value = self.converter._convert_expression(node.value)
+
+            # Add inline type annotation if the type is concrete (not generic)
+            if node.annotation:
+                haskell_type = self.converter._convert_type_annotation(node.annotation)
+                # Only add annotation for concrete types (not polymorphic "a" or "[a]")
+                if haskell_type and "a" not in haskell_type:
+                    # Use inline type annotation: let var :: Type = value
+                    return f"{var_name} :: {haskell_type} = {value}"
+
             return f"{var_name} = {value}"
         return None
 
@@ -228,7 +237,7 @@ class FunctionBodyAnalyzer:
 
     @staticmethod
     def detect_early_return_pattern(stmts: list[ast.stmt]) -> Optional[tuple[ast.If, ast.Return]]:
-        """Detect early return pattern: if cond: return X; return Y.
+        """Detect early return pattern: if cond: return X; ...; return Y.
 
         Args:
             stmts: Filtered body statements (no docstrings)
@@ -236,6 +245,7 @@ class FunctionBodyAnalyzer:
         Returns:
             Tuple of (if_stmt, final_return) if pattern detected, None otherwise
         """
+        # Pattern 1: if cond: return X; return Y (exactly 2 statements)
         if (
             len(stmts) == 2
             and isinstance(stmts[0], ast.If)
@@ -245,6 +255,22 @@ class FunctionBodyAnalyzer:
             and not stmts[0].orelse
         ):
             return (stmts[0], stmts[1])
+
+        # Pattern 2: if cond: return X; ...(bindings)...; return Y (>= 2 statements)
+        if (
+            len(stmts) >= 2
+            and isinstance(stmts[0], ast.If)
+            and len(stmts[0].body) == 1
+            and isinstance(stmts[0].body[0], ast.Return)
+            and isinstance(stmts[-1], ast.Return)
+            and not stmts[0].orelse
+        ):
+            # Check that all middle statements are bindings (assignments)
+            for stmt in stmts[1:-1]:
+                if not isinstance(stmt, (ast.Assign, ast.AnnAssign)):
+                    return None  # Not all bindings, can't use this pattern
+            return (stmts[0], stmts[-1])
+
         return None
 
     @staticmethod
