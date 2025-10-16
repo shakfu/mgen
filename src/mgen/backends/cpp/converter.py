@@ -1072,6 +1072,8 @@ class MGenPythonToCppConverter:
             return self._convert_set_literal(expr)
         elif isinstance(expr, ast.Subscript):
             return self._convert_subscript(expr)
+        elif isinstance(expr, ast.JoinedStr):
+            return self._convert_f_string(expr)
         else:
             raise UnsupportedFeatureError(f"Unsupported expression type: {type(expr).__name__}")
 
@@ -1451,6 +1453,73 @@ class MGenPythonToCppConverter:
             # Simple subscript
             index_expr = self._convert_expression(expr.slice)
             return f"{value_expr}[{index_expr}]"
+
+    def _convert_f_string(self, expr: ast.JoinedStr) -> str:
+        """Convert f-string to C++ string concatenation.
+
+        Example:
+            f"Result: {x}" -> ("Result: " + std::to_string(x))
+            f"Count: {len(items)} items" -> ("Count: " + std::to_string(mgen::len(items)) + " items")
+        """
+        parts: list[str] = []
+        for value in expr.values:
+            if isinstance(value, ast.Constant):
+                # Literal string part
+                if isinstance(value.value, str):
+                    parts.append(f'"{value.value}"')
+            elif isinstance(value, ast.FormattedValue):
+                # Expression to be converted to string
+                expr_code = self._convert_expression(value.value)
+                parts.append(self._to_string_cpp(expr_code, value.value))
+
+        if len(parts) == 0:
+            return '""'
+        elif len(parts) == 1:
+            return parts[0]
+        else:
+            return "(" + " + ".join(parts) + ")"
+
+    def _to_string_cpp(self, expr_code: str, expr_node: ast.expr) -> str:
+        """Convert an expression to string in C++.
+
+        Args:
+            expr_code: The C++ code for the expression
+            expr_node: The original AST node (for type inference)
+
+        Returns:
+            C++ code that converts the expression to a string
+        """
+        # Try to infer the type of the expression
+        # For simple names, check variable context
+        if isinstance(expr_node, ast.Name):
+            var_name = expr_node.id
+            if var_name in self.variable_context:
+                cpp_type = self.variable_context[var_name]
+                if cpp_type == "std::string":
+                    return expr_code  # Already a string
+                elif cpp_type == "bool":
+                    # Convert bool to string ("true" or "false")
+                    return f'({expr_code} ? "true" : "false")'
+
+        # Check if it's already a string literal
+        if isinstance(expr_node, ast.Constant) and isinstance(expr_node.value, str):
+            return expr_code  # Already a string
+
+        # For boolean values
+        if isinstance(expr_node, ast.Constant) and isinstance(expr_node.value, bool):
+            # Convert bool to string ("true" or "false")
+            return f'({expr_code} ? "true" : "false")'
+
+        # Check for string method calls or operations that return strings
+        if isinstance(expr_node, ast.Call):
+            if isinstance(expr_node.func, ast.Attribute):
+                # String methods return strings
+                attr_name = expr_node.func.attr
+                if attr_name in {"lower", "upper", "strip", "replace", "join"}:
+                    return expr_code  # Already returns string
+
+        # Default: use std::to_string for numbers
+        return f"std::to_string({expr_code})"
 
     def _convert_statements(self, statements: list[ast.stmt]) -> str:
         """Convert multiple statements."""

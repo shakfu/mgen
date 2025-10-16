@@ -58,6 +58,7 @@ class CBuilder(AbstractBuilder):
             source_path = Path(source_file)
             out_dir = Path(output_dir)
             executable_name = source_path.stem
+            output_path = out_dir / executable_name
 
             # Build gcc command with base flags
             cmd = [
@@ -80,11 +81,11 @@ class CBuilder(AbstractBuilder):
                 # Add runtime sources
                 cmd.extend(self.get_runtime_sources())
 
-            # Add main source file and output
-            cmd.extend([str(source_path), "-o", str(out_dir / executable_name)])
+            # Add main source file and output (use absolute paths to avoid cwd confusion)
+            cmd.extend([str(source_path), "-o", str(output_path)])
 
-            # Run compilation
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
+            # Run compilation (don't set cwd to avoid path resolution issues)
+            result = subprocess.run(cmd, capture_output=True, text=True)
 
             return result.returncode == 0
 

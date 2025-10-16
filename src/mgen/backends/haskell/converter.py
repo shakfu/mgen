@@ -495,6 +495,9 @@ main = printValue "Generated Haskell code executed successfully"'''
         elif isinstance(node, ast.IfExp):
             return self._convert_ternary_expression(node)
 
+        elif isinstance(node, ast.JoinedStr):
+            return self._convert_f_string(node)
+
         else:
             raise UnsupportedFeatureError(f"Unsupported expression type: {type(node).__name__}")
 
@@ -767,6 +770,58 @@ main = printValue "Generated Haskell code executed successfully"'''
             return f"({obj} Map.! {index})"
         else:
             return f"({obj} !! {index})"
+
+    def _convert_f_string(self, node: ast.JoinedStr) -> str:
+        """Convert f-string to Haskell string concatenation with show.
+
+        Example:
+            f"Result: {x}" -> "Result: " ++ show x
+            f"Count: {len(items)} items" -> "Count: " ++ show (length items) ++ " items"
+        """
+        parts: list[str] = []
+
+        for value in node.values:
+            if isinstance(value, ast.Constant):
+                # Literal string part
+                if isinstance(value.value, str):
+                    parts.append(f'"{value.value}"')
+            elif isinstance(value, ast.FormattedValue):
+                # Expression to be converted to string
+                expr_code = self._convert_expression(value.value)
+                # Use show to convert to string, but check if already a string
+                if self._is_string_expression(value.value):
+                    parts.append(expr_code)
+                else:
+                    parts.append(f"(show {expr_code})")
+
+        if len(parts) == 0:
+            return '""'
+        elif len(parts) == 1:
+            return parts[0]
+        else:
+            return "(" + " ++ ".join(parts) + ")"
+
+    def _is_string_expression(self, node: ast.expr) -> bool:
+        """Check if an expression already returns a String."""
+        # String literals
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return True
+        # Variable names - we can't definitively know the type without more context,
+        # but we can make a best guess. In practice, the type checker should catch issues.
+        # For now, assume variables ending in common string suffixes or with string-like names
+        # are strings. This is a heuristic that works for the common case where f-strings
+        # are used with string parameters.
+        if isinstance(node, ast.Name):
+            var_name = node.id.lower()
+            # Common string variable names
+            if any(substr in var_name for substr in ["name", "text", "str", "msg", "message", "path", "file"]):
+                return True
+        # String method calls that return strings
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            method_name = node.func.attr
+            if method_name in {"lower", "upper", "strip", "replace"}:
+                return True
+        return False
 
     def _convert_list_literal(self, node: ast.List) -> str:
         """Convert Python list literal to Haskell list."""

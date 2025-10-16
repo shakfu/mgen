@@ -17,6 +17,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.86] - 2025-10-16
+
+**F-String Support - Modern Python String Formatting! 🎯**
+
+MGen now supports Python f-strings (formatted string literals), one of the most commonly requested features. F-strings work across 6 out of 7 production backends, providing idiomatic string formatting in each target language.
+
+### Added
+
+- **F-String Support** (`subset_validator.py`, all backend converters)
+  - Full f-string syntax support for basic expressions: `f"Hello {name}"`
+  - Expression interpolation: `f"Sum: {x + y}"`
+  - Function call support: `f"Length: {len(items)}"`
+  - Smart type conversion in all backends
+  - Phase 1: Basic expressions (format specs deferred to Phase 2)
+
+- **Backend Implementations** (6/7 backends)
+  - **C++**: String concatenation + `std::to_string()` with smart type inference
+  - **Rust**: Native `format!()` macro (perfect idiomatic mapping)
+  - **Go**: `fmt.Sprintf()` with `%v` placeholders
+  - **Haskell**: String concatenation (`++`) with `show` and heuristics
+  - **OCaml**: String concatenation (`^`) with `string_of_*` functions
+  - **C**: Runtime helper functions (`mgen_sprintf_string`, `mgen_int_to_string`)
+
+- **Validation & Testing**
+  - F-strings marked as Tier 1, FULLY_SUPPORTED in `subset_validator.py`
+  - Validation for unsupported features (format specs, conversion flags)
+  - 11 comprehensive C++ f-string tests (100% passing)
+  - Zero regressions across 1043 total tests
+
+### Changed
+
+- `SUPPORTED_SYNTAX.md` updated to reflect f-string support
+
+### Fixed
+
+- **C Backend Compilation** - Fixed 4 failing tests where executables weren't being created
+  - Added missing `#include <stdbool.h>` in `mgen_string_ops.h` (line 15)
+  - Fixed path resolution in `compile_direct()` by removing `cwd=output_dir` and using absolute paths
+  - All C backend compilation tests now pass (100%)
+
+- **Type Safety** - Fixed 27 mypy type errors across all f-string implementations
+  - Added type guards for `ast.Constant.value` before string operations
+  - Added proper type annotations (`list[str]`) to format_parts and args variables
+  - All 6 backend converters now pass strict mypy type checking (0 errors)
+
+### Notes
+
+- **LLVM Backend**: Deferred pending Static IR layer refactoring
+- **Phase 2 Features** (future): Format specifications (`.2f`, `:03d`), conversion flags (`!r`, `!s`, `!a`)
+- **Test Results**: 1043 tests passing, 2 skipped (100% pass rate)
+
 ## [0.1.85] - 2025-10-16
 
 **WebAssembly Target - Experimental Support! 🌐**

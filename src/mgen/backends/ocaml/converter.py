@@ -477,6 +477,8 @@ class MGenPythonToOCamlConverter:
             return self._convert_set_comprehension(node)
         elif isinstance(node, ast.IfExp):
             return self._convert_ternary_expression(node)
+        elif isinstance(node, ast.JoinedStr):
+            return self._convert_f_string(node)
         else:
             raise UnsupportedFeatureError(f"Unsupported expression: {type(node).__name__}")
 
@@ -1432,3 +1434,70 @@ class MGenPythonToOCamlConverter:
         else:
             # Array access - use array indexing notation
             return f"{value}.({slice_expr})"
+
+    def _convert_f_string(self, node: ast.JoinedStr) -> str:
+        """Convert f-string to OCaml string concatenation.
+
+        Example:
+            f"Result: {x}" -> "Result: " ^ string_of_int x
+            f"Count: {len(items)} items" -> "Count: " ^ string_of_int (List.length items) ^ " items"
+        """
+        parts: list[str] = []
+
+        for value in node.values:
+            if isinstance(value, ast.Constant):
+                # Literal string part - escape properly
+                if isinstance(value.value, str):
+                    escaped = value.value.replace("\\", "\\\\").replace('"', '\\"')
+                    parts.append(f'"{escaped}"')
+            elif isinstance(value, ast.FormattedValue):
+                # Expression to be converted to string
+                expr_code = self._convert_expression(value.value)
+                # Determine the type conversion function needed
+                parts.append(self._to_string_ocaml(expr_code, value.value))
+
+        if len(parts) == 0:
+            return '""'
+        elif len(parts) == 1:
+            return parts[0]
+        else:
+            return "(" + " ^ ".join(parts) + ")"
+
+    def _to_string_ocaml(self, expr_code: str, node: ast.expr) -> str:
+        """Convert an expression to string in OCaml.
+
+        Args:
+            expr_code: The OCaml code for the expression
+            node: The original AST node for type inference
+
+        Returns:
+            OCaml code that converts the expression to a string
+        """
+        # String literals
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, str):
+                return expr_code  # Already a string
+            elif isinstance(node.value, bool):
+                return f'(string_of_bool {expr_code})'
+            elif isinstance(node.value, int):
+                return f'(string_of_int {expr_code})'
+            elif isinstance(node.value, float):
+                return f'(string_of_float {expr_code})'
+
+        # Variable names - heuristic based on name
+        if isinstance(node, ast.Name):
+            var_name = node.id.lower()
+            # Common string variable names
+            if any(substr in var_name for substr in ["name", "text", "str", "msg", "message", "path", "file"]):
+                return expr_code  # Assume it's a string
+            # Otherwise, assume int (common default)
+            return f'(string_of_int {expr_code})'
+
+        # String method calls return strings
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            method_name = node.func.attr
+            if method_name in {"lower", "upper", "strip", "replace"}:
+                return expr_code  # Already returns string
+
+        # Default to string_of_int (most common case)
+        return f'(string_of_int {expr_code})'

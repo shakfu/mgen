@@ -3,6 +3,8 @@
  */
 
 #include "mgen_string_ops.h"
+#include <stdarg.h>
+#include <stdbool.h>
 
 // String array implementation
 mgen_string_array_t* mgen_string_array_new(void) {
@@ -336,5 +338,72 @@ mgen_string_array_t* mgen_str_split(const char* str, const char* delimiter) {
     }
 
     free(str_copy);
+    return result;
+}
+
+// F-string support functions
+
+char* mgen_int_to_string(int value) {
+    // Allocate enough space for the string representation
+    // Max int is 11 chars (-2147483648) + null terminator
+    char* result = malloc(12);
+    if (!result) {
+        MGEN_SET_ERROR(MGEN_ERROR_MEMORY, "Failed to allocate memory for int to string");
+        return NULL;
+    }
+    snprintf(result, 12, "%d", value);
+    return result;
+}
+
+char* mgen_float_to_string(double value) {
+    // Allocate enough space for float representation
+    // Use 32 chars to handle most float values
+    char* result = malloc(32);
+    if (!result) {
+        MGEN_SET_ERROR(MGEN_ERROR_MEMORY, "Failed to allocate memory for float to string");
+        return NULL;
+    }
+    snprintf(result, 32, "%g", value);  // %g removes trailing zeros
+    return result;
+}
+
+const char* mgen_bool_to_string(bool value) {
+    // Return static strings - no need to free
+    return value ? "true" : "false";
+}
+
+char* mgen_sprintf_string(const char* format, ...) {
+    if (!format) {
+        return mgen_strdup("");
+    }
+
+    va_list args, args_copy;
+    va_start(args, format);
+
+    // Make a copy for the second pass
+    va_copy(args_copy, args);
+
+    // Determine required size
+    int size = vsnprintf(NULL, 0, format, args);
+    va_end(args);
+
+    if (size < 0) {
+        va_end(args_copy);
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Failed to format string");
+        return NULL;
+    }
+
+    // Allocate buffer
+    char* result = malloc(size + 1);
+    if (!result) {
+        va_end(args_copy);
+        MGEN_SET_ERROR(MGEN_ERROR_MEMORY, "Failed to allocate memory for formatted string");
+        return NULL;
+    }
+
+    // Format the string
+    vsnprintf(result, size + 1, format, args_copy);
+    va_end(args_copy);
+
     return result;
 }

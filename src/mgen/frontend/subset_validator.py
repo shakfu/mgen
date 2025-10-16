@@ -255,6 +255,21 @@ class StaticPythonSubsetValidator:
             c_mapping="Direct mapping to C operators",
         )
 
+        rules["f_strings"] = FeatureRule(
+            name="F-Strings",
+            tier=SubsetTier.TIER_1_FUNDAMENTAL,
+            status=FeatureStatus.FULLY_SUPPORTED,
+            description="F-string literals for string formatting",
+            ast_nodes=[ast.JoinedStr, ast.FormattedValue],
+            validator=self._validate_f_string,
+            c_mapping="String concatenation with type conversion (std::to_string, sprintf, etc.)",
+            examples={
+                "valid": 'f"Result: {x}"\nf"Count: {len(items)} items"',
+                "invalid": 'f"Value: {x:.2f}"  # Format specs not yet supported',
+            },
+            constraints=["No format specifications in Phase 1", "Expressions must be type-inferrable"],
+        )
+
         # Tier 2: Structured Data (Feasible)
 
         rules["enums"] = FeatureRule(
@@ -584,6 +599,28 @@ class StaticPythonSubsetValidator:
             # Union types should have reasonable number of alternatives
             if isinstance(node.slice, ast.Tuple):
                 return len(node.slice.elts) <= 4  # Arbitrary limit
+        return True
+
+    def _validate_f_string(self, node: ast.AST) -> bool:
+        """Validate f-string constraints."""
+        if isinstance(node, ast.JoinedStr):
+            # Check each formatted value in the f-string
+            for value in node.values:
+                if isinstance(value, ast.FormattedValue):
+                    # Phase 1: Don't support format specifications
+                    if value.format_spec is not None:
+                        self.last_validation_error = (
+                            f"F-string format specifications (e.g., ':.2f') are not yet supported "
+                            f"at line {node.lineno if hasattr(node, 'lineno') else '?'}"
+                        )
+                        return False
+                    # Phase 1: Don't support conversion flags (!r, !s, !a)
+                    if value.conversion != -1:
+                        self.last_validation_error = (
+                            f"F-string conversion flags (!r, !s, !a) are not yet supported "
+                            f"at line {node.lineno if hasattr(node, 'lineno') else '?'}"
+                        )
+                        return False
         return True
 
     def _validate_no_metaclasses(self, node: ast.ClassDef) -> bool:

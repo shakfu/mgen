@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdbool.h>
 #include "mgen_error_handling.h"
 
 #ifdef __cplusplus
@@ -102,6 +103,31 @@ mgen_string_array_t* mgen_str_split(const char* str, const char* delimiter);
  * Safe string duplication with error handling
  */
 char* mgen_strdup(const char* str);
+
+/**
+ * Convert integer to string (caller must free result)
+ * Used for f-string formatting
+ */
+char* mgen_int_to_string(int value);
+
+/**
+ * Convert float to string (caller must free result)
+ * Used for f-string formatting
+ */
+char* mgen_float_to_string(double value);
+
+/**
+ * Convert boolean to string (returns "true" or "false")
+ * Used for f-string formatting (does NOT need to be freed - returns static string)
+ */
+const char* mgen_bool_to_string(bool value);
+
+/**
+ * F-string sprintf helper - formats a string with variable arguments
+ * Usage: mgen_sprintf_string("Hello %s, count: %s", name, int_str)
+ * Returns allocated string (caller must free)
+ */
+char* mgen_sprintf_string(const char* format, ...);
 
 #ifdef __cplusplus
 }

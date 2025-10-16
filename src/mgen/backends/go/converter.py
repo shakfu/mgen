@@ -1260,6 +1260,8 @@ class MGenPythonToGoConverter:
             return self._convert_set_comprehension(expr)
         elif isinstance(expr, ast.Subscript):
             return self._convert_subscript(expr)
+        elif isinstance(expr, ast.JoinedStr):
+            return self._convert_f_string(expr)
         else:
             raise UnsupportedFeatureError(f"Unsupported expression type: {type(expr).__name__}")
 
@@ -1744,6 +1746,39 @@ class MGenPythonToGoConverter:
             # Simple subscript
             index_expr = self._convert_expression(expr.slice)
             return f"{value_expr}[{index_expr}]"
+
+    def _convert_f_string(self, expr: ast.JoinedStr) -> str:
+        """Convert f-string to Go fmt.Sprintf.
+
+        Example:
+            f"Result: {x}" -> fmt.Sprintf("Result: %v", x)
+            f"Count: {len(items)} items" -> fmt.Sprintf("Count: %v items", len(items))
+        """
+        # Build format string and arguments list
+        format_parts: list[str] = []
+        args: list[str] = []
+
+        for value in expr.values:
+            if isinstance(value, ast.Constant):
+                # Literal string part - escape % signs
+                if isinstance(value.value, str):
+                    literal = value.value.replace("%", "%%")
+                    format_parts.append(literal)
+            elif isinstance(value, ast.FormattedValue):
+                # Expression to be formatted - use %v (value in default format)
+                format_parts.append("%v")
+                expr_code = self._convert_expression(value.value)
+                args.append(expr_code)
+
+        format_string = "".join(format_parts)
+
+        if len(args) == 0:
+            # No expressions, just return string literal
+            return f'"{format_string}"'
+        else:
+            # Use fmt.Sprintf
+            args_str = ", ".join(args)
+            return f'fmt.Sprintf("{format_string}", {args_str})'
 
     # Helper methods for type inference and mapping
 

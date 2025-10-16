@@ -901,6 +901,8 @@ class MGenPythonToCConverter:
             return self._convert_dict_literal(expr)
         elif isinstance(expr, ast.Set):
             return self._convert_set_literal(expr)
+        elif isinstance(expr, ast.JoinedStr):
+            return self._convert_f_string(expr)
         else:
             return f"/* Unsupported expression {type(expr).__name__} */"
 
@@ -1784,6 +1786,66 @@ class MGenPythonToCConverter:
 
         # Default: use direct array subscript
         return f"{obj}[{index}]"
+
+    def _convert_f_string(self, expr: ast.JoinedStr) -> str:
+        """Convert f-string to C string concatenation using mgen_string_concat.
+
+        Example:
+            f"Result: {x}" -> mgen_string_concat_int("Result: ", x)
+            f"Count: {len(items)}" -> mgen_string_concat_int("Count: ", vec_int_len(&items))
+
+        Note: This generates a call to mgen runtime functions that handle string building.
+        The runtime will need to implement mgen_string_concat_* functions for different types.
+        """
+        # For simplicity in Phase 1, we'll generate a multi-part concatenation
+        # using a helper function that takes multiple arguments
+
+        # Count format string placeholders and collect arguments
+        format_parts: list[str] = []
+        args: list[str] = []
+
+        for value in expr.values:
+            if isinstance(value, ast.Constant):
+                # Literal string part
+                if isinstance(value.value, str):
+                    format_parts.append(value.value)
+            elif isinstance(value, ast.FormattedValue):
+                # Expression - add placeholder
+                format_parts.append("%s")
+                expr_code = self._convert_expression(value.value)
+                # Wrap in appropriate conversion based on type
+                args.append(self._to_c_string_expr(expr_code, value.value))
+
+        format_string = "".join(format_parts)
+
+        if len(args) == 0:
+            # No interpolation, just return the string
+            return f'"{format_string}"'
+        else:
+            # Use mgen_sprintf_string helper (needs to be in runtime)
+            args_str = ", ".join(args)
+            return f'mgen_sprintf_string("{format_string}", {args_str})'
+
+    def _to_c_string_expr(self, expr_code: str, node: ast.expr) -> str:
+        """Wrap an expression for string formatting in C.
+
+        Returns an expression that can be used as a %s argument to sprintf.
+        For non-strings, we need to convert them first.
+        """
+        # Check if it's a string literal or variable
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return expr_code  # Already a string
+
+        if isinstance(node, ast.Name):
+            var_name = node.id.lower()
+            # Heuristic: check if variable name suggests it's a string
+            if any(substr in var_name for substr in ["name", "text", "str", "msg", "message", "path", "file"]):
+                return expr_code  # Assume string type
+
+        # For other types, we need a temp buffer approach
+        # This is a simplified version - in practice would need type inference
+        # For now, assume integers and use mgen_int_to_string
+        return f'mgen_int_to_string({expr_code})'
 
     def _convert_class(self, node: ast.ClassDef) -> str:
         """Convert Python class to C struct with associated methods."""

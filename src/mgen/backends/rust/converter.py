@@ -1008,6 +1008,8 @@ class MGenPythonToRustConverter:
             return self._convert_set_literal(expr)
         elif isinstance(expr, ast.Subscript):
             return self._convert_subscript(expr)
+        elif isinstance(expr, ast.JoinedStr):
+            return self._convert_f_string(expr)
         elif isinstance(expr, ast.GeneratorExp):
             raise UnsupportedFeatureError("Generator expressions are not supported in Rust backend")
         else:
@@ -1181,6 +1183,40 @@ class MGenPythonToRustConverter:
 
         # For complex expressions or unknown types, assume Vec (safer default)
         return f"{value}[{slice_expr} as usize]"
+
+
+    def _convert_f_string(self, expr: ast.JoinedStr) -> str:
+        """Convert f-string to Rust format! macro.
+
+        Example:
+            f"Result: {x}" -> format!("Result: {}", x)
+            f"Count: {len(items)} items" -> format!("Count: {} items", items.len())
+        """
+        # Build format string and arguments list
+        format_parts: list[str] = []
+        args: list[str] = []
+
+        for value in expr.values:
+            if isinstance(value, ast.Constant):
+                # Literal string part - escape braces
+                if isinstance(value.value, str):
+                    literal = value.value.replace("{", "{{").replace("}", "}}")
+                    format_parts.append(literal)
+            elif isinstance(value, ast.FormattedValue):
+                # Expression to be formatted
+                format_parts.append("{}")
+                expr_code = self._convert_expression(value.value)
+                args.append(expr_code)
+
+        format_string = "".join(format_parts)
+
+        if len(args) == 0:
+            # No expressions, just return string literal
+            return f'"{format_string}".to_string()'
+        else:
+            # Use format! macro
+            args_str = ", ".join(args)
+            return f'format!("{format_string}", {args_str})'
 
     def _convert_call(self, expr: ast.Call) -> str:
         """Convert function calls."""
