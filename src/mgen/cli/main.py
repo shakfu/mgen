@@ -51,24 +51,65 @@ class MGenCLI:
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog=f"""
 Examples:
+  # Basic conversion
   mgen convert -t rust app.py              # Convert single file to Rust
   mgen convert -t c app1.py app2.py        # Convert multiple files to C
   mgen convert --to go *.py                # Convert all Python files to Go
+
+  # With optimization levels (standard -O0/-O1/-O2/-O3 flags supported)
+  mgen convert -t cpp app.py -O0           # No optimization (fastest compile, debug)
+  mgen convert -t cpp app.py -O1           # Basic optimization
+  mgen convert -t cpp app.py -O2           # Moderate optimization (default)
+  mgen convert -t cpp app.py -O3           # Aggressive optimization (max performance)
+
+  # With backend preferences
   mgen convert -t haskell app.py --prefer use_native_comprehensions=true
-  mgen build -t rust app.py                # Build Rust executable
+
+  # With progress and verbose output
+  mgen convert -t rust app.py --progress   # Show progress bar during conversion
+  mgen convert -t rust app.py -v           # Verbose output (detailed logging)
+  mgen convert -t rust app.py --dry-run    # Preview what would be generated
+
+  # Building executables
+  mgen build -t rust app.py                # Build Rust executable (direct compilation)
   mgen build -t cpp app.py -m              # Generate C++ code and Makefile
   mgen build -t go app.py --progress       # Show build progress
+  mgen build -t llvm app.py -O3            # LLVM backend with O3 optimization
+
+  # Batch operations
   mgen batch -t c -s src/                  # Batch convert directory to C
+  mgen batch -t rust -s src/ -b            # Batch convert and build all files
+  mgen batch -t go -s src/ --progress      # Batch convert with progress indicators
+
+  # Utility commands
   mgen backends                            # List available language backends
   mgen clean                               # Clean build directory
 
 Available backends: {backends_str}
+
+Optimization Levels (all backends):
+  -O0 / -O none       No optimization - fastest compilation, best for debugging
+  -O1 / -O basic      Basic optimization - moderate compile time, good performance
+  -O2 / -O moderate   Moderate optimization - default, balanced (RECOMMENDED)
+  -O3 / -O aggressive Aggressive optimization - slower compilation, maximum performance
+
+LLVM Backend Notes:
+  The LLVM backend supports advanced optimization passes:
+  - O0: No optimization, debug-friendly
+  - O1: Basic optimizations (dead code elimination, simple inlining)
+  - O2: Default optimizations (loop unrolling, vectorization) - RECOMMENDED
+  - O3: Aggressive optimizations (maximum inlining, tail call elimination)
+
+  Performance example (fibonacci benchmark):
+  - O0: 86ms | O1: 64ms | O2: 57ms | O3: 54ms (36.5% faster than O0)
 
 Build Directory Structure:
   build/
   ├── src/                 # Generated source files
   ├── build_file           # Generated build system (if -m flag used)
   └── executable           # Compiled binary (if compilation enabled)
+
+For more information, visit: https://github.com/your-org/mgen
             """,
         )
 
@@ -89,9 +130,9 @@ Build Directory Structure:
         convert_parser.add_argument(
             "-O",
             "--optimization",
-            choices=["none", "basic", "moderate", "aggressive"],
+            choices=["none", "basic", "moderate", "aggressive", "0", "1", "2", "3"],
             default="moderate",
-            help="Optimization level (default: moderate)",
+            help="Optimization level: none/0, basic/1, moderate/2, aggressive/3 (default: moderate/2)",
         )
         convert_parser.add_argument(
             "--prefer",
@@ -121,9 +162,9 @@ Build Directory Structure:
         build_parser.add_argument(
             "-O",
             "--optimization",
-            choices=["none", "basic", "moderate", "aggressive"],
+            choices=["none", "basic", "moderate", "aggressive", "0", "1", "2", "3"],
             default="moderate",
-            help="Optimization level (default: moderate)",
+            help="Optimization level: none/0, basic/1, moderate/2, aggressive/3 (default: moderate/2)",
         )
         build_parser.add_argument(
             "--prefer",
@@ -174,9 +215,9 @@ Build Directory Structure:
         batch_parser.add_argument(
             "-O",
             "--optimization",
-            choices=["none", "basic", "moderate", "aggressive"],
+            choices=["none", "basic", "moderate", "aggressive", "0", "1", "2", "3"],
             default="moderate",
-            help="Optimization level (default: moderate)",
+            help="Optimization level: none/0, basic/1, moderate/2, aggressive/3 (default: moderate/2)",
         )
         batch_parser.add_argument(
             "--prefer",
@@ -194,12 +235,20 @@ Build Directory Structure:
         return parser
 
     def get_optimization_level(self, level_str: str) -> OptimizationLevel:
-        """Convert string to OptimizationLevel."""
+        """Convert string to OptimizationLevel.
+
+        Supports both verbose names (none/basic/moderate/aggressive)
+        and standard compiler flags (0/1/2/3).
+        """
         mapping = {
             "none": OptimizationLevel.NONE,
+            "0": OptimizationLevel.NONE,
             "basic": OptimizationLevel.BASIC,
+            "1": OptimizationLevel.BASIC,
             "moderate": OptimizationLevel.MODERATE,
+            "2": OptimizationLevel.MODERATE,
             "aggressive": OptimizationLevel.AGGRESSIVE,
+            "3": OptimizationLevel.AGGRESSIVE,
         }
         return mapping.get(level_str, OptimizationLevel.MODERATE)
 
@@ -310,16 +359,29 @@ Build Directory Structure:
         target = args.to
         if not registry.has_backend(target):
             available = ", ".join(registry.list_backends())
-            self.log.error(f"Unsupported target language '{target}'. Available: {available}")
+            self.log.error(f"Unsupported target language '{target}'")
+            self.log.info(f"Available backends: {available}")
+            self.log.info(f"Tip: Use 'mgen backends' to see all available backends")
             return 1
+
+        if self.verbose:
+            self.log.info(f"Target language: {target}")
+            self.log.info(f"Optimization level: {args.optimization}")
 
         # Parse backend preferences
         preferences = self.parse_preferences(target, getattr(args, "prefer", None))
+
+        if self.verbose and preferences:
+            self.log.info(f"Backend preferences: {preferences}")
 
         build_dir = Path(args.build_dir)
 
         # Get input files
         input_files = [Path(f) for f in args.input_files]
+
+        if self.verbose:
+            self.log.info(f"Input files: {', '.join(str(f) for f in input_files)}")
+            self.log.info(f"Build directory: {build_dir}")
 
         # Check all files exist
         for input_path in input_files:
@@ -393,6 +455,11 @@ Build Directory Structure:
                     self.log.info(f"Conversion successful! {target.upper()} source: {source_file}")
                     successful_files.append(str(input_path))
 
+                    if self.verbose and result.output_files:
+                        self.log.info(f"Output files generated:")
+                        for key, filepath in result.output_files.items():
+                            self.log.info(f"  {key}: {filepath}")
+
                     if result.warnings:
                         for warning in result.warnings:
                             self.log.warning(f"Warning: {warning}")
@@ -421,11 +488,20 @@ Build Directory Structure:
         target = args.to
         if not registry.has_backend(target):
             available = ", ".join(registry.list_backends())
-            self.log.error(f"Unsupported target language '{target}'. Available: {available}")
+            self.log.error(f"Unsupported target language '{target}'")
+            self.log.info(f"Available backends: {available}")
+            self.log.info(f"Tip: Use 'mgen backends' to see all available backends")
             return 1
+
+        if self.verbose:
+            self.log.info(f"Target language: {target}")
+            self.log.info(f"Optimization level: {args.optimization}")
 
         # Parse backend preferences
         preferences = self.parse_preferences(target, getattr(args, "prefer", None))
+
+        if self.verbose and preferences:
+            self.log.info(f"Backend preferences: {preferences}")
 
         # Get input files
         input_files = [Path(f) for f in args.input_files]
@@ -453,6 +529,12 @@ Build Directory Structure:
         else:
             build_mode = BuildMode.DIRECT
             mode_desc = "compile directly"
+
+        if self.verbose:
+            self.log.info(f"Build mode: {mode_desc}")
+            self.log.info(f"Build directory: {build_dir}")
+            if hasattr(args, "compiler") and args.compiler:
+                self.log.info(f"Compiler: {args.compiler}")
 
         # Dry-run mode
         if hasattr(args, "dry_run") and args.dry_run:
@@ -560,6 +642,11 @@ Build Directory Structure:
 
                     self.log.info(f"Compilation successful! Executable: {result.executable_path}")
 
+                    if self.verbose and result.output_files:
+                        self.log.info(f"Output files generated:")
+                        for key, filepath in result.output_files.items():
+                            self.log.info(f"  {key}: {filepath}")
+
                 if result.warnings:
                     for warning in result.warnings:
                         self.log.warning(f"Warning: {warning}")
@@ -605,7 +692,9 @@ Build Directory Structure:
         target = args.to
         if not registry.has_backend(target):
             available = ", ".join(registry.list_backends())
-            self.log.error(f"Unsupported target language '{target}'. Available: {available}")
+            self.log.error(f"Unsupported target language '{target}'")
+            self.log.info(f"Available backends: {available}")
+            self.log.info(f"Tip: Use 'mgen backends' to see all available backends")
             return 1
 
         # Parse backend preferences

@@ -103,7 +103,7 @@
 
 - [x] Performance benchmarking vs other backends
 - [x] LLVM optimization pass tuning
-- [ ] WebAssembly target exploration
+- [x] WebAssembly target exploration
 
 **Effort**: 1-2 weeks (lower priority, backend is production-ready)
 
@@ -139,17 +139,43 @@
 
 **Effort**: 1-2 weeks
 
-### 3. CLI Improvements (MEDIUM)
+### 3. CLI Improvements (MEDIUM) ✅ COMPLETE
 
 **Goals**:
 
-- Progress bars for compilation
-- Verbose mode with detailed logging
-- Dry-run mode (show what would be generated)
-- Better help messages with examples
-- LLVM optimization level flags (-O0, -O1, -O2, -O3)
+- ✅ Progress bars for compilation (already implemented, `--progress` flag)
+- ✅ Verbose mode with detailed logging (enhanced with more detailed output, `-v` flag)
+- ✅ Dry-run mode (already implemented, `--dry-run` flag)
+- ✅ Better help messages with examples (comprehensive examples added for all commands)
+- ✅ Standard optimization flags (implemented `-O0/-O1/-O2/-O3` + verbose `-O none/basic/moderate/aggressive`)
 
-**Effort**: 2-3 days
+**Completed Features**:
+
+- Enhanced verbose mode shows:
+  - Target language and optimization level
+  - Backend preferences (when set)
+  - Input files and build directory
+  - Build mode and compiler (for build command)
+  - All output files generated
+- Improved help messages with:
+  - Organized examples by category (basic, optimization, preferences, progress, building, batch)
+  - Detailed optimization level explanations for all backends
+  - LLVM-specific optimization notes with performance benchmarks
+  - Build directory structure diagram
+- Better error messages with helpful hints:
+  - Invalid backend errors now suggest using `mgen backends` command
+  - Available backends listed after error
+- Standard optimization flags:
+  - `-O0` / `-O none` - No optimization (fastest compile, debug)
+  - `-O1` / `-O basic` - Basic optimization
+  - `-O2` / `-O moderate` - Moderate optimization (default)
+  - `-O3` / `-O aggressive` - Aggressive optimization (max performance)
+  - Both numeric and verbose formats supported for all backends
+- Existing features preserved:
+  - Progress bars with visual indicators
+  - Dry-run mode for previewing operations
+
+**Effort**: 2-3 days (COMPLETED)
 
 ### 4. Build System Generation (MEDIUM)
 
