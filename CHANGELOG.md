@@ -27,11 +27,23 @@ MGen now supports the `any()` and `all()` built-in functions across all producti
 
 - **Built-in Functions** - `any()` and `all()` support across 6 production backends
   - **C++**: Template functions `mgen::any()` and `mgen::all()` with automatic `bool_value()` conversion
-  - **Rust**: `Builtins::any()` and `Builtins::all()` using Rust iterator methods (`any`, `all`)
+    - Runtime: `src/mgen/backends/cpp/runtime/mgen_cpp_runtime.hpp` (lines 165-178)
+    - Works with any container type, converts elements to bool automatically
+  - **Rust**: `Builtins::any()` and `Builtins::all()` using Rust iterator methods
+    - Runtime: `src/mgen/backends/rust/runtime/mgen_rust_runtime.rs` (lines 116-123)
+    - Idiomatic Rust: `vec.iter().any(|&x| x)` and `vec.iter().all(|&x| x)`
   - **Go**: `mgen.Any()` and `mgen.All()` functions for `[]bool` slices
-  - **Haskell**: Native `or` and `and` functions (direct mapping to Prelude functions)
-  - **OCaml**: `any'` and `all'` using `List.exists` and `List.for_all` standard library functions
-  - **C**: Added to builtin function mapping (runtime implementation pending)
+    - Runtime: `src/mgen/backends/go/runtime/mgen_go_runtime.go` (lines 142-160)
+    - Simple loop-based implementation
+  - **Haskell**: Native `or` and `and` functions (direct mapping to Prelude)
+    - Converter: Maps `any(list)` → `or list`, `all(list)` → `and list`
+    - Zero runtime overhead - uses built-in functions
+  - **OCaml**: `any'` and `all'` using `List.exists` and `List.for_all`
+    - Runtime: `src/mgen/backends/ocaml/runtime/mgen_runtime.ml` (lines 116-117, 216-217)
+    - Functional implementation using standard library
+  - **C**: Added to builtin function mapping
+    - Converter: `src/mgen/backends/c/converter.py` (line 1024)
+    - Runtime implementation pending
 
 - **Usage Examples**
   ```python
@@ -41,13 +53,26 @@ MGen now supports the `any()` and `all()` built-in functions across all producti
   # all() - returns True if ALL elements are True
   result: bool = all([True, True, True])    # True
   result: bool = all([True, False, True])   # False
+
+  # Common use case: condition checking
+  def check_flags(flags: list[bool]) -> bool:
+      return any(flags)  # Returns True if any flag is set
   ```
+
+### Changed
+
+- `SUPPORTED_SYNTAX.md` updated to mark `any()` and `all()` as implemented
 
 ### Notes
 
 - **Test Results**: 1046 tests passing, 2 skipped (100% pass rate)
 - **Type Safety**: All implementations work with `list[bool]` types and their language-specific equivalents
-- **Implementation**: Each backend uses idiomatic language features (templates in C++, iterators in Rust, native functions in Haskell/OCaml)
+- **Implementation Strategy**: Each backend uses idiomatic language features
+  - C++: Templates with SFINAE for type flexibility
+  - Rust: Iterator methods for zero-cost abstraction
+  - Go: Explicit loops for simplicity
+  - Haskell/OCaml: Native functional combinators
+- **Future Enhancement**: `enumerate()` and `zip()` require tuple support (deferred)
 
 ## [0.1.86] - 2025-10-16
 
