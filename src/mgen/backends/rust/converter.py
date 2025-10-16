@@ -1279,6 +1279,10 @@ class MGenPythonToRustConverter:
                     return "0"  # Fallback for invalid max args
             elif func_name == "sum":
                 return f"Builtins::sum_i32(&{args[0]})"
+            elif func_name == "any":
+                return f"Builtins::any(&{args[0]})"
+            elif func_name == "all":
+                return f"Builtins::all(&{args[0]})"
             elif func_name == "bool":
                 return f"to_bool({args[0]})"
             elif func_name == "int":

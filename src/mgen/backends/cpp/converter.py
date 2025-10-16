@@ -1180,6 +1180,8 @@ class MGenPythonToCppConverter:
                 "min": "mgen::min",
                 "max": "mgen::max",
                 "sum": "mgen::sum",
+                "any": "mgen::any",
+                "all": "mgen::all",
                 "bool": "mgen::bool_value",
                 "range": "Range",
             }

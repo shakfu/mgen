@@ -683,6 +683,8 @@ class MGenPythonToOCamlConverter:
             "min": f"min' {arg} {self._convert_expression(args[1]) if len(args) > 1 else arg}",
             "max": f"max' {arg} {self._convert_expression(args[1]) if len(args) > 1 else arg}",
             "sum": f"sum' {arg}",
+            "any": f"any' {arg}",
+            "all": f"all' {arg}",
         }
 
         return builtin_map.get(func_name, f"{func_name}' {arg}")

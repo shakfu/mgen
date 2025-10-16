@@ -1394,6 +1394,10 @@ class MGenPythonToGoConverter:
                 arg_type = self._infer_type_from_value(expr.args[0])
                 elem_type = arg_type[2:] if arg_type.startswith("[]") else "int"
                 return f"mgen.Sum[{elem_type}]({args[0]})"
+            elif func_name == "any":
+                return f"mgen.Any({args[0]})"
+            elif func_name == "all":
+                return f"mgen.All({args[0]})"
             elif func_name == "bool":
                 # BoolValue still needs to use interface{} since it handles many types
                 return f"mgen.ToBool({args[0]})"

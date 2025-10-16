@@ -113,6 +113,9 @@ module Builtins = struct
   let sum_int_list lst = List.fold_left (+) 0 lst
   let sum_float_list lst = List.fold_left (+.) 0.0 lst
 
+  let any_bool_list lst = List.exists (fun x -> x) lst
+  let all_bool_list lst = List.for_all (fun x -> x) lst
+
   (* Set constructor - empty set as empty list *)
   let set () = []
 end
@@ -210,6 +213,8 @@ let len_array = Builtins.len_array
 let min' = Builtins.min_int
 let max' = Builtins.max_int
 let sum' = Builtins.sum_int_list
+let any' = Builtins.any_bool_list
+let all' = Builtins.all_bool_list
 let set = Builtins.set
 
 let list_comprehension = Comprehensions.list_comprehension

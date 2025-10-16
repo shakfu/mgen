@@ -139,6 +139,26 @@ func Sum[T Numeric](slice []T) T {
 	return total
 }
 
+// Any returns true if any element in the slice is true
+func Any(slice []bool) bool {
+	for _, v := range slice {
+		if v {
+			return true
+		}
+	}
+	return false
+}
+
+// All returns true if all elements in the slice are true
+func All(slice []bool) bool {
+	for _, v := range slice {
+		if !v {
+			return false
+		}
+	}
+	return true
+}
+
 // Legacy BuiltinOps struct for backwards compatibility
 type BuiltinOps struct{}
 

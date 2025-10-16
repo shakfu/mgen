@@ -637,6 +637,16 @@ main = printValue "Generated Haskell code executed successfully"'''
                     return f"sum' {args[0]}"
                 else:
                     return "0"  # Default sum value
+            elif func_name == "any":
+                if args:
+                    return f"or {args[0]}"
+                else:
+                    return "False"
+            elif func_name == "all":
+                if args:
+                    return f"and {args[0]}"
+                else:
+                    return "True"
             elif func_name == "bool":
                 if args:
                     return f"bool' {args[0]}"

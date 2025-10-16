@@ -160,6 +160,26 @@ auto sum(const Container& container) -> typename Container::value_type {
     return result;
 }
 
+template<typename Container>
+bool any(const Container& container) {
+    for (const auto& item : container) {
+        if (bool_value(item)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+template<typename Container>
+bool all(const Container& container) {
+    for (const auto& item : container) {
+        if (!bool_value(item)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // ============================================================================
 // STL Container Aliases (Python-like naming)
 // ============================================================================

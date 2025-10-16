@@ -101,6 +101,14 @@ impl Builtins {
     pub fn sum_f64(vec: &Vec<f64>) -> f64 {
         vec.iter().sum()
     }
+
+    pub fn any(vec: &Vec<bool>) -> bool {
+        vec.iter().any(|&x| x)
+    }
+
+    pub fn all(vec: &Vec<bool>) -> bool {
+        vec.iter().all(|&x| x)
+    }
 }
 
 // Type conversion utilities

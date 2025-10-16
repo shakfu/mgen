@@ -17,6 +17,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.87] - 2025-01-16
+
+**Built-in Functions - `any()` and `all()` Support! ✅**
+
+MGen now supports the `any()` and `all()` built-in functions across all production backends. These boolean aggregate functions enable clean, expressive code for checking conditions across collections.
+
+### Added
+
+- **Built-in Functions** - `any()` and `all()` support across 6 production backends
+  - **C++**: Template functions `mgen::any()` and `mgen::all()` with automatic `bool_value()` conversion
+  - **Rust**: `Builtins::any()` and `Builtins::all()` using Rust iterator methods (`any`, `all`)
+  - **Go**: `mgen.Any()` and `mgen.All()` functions for `[]bool` slices
+  - **Haskell**: Native `or` and `and` functions (direct mapping to Prelude functions)
+  - **OCaml**: `any'` and `all'` using `List.exists` and `List.for_all` standard library functions
+  - **C**: Added to builtin function mapping (runtime implementation pending)
+
+- **Usage Examples**
+  ```python
+  # any() - returns True if ANY element is True
+  result: bool = any([False, False, True])  # True
+
+  # all() - returns True if ALL elements are True
+  result: bool = all([True, True, True])    # True
+  result: bool = all([True, False, True])   # False
+  ```
+
+### Notes
+
+- **Test Results**: 1046 tests passing, 2 skipped (100% pass rate)
+- **Type Safety**: All implementations work with `list[bool]` types and their language-specific equivalents
+- **Implementation**: Each backend uses idiomatic language features (templates in C++, iterators in Rust, native functions in Haskell/OCaml)
+
 ## [0.1.86] - 2025-10-16
 
 **F-String Support - Modern Python String Formatting! 🎯**

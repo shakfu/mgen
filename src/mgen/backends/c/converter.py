@@ -1021,7 +1021,7 @@ class MGenPythonToCConverter:
                 return "/* EMPTY_SET_LITERAL */"
 
             # Handle built-in functions with runtime support
-            elif func_name in ["len", "bool", "abs", "min", "max", "sum", "print"] and self.use_runtime:
+            elif func_name in ["len", "bool", "abs", "min", "max", "sum", "any", "all", "print"] and self.use_runtime:
                 # Pass original AST args to print for type detection
                 if func_name == "print":
                     return self._convert_print_call(expr.args, args)

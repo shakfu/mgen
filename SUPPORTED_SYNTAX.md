@@ -138,13 +138,14 @@ Why: Legacy support for older codebases
 - "Hello %s" % name → string substitution
 - Less important than f-strings (f-strings preferred)
 
-5. [ ] More Built-ins
+5. [~] More Built-ins (Partial Support ✅)
 
 Why: Incremental improvements, well-defined semantics
-- enumerate(): Easy, just counter + loop
-- zip(): Easy, parallel iteration
-- reversed(): Easy, reverse iteration
-- any()/all(): Simple boolean reductions
+- ✅ **any()**: IMPLEMENTED in v0.1.87 (boolean reduction: returns True if any element is True)
+- ✅ **all()**: IMPLEMENTED in v0.1.87 (boolean reduction: returns True if all elements are True)
+- [ ] enumerate(): Easy, just counter + loop (requires tuple support)
+- [ ] zip(): Easy, parallel iteration (requires tuple support)
+- [ ] reversed(): Easy, reverse iteration
 - Already have infrastructure for built-ins
 
 6. [ ] @property Decorator
