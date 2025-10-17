@@ -53,23 +53,26 @@ Not Implemented (No Support)
   - ✅ Supported: @staticmethod, @classmethod, @dataclass
   - ❌ Not supported: @property, user-defined decorators
 4. Imports (partial support)
-  - ✅ Supported: import module, from module import name, import ... as
-alias
+  - ✅ Supported: import module, from module import name, import ... as alias
   - ❌ Not supported: Relative imports, star imports (from x import *)
 5. String Features
   - ✅ F-strings (basic expressions, no format specs in Phase 1)
   - ❌ String formatting (%, .format())
   - ✅ String methods: split, lower, upper, strip, replace, join, etc.
 6. Built-in Functions (partial)
-  - ❌ Not supported: isinstance, type(), globals(), locals(), getattr,
-setattr, hasattr, dir
+  - ❌ Not supported: isinstance, type(), globals(), locals(), getattr, setattr, hasattr, dir
 7. Class Features (partial)
   - ✅ Supported: Basic classes, __init__, methods, single inheritance
-  - ❌ Not supported: Multiple inheritance, @property, descriptors, magic
-methods (beyond __init__)
+  - ❌ Not supported: Multiple inheritance, @property, descriptors, magic methods (beyond __init__)
 8. Generator Expressions
   - (x for x in items) - different from list comprehensions
   - Not mentioned in supported features
+9. **List Slicing (partial support)**
+  - ✅ **Haskell**: Full support via `drop`/`take` (arr[1:], arr[:n], arr[1:n])
+  - ❌ **C, C++, Rust, Go, OCaml, LLVM**: Not yet implemented
+  - **Status**: On roadmap for future implementation
+  - **Workaround**: Use explicit loops or list comprehensions
+  - **Example**: Instead of `rest = arr[1:]`, use `rest = [arr[i] for i in range(1, len(arr))]`
 
 Current Support Summary
 
@@ -131,14 +134,29 @@ Why: Modern Python feature, maps well to switch/case
 
 Medium-Impact, Low Complexity (Quick Wins)
 
-4. [ ] String Formatting (% and .format())
+4. [ ] **List Slicing (arr[1:], arr[:n], arr[start:end])**
+
+Why: Common Python pattern, clean syntax
+- ✅ **Already working in Haskell** (maps to `drop`/`take`)
+- Backend mappings straightforward:
+  - C++: `std::vector(begin + start, begin + end)` or constructor
+  - Rust: `&arr[start..end]` (slices) or `.iter().skip(n).take(m)`
+  - Go: `arr[start:end]` (native support!)
+  - C: Manual copy or pointer arithmetic
+  - OCaml: `List.filteri` or recursive approach
+  - LLVM: Vector operations
+- **Status**: Haskell complete, other backends pending
+- **Impact**: Enables functional programming patterns, cleaner algorithm implementations
+- **Example**: `rest = arr[1:]` instead of manual indexing loops
+
+5. [ ] String Formatting (% and .format())
 
 Why: Legacy support for older codebases
 - Similar to f-strings but easier (no expression parsing)
 - "Hello %s" % name → string substitution
 - Less important than f-strings (f-strings preferred)
 
-5. [~] More Built-ins (Partial Support ✅)
+6. [~] More Built-ins (Partial Support ✅)
 
 Why: Incremental improvements, well-defined semantics
 - ✅ **any()**: IMPLEMENTED in v0.1.87 (boolean reduction: returns True if any element is True)
@@ -193,7 +211,8 @@ Rust/Haskell/OCaml backends would shine here.
 Avoid for now: Context managers, generators, async/await (as roadmap
 indicates - need more research, exception handling dependencies)
 
-**Updated Priority (Post v0.1.86):**
-1. Tuple support - Next logical feature after f-strings
-2. Pattern matching - Leverage backend strengths (Rust/Haskell/OCaml)
-3. More built-ins (enumerate, zip, reversed, any/all) - Quick wins
+**Updated Priority (Post v0.1.87):**
+1. **List slicing** - Already working in Haskell, straightforward backend mappings, high-impact for algorithms
+2. **Tuple support** - Enables multiple returns, unlocks real-world patterns
+3. **Pattern matching** - Leverage backend strengths (Rust/Haskell/OCaml), future-proof for Python 3.10+
+4. **More built-ins** (enumerate, zip, reversed) - Quick wins, requires tuple support for enumerate/zip
