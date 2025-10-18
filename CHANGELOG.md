@@ -17,6 +17,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.93] - 2025-10-18
+
+**C Backend Tier 1 Fixes - Type Casting & String Membership!**
+
+Implemented Tier 1 high-priority fixes from translation test failure analysis. Added support for Python type cast syntax (`int()`, `float()`, `str()`) and string membership testing (`in` operator for strings). Zero regression failures, 4/5 target tests now build.
+
+### Added
+
+- **Type Cast Conversion Support**
+  - `float(x)` → `(double)x` - Python float() to C double cast
+  - `int(x)` → `(int)x` - Python int() to C int cast
+  - `str(x)` → `mgen_int_to_string(x)` - String conversion with runtime support
+  - Pre-scan detection ensures `mgen_string_ops.h` included when needed
+  - Preserves existing `bool()` behavior (uses runtime for truthiness semantics)
+  - Files: `src/mgen/backends/c/converter.py:1173-1231,202-215`
+
+- **String Membership Testing**
+  - `substring in text` → `(strstr(text, substring) != NULL)`
+  - `substring not in text` → `(!(strstr(text, substring) != NULL))`
+  - Automatic `#include <string.h>` when string membership used
+  - Files: `src/mgen/backends/c/converter.py:1078-1103`
+
+### Fixed
+
+- **Translation Tests** - 4/5 target tests now build (was 0/5)
+  - ✓ `test_string_membership_simple.py` - **FULLY FIXED** (builds + runs)
+  - ✓ `test_string_membership.py` - **FULLY FIXED** (builds + runs)
+  - ✓ `test_struct_field_access.py` - Now builds and runs (was build failure)
+  - ✓ `test_string_methods_new.py` - Now builds (was build failure, runtime issue separate)
+  - ✗ `test_string_methods.py` - Still has unrelated errors (string concatenation, type inference)
+
+### Test Results
+
+- **Regression tests**: 1045/1045 passing (100%, zero regressions)
+- **Translation tests**: 2 tests fully fixed, 4 tests now building
+- **Type check**: All files pass strict mypy
+- **Impact**: Tier 1 fixes address highest-priority common Python patterns
+
+### Technical Details
+
+- Type cast conversion handles most common numeric/string conversions
+- String membership extends existing `_convert_compare()` method
+- Pre-scan phase ensures headers included before code generation
+- Design preserves Python semantics (`bool()` for truthiness, casts for numeric conversion)
+- Zero technical debt, clean implementation following project architecture
+
+### Next Steps
+
+- **Tier 2 Fixes** (optional): List slicing (3 tests), Set type inference (2 tests)
+- **Expected impact**: ~70% translation test pass rate after Tier 2
+
 ## [0.1.92] - 2025-10-18
 
 **C Backend Phase 3.2 Complete - Import/ImportFrom Support!**

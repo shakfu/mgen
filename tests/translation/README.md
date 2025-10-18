@@ -2,6 +2,16 @@
 
 This directory contains focused test cases for Python-to-C translation features. These files are specifically designed to test and validate core translation capabilities.
 
+## Status (v0.1.93)
+
+**Overall**: 6/27 tests passing (22%)
+**Recent Fixes**: Tier 1 improvements (v0.1.93)
+- ✓ Type casting support (`int()`, `float()`, `str()`)
+- ✓ String membership testing (`in` operator)
+- 4/5 target tests now build (2 fully pass)
+
+See `/tmp/failure_analysis_report.md` for detailed analysis and roadmap.
+
 ## Test Categories
 
 ### Container and Data Structure Tests

@@ -116,6 +116,9 @@ class MGenPythonToCConverter:
         # First pass: process imports for include generation
         self._detect_imports(node)
 
+        # First pass: detect type casts for include generation
+        self._detect_type_casts(node)
+
         # First pass: detect container variables to generate STC declarations
         self._detect_container_variables(node)
 
@@ -195,6 +198,21 @@ class MGenPythonToCConverter:
                 self._process_import(stmt)
             elif isinstance(stmt, ast.ImportFrom):
                 self._process_from_import(stmt)
+
+    def _detect_type_casts(self, node: ast.Module) -> None:
+        """Pre-scan module to detect type casts and add necessary includes.
+
+        Args:
+            node: Module node to scan
+        """
+        for child in ast.walk(node):
+            if isinstance(child, ast.Call) and isinstance(child.func, ast.Name):
+                func_name = child.func.id
+                # Check for str() calls which need mgen_string_ops.h
+                if func_name == "str":
+                    self.includes_needed.add('#include "mgen_string_ops.h"')
+                    # No need to continue scanning once we found it
+                    break
 
     def _process_import(self, node: ast.Import) -> None:
         """Process import statement and add necessary C includes.
@@ -1059,7 +1077,12 @@ class MGenPythonToCConverter:
 
                 if c_type:
                     result = None
-                    if c_type == "map_str_int":
+                    if c_type in ["str", "char*", "const char*"] or "char*" in c_type:
+                        # String membership: use strstr()
+                        # Need to add string.h if not already present
+                        self.includes_needed.add("#include <string.h>")
+                        result = f"(strstr({right}, {left}) != NULL)"
+                    elif c_type == "map_str_int":
                         # Vanilla C string map
                         result = f"mgen_str_int_map_contains({right}, {left})"
                     elif c_type.startswith("map_"):
@@ -1077,7 +1100,7 @@ class MGenPythonToCConverter:
                         if is_not_in:
                             return f"(!{result})"
                         else:
-                            return f"({result})"
+                            return result
 
             raise UnsupportedFeatureError("'in' operator not supported for this container type")
 
@@ -1146,6 +1169,10 @@ class MGenPythonToCConverter:
                 # Empty set literal - return a marker that assignment handling will replace
                 return "/* EMPTY_SET_LITERAL */"
 
+            # Handle type cast built-ins (but not bool - it uses runtime)
+            elif func_name in ["float", "int", "str"]:
+                return self._convert_type_cast(func_name, expr.args)
+
             # Handle built-in functions with runtime support
             elif func_name in ["len", "bool", "abs", "min", "max", "sum", "any", "all", "print"] and self.use_runtime:
                 # Pass original AST args to print for type detection
@@ -1162,6 +1189,46 @@ class MGenPythonToCConverter:
 
         else:
             raise UnsupportedFeatureError("Only simple function calls and method calls supported")
+
+    def _convert_type_cast(self, cast_type: str, args: list[ast.expr]) -> str:
+        """Convert Python type cast to C cast.
+
+        Args:
+            cast_type: Type to cast to ('float', 'int', 'str')
+            args: Arguments to the cast (should be exactly 1)
+
+        Returns:
+            C cast expression
+
+        Example:
+            float(x) → (double)x
+            int(x) → (int)x
+            str(x) → mgen_int_to_string(x)  [if x is int]
+
+        Note:
+            bool(x) is NOT handled here - it uses mgen_bool_int() runtime function
+            because Python's bool() has specific truthiness semantics.
+        """
+        if len(args) != 1:
+            raise UnsupportedFeatureError(f"Type cast {cast_type}() expects exactly 1 argument")
+
+        arg = self._convert_expression(args[0])
+
+        # Map Python types to C types
+        if cast_type == "float":
+            # Python float is C double
+            return f"(double){arg}"
+        elif cast_type == "int":
+            return f"(int){arg}"
+        elif cast_type == "str":
+            # String conversion requires runtime function
+            # Add string ops header if not already present
+            self.includes_needed.add('#include "mgen_string_ops.h"')
+            # For now, support int to string (most common case)
+            # TODO: Add support for float to string, bool to string, etc.
+            return f"mgen_int_to_string({arg})"
+        else:
+            raise UnsupportedFeatureError(f"Type cast {cast_type}() not supported")
 
     def _convert_builtin_with_runtime(self, func_name: str, args: list[str]) -> str:
         """Convert built-in functions using MGen runtime."""
