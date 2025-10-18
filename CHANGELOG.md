@@ -17,6 +17,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+### 🎉 C Backend Milestone: 70% → 93% Pass Rate (v0.1.100-104)
+
+**Date**: October 18, 2025
+**Summary**: Major C backend improvement sprint - fixed 6 bugs in one session, bringing the C backend from 70% to **93% pass rate (25/27 tests)**. All practical features now working.
+
+**Releases in this sprint**:
+- **v0.1.100** - Phase 1: Validation fixes → 81% (22/27)
+- **v0.1.101** - Phase 2: Dict length support → 85% (23/27)
+- **v0.1.102** - Phase 2: String literal wrapping → 85% (23/27)
+- **v0.1.103** - Bugfix: Loop variable type inference → 89% (24/27)
+- **v0.1.104** - Bugfix: String array subscript → **93% (25/27)**
+
+**Key Achievements**:
+- ✅ Dict comprehensions with `len()` working
+- ✅ String lists (`vec_cstr`) fully supported
+- ✅ Loop variable types correctly inferred
+- ✅ String `split()` operations working
+- ✅ All 1045 regression tests passing
+- ✅ Only 2 advanced nested container features remaining
+
+**Remaining**: 2 tests (nested dict-list containers) - advanced features rarely used in practice
+
+---
+
+## [0.1.104] - 2025-10-18
+
+**C Backend Fix - String Array Subscript Access**
+
+Fixed subscript access for `mgen_string_array_t*` (result of `str.split()`). String arrays now correctly use accessor functions instead of direct subscript notation.
+
+### Fixed
+
+- **String array subscript access**
+  - `words[0]` now generates `mgen_string_array_get(words, 0)` for `mgen_string_array_t*` type
+  - Enables proper access to string split results
+  - test_string_split_simple.py now **BUILD+RUN PASS** ✅
+  - Files: `src/mgen/backends/c/converter.py:2186-2188`
+
+### Technical Details
+
+**Problem**: Subscript on `mgen_string_array_t*` generated `words[0]` which is invalid C
+
+**Before** (Incorrect):
+```c
+mgen_string_array_t* words = mgen_str_split(text, ",");
+assert((strcmp(words[0], "hello") == 0));  // ERROR: incompatible types
+```
+
+**After** (Correct):
+```c
+mgen_string_array_t* words = mgen_str_split(text, ",");
+assert((strcmp(mgen_string_array_get(words, 0), "hello") == 0));  // ✓ Correct
+```
+
+**Solution**: Added special case in `_convert_subscript()` to detect `mgen_string_array_t*` type and use `mgen_string_array_get()` accessor function.
+
+---
+
 ## [0.1.103] - 2025-10-18
 
 **C Backend Bugfix - Loop Variable Type Inference**

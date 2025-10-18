@@ -2183,8 +2183,11 @@ class MGenPythonToCConverter:
                 c_type = self.inferred_types[var_name].c_type
 
             if c_type:
+                # If it's a mgen_string_array_t*, use mgen_string_array_get()
+                if c_type == "mgen_string_array_t*":
+                    return f"mgen_string_array_get({obj}, {index})"
                 # If it's a nested vector (vec_vec_int), first access returns a vec_int*
-                if c_type == "vec_vec_int":
+                elif c_type == "vec_vec_int":
                     return f"vec_vec_int_at(&{obj}, {index})"
                 # If it's an STC vector type, use vec_*_at() function
                 elif c_type.startswith("vec_"):
