@@ -440,7 +440,9 @@ class MGenPythonToCConverter:
                 if element_type == "cstr":
                     declarations.extend(
                         [
+                            "#define i_implement",  # Enable cstr implementation
                             '#include "stc/cstr.h"',
+                            "#undef i_implement",
                             "",
                         ]
                     )
@@ -2027,9 +2029,13 @@ class MGenPythonToCConverter:
             if container_type and "mgen_string_array" in container_type:
                 self.variable_context[var_name] = "char*"
             elif container_type and container_type.startswith("vec_"):
-                self.variable_context[var_name] = "int"  # TODO: infer element type
+                # Extract element type from vec_TYPE (e.g., vec_cstr -> cstr, vec_int -> int)
+                element_type = container_type[4:]  # Remove "vec_" prefix
+                self.variable_context[var_name] = element_type
             elif container_type and container_type.startswith("set_"):
-                self.variable_context[var_name] = "int"  # TODO: infer element type
+                # Extract element type from set_TYPE (e.g., set_int -> int)
+                element_type = container_type[4:]  # Remove "set_" prefix
+                self.variable_context[var_name] = element_type
             else:
                 self.variable_context[var_name] = "int"  # Default
 
@@ -2049,7 +2055,8 @@ class MGenPythonToCConverter:
                 result += "}"
             elif container_type and container_type.startswith("set_"):
                 # STC set iteration using iterator (var_name already set above)
-                element_type = "int"  # Default
+                # Extract element type from set_TYPE (e.g., set_int -> int)
+                element_type = container_type[4:]  # Remove "set_" prefix
                 iter_var = self._generate_temp_var_name("set_iter")
                 result = f"{container_type}_iter {iter_var} = {container_type}_begin(&{container_name});\n"
                 result += f"for (; {iter_var}.ref; {container_type}_next(&{iter_var})) {{\n"
@@ -2059,7 +2066,8 @@ class MGenPythonToCConverter:
                 result += "}"
             elif container_type and container_type.startswith("vec_"):
                 # STC vector iteration (var_name already set above)
-                element_type = "int"  # Default
+                # Extract element type from vec_TYPE (e.g., vec_cstr -> cstr, vec_int -> int)
+                element_type = container_type[4:]  # Remove "vec_" prefix
                 result = f"for (size_t {index_var} = 0; {index_var} < {container_type}_size(&{container_name}); {index_var}++) {{\n"
                 result += f"    {element_type} {var_name} = *{container_type}_at(&{container_name}, {index_var});\n"
                 for line in body:

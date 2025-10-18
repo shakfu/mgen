@@ -17,6 +17,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.103] - 2025-10-18
+
+**C Backend Bugfix - Loop Variable Type Inference**
+
+Fixed Issue 2.3: Loop variables for container iteration now correctly infer element types from container type names.
+
+### Fixed
+
+- **Loop variable type inference**
+  - Loop variables for `vec_cstr` now correctly typed as `cstr` instead of `int`
+  - Loop variables for `set_int` now correctly typed as `int` (extracted from type name)
+  - Generic type extraction: `vec_TYPE` → `TYPE`, `set_TYPE` → `TYPE`
+  - test_container_iteration.py now **BUILD+RUN PASS** ✅
+  - Files: `src/mgen/backends/c/converter.py:2029-2037,2057,2068`
+
+- **STC cstr implementation**
+  - Added `#define i_implement` before `#include "stc/cstr.h"` to enable implementation
+  - Fixes linker errors for `vec_cstr` usage
+  - Files: `src/mgen/backends/c/converter.py:443-445`
+
+### Technical Details
+
+**Problem**: Loop variables were hardcoded to `int` type instead of inferring from container element type
+
+**Before** (Incorrect):
+```c
+for (size_t idx = 0; idx < vec_cstr_size(&names); idx++) {
+    int name = *vec_cstr_at(&names, idx);  // ERROR: incompatible types
+}
+```
+
+**After** (Correct):
+```c
+for (size_t idx = 0; idx < vec_cstr_size(&names); idx++) {
+    cstr name = *vec_cstr_at(&names, idx);  // ✓ Correct type
+}
+```
+
+**Solution**: Extract element type from container type name by removing prefix:
+- `vec_cstr` → `cstr` (remove "vec_" prefix)
+- `set_int` → `int` (remove "set_" prefix)
+
+---
+
 ## [0.1.102] - 2025-10-18
 
 **C Backend Phase 2 v0.1.102 - String Literal Wrapping**
