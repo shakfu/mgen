@@ -1966,6 +1966,8 @@ class MGenPythonToCConverter:
                 self.variable_context[var_name] = "char*"
             elif container_type and container_type.startswith("vec_"):
                 self.variable_context[var_name] = "int"  # TODO: infer element type
+            elif container_type and container_type.startswith("set_"):
+                self.variable_context[var_name] = "int"  # TODO: infer element type
             else:
                 self.variable_context[var_name] = "int"  # Default
 
@@ -1980,6 +1982,16 @@ class MGenPythonToCConverter:
                 # String array iteration (var_name already set above)
                 result = f"for (size_t {index_var} = 0; {index_var} < mgen_string_array_size({container_name}); {index_var}++) {{\n"
                 result += f"    const char* {var_name} = mgen_string_array_get({container_name}, {index_var});\n"
+                for line in body:
+                    result += f"    {line}\n"
+                result += "}"
+            elif container_type and container_type.startswith("set_"):
+                # STC set iteration using iterator (var_name already set above)
+                element_type = "int"  # Default
+                iter_var = self._generate_temp_var_name("set_iter")
+                result = f"{container_type}_iter {iter_var} = {container_type}_begin(&{container_name});\n"
+                result += f"for (; {iter_var}.ref; {container_type}_next(&{iter_var})) {{\n"
+                result += f"    {element_type} {var_name} = *{iter_var}.ref;\n"
                 for line in body:
                     result += f"    {line}\n"
                 result += "}"
