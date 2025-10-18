@@ -17,6 +17,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.102] - 2025-10-18
+
+**C Backend Phase 2 v0.1.102 - String Literal Wrapping**
+
+String literals are now correctly wrapped for STC `vec_cstr` containers. This completes the second part of Phase 2 code generation improvements.
+
+### Fixed
+
+- **String literal wrapping for vec_cstr**
+  - String literals in list append operations now wrapped with `cstr_lit()` macro
+  - String literals in list initialization now wrapped with `cstr_lit()`
+  - Added automatic `#include "stc/cstr.h"` when `vec_cstr` type is detected
+  - Generates correct code: `vec_cstr_push(&names, cstr_lit("Alice"))`
+  - Files: `src/mgen/backends/c/converter.py:440-446,900-902,1379,1539-1548`
+
+### Changed
+
+- **List method conversion**
+  - `_convert_list_method()` now accepts AST args to detect string literal types
+  - Detects `vec_cstr` container type and wraps string literals appropriately
+  - Files: `src/mgen/backends/c/converter.py:1519,1539-1548`
+
+- **Container include directives**
+  - Added special case for `vec_cstr` to include `stc/cstr.h` before container declaration
+  - Ensures `cstr_lit()` macro is available for string literal wrapping
+  - Files: `src/mgen/backends/c/converter.py:440-446`
+
+### Known Limitations
+
+- **Loop variable type inference for vec_cstr**
+  - Loop variables for `vec_cstr` iteration currently inferred as `int` instead of `cstr`
+  - This is a separate type inference issue, NOT related to string literal wrapping
+  - Will be addressed in a future release
+  - Workaround: Use explicit type annotations or avoid iterating over string lists
+
+---
+
+## [0.1.101] - 2025-10-18
+
+**C Backend Phase 2 v0.1.101 - Dict Length Support**
+
+Dict comprehensions now correctly support `len()` operations. This is the first part of Phase 2 code generation improvements.
+
+### Fixed
+
+- **Dict length support**
+  - `len()` on `mgen_str_int_map_t*` now generates `mgen_str_int_map_size(result)`
+  - `len()` on STC map types now generates `map_TYPE_size(&map)`
+  - Fixed dict comprehension type inference to return `mgen_str_int_map_t*` for string-keyed maps
+  - test_dict_comprehension.py now builds and runs successfully (returns 5)
+  - Files: `src/mgen/backends/c/converter.py:1291-1295,1717-1722,859`
+
+### Changed
+
+- **Dict comprehension type inference**
+  - `_infer_expression_type()` for DictComp now returns correct fallback type
+  - String-keyed maps use `mgen_str_int_map_t*` instead of STC `map_str_int`
+  - Ensures type consistency between dict creation and length operations
+  - Files: `src/mgen/backends/c/converter.py:1717-1722`
+
+- **Type assignment logic**
+  - Added `"mgen_"` prefix to type prefix check for custom types
+  - Ensures mgen custom types are preferred over generic defaults
+  - Files: `src/mgen/backends/c/converter.py:859`
+
+---
+
 ## [0.1.100] - 2025-10-18
 
 **C Backend Phase 1 Complete - 81% Pass Rate!**

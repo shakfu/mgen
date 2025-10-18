@@ -436,6 +436,14 @@ class MGenPythonToCConverter:
             if c_type.startswith("vec_"):
                 # Extract element type
                 element_type = c_type[4:]  # Remove "vec_"
+                # Special case: vec_cstr needs cstr.h for cstr_lit() macro
+                if element_type == "cstr":
+                    declarations.extend(
+                        [
+                            '#include "stc/cstr.h"',
+                            "",
+                        ]
+                    )
                 declarations.extend(
                     [
                         f"#define i_type {c_type}",
@@ -856,8 +864,8 @@ class MGenPythonToCConverter:
                 # If the value type is more specific than a generic container, use it
                 if value_type in ["mgen_string_array_t*", "char*"] and type_annotation == "list":
                     c_type = value_type
-                elif value_type.startswith(("map_", "vec_", "set_")) and value_type != "vec_int":
-                    # Use specific STC type if not the generic default
+                elif value_type.startswith(("map_", "vec_", "set_", "mgen_")) and value_type != "vec_int":
+                    # Use specific STC type or mgen custom type if not the generic default
                     c_type = value_type
 
             # If we didn't get a specific type from value, try enhanced type inference
@@ -897,6 +905,9 @@ class MGenPythonToCConverter:
                     statements = [f"{c_type} {var_name} = {{0}};"]
                     for element in stmt.value.elts:
                         element_code = self._convert_expression(element)
+                        # For vec_cstr, wrap string literals with cstr_lit()
+                        if c_type == "vec_cstr" and isinstance(element, ast.Constant) and isinstance(element.value, str):
+                            element_code = f"cstr_lit({element_code})"
                         statements.append(f"{c_type}_push(&{var_name}, {element_code});")
                     return "\n".join(statements)
 
@@ -1287,7 +1298,11 @@ class MGenPythonToCConverter:
                 container_type = self.inferred_types[container_name].c_type
 
             # Use the appropriate size function based on container type
-            if container_type and container_type.startswith("map_"):
+            # Check for mgen custom types first (before generic STC types)
+            if container_type == "mgen_str_int_map_t*":
+                return f"mgen_str_int_map_size({container_name})"
+            elif container_type and container_type.startswith("map_"):
+                # STC map types
                 return f"{container_type}_size(&{container_name})"
             elif container_type and container_type.startswith("set_"):
                 return f"{container_type}_size(&{container_name})"
@@ -1372,7 +1387,7 @@ class MGenPythonToCConverter:
 
         # Check if this is a list method call
         if self._is_list_type(obj_expr):
-            return self._convert_list_method(obj, method_name, args, obj_expr)
+            return self._convert_list_method(obj, method_name, args, obj_expr, expr.args)
 
         # Check if this is a set method call
         if self._is_set_type(obj_expr):
@@ -1512,7 +1527,7 @@ class MGenPythonToCConverter:
 
         return False
 
-    def _convert_list_method(self, obj: str, method_name: str, args: list[str], obj_expr: ast.expr) -> str:
+    def _convert_list_method(self, obj: str, method_name: str, args: list[str], obj_expr: ast.expr, ast_args: list[ast.expr] | None = None) -> str:
         """Convert list method calls to STC vector operations."""
         # Get the variable name to determine the vec type
         vec_type = "vec_int"  # Default
@@ -1531,8 +1546,17 @@ class MGenPythonToCConverter:
         if method_name == "append":
             if len(args) != 1:
                 raise UnsupportedFeatureError("list.append() requires exactly one argument")
+
+            # For vec_cstr, wrap string literals with cstr_lit()
+            arg_str = args[0]
+            if vec_type == "vec_cstr" and ast_args and len(ast_args) == 1:
+                arg_node = ast_args[0]
+                if isinstance(arg_node, ast.Constant) and isinstance(arg_node.value, str):
+                    # String literal - wrap with cstr_lit()
+                    arg_str = f"cstr_lit({args[0]})"
+
             # vec_int_push(&data, value)
-            return f"{vec_type}_push(&{obj}, {args[0]})"
+            return f"{vec_type}_push(&{obj}, {arg_str})"
 
         elif method_name == "extend":
             if len(args) != 1:
@@ -1706,11 +1730,16 @@ class MGenPythonToCConverter:
             key_type = self._infer_expression_type(expr.key)
             value_type = self._infer_expression_type(expr.value)
 
-            # Map Python types to STC container types
+            # Map Python types to C container types
             key_c_type = "int" if key_type == "int" else "str" if key_type == "char*" else "int"
             val_c_type = "int" if value_type == "int" else "str" if value_type == "char*" else "int"
 
-            return f"map_{key_c_type}_{val_c_type}"
+            # For string-keyed maps, use mgen custom type (not STC)
+            if key_c_type == "str" and val_c_type == "int":
+                return "mgen_str_int_map_t*"
+            else:
+                # Use STC map types for other combinations
+                return f"map_{key_c_type}_{val_c_type}"
         elif isinstance(expr, ast.ListComp):
             # Infer list comprehension type from element expression
             element_type = self._infer_expression_type(expr.elt)
