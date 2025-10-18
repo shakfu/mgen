@@ -360,7 +360,7 @@ class MGenPythonToCConverter:
                     [
                         f"#define i_type {c_type}",
                         f"#define i_key {element_type}",
-                        '#include "ext/stc/include/stc/vec.h"',
+                        '#include "stc/vec.h"',
                         "#undef i_type",
                         "#undef i_key",
                         "",
@@ -382,7 +382,7 @@ class MGenPythonToCConverter:
                                 f"#define i_type {c_type}",
                                 f"#define i_key {key_type}",
                                 f"#define i_val {val_type}",
-                                '#include "ext/stc/include/stc/hmap.h"',
+                                '#include "stc/hmap.h"',
                                 "#undef i_type",
                                 "#undef i_key",
                                 "#undef i_val",
@@ -396,7 +396,7 @@ class MGenPythonToCConverter:
                     [
                         f"#define i_type {c_type}",
                         f"#define i_key {element_type}",
-                        '#include "ext/stc/include/stc/hset.h"',
+                        '#include "stc/hset.h"',
                         "#undef i_type",
                         "#undef i_key",
                         "",

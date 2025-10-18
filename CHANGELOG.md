@@ -19,9 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.89] - 2025-10-18
 
-**C Backend Phase 1 Critical Fixes - Assert & Dataclass Support!**
+**C Backend Phase 1 Critical Fixes - Assert & Dataclass Support + Build System Fix!**
 
-Major improvements to the C backend implementing Phase 1 fixes from `C_BACKEND_PLAN.md`. Translation test success rate improved from 3.7% to 7.4% (targeting 60%+ after build system fixes).
+Major improvements to the C backend implementing Phase 1 fixes from `C_BACKEND_PLAN.md` plus runtime library build system fix. Translation test success rate improved from 3.7% (1/27) to **25.9% (7/27)** - a **7x improvement**!
 
 ### Added
 
@@ -47,6 +47,15 @@ Major improvements to the C backend implementing Phase 1 fixes from `C_BACKEND_P
   - File: `src/mgen/backends/c/converter.py:2153-2174`
 
 ### Fixed
+
+- **STC Include Paths (CRITICAL BUILD FIX)**
+  - Fixed incorrect STC header paths in generated C code
+  - Changed from `#include "ext/stc/include/stc/vec.h"` to `#include "stc/vec.h"`
+  - Allows compilation to succeed with `-I` include directories
+  - This was the root cause preventing most translation tests from building
+  - Fixed for vec.h, hmap.h, and hset.h (3 includes total)
+  - File: `src/mgen/backends/c/converter.py:363,385,399`
+  - **Impact**: Enabled 5 additional tests to pass (20% → 26% pass rate)
 
 - **Error Handling**
   - Removed broken fallback that generated `/* TODO: Enhanced statement generation */`
