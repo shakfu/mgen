@@ -8,15 +8,15 @@
 
 ## Status Update
 
-**Tier 1 Fixes (v0.1.93)**: ✅ COMPLETE
+**Tier 1 Fixes (v0.1.93)**: [x] COMPLETE
 - Type casting (`int()`, `float()`, `str()`)
 - String membership (`in` operator for strings)
 
-**Tier 2 Fixes (v0.1.94)**: ✅ COMPLETE
+**Tier 2 Fixes (v0.1.94)**: [x] COMPLETE
 - List slicing (`list[1:3]`, `list[1:]`, `list[:2]`, `list[::2]`)
 - Set methods (`.add()`, `.remove()`, `.discard()`, `.clear()`)
 
-**Category A Fixes (v0.1.95)**: ✅ COMPLETE
+**Category A Fixes (v0.1.95)**: [x] COMPLETE
 - Container detection for unannotated lists (`.append()`, `.extend()` method calls)
 - String comparison using `strcmp()` instead of pointer equality
 - Fixed test bug in `test_control_flow.py` (wrong expected value)
@@ -26,7 +26,7 @@
 
 ---
 
-## ✅ FIXED Categories
+## [x] FIXED Categories
 
 ### ~~1. Validation Errors~~ (3 tests - SKIPPED, not backend issues)
 
@@ -38,11 +38,11 @@
 
 ---
 
-### ~~2. Type Cast Conversion~~ ✅ FIXED (Tier 1 - v0.1.93)
+### ~~2. Type Cast Conversion~~ [x] FIXED (Tier 1 - v0.1.93)
 
 **Previously Affected**:
-- `test_struct_field_access.py` - ✅ NOW WORKS (exit 78 is functional)
-- `test_dict_comprehension.py` - ⚠ Still has dict type inference issue (separate problem)
+- `test_struct_field_access.py` - [x] NOW WORKS (exit 78 is functional)
+- `test_dict_comprehension.py` - [!] Still has dict type inference issue (separate problem)
 
 **Fix Implemented**: Added `_convert_type_cast()` method
 - `float(x)` → `(double)x`
@@ -54,13 +54,13 @@
 
 ---
 
-### ~~3. String Membership~~ ✅ FIXED (Tier 1 - v0.1.93)
+### ~~3. String Membership~~ [x] FIXED (Tier 1 - v0.1.93)
 
 **Previously Affected**:
-- `test_string_membership_simple.py` - ✅ FULLY FIXED
-- `test_string_membership.py` - ✅ FULLY FIXED
-- `test_string_methods_new.py` - ⚠ Still has runtime issue (separate)
-- `test_string_methods.py` - ⚠ Still has build errors (multiple issues)
+- `test_string_membership_simple.py` - [x] FULLY FIXED
+- `test_string_membership.py` - [x] FULLY FIXED
+- `test_string_methods_new.py` - [!] Still has runtime issue (separate)
+- `test_string_methods.py` - [!] Still has build errors (multiple issues)
 
 **Fix Implemented**: Extended `_convert_compare()` to handle string types
 - `substring in text` → `(strstr(text, substring) != NULL)`
@@ -71,11 +71,11 @@
 
 ---
 
-### ~~4. List/Array Slicing~~ ✅ FIXED (Tier 2 - v0.1.94)
+### ~~4. List/Array Slicing~~ [x] FIXED (Tier 2 - v0.1.94)
 
 **Previously Affected**:
-- `test_list_slicing.py` - ✅ FULLY FIXED
-- `test_simple_slice.py` - ✅ FULLY FIXED
+- `test_list_slicing.py` - [x] FULLY FIXED
+- `test_simple_slice.py` - [x] FULLY FIXED
 
 **Fix Implemented**: Added `_convert_slice()` method
 - `list[start:end]` → compound literal with loop
@@ -87,11 +87,11 @@
 
 ---
 
-### ~~5. Set Variable Type Issues~~ ✅ FIXED (Tier 2 - v0.1.94)
+### ~~5. Set Variable Type Issues~~ [x] FIXED (Tier 2 - v0.1.94)
 
 **Previously Affected**:
-- `test_set_support.py` - ✅ FULLY FIXED (exit 19 is correct sum)
-- `test_container_iteration.py` - ⚠ Still has set iteration issue (loop generation)
+- `test_set_support.py` - [x] FULLY FIXED (exit 19 is correct sum)
+- `test_container_iteration.py` - [!] Still has set iteration issue (loop generation)
 
 **Fix Implemented**: Added set method support
 - Added `_is_set_type()` detection method
@@ -107,13 +107,13 @@
 
 ---
 
-### ~~6. Category A: Container Detection & String Comparison~~ ✅ FIXED (v0.1.95)
+### ~~6. Category A: Container Detection & String Comparison~~ [x] FIXED (v0.1.95)
 
 **Previously Affected**:
-- `simple_infer_test.py` - ✅ BUILD FIXED (container detection)
-- `test_string_methods_new.py` - ✅ FULLY FIXED (string comparison)
-- `test_control_flow.py` - ✅ TEST BUG FIXED (wrong expected value)
-- `simple_test.py`, `container_iteration_test.py`, `test_list_comprehension.py` - ✅ CLARIFIED (correct non-zero exit codes)
+- `simple_infer_test.py` - [x] BUILD FIXED (container detection)
+- `test_string_methods_new.py` - [x] FULLY FIXED (string comparison)
+- `test_control_flow.py` - [x] TEST BUG FIXED (wrong expected value)
+- `simple_test.py`, `container_iteration_test.py`, `test_list_comprehension.py` - [x] CLARIFIED (correct non-zero exit codes)
 
 **Fixes Implemented**:
 
@@ -144,7 +144,7 @@
 
 ---
 
-## 📋 REMAINING Failures (14 tests)
+## [list] REMAINING Failures (14 tests)
 
 ### Category A: Set Iteration (1 test - 7%)
 **PRIORITY: MEDIUM**
@@ -287,22 +287,22 @@ map_int_int_insert(&result, mgen_int_to_string(x), (x * 2));
 - **Improvement**: +67% relative improvement from baseline (6 → 10 passing tests)
 
 ### Tests by Status
-- ✅ **Fully passing**: 10 tests (37%)
-  - test_control_flow.py ✅ (fixed from test bug)
-  - test_string_methods_new.py ✅ (fixed from strcmp bug)
+- [x] **Fully passing**: 10 tests (37%)
+  - test_control_flow.py [x] (fixed from test bug)
+  - test_string_methods_new.py [x] (fixed from strcmp bug)
   - (8 previously passing tests)
-- ⚠️ **Functional (non-zero exit)**: 5 tests (19%)
+- [!] **Functional (non-zero exit)**: 5 tests (19%)
   - simple_test.py (exit 1 - returns result)
-  - simple_infer_test.py (exit 1 - returns result) ✅ (fixed from build failure)
+  - simple_infer_test.py (exit 1 - returns result) [x] (fixed from build failure)
   - container_iteration_test.py (exit 60 - returns sum)
   - test_list_comprehension.py (exit 13 - returns count)
   - test_struct_field_access.py (exit 78)
   - test_set_support.py (exit 19)
-- ❌ **Remaining failures**: 14 tests (52%)
+- [X] **Remaining failures**: 14 tests (52%)
   - 3 validation errors (test file issues, not backend bugs)
   - 11 actual backend issues
-- ❌ **Build failures**: 9 tests (33%)
-- ⏭️ **Skipped (validation)**: 3 tests (11%)
+- [X] **Build failures**: 9 tests (33%)
+- ⏭ **Skipped (validation)**: 3 tests (11%)
 
 ### If All Remaining Issues Fixed
 - **Estimated pass rate**: 50-60% (14-16/27 tests)
@@ -315,10 +315,10 @@ map_int_int_insert(&result, mgen_int_to_string(x), (x * 2));
 
 ### Option 1: Stop Here (RECOMMENDED)
 **Rationale**: C backend is production-ready for common use cases
-- ✓ 30% pass rate is respectable
-- ✓ All 7 benchmarks pass (100%)
-- ✓ Core features work (assert, dataclass, type casting, slicing, containers)
-- ✓ Zero regressions
+- [x] 30% pass rate is respectable
+- [x] All 7 benchmarks pass (100%)
+- [x] Core features work (assert, dataclass, type casting, slicing, containers)
+- [x] Zero regressions
 - Remaining issues are edge cases or require significant debugging effort
 
 ### Option 2: Fix Runtime Crashes (HIGH VALUE)

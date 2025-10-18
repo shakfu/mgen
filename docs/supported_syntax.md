@@ -50,26 +50,26 @@ Not Implemented (No Support)
   - Not implemented
   - Listed in PRODUCTION_ROADMAP.md:256 as post-v1.0
 3. Decorators (limited support)
-  - ✅ Supported: @staticmethod, @classmethod, @dataclass
-  - ❌ Not supported: @property, user-defined decorators
+  - [x] Supported: @staticmethod, @classmethod, @dataclass
+  - [X] Not supported: @property, user-defined decorators
 4. Imports (partial support)
-  - ✅ Supported: import module, from module import name, import ... as alias
-  - ❌ Not supported: Relative imports, star imports (from x import *)
+  - [x] Supported: import module, from module import name, import ... as alias
+  - [X] Not supported: Relative imports, star imports (from x import *)
 5. String Features
-  - ✅ F-strings (basic expressions, no format specs in Phase 1)
-  - ❌ String formatting (%, .format())
-  - ✅ String methods: split, lower, upper, strip, replace, join, etc.
+  - [x] F-strings (basic expressions, no format specs in Phase 1)
+  - [X] String formatting (%, .format())
+  - [x] String methods: split, lower, upper, strip, replace, join, etc.
 6. Built-in Functions (partial)
-  - ❌ Not supported: isinstance, type(), globals(), locals(), getattr, setattr, hasattr, dir
+  - [X] Not supported: isinstance, type(), globals(), locals(), getattr, setattr, hasattr, dir
 7. Class Features (partial)
-  - ✅ Supported: Basic classes, __init__, methods, single inheritance
-  - ❌ Not supported: Multiple inheritance, @property, descriptors, magic methods (beyond __init__)
+  - [x] Supported: Basic classes, __init__, methods, single inheritance
+  - [X] Not supported: Multiple inheritance, @property, descriptors, magic methods (beyond __init__)
 8. Generator Expressions
   - (x for x in items) - different from list comprehensions
   - Not mentioned in supported features
 9. **List Slicing (partial support)**
-  - ✅ **Haskell**: Full support via `drop`/`take` (arr[1:], arr[:n], arr[1:n])
-  - ❌ **C, C++, Rust, Go, OCaml, LLVM**: Not yet implemented
+  - [x] **Haskell**: Full support via `drop`/`take` (arr[1:], arr[:n], arr[1:n])
+  - [X] **C, C++, Rust, Go, OCaml, LLVM**: Not yet implemented
   - **Status**: On roadmap for future implementation
   - **Workaround**: Use explicit loops or list comprehensions
   - **Example**: Instead of `rest = arr[1:]`, use `rest = [arr[i] for i in range(1, len(arr))]`
@@ -101,7 +101,7 @@ complexity:
 
 High-Impact, Medium Complexity (Recommend These)
 
-1. [x] F-strings (Python 3.6+) ✅ **IMPLEMENTED in v0.1.86**
+1. [x] F-strings (Python 3.6+) [x] **IMPLEMENTED in v0.1.86**
 
 Why: Ubiquitous in modern Python, relatively straightforward to implement
 - Maps cleanly to string concatenation + type conversion
@@ -137,7 +137,7 @@ Medium-Impact, Low Complexity (Quick Wins)
 4. [ ] **List Slicing (arr[1:], arr[:n], arr[start:end])**
 
 Why: Common Python pattern, clean syntax
-- ✅ **Already working in Haskell** (maps to `drop`/`take`)
+- [x] **Already working in Haskell** (maps to `drop`/`take`)
 - Backend mappings straightforward:
   - C++: `std::vector(begin + start, begin + end)` or constructor
   - Rust: `&arr[start..end]` (slices) or `.iter().skip(n).take(m)`
@@ -156,11 +156,11 @@ Why: Legacy support for older codebases
 - "Hello %s" % name → string substitution
 - Less important than f-strings (f-strings preferred)
 
-6. [~] More Built-ins (Partial Support ✅)
+6. [~] More Built-ins (Partial Support [x])
 
 Why: Incremental improvements, well-defined semantics
-- ✅ **any()**: IMPLEMENTED in v0.1.87 (boolean reduction: returns True if any element is True)
-- ✅ **all()**: IMPLEMENTED in v0.1.87 (boolean reduction: returns True if all elements are True)
+- [x] **any()**: IMPLEMENTED in v0.1.87 (boolean reduction: returns True if any element is True)
+- [x] **all()**: IMPLEMENTED in v0.1.87 (boolean reduction: returns True if all elements are True)
 - [ ] enumerate(): Easy, just counter + loop (requires tuple support)
 - [ ] zip(): Easy, parallel iteration (requires tuple support)
 - [ ] reversed(): Easy, reverse iteration
@@ -195,14 +195,14 @@ My Recommendation
 
 Top 3 priorities for next implementation:
 
-1. ~~F-strings~~ ✅ **COMPLETED in v0.1.86**
+1. ~~F-strings~~ [x] **COMPLETED in v0.1.86**
 2. Tuple support - Enables multiple returns, unlocks real-world patterns,
 clean backend mapping
 3. Pattern matching - Future-proof (Python 3.10+), perfect mapping to
 Rust/Haskell/OCaml, sets MGen apart
 
 Rationale:
-- ~~F-strings~~: ✅ **DONE** - Working in 6/7 backends with smart type conversion
+- ~~F-strings~~: [x] **DONE** - Working in 6/7 backends with smart type conversion
 - Tuples: Essential for idiomatic Python (multiple returns, unpacking).
 Backend support is straightforward.
 - Pattern matching: Differentiates MGen as a "modern Python" compiler.
