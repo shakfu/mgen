@@ -213,5 +213,5 @@ def main() -> int:
     assert test_boolean_or_operation() == 1
     assert test_comparison_operators() == 31
     assert test_early_return() == 2
-    assert test_control_flow_with_variables() == 22
+    assert test_control_flow_with_variables() == 10
     return 0

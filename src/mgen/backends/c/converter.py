@@ -1107,6 +1107,29 @@ class MGenPythonToCConverter:
         left = self._convert_expression(expr.left)
         right = self._convert_expression(expr.comparators[0])
 
+        # Check if we're comparing strings
+        left_is_string = self._is_string_type(expr.left)
+        right_is_string = self._is_string_type(expr.comparators[0])
+
+        if left_is_string or right_is_string:
+            # String comparison - use strcmp()
+            self.includes_needed.add("#include <string.h>")
+
+            if isinstance(expr.ops[0], ast.Eq):
+                return f"(strcmp({left}, {right}) == 0)"
+            elif isinstance(expr.ops[0], ast.NotEq):
+                return f"(strcmp({left}, {right}) != 0)"
+            elif isinstance(expr.ops[0], ast.Lt):
+                return f"(strcmp({left}, {right}) < 0)"
+            elif isinstance(expr.ops[0], ast.LtE):
+                return f"(strcmp({left}, {right}) <= 0)"
+            elif isinstance(expr.ops[0], ast.Gt):
+                return f"(strcmp({left}, {right}) > 0)"
+            elif isinstance(expr.ops[0], ast.GtE):
+                return f"(strcmp({left}, {right}) >= 0)"
+            else:
+                raise UnsupportedFeatureError(f"Unsupported string comparison: {type(expr.ops[0])}")
+
         # Use standard operator mapping from converter_utils
         op = get_standard_comparison_operator(expr.ops[0])
         if op is None:
@@ -1328,6 +1351,10 @@ class MGenPythonToCConverter:
         if self._is_list_type(obj_expr):
             return self._convert_list_method(obj, method_name, args, obj_expr)
 
+        # Check if this is a set method call
+        if self._is_set_type(obj_expr):
+            return self._convert_set_method(obj, method_name, args, obj_expr)
+
         # Try to determine the class type from the object
         # For now, we'll use a simple heuristic - look for known class names
         class_name = None
@@ -1507,6 +1534,71 @@ class MGenPythonToCConverter:
         else:
             raise UnsupportedFeatureError(f"Unsupported list method: {method_name}")
 
+    def _is_set_type(self, expr: ast.expr) -> bool:
+        """Check if expression represents a set type."""
+        # Check if it's a set literal
+        if isinstance(expr, ast.Set):
+            return True
+
+        # Check if it's a variable with set type
+        if isinstance(expr, ast.Name):
+            var_name = expr.id
+
+            # Check inferred types first
+            if var_name in self.inferred_types:
+                inferred = self.inferred_types[var_name]
+                if inferred.confidence >= TypeConfidence.MEDIUM.value:
+                    return inferred.python_type == "set" or inferred.c_type.startswith("set_")
+
+            # Check variable context
+            if var_name in self.variable_context:
+                var_type = self.variable_context[var_name]
+                return var_type.startswith("set_") or var_type == "set"
+
+        return False
+
+    def _convert_set_method(self, obj: str, method_name: str, args: list[str], obj_expr: ast.expr) -> str:
+        """Convert set method calls to STC hset operations."""
+        # Get the variable name to determine the set type
+        set_type = "set_int"  # Default
+        if isinstance(obj_expr, ast.Name):
+            var_name = obj_expr.id
+
+            # Check variable_context first (most reliable for local vars)
+            if var_name in self.variable_context:
+                set_type = self.variable_context[var_name]
+            # Then check inferred types
+            elif var_name in self.inferred_types:
+                inferred = self.inferred_types[var_name]
+                if inferred.confidence >= TypeConfidence.MEDIUM.value:
+                    set_type = inferred.c_type
+
+        if method_name == "add":
+            if len(args) != 1:
+                raise UnsupportedFeatureError("set.add() requires exactly one argument")
+            # set_int_insert(&data, value)
+            return f"{set_type}_insert(&{obj}, {args[0]})"
+
+        elif method_name == "remove":
+            if len(args) != 1:
+                raise UnsupportedFeatureError("set.remove() requires exactly one argument")
+            # set_int_erase(&data, value)
+            return f"{set_type}_erase(&{obj}, {args[0]})"
+
+        elif method_name == "discard":
+            if len(args) != 1:
+                raise UnsupportedFeatureError("set.discard() requires exactly one argument")
+            # Same as remove in STC (erase doesn't fail if not present)
+            return f"{set_type}_erase(&{obj}, {args[0]})"
+
+        elif method_name == "clear":
+            if args:
+                raise UnsupportedFeatureError("set.clear() takes no arguments")
+            return f"{set_type}_clear(&{obj})"
+
+        else:
+            raise UnsupportedFeatureError(f"Unsupported set method: {method_name}")
+
     def _get_type_annotation(self, annotation: ast.expr) -> str:
         """Extract type from annotation."""
         if isinstance(annotation, ast.Name):
@@ -1639,9 +1731,15 @@ class MGenPythonToCConverter:
         for child in ast.walk(node):
             if isinstance(child, ast.Name) and child.id in ["list", "dict", "set"]:
                 return True
-            if isinstance(child, ast.Call) and isinstance(child.func, ast.Name):
-                if child.func.id in ["list", "dict", "set", "append", "extend"]:
-                    return True
+            if isinstance(child, ast.Call):
+                # Check for direct calls: list(), dict(), set()
+                if isinstance(child.func, ast.Name):
+                    if child.func.id in ["list", "dict", "set", "append", "extend"]:
+                        return True
+                # Check for method calls: numbers.append(), items.extend()
+                elif isinstance(child.func, ast.Attribute):
+                    if child.func.attr in ["append", "extend", "add", "remove", "pop", "clear", "update", "keys", "values", "items"]:
+                        return True
         return False
 
     def _needs_containers(self) -> bool:
@@ -1968,7 +2066,11 @@ class MGenPythonToCConverter:
         return f"{obj}.{expr.attr}"
 
     def _convert_subscript(self, expr: ast.Subscript) -> str:
-        """Convert subscript access (including nested like a[i][j])."""
+        """Convert subscript access (including nested like a[i][j]) and slicing."""
+        # Check if this is a slice operation (e.g., list[1:3])
+        if isinstance(expr.slice, ast.Slice):
+            return self._convert_slice(expr)
+
         # Handle both Python 3.8 (with ast.Index) and Python 3.9+ (without ast.Index)
         if hasattr(ast, "Index") and isinstance(expr.slice, ast.Index):  # Python < 3.9
             index = self._convert_expression(expr.slice.value)  # type: ignore
@@ -2017,6 +2119,61 @@ class MGenPythonToCConverter:
 
         # Default: use direct array subscript
         return f"{obj}[{index}]"
+
+    def _convert_slice(self, expr: ast.Subscript) -> str:
+        """Convert slice operation to C code.
+
+        Examples:
+            list[1:3] → creates new vec with elements [1, 2]
+            list[1:] → creates new vec from index 1 to end
+            list[:2] → creates new vec from start to index 2
+            list[::2] → creates new vec with every 2nd element (step)
+
+        Args:
+            expr: ast.Subscript with ast.Slice as slice
+
+        Returns:
+            C expression that creates a new vector with sliced elements
+        """
+        slice_obj = expr.slice
+        assert isinstance(slice_obj, ast.Slice), "Expected ast.Slice"
+
+        # Get container name and type
+        obj = self._convert_expression(expr.value)
+
+        # Determine container type
+        c_type = None
+        if isinstance(expr.value, ast.Name):
+            var_name = expr.value.id
+            if var_name in self.variable_context:
+                c_type = self.variable_context[var_name]
+            elif var_name in self.inferred_types:
+                c_type = self.inferred_types[var_name].c_type
+
+        if not c_type or not c_type.startswith("vec_"):
+            raise UnsupportedFeatureError(f"Slicing only supported for vec_* containers, got {c_type}")
+
+        # Extract start, stop, step
+        start = self._convert_expression(slice_obj.lower) if slice_obj.lower else "0"
+        stop = self._convert_expression(slice_obj.upper) if slice_obj.upper else f"{c_type}_size(&{obj})"
+        step = self._convert_expression(slice_obj.step) if slice_obj.step else "1"
+
+        # Generate unique variable name for the slice result
+        slice_var = f"slice_result_{id(expr)}"
+
+        # Generate C code for slicing using a compound statement
+        # This creates a new vector and copies elements in the range
+        element_type = c_type[4:]  # Remove "vec_" prefix to get element type
+
+        slice_code = f"""({{
+        {c_type} {slice_var} = {{0}};
+        for (int _i = {start}; _i < {stop}; _i += {step}) {{
+            {c_type}_push(&{slice_var}, *{c_type}_at(&{obj}, _i));
+        }}
+        {slice_var};
+    }})"""
+
+        return slice_code
 
     def _convert_f_string(self, expr: ast.JoinedStr) -> str:
         """Convert f-string to C string concatenation using mgen_string_concat.

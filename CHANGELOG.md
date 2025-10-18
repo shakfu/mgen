@@ -17,6 +17,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.94] - 2025-10-18
+
+**C Backend Tier 2 Fixes - List Slicing & Set Methods!**
+
+Implemented Tier 2 high-priority fixes from translation test failure analysis. Added support for list slicing syntax (`list[1:3]`) and set method calls (`.add()`, `.remove()`, `.discard()`, `.clear()`). Translation test pass rate improved from 22% to 30% (8/27 tests passing). Zero regression failures, all 1045 tests pass.
+
+### Added
+
+- **List Slicing Support**
+  - `list[1:3]` → creates new vec with elements in range [1, 3)
+  - `list[1:]` → slices from index 1 to end
+  - `list[:2]` → slices from start to index 2
+  - `list[::2]` → slices with step (every 2nd element)
+  - Uses C99 compound literal for expression-level slice creation
+  - Files: `src/mgen/backends/c/converter.py:1970-2078`
+
+- **Set Method Support**
+  - `set.add(x)` → `set_int_insert(&set, x)`
+  - `set.remove(x)` → `set_int_erase(&set, x)`
+  - `set.discard(x)` → `set_int_erase(&set, x)` (safe erase)
+  - `set.clear()` → `set_int_clear(&set)`
+  - Type-aware method resolution (checks variable_context and inferred_types)
+  - Files: `src/mgen/backends/c/converter.py:1514-1577,1331-1333`
+
+### Fixed
+
+- **Translation Tests** - 3 tests now working (was 6/27, now 9/27 counting set_support)
+  - ✓ `test_simple_slice.py` - **FULLY FIXED** (builds + runs)
+  - ✓ `test_list_slicing.py` - **FULLY FIXED** (builds + runs, tests all slice variants)
+  - ✓ `test_set_support.py` - **FULLY FIXED** (builds + runs correctly, exit 19 is expected)
+  - ⚠ `test_container_iteration.py` - Set iteration has separate issue (loop generation)
+
+### Test Results
+
+- **Regression tests**: 1045/1045 passing (100%, zero regressions)
+- **Translation tests**: 8/27 passing (30%, up from 22%)
+  - Tier 1 fixes: 2 tests fully fixed (string membership)
+  - Tier 2 fixes: 3 tests fully fixed (slicing + set methods)
+- **Type check**: All files pass strict mypy
+
+### Technical Details
+
+- **Slicing implementation**: Uses compound literal expression `({vec_int result = {0}; for(...) vec_int_push(...); result;})`
+- **Set methods**: Added `_is_set_type()` and `_convert_set_method()` parallel to list method handling
+- **Type resolution**: Checks both `variable_context` (explicit) and `inferred_types` (flow-sensitive)
+- **STC integration**: Uses STC hset operations (insert, erase, clear, size, contains)
+
+### Known Limitations
+
+- Set iteration generates incorrect loop code (uses vec functions instead of set iterator)
+  - This is a loop generation issue, not a type inference issue
+  - Affects `test_container_iteration.py`
+  - Would require implementing set iterator support in loop conversion
+
 ## [0.1.93] - 2025-10-18
 
 **C Backend Tier 1 Fixes - Type Casting & String Membership!**

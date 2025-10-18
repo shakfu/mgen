@@ -2,15 +2,21 @@
 
 This directory contains focused test cases for Python-to-C translation features. These files are specifically designed to test and validate core translation capabilities.
 
-## Status (v0.1.93)
+## Status (v0.1.94)
 
-**Overall**: 6/27 tests passing (22%)
-**Recent Fixes**: Tier 1 improvements (v0.1.93)
+**Overall**: 8/27 tests passing (30%)
+
+**Recent Fixes**:
+- Tier 1 (v0.1.93): Type casting, string membership
+- Tier 2 (v0.1.94): List slicing, set methods
+
+**Implemented Features**:
 - ✓ Type casting support (`int()`, `float()`, `str()`)
-- ✓ String membership testing (`in` operator)
-- 4/5 target tests now build (2 fully pass)
+- ✓ String membership testing (`in` operator for strings)
+- ✓ List slicing (`list[1:3]`, `list[1:]`, `list[:2]`, `list[::2]`)
+- ✓ Set methods (`.add()`, `.remove()`, `.discard()`, `.clear()`)
 
-See `/tmp/failure_analysis_report.md` for detailed analysis and roadmap.
+See `/tmp/failure_analysis_report.md` for detailed analysis and remaining issues.
 
 ## Test Categories
 
