@@ -2,21 +2,30 @@
 
 This directory contains focused test cases for Python-to-C translation features. These files are specifically designed to test and validate core translation capabilities.
 
-## Status (v0.1.94)
+## Status (v0.1.98)
 
-**Overall**: 8/27 tests passing (30%)
+**Overall**: Significant improvements in C backend translation capabilities
 
 **Recent Fixes**:
 - Tier 1 (v0.1.93): Type casting, string membership
 - Tier 2 (v0.1.94): List slicing, set methods
+- Category A (v0.1.95-96): Container detection, set iteration
+- Category B (v0.1.97): String operations (`len()`, concatenation)
+- Category C (v0.1.98): Nested container type inference (2D arrays)
 
 **Implemented Features**:
 - ✓ Type casting support (`int()`, `float()`, `str()`)
 - ✓ String membership testing (`in` operator for strings)
 - ✓ List slicing (`list[1:3]`, `list[1:]`, `list[:2]`, `list[::2]`)
 - ✓ Set methods (`.add()`, `.remove()`, `.discard()`, `.clear()`)
+- ✓ Set iteration using STC iterator API
+- ✓ String length via `strlen()` instead of vec functions
+- ✓ String concatenation with `+` operator
+- ✓ Nested container parameters (`list` → `vec_vec_int` for 2D arrays)
+- ✓ Nested container return types (automatic type upgrading)
 
-See `/tmp/failure_analysis_report.md` for detailed analysis and remaining issues.
+**Known Limitations**:
+- Dict-with-list-values not yet supported (requires `map_int_vec_int` type)
 
 ## Test Categories
 
@@ -26,6 +35,11 @@ See `/tmp/failure_analysis_report.md` for detailed analysis and remaining issues
 - `container_iteration_test.py` - Alternative container iteration tests
 - `test_list_slicing.py` - Tests list slicing operations
 - `test_simple_slice.py` - Simple slicing test cases
+- `nested_2d_params.py` - Tests 2D array as function parameter
+- `nested_2d_return.py` - Tests 2D array as return type
+- `nested_2d_simple.py` - Simple 2D array test
+- `nested_dict_list.py` - Dict with list values (not yet supported)
+- `nested_containers_comprehensive.py` - Comprehensive nested container tests
 
 ### String Operation Tests
 
