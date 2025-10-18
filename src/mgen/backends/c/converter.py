@@ -1040,6 +1040,11 @@ class MGenPythonToCConverter:
                     # Dataclass instantiation: ClassName() -> make_ClassName()
                     args_str = ", ".join(args)
                     return f"make_{func_name}({args_str})"
+                elif struct_info.get("is_namedtuple"):
+                    # NamedTuple instantiation: ClassName() -> (ClassName){...}
+                    # Use C99 compound literal syntax
+                    args_str = ", ".join(args)
+                    return f"({func_name}){{{args_str}}}"
                 else:
                     # Regular class instantiation: ClassName() -> ClassName_new()
                     args_str = ", ".join(args)

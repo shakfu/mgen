@@ -17,6 +17,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.90] - 2025-10-18
+
+**C Backend Phase 2 Complete - NamedTuple Instantiation Fix!**
+
+Implemented Phase 2 from `C_BACKEND_PLAN.md` with proper NamedTuple instantiation using C99 compound literals. Translation test success rate improved from 25.9% (7/27) to **29.6% (8/27)**.
+
+### Fixed
+
+- **NamedTuple Instantiation**
+  - Fixed incorrect `ClassName_new()` calls for NamedTuple types
+  - Now uses C99 compound literal syntax: `(ClassName){args...}`
+  - Example: `Coordinate(5, 10)` → `(Coordinate){5, 10}`
+  - NamedTuple structs generated correctly without constructors (per Python semantics)
+  - File: `src/mgen/backends/c/converter.py:1043-1047`
+
+### Test Results
+
+- **Translation tests**: 8/27 passing (29.6%, up from 25.9%)
+  - ✓ test_namedtuple_basic.py (NEW!)
+  - All Phase 1 tests still passing
+- **Regression tests**: 1045/1045 passing (100%)
+- **Type check**: All files pass strict mypy
+
+### Technical Details
+
+- Added conditional branch in `_convert_call()` to detect NamedTuple instantiation
+- Uses `is_namedtuple` flag from `defined_structs` metadata
+- C99 compound literals enable direct struct initialization without helper functions
+- Maintains distinction between dataclass (with constructor) and NamedTuple (without)
+
 ## [0.1.89] - 2025-10-18
 
 **C Backend Phase 1 Critical Fixes - Assert & Dataclass Support + Build System Fix!**
