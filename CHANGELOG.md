@@ -17,6 +17,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.99] - 2025-10-18
+
+**C Backend Dict Comprehension Type Inference Fix!**
+
+Fixed dict comprehension key type inference to correctly analyze type casting expressions like `str()`, enabling proper generation of string-keyed dictionaries.
+
+### Fixed
+
+- **Dict Comprehension Type Inference**
+  - Dict comprehensions with `str()` key conversion now correctly infer as `mgen_str_int_map_t*` instead of `map_int_int`
+  - Example: `{str(x): x*2 for x in range(5)}` now generates correct string-keyed map
+  - Added type casting detection for `str()`, `int()`, `float()`, `bool()` in `_infer_expression_type()`
+  - Files: `src/mgen/backends/c/converter.py:1742-1749`
+
+- **Type Name Sanitization**
+  - Fixed `_sanitize_type_name()` to check for `char*` → `str` mapping before character replacement
+  - Prevents incorrect `charptr` generation
+  - Files: `src/mgen/backends/c/converter.py:1790-1794`
+
+- **Fallback Type Support in Comprehensions**
+  - Dict comprehensions now use fallback `mgen_str_int_map_t*` type for string-keyed maps
+  - Matches manual dict construction behavior
+  - Generates correct `mgen_str_int_map_new()` and `mgen_str_int_map_insert()` API calls
+  - Files: `src/mgen/backends/c/converter.py:2790-2916`
+
+### Tests
+
+- All regression tests pass: **1045/1045** ✅
+- New test case verifies dict comprehension with str() keys works correctly
+- Output: `{str(0): 0, str(1): 2, str(2): 4}` ✓
+
+---
+
 ## [0.1.98] - 2025-10-18
 
 **C Backend Category C Fixes - Nested Container Support!**

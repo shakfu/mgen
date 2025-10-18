@@ -1738,8 +1738,17 @@ class MGenPythonToCConverter:
             # Check for function calls with known return types
             elif isinstance(expr.func, ast.Name):
                 func_name = expr.func.id
+                # Check for type casting functions
+                if func_name == "str":
+                    return "char*"
+                elif func_name == "int":
+                    return "int"
+                elif func_name == "float":
+                    return "double"
+                elif func_name == "bool":
+                    return "bool"
                 # Check if we know this function's return type
-                if func_name in self.function_return_types:
+                elif func_name in self.function_return_types:
                     return self.function_return_types[func_name]
                 # Check for constructor calls
                 elif func_name in ["list", "set"]:
@@ -1778,12 +1787,13 @@ class MGenPythonToCConverter:
 
     def _sanitize_type_name(self, type_name: str) -> str:
         """Sanitize type name for use in STC containers."""
+        # Check for special types BEFORE doing character replacement
+        if type_name == "char*":
+            return "str"
+        elif type_name == "const char*":
+            return "cstr"
         # Replace special characters and keywords
         sanitized = type_name.replace("*", "ptr").replace(" ", "_")
-        if sanitized == "char*":
-            return "str"
-        elif sanitized == "const char*":
-            return "cstr"
         return sanitized
 
     def _generate_main_function(self) -> str:
@@ -2776,7 +2786,18 @@ class MGenPythonToCConverter:
         # Infer key and value types
         key_type = self._infer_expression_type(node.key)
         value_type = self._infer_expression_type(node.value)
-        result_container_type = f"map_{self._sanitize_type_name(key_type)}_{self._sanitize_type_name(value_type)}"
+
+        # Check if we need to use fallback type for string-keyed maps
+        key_sanitized = self._sanitize_type_name(key_type)
+        val_sanitized = self._sanitize_type_name(value_type)
+
+        # For string-keyed maps, we use the fallback type mgen_str_int_map_t*
+        if key_sanitized == "str" and val_sanitized == "int":
+            result_container_type = "mgen_str_int_map_t*"
+            use_fallback = True
+        else:
+            result_container_type = f"map_{key_sanitized}_{val_sanitized}"
+            use_fallback = False
 
         # Process the single generator
         if len(node.generators) != 1:
@@ -2874,7 +2895,19 @@ class MGenPythonToCConverter:
             # Tuple unpacking case - add the unpacking code
             loop_body_prefix = f"{tuple_unpacking_code}"
 
-        comp_code = f"""({{
+        # Generate code based on whether we're using fallback or STC types
+        if use_fallback:
+            # Fallback type uses pointer and different API
+            comp_code = f"""({{
+    {result_container_type} {temp_var} = mgen_str_int_map_new();
+    {loop_code} {{
+        {loop_body_prefix}{condition_code}mgen_str_int_map_insert({temp_var}, {key_str}, {value_str});
+    }}
+    {temp_var};
+}})"""
+        else:
+            # STC type uses struct and STC API
+            comp_code = f"""({{
     {result_container_type} {temp_var} = {{0}};
     {loop_code} {{
         {loop_body_prefix}{condition_code}{result_container_type}_insert(&{temp_var}, {key_str}, {value_str});
