@@ -906,6 +906,8 @@ class MGenPythonToCConverter:
             return self._convert_unary_op(expr)
         elif isinstance(expr, ast.Compare):
             return self._convert_compare(expr)
+        elif isinstance(expr, ast.BoolOp):
+            return self._convert_boolop(expr)
         elif isinstance(expr, ast.Call):
             return self._convert_call(expr)
         elif isinstance(expr, ast.Attribute):
@@ -1025,6 +1027,33 @@ class MGenPythonToCConverter:
         if op is None:
             raise UnsupportedFeatureError(f"Unsupported comparison: {type(expr.ops[0])}")
         return f"({left} {op} {right})"
+
+    def _convert_boolop(self, expr: ast.BoolOp) -> str:
+        """Convert boolean operations (and/or).
+
+        Args:
+            expr: BoolOp node
+
+        Returns:
+            C boolean expression
+
+        Example:
+            x > 0 and y < 10  →  ((x > 0) && (y < 10))
+            a or b  →  ((a) || (b))
+        """
+        # Determine operator
+        if isinstance(expr.op, ast.And):
+            op = "&&"
+        elif isinstance(expr.op, ast.Or):
+            op = "||"
+        else:
+            raise UnsupportedFeatureError(f"Unsupported boolean operator: {type(expr.op).__name__}")
+
+        # Convert operands and wrap each in parentheses
+        operands = [f"({self._convert_expression(val)})" for val in expr.values]
+
+        # Join with operator and wrap the whole expression
+        return f"({(' ' + op + ' ').join(operands)})"
 
     def _convert_call(self, expr: ast.Call) -> str:
         """Convert function calls."""

@@ -17,6 +17,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.91] - 2025-10-18
+
+**C Backend Phase 3.1 Complete - BoolOp Support!**
+
+Implemented Phase 3.1 from `C_BACKEND_PLAN.md` with full boolean operation support. Translation test success rate improved from 29.6% (8/27) to **33.3% (9/27)**.
+
+### Added
+
+- **Boolean Operation (BoolOp) Support**
+  - Full support for Python `and` and `or` operators
+  - Converts to C `&&` and `||` operators
+  - Proper parenthesization for precedence
+  - Example: `if x > 3 and y < 5:` → `if (((x > 3)) && ((y < 5)))`
+  - Example: `if a or b:` → `if (((a)) || ((b)))`
+  - File: `src/mgen/backends/c/converter.py:1031-1056,909-910`
+
+### Test Results
+
+- **Translation tests**: 9/27 passing (33.3%, up from 29.6%)
+  - ✓ test_control_flow.py (NEW!)
+  - All previous tests still passing
+- **Regression tests**: 1045/1045 passing (100%)
+- **Type check**: All files pass strict mypy
+
+### Technical Details
+
+- Added `_convert_boolop()` method to handle ast.BoolOp nodes
+- Added BoolOp handler in `_convert_expression()` dispatch logic
+- Supports multi-operand boolean expressions (Python allows `a or b or c`)
+- Each operand wrapped in parentheses for clarity and precedence
+- Follows C_BACKEND_PLAN.md Phase 3.1 specification exactly
+
 ## [0.1.90] - 2025-10-18
 
 **C Backend Phase 2 Complete - NamedTuple Instantiation Fix!**
