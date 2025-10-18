@@ -17,6 +17,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.98] - 2025-10-18
+
+**C Backend Category C Fixes - Nested Container Support!**
+
+Implemented nested container type inference for function parameters and return types. The C backend now correctly handles 2D arrays (nested lists) in function signatures, upgrading `vec_int` to `vec_vec_int` when detecting nested subscript patterns (`data[i][j]`). All 1045 regression tests pass.
+
+### Fixed
+
+- **Nested Container Parameters**
+  - Functions with `data: list` parameter and 2D subscript access (`data[i][j]`) now generate correct `vec_vec_int` parameter type
+  - Leverages existing `_detect_nested_containers()` pattern detection
+  - Example: `def sum_matrix(data: list)` with `data[i][j]` → `int sum_matrix(vec_vec_int data)`
+  - Files: `src/mgen/backends/c/converter.py:584-586`
+
+- **Nested Container Return Types**
+  - Functions returning nested containers now generate correct `vec_vec_int` return type
+  - AST traversal finds Return statements and checks returned variable against `nested_containers` set
+  - Example: `def create_matrix() -> list` returning 2D array → `vec_vec_int create_matrix(void)`
+  - Files: `src/mgen/backends/c/converter.py:610-619`
+
+### Notes
+
+- **Dict-with-List-Values**: Not implemented in this release
+  - Would require new `map_int_vec_int` container type (map with vector values)
+  - Deferred as lower priority edge case
+  - Requires significant container infrastructure changes
+
+### Tests
+
+- All regression tests pass: **1045/1045** ✅
+- New test cases verify nested 2D array parameter and return type handling
+- Zero breaking changes to existing functionality
+
+---
+
 ## [0.1.94] - 2025-10-18
 
 **C Backend Tier 2 Fixes - List Slicing & Set Methods!**
