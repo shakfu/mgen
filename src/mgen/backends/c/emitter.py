@@ -65,11 +65,13 @@ class CEmitter(AbstractEmitter):
             # Try sophisticated py2c conversion first
             return self.py2c_converter.convert_code(source_code)
         except UnsupportedFeatureError as e:
-            # Fall back to basic conversion with warning
-            return f"/* Py2C conversion failed: {e} */\n" + self._emit_module_with_runtime(source_code)
+            # Log detailed error and fail gracefully
+            error_msg = f"C backend does not support: {e}"
+            raise UnsupportedFeatureError(error_msg) from e
         except Exception as e:
-            # Fall back to basic conversion with error comment
-            return f"/* Py2C conversion error: {e} */\n" + self._emit_module_with_runtime(source_code)
+            # Unexpected error - provide diagnostics
+            error_msg = f"C code generation failed: {e}\nPlease report this issue with the input file."
+            raise UnsupportedFeatureError(error_msg) from e
 
     def can_use_simple_emission(self, func_node: ast.FunctionDef, type_context: dict[str, str]) -> bool:
         """Check if simple emission can be used for this code."""

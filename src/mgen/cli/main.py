@@ -638,9 +638,16 @@ For more information, visit: https://github.com/your-org/mgen
                             result.executable_path = str(exe_dest)
 
                     if show_progress:
-                        progress_indicator.finish(f"Compiled {result.executable_path}")
+                        if result.executable_path:
+                            progress_indicator.finish(f"Compiled {result.executable_path}")
+                        else:
+                            progress_indicator.finish("Build failed")
 
-                    self.log.info(f"Compilation successful! Executable: {result.executable_path}")
+                    if result.executable_path:
+                        self.log.info(f"Compilation successful! Executable: {result.executable_path}")
+                    else:
+                        self.log.error("Build failed: No executable produced")
+                        sys.exit(1)
 
                     if self.verbose and result.output_files:
                         self.log.info(f"Output files generated:")

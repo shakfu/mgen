@@ -110,6 +110,9 @@ class MGenPythonToCConverter:
         # First pass: check for string methods to populate includes_needed
         self._detect_string_methods(node)
 
+        # First pass: detect asserts for include generation
+        self.uses_asserts = self._detect_asserts(node)
+
         # First pass: detect container variables to generate STC declarations
         self._detect_container_variables(node)
 
@@ -157,6 +160,20 @@ class MGenPythonToCConverter:
                     # For pre-scan, we're more liberal - assume any call to these methods is a string method
                     self.includes_needed.add('#include "mgen_string_ops.h"')
                     break  # Only need to add it once
+
+    def _detect_asserts(self, node: ast.AST) -> bool:
+        """Check if module uses assert statements.
+
+        Args:
+            node: AST node to scan
+
+        Returns:
+            True if assert statements are found
+        """
+        for child in ast.walk(node):
+            if isinstance(child, ast.Assert):
+                return True
+        return False
 
     def _detect_container_variables(self, node: ast.AST) -> None:
         """Pre-scan AST to detect container variable declarations for STC generation."""
@@ -238,6 +255,10 @@ class MGenPythonToCConverter:
             "#include <stdlib.h>",
             "#include <stdbool.h>",
         ]
+
+        # Add assert.h if asserts are used
+        if hasattr(self, 'uses_asserts') and self.uses_asserts:
+            includes.append("#include <assert.h>")
 
         if self.use_runtime:
             includes.extend(
@@ -543,6 +564,8 @@ class MGenPythonToCConverter:
             return self._convert_expression_statement(stmt)
         elif isinstance(stmt, ast.ClassDef):
             return self._convert_class(stmt)
+        elif isinstance(stmt, ast.Assert):
+            return self._convert_assert(stmt)
         elif isinstance(stmt, ast.Pass):
             return "/* pass */"
         else:
@@ -1011,9 +1034,16 @@ class MGenPythonToCConverter:
 
             # Check if this is a class instantiation
             if func_name in self.defined_structs:
-                # Class instantiation: ClassName() -> ClassName_new()
-                args_str = ", ".join(args)
-                return f"{func_name}_new({args_str})"
+                struct_info = self.defined_structs[func_name]
+                # Check if it's a dataclass
+                if struct_info.get("is_dataclass"):
+                    # Dataclass instantiation: ClassName() -> make_ClassName()
+                    args_str = ", ".join(args)
+                    return f"make_{func_name}({args_str})"
+                else:
+                    # Regular class instantiation: ClassName() -> ClassName_new()
+                    args_str = ", ".join(args)
+                    return f"{func_name}_new({args_str})"
 
             # Handle set() constructor - return placeholder that will be replaced during assignment
             elif func_name == "set" and len(args) == 0:
@@ -1720,6 +1750,34 @@ class MGenPythonToCConverter:
         expr = self._convert_expression(stmt.value)
         return f"{expr};"
 
+    def _convert_assert(self, stmt: ast.Assert) -> str:
+        """Convert Python assert statement to C assert() call.
+
+        Args:
+            stmt: Python assert statement node
+
+        Returns:
+            C assert() call as string
+
+        Example:
+            assert x > 0  →  assert(x > 0);
+            assert result == 1, "Test failed"  →  assert(result == 1); // Test failed
+        """
+        # Convert the test expression
+        test_expr = self._convert_expression(stmt.test)
+
+        # Handle optional message
+        if stmt.msg:
+            # Convert message to string
+            if isinstance(stmt.msg, ast.Constant) and isinstance(stmt.msg.value, str):
+                msg = stmt.msg.value
+                return f"assert({test_expr}); // {msg}"
+            else:
+                # Complex message expression or non-string - just add assert without comment
+                return f"assert({test_expr});"
+        else:
+            return f"assert({test_expr});"
+
     def _convert_attribute(self, expr: ast.Attribute) -> str:
         """Convert attribute access."""
         obj = self._convert_expression(expr.value)
@@ -1851,6 +1909,39 @@ class MGenPythonToCConverter:
         """Convert Python class to C struct with associated methods."""
         class_name = node.name
 
+        # Check if this is a dataclass or namedtuple
+        is_dataclass = self._is_dataclass(node)
+        is_namedtuple = self._is_namedtuple(node)
+
+        if is_dataclass or is_namedtuple:
+            # Extract fields from annotations
+            fields = self._extract_dataclass_fields(node)
+
+            # Generate struct definition
+            if fields:
+                field_lines = [f"    {c_type} {name};" for name, c_type in fields.items()]
+                struct_def = f"typedef struct {{\n{chr(10).join(field_lines)}\n}} {class_name};"
+            else:
+                # Empty dataclass - fallback to dummy field
+                struct_def = f"typedef struct {{\n    char _dummy;\n}} {class_name};"
+
+            # Store struct info
+            self.defined_structs[class_name] = {
+                "instance_vars": fields,
+                "attributes": fields,
+                "is_dataclass": is_dataclass,
+                "is_namedtuple": is_namedtuple,
+            }
+
+            # Generate constructor (only for dataclass, not namedtuple)
+            if is_dataclass and fields:
+                constructor = self._generate_dataclass_constructor(class_name, fields)
+                return f"{struct_def}\n\n{constructor}"
+            else:
+                # NamedTuple - just struct definition
+                return struct_def
+
+        # Regular class - use existing logic
         # Analyze class to extract instance variables and methods
         instance_vars = self._extract_instance_variables(node)
         methods = self._extract_methods(node)
@@ -2040,6 +2131,116 @@ class MGenPythonToCConverter:
 
         self.current_function = old_function
         return f"{signature} {{\n{body}\n}}"
+
+    def _is_dataclass(self, node: ast.ClassDef) -> bool:
+        """Check if class has @dataclass decorator.
+
+        Args:
+            node: Class definition node
+
+        Returns:
+            True if class has @dataclass decorator
+
+        Example:
+            @dataclass
+            class Point:
+                x: int
+                y: int
+        """
+        for decorator in node.decorator_list:
+            # Handle @dataclass
+            if isinstance(decorator, ast.Name) and decorator.id == "dataclass":
+                return True
+            # Handle @dataclass(...) with arguments
+            elif isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Name):
+                if decorator.func.id == "dataclass":
+                    return True
+        return False
+
+    def _is_namedtuple(self, node: ast.ClassDef) -> bool:
+        """Check if class inherits from NamedTuple.
+
+        Args:
+            node: Class definition node
+
+        Returns:
+            True if class inherits from NamedTuple
+
+        Example:
+            class Point(NamedTuple):
+                x: int
+                y: int
+        """
+        for base in node.bases:
+            if isinstance(base, ast.Name):
+                if base.id == "NamedTuple":
+                    return True
+            elif isinstance(base, ast.Attribute):
+                if base.attr == "NamedTuple":
+                    return True
+        return False
+
+    def _extract_dataclass_fields(self, node: ast.ClassDef) -> dict[str, str]:
+        """Extract field names and types from dataclass.
+
+        Args:
+            node: Dataclass definition node
+
+        Returns:
+            Dictionary mapping field names to C types
+
+        Example:
+            @dataclass
+            class Point:
+                x: int  →  {"x": "int"}
+                y: int  →  {"y": "int"}
+        """
+        fields = {}
+
+        for stmt in node.body:
+            if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                field_name = stmt.target.id
+
+                # Extract type annotation
+                if isinstance(stmt.annotation, ast.Name):
+                    python_type = stmt.annotation.id
+                    c_type = self.type_mapping.get(python_type, "int")
+                    fields[field_name] = c_type
+                elif isinstance(stmt.annotation, ast.Subscript):
+                    # Handle generic types like list[int]
+                    python_type = self._get_type_annotation(stmt.annotation)
+                    c_type = self.type_mapping.get(python_type, python_type)
+                    fields[field_name] = c_type
+
+        return fields
+
+    def _generate_dataclass_constructor(self, struct_name: str, fields: dict[str, str]) -> str:
+        """Generate constructor function for dataclass.
+
+        Args:
+            struct_name: Name of the struct
+            fields: Dictionary of field names to C types
+
+        Returns:
+            C constructor function as string
+
+        Example:
+            make_Point(int x, int y) { return (Point){x, y}; }
+        """
+        # Create parameter list
+        params = [f"{c_type} {name}" for name, c_type in fields.items()]
+        params_str = ", ".join(params)
+
+        # Create field list for initialization
+        field_names = ", ".join(fields.keys())
+
+        # Generate constructor function
+        constructor = f"""{struct_name} make_{struct_name}({params_str})
+{{
+    return ({struct_name}){{{field_names}}};
+}}"""
+
+        return constructor
 
     def _convert_method_statement(self, stmt: ast.stmt, class_name: str) -> str:
         """Convert statement inside a method, handling self references."""

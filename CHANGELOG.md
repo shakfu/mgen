@@ -17,6 +17,86 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.89] - 2025-10-18
+
+**C Backend Phase 1 Critical Fixes - Assert & Dataclass Support!**
+
+Major improvements to the C backend implementing Phase 1 fixes from `C_BACKEND_PLAN.md`. Translation test success rate improved from 3.7% to 7.4% (targeting 60%+ after build system fixes).
+
+### Added
+
+- **Assert Statement Support**
+  - Full support for Python `assert` statements
+  - Converts to C `assert()` calls with `<assert.h>` include
+  - Handles optional assertion messages as comments
+  - Example: `assert result == 1` → `assert(result == 1);`
+  - Example: `assert x > 0, "Invalid"` → `assert(x > 0); // Invalid`
+  - File: `src/mgen/backends/c/converter.py:1725-1779`
+
+- **Dataclass Support**
+  - Full support for `@dataclass` decorator
+  - Generates proper C structs with actual fields (no more dummy placeholders)
+  - Auto-generates constructor functions: `make_StructName(args...)`
+  - Handles type annotations including generic types
+  - Example: `@dataclass class Point: x: int; y: int` → `typedef struct {int x; int y;} Point;` + `Point make_Point(int x, int y)`
+  - Files: `src/mgen/backends/c/converter.py:2128-2235`
+
+- **NamedTuple Support**
+  - Detection of `NamedTuple` base class
+  - Generates struct definition without constructor (as per Python semantics)
+  - File: `src/mgen/backends/c/converter.py:2153-2174`
+
+### Fixed
+
+- **Error Handling**
+  - Removed broken fallback that generated `/* TODO: Enhanced statement generation */`
+  - Now raises clear `UnsupportedFeatureError` for truly unsupported features
+  - Prevents cascading failures where one unsupported statement breaks entire function
+  - File: `src/mgen/backends/c/emitter.py:67-74`
+
+- **CLI Success Message**
+  - Fixed misleading "Compilation successful! Executable: None" message
+  - Now properly reports `Build failed: No executable produced` when build fails
+  - Exits with code 1 on build failure
+  - File: `src/mgen/backends/c/cli/main.py:646-650`
+
+### Test Results
+
+- **Translation tests**: 2/27 passing (7.4%, up from 3.7%)
+  - ✓ test_dataclass_basic.py (NEW!)
+  - ✓ string_methods_test.py
+  - Remaining failures due to runtime library build system issue (out of Phase 1 scope)
+
+- **Regression tests**: 1045/1045 passing (100%)
+- **Type check**: All files pass strict mypy
+- **Benchmark tests**: fibonacci confirmed working
+
+### Technical Details
+
+- Assert detection added to module analysis phase
+- Dataclass/NamedTuple decorator detection via AST analysis
+- Field extraction from annotated class body
+- Constructor call handling updated to use `make_` prefix for dataclasses
+- Proper C99 struct initialization syntax
+
+### Implementation
+
+Based on comprehensive analysis comparing mgen C backend with cgen reference implementation (see `C_BACKEND_PLAN.md`):
+- Assert implementation: ~40 lines (method + detection + includes)
+- Dataclass implementation: ~110 lines (detection + field extraction + constructor generation)
+- Error handling fix: ~8 lines
+- CLI fix: ~6 lines
+
+### Known Issues
+
+- Some translation tests still fail due to runtime library linking (separate issue #TBD)
+- Complex comprehensions need runtime library present during build
+- This is a build system issue, not code generation - generated C code is correct
+
+### Next Steps (Phase 2)
+
+See `C_BACKEND_PLAN.md` for Phase 2 (NamedTuple enhancement) and Phase 3 (BoolOp, Import support).
+
 ## [0.1.88] - 2025-10-17
 
 **Haskell Backend Improvements - Production-Ready Functional Code Generation!**

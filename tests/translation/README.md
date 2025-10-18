@@ -1,4 +1,4 @@
-# CGen Translation Test Examples
+# MGen Translation Test Examples
 
 This directory contains focused test cases for Python-to-C translation features. These files are specifically designed to test and validate core translation capabilities.
 
@@ -32,20 +32,6 @@ These files are designed for:
 - **Feature Validation**: Testing new translation features as they're implemented
 - **Batch Testing**: Using with `cgen batch` command to test all translation features at once
 
-## Usage
-
-Test all translation features at once:
-
-```bash
-cgen batch -s examples --summary-only
-```
-
-Test individual translation features:
-
-```bash
-cgen convert examples/test_string_methods.py
-cgen convert examples/test_container_iteration.py
-```
 
 ## Note
 
