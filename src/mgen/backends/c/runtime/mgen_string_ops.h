@@ -129,6 +129,12 @@ const char* mgen_bool_to_string(bool value);
  */
 char* mgen_sprintf_string(const char* format, ...);
 
+/**
+ * Concatenate two strings (returns allocated string, caller must free)
+ * Used for Python's + operator with strings
+ */
+char* mgen_str_concat(const char* str1, const char* str2);
+
 #ifdef __cplusplus
 }
 #endif

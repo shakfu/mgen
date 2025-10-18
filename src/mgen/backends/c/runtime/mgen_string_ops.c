@@ -407,3 +407,29 @@ char* mgen_sprintf_string(const char* format, ...) {
 
     return result;
 }
+
+char* mgen_str_concat(const char* str1, const char* str2) {
+    if (!str1 || !str2) {
+        MGEN_SET_ERROR(MGEN_ERROR_VALUE, "Cannot concatenate NULL strings");
+        return NULL;
+    }
+
+    // Calculate total length needed
+    size_t len1 = strlen(str1);
+    size_t len2 = strlen(str2);
+    size_t total_len = len1 + len2 + 1;  // +1 for null terminator
+
+    // Allocate memory for concatenated string
+    char* result = malloc(total_len);
+    if (!result) {
+        MGEN_SET_ERROR(MGEN_ERROR_MEMORY, "Failed to allocate memory for string concatenation");
+        return NULL;
+    }
+
+    // Copy first string
+    strcpy(result, str1);
+    // Append second string
+    strcat(result, str2);
+
+    return result;
+}

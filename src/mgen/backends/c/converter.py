@@ -1033,6 +1033,10 @@ class MGenPythonToCConverter:
         elif isinstance(expr.op, ast.FloorDiv):
             # FloorDiv maps to regular division in C (not exact for negative numbers)
             return f"({left} / {right})"
+        elif isinstance(expr.op, ast.Add) and (self._is_string_type(expr.left) or self._is_string_type(expr.right)):
+            # String concatenation using mgen_str_concat
+            self.includes_needed.add('#include "mgen_string_ops.h"')
+            return f"mgen_str_concat({left}, {right})"
         else:
             # Use standard operator mapping from converter_utils for common operators
             op = get_standard_binary_operator(expr.op)
@@ -1276,6 +1280,10 @@ class MGenPythonToCConverter:
                 return f"{container_type}_size(&{container_name})"
             elif container_type and "mgen_string_array" in container_type:
                 return f"mgen_string_array_size({container_name})"
+            elif container_type and container_type in ("char*", "const char*", "string"):
+                # String type - use strlen()
+                self.includes_needed.add("#include <string.h>")
+                return f"strlen({container_name})"
             else:
                 # Default to vec_int for backward compatibility
                 return f"vec_int_size(&{container_name})"
