@@ -581,6 +581,10 @@ class MGenPythonToCConverter:
                 # Use enhanced type inference engine for complex/nested types
                 c_type = self.type_engine._map_python_to_c_type(param_type)
 
+            # Check if this parameter is detected as a nested container
+            if arg.arg in self.nested_containers and c_type == "vec_int":
+                c_type = "vec_vec_int"
+
             # Special case: map_str_int uses pointer type
             if c_type == "map_str_int":
                 c_type = "mgen_str_int_map_t*"
@@ -602,6 +606,17 @@ class MGenPythonToCConverter:
             # Special case: map_str_int uses pointer type
             if return_type == "map_str_int":
                 return_type = "mgen_str_int_map_t*"
+
+            # Check if any returned variable is a nested container
+            if return_type == "vec_int":
+                for stmt in ast.walk(node):
+                    if isinstance(stmt, ast.Return) and stmt.value:
+                        # Get the returned variable name
+                        if isinstance(stmt.value, ast.Name):
+                            returned_var = stmt.value.id
+                            if returned_var in self.nested_containers:
+                                return_type = "vec_vec_int"
+                                break
 
         # Build function signature
         params_str = ", ".join(params) if params else "void"
