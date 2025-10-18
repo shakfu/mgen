@@ -1,4 +1,4 @@
-def test_string_split_assignment():
+def test_string_split_assignment() -> None:
     text: str = "hello,world"
     # Avoid direct return of list, assign to variable first
     words: list[str] = text.split(",")
