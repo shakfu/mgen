@@ -113,6 +113,9 @@ class MGenPythonToCConverter:
         # First pass: detect asserts for include generation
         self.uses_asserts = self._detect_asserts(node)
 
+        # First pass: process imports for include generation
+        self._detect_imports(node)
+
         # First pass: detect container variables to generate STC declarations
         self._detect_container_variables(node)
 
@@ -136,7 +139,13 @@ class MGenPythonToCConverter:
 
         # Convert functions and classes
         for stmt in node.body:
-            if isinstance(stmt, ast.FunctionDef):
+            if isinstance(stmt, ast.Import):
+                # Process import statements (may add includes)
+                self._process_import(stmt)
+            elif isinstance(stmt, ast.ImportFrom):
+                # Process from...import statements (may add includes)
+                self._process_from_import(stmt)
+            elif isinstance(stmt, ast.FunctionDef):
                 parts.append(self._convert_function(stmt))
                 parts.append("")
             elif isinstance(stmt, ast.ClassDef):
@@ -174,6 +183,59 @@ class MGenPythonToCConverter:
             if isinstance(child, ast.Assert):
                 return True
         return False
+
+    def _detect_imports(self, node: ast.Module) -> None:
+        """Pre-scan module to detect imports and add necessary includes.
+
+        Args:
+            node: Module node to scan
+        """
+        for stmt in node.body:
+            if isinstance(stmt, ast.Import):
+                self._process_import(stmt)
+            elif isinstance(stmt, ast.ImportFrom):
+                self._process_from_import(stmt)
+
+    def _process_import(self, node: ast.Import) -> None:
+        """Process import statement and add necessary C includes.
+
+        Args:
+            node: Import statement node
+
+        Example:
+            import math  →  adds #include <math.h> to includes_needed
+            import typing  →  ignored (type-only import)
+        """
+        for alias in node.names:
+            module_name = alias.name
+
+            # Handle standard library modules that need C includes
+            if module_name == "math":
+                self.includes_needed.add("#include <math.h>")
+            # typing, dataclasses, etc. are type-only imports - no C equivalent needed
+            # Local module imports would need generated headers, but not implemented yet
+
+    def _process_from_import(self, node: ast.ImportFrom) -> None:
+        """Process from...import statement and add necessary C includes.
+
+        Args:
+            node: ImportFrom statement node
+
+        Example:
+            from math import sqrt  →  adds #include <math.h>
+            from typing import NamedTuple  →  ignored (type-only)
+            from dataclasses import dataclass  →  ignored (type-only)
+        """
+        if not node.module:
+            return  # from __future__ import ... or relative imports
+
+        module_name = node.module
+
+        # Handle standard library modules that need C includes
+        if module_name == "math":
+            self.includes_needed.add("#include <math.h>")
+        # typing, dataclasses, etc. are type-only imports - no C equivalent needed
+        # Local module imports would need generated headers, but not implemented yet
 
     def _detect_container_variables(self, node: ast.AST) -> None:
         """Pre-scan AST to detect container variable declarations for STC generation."""
@@ -1176,6 +1238,16 @@ class MGenPythonToCConverter:
 
         obj_expr = expr.func.value
         method_name = expr.func.attr
+
+        # Check if this is a module function call (e.g., math.sqrt)
+        if isinstance(obj_expr, ast.Name):
+            module_name = obj_expr.id
+            # Handle standard library module functions
+            if module_name == "math":
+                # math module functions are just regular C functions from math.h
+                args = [self._convert_expression(arg) for arg in expr.args]
+                args_str = ", ".join(args)
+                return f"{method_name}({args_str})"
 
         # Convert the object and arguments
         obj = self._convert_expression(obj_expr)

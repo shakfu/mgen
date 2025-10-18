@@ -17,6 +17,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+## [0.1.92] - 2025-10-18
+
+**C Backend Phase 3.2 Complete - Import/ImportFrom Support!**
+
+Implemented Phase 3.2 from `C_BACKEND_PLAN.md` with import statement support for standard library modules. Translation test success rate remains at **33.3% (9/27)** (no additional tests enabled by this feature).
+
+### Added
+
+- **Import Statement Support**
+  - Support for `import math` → adds `#include <math.h>`
+  - Support for `from math import sqrt` → adds `#include <math.h>`
+  - Module function calls: `math.sqrt(x)` → `sqrt(x)` (standard C library)
+  - Type-only imports ignored: `from typing import ...`, `from dataclasses import ...`
+  - Files: `src/mgen/backends/c/converter.py:187-223,1227-1235,139-144`
+
+### Test Results
+
+- **Translation tests**: 9/27 passing (33.3%, unchanged)
+  - Import feature works but doesn't unlock new tests
+  - test_math_import.py still fails due to missing return type annotations (validation error)
+- **Regression tests**: 1045/1045 passing (100%)
+- **Type check**: All files pass strict mypy
+- **New test**: Created `/tmp/test_import.py` demonstrating `import math` with `math.sqrt()`
+
+### Technical Details
+
+- Added `_detect_imports()` pre-scan phase to find imports before includes are generated
+- Added `_process_import()` to handle `ast.Import` nodes
+- Added `_process_from_import()` to handle `ast.ImportFrom` nodes
+- Modified `_convert_method_call()` to recognize module function calls (e.g., `math.sqrt`)
+- Module functions called directly without module prefix in C (per C conventions)
+- Extensible design allows adding more standard library modules in the future
+
 ## [0.1.91] - 2025-10-18
 
 **C Backend Phase 3.1 Complete - BoolOp Support!**
