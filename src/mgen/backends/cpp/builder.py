@@ -55,24 +55,29 @@ class CppBuilder(AbstractBuilder):
     def compile_direct(self, source_file: str, output_dir: str, **kwargs: Any) -> bool:
         """Compile C++ source directly to executable."""
         try:
-            source_path = Path(source_file)
-            output_path = Path(output_dir) / source_path.stem
+            source_path = Path(source_file).absolute()
+            out_dir = Path(output_dir).absolute()
+            output_path = out_dir / source_path.stem
 
             # Setup runtime environment (copy headers if needed)
-            self._setup_runtime_environment(output_dir)
+            self._setup_runtime_environment(str(out_dir))
 
             # Build the compilation command
             cmd = [self.compiler] + self.get_compile_flags() + [str(source_path), "-o", str(output_path)]
 
-            # Execute compilation
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
+            # Execute compilation (don't set cwd to avoid path issues)
+            result = subprocess.run(cmd, capture_output=True, text=True)
 
             if result.returncode == 0:
                 return True
             else:
+                # Print error for debugging
+                if result.stderr:
+                    print(f"C++ compilation error: {result.stderr}")
                 return False
 
-        except Exception:
+        except Exception as e:
+            print(f"C++ compilation exception: {e}")
             return False
 
     def get_executable_name(self, source_file: str) -> str:

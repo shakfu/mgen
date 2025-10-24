@@ -168,28 +168,39 @@ class OCamlBuilder(AbstractBuilder):
 
     def compile_direct(self, source_file: str, output_dir: str, **kwargs: Any) -> bool:
         """Compile OCaml source directly using ocamlc via opam."""
-        base_path = Path(output_dir)
-        source_path = Path(source_file)
-        runtime_path = base_path / "mgen_runtime.ml"
+        source_path = Path(source_file).absolute()
+        out_dir = Path(output_dir).absolute()
+        executable_name = source_path.stem
 
-        # Copy runtime file if it doesn't exist
+        # Determine source directory (where .ml files are)
+        source_dir = source_path.parent
+
+        # Copy runtime file to source directory (OCaml looks for modules there)
+        runtime_path = source_dir / "mgen_runtime.ml"
         if not runtime_path.exists():
-            self._copy_runtime_files(base_path)
+            self._copy_runtime_files(source_dir)
 
         # Compile with OCaml compiler via opam
-        executable = base_path / source_path.stem
-        cmd = ["opam", "exec", "--", "ocamlc", "-o", str(executable), str(runtime_path), source_file]
+        # Use absolute paths for all files and include source directory for module resolution
+        executable = out_dir / executable_name
+        cmd = [
+            "opam", "exec", "--", "ocamlc",
+            "-I", str(source_dir),  # Add include path for module resolution
+            "-o", str(executable),
+            str(runtime_path),
+            str(source_path)
+        ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(base_path))
+        # Run compilation (don't set cwd to avoid path issues)
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
         if result.returncode != 0:
-            # Log compilation errors for debugging
-            import logging
+            # Print error for debugging
+            if result.stderr:
+                print(f"OCaml compilation error: {result.stderr}")
+            return False
 
-            logger = logging.getLogger(__name__)
-            logger.error(f"OCaml compilation failed: {result.stderr}")
-
-        return result.returncode == 0
+        return True
 
     def get_compile_flags(self) -> list[str]:
         """Get compilation flags for OCaml."""

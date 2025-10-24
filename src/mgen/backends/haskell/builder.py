@@ -55,17 +55,20 @@ executable {target_name}
     def compile_direct(self, source_file: str, output_dir: str, **kwargs: Any) -> bool:
         """Compile Haskell source directly using GHC."""
         try:
-            source_path = Path(source_file)
-            out_dir = Path(output_dir)
+            source_path = Path(source_file).absolute()
+            out_dir = Path(output_dir).absolute()
             executable_name = source_path.stem
 
-            # Copy runtime module if it exists
+            # Determine source directory (where .hs files are)
+            source_dir = source_path.parent
+
+            # Copy runtime module to source directory (GHC looks for imports there)
             runtime_src = Path(__file__).parent / "runtime" / "MGenRuntime.hs"
             if runtime_src.exists():
-                runtime_dst = out_dir / "MGenRuntime.hs"
+                runtime_dst = source_dir / "MGenRuntime.hs"
                 shutil.copy2(runtime_src, runtime_dst)
 
-            # Build GHC command
+            # Build GHC command with absolute paths
             cmd = [
                 "ghc",
                 str(source_path),
@@ -76,17 +79,24 @@ executable {target_name}
                 "-XTypeSynonymInstances",
             ]
 
-            # Add runtime if it was copied
-            runtime_path = out_dir / "MGenRuntime.hs"
+            # Add runtime module path if it exists
+            runtime_path = source_dir / "MGenRuntime.hs"
             if runtime_path.exists():
                 cmd.extend([str(runtime_path)])
 
-            # Run compilation
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
+            # Run compilation (don't set cwd to avoid path issues)
+            result = subprocess.run(cmd, capture_output=True, text=True)
 
-            return result.returncode == 0
+            if result.returncode != 0:
+                # Print error for debugging
+                if result.stderr:
+                    print(f"Haskell compilation error: {result.stderr}")
+                return False
 
-        except Exception:
+            return True
+
+        except Exception as e:
+            print(f"Haskell compilation exception: {e}")
             return False
 
     def get_compile_flags(self) -> list[str]:

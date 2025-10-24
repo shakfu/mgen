@@ -27,33 +27,59 @@ go 1.21
     def compile_direct(self, source_file: str, output_dir: str, **kwargs: Any) -> bool:
         """Compile Go source directly using go build."""
         try:
-            source_path = Path(source_file)
-            out_dir = Path(output_dir)
+            source_path = Path(source_file).absolute()
+            out_dir = Path(output_dir).absolute()
             executable_name = source_path.stem
 
-            # Create go.mod file for module support
-            go_mod_path = out_dir / "go.mod"
+            # Create a temporary Go-specific build directory to avoid conflicts with C files
+            go_build_dir = out_dir / f"go_build_{executable_name}"
+            go_build_dir.mkdir(exist_ok=True)
+
+            # Copy source file to Go build directory
+            # IMPORTANT: If filename ends with _test.go, Go treats it as a test file
+            # So we rename it to avoid this issue
+            source_name = source_path.name
+            if source_name.endswith("_test.go"):
+                # Rename to avoid Go treating it as a test file
+                source_name = source_name.replace("_test.go", "_main.go")
+
+            go_source = go_build_dir / source_name
+            shutil.copy2(source_path, go_source)
+
+            # Create go.mod file in Go build directory
+            go_mod_path = go_build_dir / "go.mod"
             go_mod_content = self.generate_build_file([str(source_path)], executable_name)
             go_mod_path.write_text(go_mod_content)
 
             # Copy runtime package if it exists
             runtime_src = Path(__file__).parent / "runtime" / "mgen_go_runtime.go"
             if runtime_src.exists():
-                # Create mgen package directory
-                mgen_pkg_dir = out_dir / "mgen"
+                # Create mgen package directory in Go build directory
+                mgen_pkg_dir = go_build_dir / "mgen"
                 mgen_pkg_dir.mkdir(exist_ok=True)
                 runtime_dst = mgen_pkg_dir / "mgen.go"
                 shutil.copy2(runtime_src, runtime_dst)
 
             # Build go build command
-            cmd = ["go", "build", "-o", str(out_dir / executable_name), str(source_path)]
+            # Build the module (current directory) which includes our renamed source and runtime
+            cmd = ["go", "build", "-o", str(out_dir / executable_name), "."]
 
-            # Run compilation
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
+            # Run compilation from Go build directory (where go.mod is)
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(go_build_dir))
 
-            return result.returncode == 0
+            if result.returncode != 0:
+                # Print error for debugging
+                if result.stderr:
+                    print(f"Go compilation error: {result.stderr}")
+                return False
 
-        except Exception:
+            # Clean up temporary Go build directory after successful build
+            shutil.rmtree(go_build_dir, ignore_errors=True)
+
+            return True
+
+        except Exception as e:
+            print(f"Go compilation exception: {e}")
             return False
 
     def get_compile_flags(self) -> list[str]:

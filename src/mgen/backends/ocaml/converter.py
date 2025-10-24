@@ -111,8 +111,38 @@ class MGenPythonToOCamlConverter:
             # Ignore ImportFrom statements (like "from __future__ import annotations")
             # These are Python-specific directives that don't need translation
             return "(* Import statement ignored *)"
+        elif isinstance(node, ast.Assert):
+            return self._convert_assert_statement(node)
         else:
             raise UnsupportedFeatureError(f"Unsupported statement: {type(node).__name__}")
+
+    def _convert_assert_statement(self, node: ast.Assert) -> str:
+        """Convert Python assert statement to OCaml assert.
+
+        Args:
+            node: Python assert statement node
+
+        Returns:
+            OCaml assert statement as string
+
+        Example:
+            assert x > 0  →  assert (x > 0);
+            assert result == 1, "Test failed"  →  assert (result = 1); (* Test failed *)
+        """
+        # Convert the test expression
+        test_expr = self._convert_expression(node.test)
+
+        # Handle optional message
+        if node.msg:
+            # Convert message to string
+            if isinstance(node.msg, ast.Constant) and isinstance(node.msg.value, str):
+                msg = node.msg.value
+                return f"assert ({test_expr}); (* {msg} *)"
+            else:
+                # Complex message expression - just add assert without comment
+                return f"assert ({test_expr});"
+        else:
+            return f"assert ({test_expr});"
 
     def _convert_function_def(self, node: ast.FunctionDef) -> list[str]:
         """Convert Python function definition to OCaml."""

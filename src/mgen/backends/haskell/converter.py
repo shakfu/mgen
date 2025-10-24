@@ -442,8 +442,39 @@ main = printValue "Generated Haskell code executed successfully"'''
         elif isinstance(node, ast.For):
             return self._convert_for_statement(node)
 
+        elif isinstance(node, ast.Assert):
+            return self._convert_assert_statement(node)
+
         else:
             raise UnsupportedFeatureError(f"Unsupported statement type: {type(node).__name__}")
+
+    def _convert_assert_statement(self, node: ast.Assert) -> str:
+        """Convert Python assert statement to Haskell error on failure.
+
+        Args:
+            node: Python assert statement node
+
+        Returns:
+            Haskell if/then/else expression that errors on assertion failure
+
+        Example:
+            assert x > 0  →  if not (x > 0) then error "assertion failed" else ()
+            assert result == 1, "Test failed"  →  if not (result == 1) then error "Test failed" else ()
+        """
+        # Convert the test expression
+        test_expr = self._convert_expression(node.test)
+
+        # Handle optional message
+        if node.msg:
+            # Convert message to string
+            if isinstance(node.msg, ast.Constant) and isinstance(node.msg.value, str):
+                msg = node.msg.value
+                return f'if not ({test_expr}) then error "{msg}" else ()'
+            else:
+                # Complex message expression - just add default error
+                return f'if not ({test_expr}) then error "assertion failed" else ()'
+        else:
+            return f'if not ({test_expr}) then error "assertion failed" else ()'
 
     def _convert_expression(self, node: ast.expr) -> str:
         """Convert Python expression to Haskell."""

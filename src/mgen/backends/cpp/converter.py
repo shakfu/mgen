@@ -118,6 +118,7 @@ class MGenPythonToCppConverter:
             "#include <unordered_set>",
             "#include <algorithm>",
             "#include <memory>",
+            "#include <cassert>",
         ]
 
         # Add MGen runtime
@@ -865,8 +866,38 @@ class MGenPythonToCppConverter:
             return self._convert_expression_statement(stmt)
         elif isinstance(stmt, ast.Pass):
             return "        // pass"
+        elif isinstance(stmt, ast.Assert):
+            return self._convert_assert(stmt)
         else:
             raise UnsupportedFeatureError(f"Unsupported statement type: {type(stmt).__name__}")
+
+    def _convert_assert(self, stmt: ast.Assert) -> str:
+        """Convert Python assert statement to C++ assert() call.
+
+        Args:
+            stmt: Python assert statement node
+
+        Returns:
+            C++ assert() call as string
+
+        Example:
+            assert x > 0  →  assert(x > 0);
+            assert result == 1, "Test failed"  →  assert(result == 1); // Test failed
+        """
+        # Convert the test expression
+        test_expr = self._convert_expression(stmt.test)
+
+        # Handle optional message
+        if stmt.msg:
+            # Convert message to string
+            if isinstance(stmt.msg, ast.Constant) and isinstance(stmt.msg.value, str):
+                msg = stmt.msg.value
+                return f"        assert({test_expr}); // {msg}"
+            else:
+                # Complex message expression - just add assert without comment
+                return f"        assert({test_expr});"
+        else:
+            return f"        assert({test_expr});"
 
     def _convert_return(self, stmt: ast.Return) -> str:
         """Convert return statement."""

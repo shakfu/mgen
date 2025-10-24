@@ -1002,8 +1002,38 @@ class MGenPythonToGoConverter:
             return self._convert_expression_statement(stmt)
         elif isinstance(stmt, ast.Pass):
             return "    // pass"
+        elif isinstance(stmt, ast.Assert):
+            return self._convert_assert(stmt)
         else:
             raise UnsupportedFeatureError(f"Unsupported statement type: {type(stmt).__name__}")
+
+    def _convert_assert(self, stmt: ast.Assert) -> str:
+        """Convert Python assert statement to Go panic on failure.
+
+        Args:
+            stmt: Python assert statement node
+
+        Returns:
+            Go if statement that panics on assertion failure
+
+        Example:
+            assert x > 0  →  if !(x > 0) { panic("assertion failed") }
+            assert result == 1, "Test failed"  →  if !(result == 1) { panic("Test failed") }
+        """
+        # Convert the test expression
+        test_expr = self._convert_expression(stmt.test)
+
+        # Handle optional message
+        if stmt.msg:
+            # Convert message to string
+            if isinstance(stmt.msg, ast.Constant) and isinstance(stmt.msg.value, str):
+                msg = stmt.msg.value
+                return f'    if !({test_expr}) {{ panic("{msg}") }}'
+            else:
+                # Complex message expression - just add default panic
+                return f'    if !({test_expr}) {{ panic("assertion failed") }}'
+        else:
+            return f'    if !({test_expr}) {{ panic("assertion failed") }}'
 
     def _convert_return(self, stmt: ast.Return) -> str:
         """Convert return statement."""
