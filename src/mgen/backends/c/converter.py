@@ -677,9 +677,19 @@ class MGenPythonToCConverter:
             raise UnsupportedFeatureError(f"Unsupported statement type: {type(stmt).__name__}")
 
     def _convert_return(self, stmt: ast.Return) -> str:
-        """Convert return statement."""
+        """Convert return statement.
+
+        Special handling for main(): In C, main() should return 0 for success.
+        Python programs may return meaningful values, but Unix convention is
+        0 = success, non-zero = failure.
+        """
         if stmt.value is None:
             return "return;"
+
+        # Special case: main() should always return 0 for Unix compatibility
+        if self.current_function == "main":
+            # If returning a value from main, just return 0 instead
+            return "return 0;"
 
         value_expr = self._convert_expression(stmt.value)
         return f"return {value_expr};"

@@ -900,7 +900,16 @@ class MGenPythonToCppConverter:
             return f"        assert({test_expr});"
 
     def _convert_return(self, stmt: ast.Return) -> str:
-        """Convert return statement."""
+        """Convert return statement.
+
+        Special handling for main(): In C++, main() should return 0 for success.
+        Python programs may return meaningful values, but Unix convention is
+        0 = success, non-zero = failure.
+        """
+        # Special case: main() should always return 0 for Unix compatibility
+        if stmt.value and self.current_function == "main":
+            return "        return 0;"
+
         if stmt.value:
             value_expr = self._convert_expression(stmt.value)
             return f"        return {value_expr};"
