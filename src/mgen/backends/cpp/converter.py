@@ -1308,6 +1308,18 @@ class MGenPythonToCppConverter:
                 # Use a helper function from runtime to extract values
                 return f"mgen::values({obj_expr})"
 
+            # Handle set methods - map Python names to C++ names
+            if method_name == "add":
+                # Python's set.add() -> C++'s insert()
+                return f"{obj_expr}.insert({', '.join(args)})"
+            elif method_name == "remove":
+                # Python's set.remove() -> C++'s erase()
+                return f"{obj_expr}.erase({', '.join(args)})"
+            elif method_name == "discard":
+                # Python's set.discard() -> C++'s erase() (doesn't throw if missing)
+                # In C++, erase() doesn't throw, so it matches discard() semantics
+                return f"{obj_expr}.erase({', '.join(args)})"
+
             # Regular method calls
             if args:
                 return f"{obj_expr}.{method_name}({', '.join(args)})"

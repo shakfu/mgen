@@ -942,9 +942,10 @@ class MGenPythonToRustConverter:
 
         if stmt.orelse:
             if len(stmt.orelse) == 1 and isinstance(stmt.orelse[0], ast.If):
-                # elif case
+                # elif case - recursively convert the elif as an if statement
                 else_part = self._convert_if(stmt.orelse[0]).strip()
-                result += f" else {else_part[4:]}"  # Remove leading spaces
+                # Remove the leading indentation, keep the "if" keyword
+                result += f" else {else_part}"
             else:
                 # else case
                 else_body = self._convert_statements(stmt.orelse)

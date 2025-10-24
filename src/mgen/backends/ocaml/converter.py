@@ -133,16 +133,17 @@ class MGenPythonToOCamlConverter:
         test_expr = self._convert_expression(node.test)
 
         # Handle optional message
+        # Note: Don't add trailing semicolon - it's added by function body assembly
         if node.msg:
             # Convert message to string
             if isinstance(node.msg, ast.Constant) and isinstance(node.msg.value, str):
                 msg = node.msg.value
-                return f"assert ({test_expr}); (* {msg} *)"
+                return f"assert ({test_expr}) (* {msg} *)"
             else:
                 # Complex message expression - just add assert without comment
-                return f"assert ({test_expr});"
+                return f"assert ({test_expr})"
         else:
-            return f"assert ({test_expr});"
+            return f"assert ({test_expr})"
 
     def _convert_function_def(self, node: ast.FunctionDef) -> list[str]:
         """Convert Python function definition to OCaml."""
@@ -682,15 +683,15 @@ class MGenPythonToOCamlConverter:
                 var_type = self.variables.get(var_name, "")
 
                 # Explicitly check for Python list type
-                # Now we store Python type names, so checks are straightforward
+                # Python lists become OCaml arrays, but are stored with OCaml type syntax like "int list"
                 if var_type:
-                    # Python list becomes OCaml array
-                    if var_type == "list":
+                    # Python list becomes OCaml array - check for bare "list" or OCaml type like "int list"
+                    if var_type == "list" or (var_type.endswith(" list") and " * " not in var_type):
                         use_array_len = True
-                    # Sets and dicts use regular OCaml lists
+                    # Sets and dicts use regular OCaml lists (association lists)
                     elif var_type == "set" or var_type == "dict":
                         use_array_len = False
-                    # Tuple/dict association lists (OCaml type strings)
+                    # Tuple/dict association lists (OCaml type strings like "(int * string) list")
                     elif " * " in var_type:
                         use_array_len = False
                     # Array type annotations

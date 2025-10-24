@@ -426,7 +426,19 @@ main = printValue "Generated Haskell code executed successfully"'''
                 return "-- Complex annotated assignment"
 
         elif isinstance(node, ast.Expr):
-            # Expression statements are already properly converted
+            # Check if this is a mutation that needs to be converted to reassignment
+            if isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Attribute):
+                method_name = node.value.func.attr
+
+                # Handle list.append() - convert to reassignment
+                if method_name == "append" and isinstance(node.value.func.value, ast.Name):
+                    list_var = self._to_haskell_var_name(node.value.func.value.id)
+                    if node.value.args:
+                        append_expr = self._convert_expression(node.value.args[0])
+                        # list.append(x) -> list = list ++ [x]
+                        return f"{list_var} = {list_var} ++ [{append_expr}]"
+
+            # Regular expression statements
             expr = self._convert_expression(node.value)
             return expr
 
@@ -460,21 +472,26 @@ main = printValue "Generated Haskell code executed successfully"'''
         Example:
             assert x > 0  →  if not (x > 0) then error "assertion failed" else ()
             assert result == 1, "Test failed"  →  if not (result == 1) then error "Test failed" else ()
+            In IO context (main): uses 'return ()' instead of '()'
         """
         # Convert the test expression
         test_expr = self._convert_expression(node.test)
+
+        # Determine the success value based on context
+        # In IO context (main function), use 'return ()', otherwise use '()'
+        success_value = "return ()" if self.current_function == "main" else "()"
 
         # Handle optional message
         if node.msg:
             # Convert message to string
             if isinstance(node.msg, ast.Constant) and isinstance(node.msg.value, str):
                 msg = node.msg.value
-                return f'if not ({test_expr}) then error "{msg}" else ()'
+                return f'if not ({test_expr}) then error "{msg}" else {success_value}'
             else:
                 # Complex message expression - just add default error
-                return f'if not ({test_expr}) then error "assertion failed" else ()'
+                return f'if not ({test_expr}) then error "assertion failed" else {success_value}'
         else:
-            return f'if not ({test_expr}) then error "assertion failed" else ()'
+            return f'if not ({test_expr}) then error "assertion failed" else {success_value}'
 
     def _convert_expression(self, node: ast.expr) -> str:
         """Convert Python expression to Haskell."""
