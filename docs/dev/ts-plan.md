@@ -1,6 +1,11 @@
 # TypeScript Backend Implementation Plan
 
-Status: proposed (not yet started)
+Status: implemented (steps 1-5 done). TypeScript is the 8th backend and passes
+7/7 benchmarks via `deno compile`. Remaining follow-ups: bigint decision for
+large-int fidelity (trap #1), format-spec completeness, and `deno check`-clean
+type annotations (return-type upgrade for inferred container types). Int is
+currently `number` (float64) per the settled decision; all 7 benchmark values
+stay below 2**53 so none diverge.
 
 This plan describes adding TypeScript as an 8th target backend, framed as a
 diff from the existing Go backend (`src/multigen/backends/go/`), which it most

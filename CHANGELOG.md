@@ -17,6 +17,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.0]
+
+### Added
+
+- **TypeScript backend (8th backend)** -- Python -> TypeScript via the Deno toolchain
+  - **7/7 benchmarks passing**: fibonacci, quicksort, matmul, wordcount, list_ops, dict_ops, set_ops
+  - **Deno build**: `deno compile --no-check` produces a standalone binary, mapping 1:1 onto the compile-time / binary-size / execute-time benchmark model
+  - **Idiomatic containers**: `list -> T[]`, `dict -> Map<K, V>`, `set -> Set<T>` (Map/Set chosen over object literals to preserve Python key types, insertion order, and `.size`)
+  - **Python semantics via runtime shims** (`multigen_ts_runtime.ts`): floor division (`mg.floorDiv`), modulo sign (`mg.pyMod`), `str.split`/`str.strip`, truthiness, Python-style stringification
+  - **Native TypeScript emission**: `class` blocks with `constructor`, template-literal f-strings, array-method comprehensions (`.map`/`.filter`), `try/catch` with `instanceof` dispatch, `throw new mg.ValueError(...)`
+  - **Type-driven dispatch**: `len` -> `.length` vs `.size`, `in` -> `.includes` vs `.has`, subscript assignment -> `[i] =` vs `.set(k, v)` based on inferred container type
+  - **snake_case preserved** (no CamelCase transform, unlike Go), collapsing Go's struct/receiver/`New*` machinery into native classes
+  - **Generators**: eager collection (`__mgen_result.push(...)`), matching the other backends
+  - **Int represented as `number`** (float64); faithful below 2**53 (all 7 benchmark values qualify). bigint fidelity for large integers is a documented follow-up (`docs/dev/ts-plan.md` trap #1)
+  - **47 new tests**: unit tests for basics/operators/containers/OOP/comprehensions/control-flow, plus 7 end-to-end Deno execution tests (skipped cleanly when Deno is absent)
+  - Registered in `registry.py`, `preferences.py` (`TypeScriptPreferences`), and the benchmark runner (`scripts/benchmark.py`)
+  - See `docs/dev/ts-plan.md` for the full design (framed as a diff from the Go backend)
+
 ## [0.1.116]
 
 ### Added

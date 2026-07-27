@@ -2,11 +2,11 @@
 
 [Documentation](https://shakfu.github.io/multigen/)
 
-MultiGen is a Python-to-multiple-languages code generator that translates Python code to C, C++, Rust, Go, Haskell, OCaml, and LLVM IR while preserving semantics and performance characteristics.
+MultiGen is a Python-to-multiple-languages code generator that translates Python code to C, C++, Rust, Go, Haskell, OCaml, LLVM IR, and TypeScript while preserving semantics and performance characteristics.
 
 ## Key Features
 
-- **Multi-Language Support**: Generate code for C, C++, Rust, Go, Haskell, OCaml, and LLVM IR
+- **Multi-Language Support**: Generate code for C, C++, Rust, Go, Haskell, OCaml, LLVM IR, and TypeScript
 - **Universal Preference System**: Customize code generation for each backend with language-specific preferences
 - **Advanced Python Support**: Object-oriented programming, comprehensions, string methods, augmented assignment
 - **Modern Libraries**: C++ STL, Rust standard library, Go standard library, Haskell containers, OCaml standard library
@@ -14,8 +14,9 @@ MultiGen is a Python-to-multiple-languages code generator that translates Python
 - **Type-Safe Generation**: Leverages Python type annotations for accurate and safe code translation
 - **Runtime Libraries**: Enhanced C backend with 50KB+ runtime libraries providing Python-like semantics
 - **CLI Interface**: Simple command-line tool with conversion, building, validation (`mgen check`), and batch processing
-- **Production-Ready**: 1353 passing tests ensuring translation accuracy and code quality
+- **Production-Ready**: 1400 passing tests ensuring translation accuracy and code quality
 - **LLVM Backend**: Native compilation via LLVM IR with O0-O3 optimization levels
+- **TypeScript Backend**: Standalone binaries via the Deno toolchain (`deno compile`)
 
 ## Supported Languages
 
@@ -28,6 +29,7 @@ MultiGen is a Python-to-multiple-languages code generator that translates Python
 | Haskell  | Production  | `.hs`     | Cabal / ghc       | Pure functional, comprehensions, type safety | 7/7 (100%) |
 | OCaml    | Production  | `.ml`     | dune / ocamlc     | Functional, pattern matching, mutable refs | 7/7 (100%) |
 | LLVM     | Production  | `.ll`     | llvmlite / clang  | Native compilation, O0-O3 optimization, multi-platform | 7/7 (100%) |
+| TypeScript | Production | `.ts`    | Deno / deno compile | Map/Set containers, native classes, template literals, comprehensions | 7/7 (100%) |
 
 ## Benchmark Results
 
@@ -36,8 +38,8 @@ MultiGen is a Python-to-multiple-languages code generator that translates Python
 ================================================================================
 BENCHMARK SUMMARY
 ================================================================================
-Total: 7 benchmarks × 7 backends = 49 runs
-Success: 49 | Failed: 0
+Total: 7 benchmarks × 8 backends = 56 runs
+Success: 56 | Failed: 0
 
 Backend      Success  Compile (s)  Run (s)      Binary (KB)  LOC
 --------------------------------------------------------------------------------
@@ -48,6 +50,7 @@ haskell      7/7       0.156        0.024035     19944.6      65
 llvm         7/7       0.310        0.251354     49.0         321
 ocaml        7/7       0.234        0.271373     826.3        27
 rust         7/7       0.266        0.250707     443.0        37
+typescript   7/7       0.660        0.803459     66815.6      38
 ===============================================================================
 ```
 
@@ -72,6 +75,8 @@ pip install -e .
 ### Optional Dependencies
 
 MultiGen has zero required dependencies for core functionality (C, C++, Rust, Go, Haskell, OCaml backends). Optional features can be installed as needed:
+
+The LLVM backend needs `llvmlite` (below); the TypeScript backend needs [Deno](https://deno.com/) on the `PATH` to build and run generated code.
 
 ```bash
 # LLVM backend support (native compilation, WebAssembly)
@@ -107,6 +112,9 @@ multigen --target haskell convert my_script.py
 
 # Convert Python to OCaml (with functional programming and pattern matching)
 multigen --target ocaml convert my_script.py
+
+# Convert Python to TypeScript and build a standalone binary (requires Deno)
+multigen --target typescript build my_script.py
 
 # Batch convert all Python files
 multigen --target cpp batch --source-dir ./examples
@@ -630,7 +638,7 @@ multigen clean
 ### Running Tests
 
 ```bash
-make test           # Run all 1353 tests
+make test           # Run all 1400 tests
 make lint           # Run code linting with ruff
 make typecheck      # Run type checking with mypy
 ```
@@ -670,7 +678,7 @@ To add support for a new target language:
 4. Add tests in `tests/test_backend_mylang_*.py`
 5. Update documentation
 
-See existing backends (C, C++, Rust, Go, Haskell, OCaml, LLVM) for implementation examples.
+See existing backends (C, C++, Rust, Go, Haskell, OCaml, LLVM, TypeScript) for implementation examples.
 
 ## Contributing
 
@@ -716,8 +724,8 @@ All backends support core Python features:
 
 MultiGen maintains test coverage ensuring translation accuracy:
 
-- **1353 total tests** across all components and backends
-- **49/49 benchmarks passing** (100%) across all 7 backends
+- **1400 total tests** across all components and backends
+- **56/56 benchmarks passing** (100%) across all 8 backends
 - Comprehensive backend coverage testing all major Python features
 - Test categories: basics, OOP, comprehensions, string methods, augmented assignment, control flow, integration, exception handling, context managers, generators, slicing, f-string format specs
 - All tests passing with zero regressions (100%)
@@ -733,14 +741,14 @@ MultiGen maintains test coverage ensuring translation accuracy:
 - Advanced Python language features: comprehensions, string methods, augmented assignment
 - Complete STC library integration (864KB Smart Template Container library)
 - Architecture consolidation with unified C backend module
-- Professional test organization with 1353 tests in focused, single-responsibility files
+- Professional test organization with 1400 tests in focused, single-responsibility files
 - Universal preference system with language-specific customization
 - Production-ready code generation with clean, efficient output
-- 7 production-ready backends (C++, C, Rust, Go, Haskell, OCaml, LLVM) with 100% benchmark success
+- 8 production-ready backends (C++, C, Rust, Go, Haskell, OCaml, LLVM, TypeScript) with 100% benchmark success
 - Exception handling (try/except/else/finally/raise) across all backends
 - Context managers (with statement) across all backends
 - Generator/yield support (eager collection) across all backends
-- List and string slicing across 6/7 backends
+- List and string slicing across 7/8 backends
 - F-string format specifications across all backends
 - `mgen check` CLI command for validation without conversion
 

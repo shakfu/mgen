@@ -267,6 +267,30 @@ class LLVMPreferences(BackendPreferences):
         )
 
 
+@dataclass
+class TypeScriptPreferences(BackendPreferences):
+    """TypeScript-specific backend preferences."""
+
+    def __post_init__(self) -> None:
+        """Initialize TypeScript-specific default preferences."""
+        self.language_specific.update(
+            {
+                # Toolchain preferences
+                "target": "deno",  # deno compile -> standalone binary
+                "strict": True,  # strict type-checking
+                "module_system": "esm",  # ECMAScript modules
+                # Container preferences
+                "container_dict": "map",  # Map<K,V> (faithful) over object literals
+                "container_set": "set",  # native Set<T>
+                # Code style preferences
+                "naming_convention": "preserved",  # keep snake_case (no CamelCase transform)
+                "int_representation": "number",  # number (float64) vs bigint (see ts-plan trap #1)
+                # Standard library preferences
+                "prefer_runtime": True,  # use multigen_ts_runtime shims for Python semantics
+            }
+        )
+
+
 class PreferencesRegistry:
     """Registry for backend preference classes."""
 
@@ -278,6 +302,7 @@ class PreferencesRegistry:
         "go": GoPreferences,
         "ocaml": OCamlPreferences,
         "llvm": LLVMPreferences,
+        "typescript": TypeScriptPreferences,
     }
 
     @classmethod

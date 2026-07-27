@@ -96,6 +96,14 @@ class BackendRegistry:
         except ImportError:
             pass  # LLVM backend not yet implemented
 
+        # Try to register TypeScript backend
+        try:
+            from .typescript.backend import TypeScriptBackend
+
+            self.register_backend("typescript", TypeScriptBackend)
+        except ImportError:
+            pass  # TypeScript backend not yet implemented
+
 
 # Global registry instance
 registry = BackendRegistry()

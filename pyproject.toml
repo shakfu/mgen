@@ -1,6 +1,6 @@
 [project]
 name = "multigen"
-version = "0.1.116"
+version = "0.2.0"
 authors = [
     { name = "Shakeeb Alireza", email = "shakfu@users.noreply.github.com" }
 ]

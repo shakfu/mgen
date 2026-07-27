@@ -129,6 +129,7 @@ class BenchmarkRunner:
             "haskell": ".hs",
             "ocaml": ".ml",
             "llvm": ".ll",
+            "typescript": ".ts",
         }
         ext = extensions.get(backend)
         if not ext:
@@ -387,6 +388,18 @@ class BenchmarkRunner:
                     "-o", str((output_dir / executable_name).absolute())
                 ]
                 result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    return False, result.stderr[:200]
+                return True, ""
+
+            elif backend == "typescript":
+                # Compile TypeScript code - deno compile to standalone binary
+                cmd = [
+                    "deno", "compile", "--no-check",
+                    "-o", str((output_dir / executable_name).absolute()),
+                    str(source_file.absolute())
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True, cwd=output_dir)
                 if result.returncode != 0:
                     return False, result.stderr[:200]
                 return True, ""
