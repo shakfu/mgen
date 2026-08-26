@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://multigen.readthedocs.io/supported_syntax/">
+        <link rel="canonical" href="https://shakfu.github.io/multigen/supported_syntax/">
       
       
         <link rel="prev" href="../guide/verification/">
       
       
-        <link rel="next" href="../backend_comparison/">
+        <link rel="next" href="../haskell_backend_limitations/">
       
       
         
@@ -527,6 +527,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Syntax
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -544,6 +562,86 @@
 
       </a>
       
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#constructs-with-no-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructs with no rule
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#type-annotations-versus-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type annotations versus values
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Type annotations versus values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diagnostic-identifiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnostic identifiers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -556,7 +654,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../backend_comparison/" class="md-nav__link">
+      <a href="../BACKEND_COMPARISON.md" class="md-nav__link">
         
   
   
@@ -584,7 +682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../backend_selection_guide/" class="md-nav__link">
+      <a href="../BACKEND_SELECTION_GUIDE.md" class="md-nav__link">
         
   
   
@@ -640,7 +738,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../use_cases/" class="md-nav__link">
+      <a href="../USE_CASES.md" class="md-nav__link">
         
   
   
@@ -1131,7 +1229,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev/LLVM_BACKEND_ROADMAP/" class="md-nav__link">
+      <a href="../dev/LLVM_BACKEND_ROADMAP.md" class="md-nav__link">
         
   
   
@@ -1459,6 +1557,75 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#constructs-with-no-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructs with no rule
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#type-annotations-versus-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type annotations versus values
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Type annotations versus values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diagnostic-identifiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnostic identifiers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1478,242 +1645,363 @@
 
 
 <h1 id="supported-python-syntax">Supported Python Syntax<a class="headerlink" href="#supported-python-syntax" title="Permanent link">&para;</a></h1>
-<blockquote>
-<p>What python syntax is not yet implemented?</p>
-</blockquote>
-<p>⏺ Explore(Explore Python syntax support)
-⎿  Done (29 tool uses · 58.5k tokens · 1m 32s)</p>
-<p>⏺ Based on my comprehensive exploration of the MultiGen codebase, here's what
-Python syntax is NOT yet implemented:</p>
-<p>Tier 4: Fundamentally Unsupported (Won't be in v1.0)</p>
-<p>These features are incompatible with static compilation:</p>
-<ol>
-<li>Exception Handling (try/except/finally/raise)</li>
-<li>Requires runtime stack unwinding</li>
-<li>Explicitly marked as NOT_SUPPORTED in subset_validator.py:400-406</li>
-<li>Lambda Functions</li>
-<li>Requires function pointers and runtime closures</li>
-<li>Marked as NOT_SUPPORTED in subset_validator.py:392-398</li>
-<li>Metaclasses</li>
-<li>Requires runtime introspection</li>
-<li>Validated against in subset_validator.py:589</li>
-<li>Duck Typing</li>
-<li>Requires runtime type checks</li>
-<li>Fundamentally incompatible with static compilation</li>
-<li>Dynamic Code Execution (eval, exec, compile, <strong>import</strong>)</li>
-<li>Explicitly forbidden in subset_validator.py:596-601</li>
-</ol>
-<p>Tier 3: Experimental/Planned (Research Required)</p>
-<ol>
-<li>Generators (yield)</li>
-<li>Marked EXPERIMENTAL in subset_validator.py:337-344</li>
-<li>Could be implemented as C state machines</li>
-<li>Listed in PRODUCTION_ROADMAP.md as post-v1.0</li>
-<li>Pattern Matching (match statement, Python 3.10+)</li>
-<li>Marked PLANNED in subset_validator.py:327-335</li>
-<li>Could map to switch statements with guards</li>
-<li>Generic Types (full parameterization)</li>
-<li>Partially supported for type annotations</li>
-<li>Full monomorphization not complete</li>
-</ol>
-<p>Not Implemented (No Support)</p>
-<ol>
-<li>Async/Await</li>
-<li>Not in validator at all</li>
-<li>Incompatible with synchronous C/Rust/Go</li>
-<li>Listed in PRODUCTION_ROADMAP.md:258 as post-v1.0</li>
-<li>Context Managers (with statement)</li>
-<li>Not implemented</li>
-<li>Listed in PRODUCTION_ROADMAP.md:256 as post-v1.0</li>
-<li>Decorators (limited support)</li>
-<li>[x] Supported: @staticmethod, @classmethod, @dataclass</li>
-<li>[X] Not supported: @property, user-defined decorators</li>
-<li>Imports (partial support)</li>
-<li>[x] Supported: import module, from module import name, import ... as alias</li>
-<li>[X] Not supported: Relative imports, star imports (from x import *)</li>
-<li>String Features</li>
-<li>[x] F-strings (basic expressions, no format specs in Phase 1)</li>
-<li>[X] String formatting (%, .format())</li>
-<li>[x] String methods: split, lower, upper, strip, replace, join, etc.</li>
-<li>Built-in Functions (partial)</li>
-<li>[X] Not supported: isinstance, type(), globals(), locals(), getattr, setattr, hasattr, dir</li>
-<li>Class Features (partial)</li>
-<li>[x] Supported: Basic classes, <strong>init</strong>, methods, single inheritance</li>
-<li>[X] Not supported: Multiple inheritance, @property, descriptors, magic methods (beyond <strong>init</strong>)</li>
-<li>Generator Expressions</li>
-<li>(x for x in items) - different from list comprehensions</li>
-<li>Not mentioned in supported features</li>
-<li><strong>List Slicing (partial support)</strong></li>
-<li>[x] <strong>Haskell</strong>: Full support via <code>drop</code>/<code>take</code> (arr[1:], arr[:n], arr[1:n])</li>
-<li>[X] <strong>C, C++, Rust, Go, OCaml, LLVM</strong>: Not yet implemented</li>
-<li><strong>Status</strong>: On roadmap for future implementation</li>
-<li><strong>Workaround</strong>: Use explicit loops or list comprehensions</li>
-<li><strong>Example</strong>: Instead of <code>rest = arr[1:]</code>, use <code>rest = [arr[i] for i in range(1, len(arr))]</code></li>
-</ol>
-<p>Current Support Summary</p>
-<p>Fully Supported:</p>
+<p>MultiGen translates a statically analysable subset of Python. This page is the
+contract for that subset: what the frontend accepts, what it reports, and what
+it refuses.</p>
+<p>Two things decide the outcome for a given construct:</p>
 <ul>
-<li>Functions, classes (basic), control flow (if/while/for/break/continue)</li>
-<li>Type annotations (int, float, str, bool, List, Dict, Set)</li>
-<li>Lists, dicts, sets with operations</li>
-<li>List/dict/set comprehensions</li>
-<li>Augmented assignment (+=, -=, etc.)</li>
-<li>String methods (9+ methods)</li>
-<li>File I/O, path operations</li>
-<li>Module imports (basic)</li>
-<li>OOP (constructors, methods, single inheritance)</li>
+<li><strong>The feature rule</strong> says what the construct means and how well the backends
+  support it. Rules are declared in <code>multigen.frontend.subset_validator</code>.</li>
+<li><strong>The validation profile</strong> says whether that level of support is good enough.
+  <code>portable</code> reports weakly supported constructs and continues; <code>strict-static</code>
+  fails on them.</li>
 </ul>
-<p>Key Limitation: MultiGen focuses on a static, type-annotated subset of Python
-suitable for compilation to systems languages. Dynamic features requiring
-runtime introspection or exception handling are out of scope.</p>
-<p>The roadmap (PRODUCTION_ROADMAP.md:253-282) explicitly states that
-exception handling, context managers, generators, and async/await are
-post-v1.0 features requiring significant research.</p>
-<p>⏺ Based on my review of SUPPORTED_SYNTAX.md and the codebase, here are my
-thoughts on what syntax to implement next, prioritized by impact vs
-complexity:</p>
-<p>High-Impact, Medium Complexity (Recommend These)</p>
-<ol>
-<li>[x] F-strings (Python 3.6+) [x] <strong>IMPLEMENTED in v0.1.86</strong></li>
-</ol>
-<p>Why: Ubiquitous in modern Python, relatively straightforward to implement</p>
-<ul>
-<li>Maps cleanly to string concatenation + type conversion</li>
-<li>C++: std::to_string() + operator+</li>
-<li>Rust: format!() macro</li>
-<li>Go: fmt.Sprintf()</li>
-<li>All backends have string infrastructure already</li>
-<li><strong>Status</strong>: Working in 6/7 backends (C, C++, Rust, Go, Haskell, OCaml)</li>
-<li><strong>Phase 1</strong>: Basic expressions (no format specs)</li>
-<li><strong>Phase 2</strong>: Format specifications (<code>.2f</code>, <code>:03d</code>) - future work</li>
-</ul>
-<p>Example: f"Result: {x}" → "Result: " + std::to_string(x)</p>
-<ol>
-<li>[ ] Tuple Support</li>
-</ol>
-<p>Why: Fundamental data structure, enables multiple returns</p>
-<ul>
-<li>Already have List/Dict/Set infrastructure</li>
-<li>Enables: def foo() -&gt; tuple[int, str]: return (1, "hello")</li>
-<li>Maps to: C++ std::tuple, Rust tuples, Go structs, Haskell tuples</li>
-<li>
-<p>Unblocks many real-world patterns</p>
-</li>
-<li>
-<p>[ ] Pattern Matching (Python 3.10+, marked PLANNED)</p>
-</li>
-</ul>
-<p>Why: Modern Python feature, maps well to switch/case</p>
-<ul>
-<li>Backends already use switch in some places</li>
-<li>C/C++: switch + guards</li>
-<li>Rust: Native match (perfect mapping!)</li>
-<li>Go: Type switches</li>
-<li>Haskell/OCaml: Native pattern matching (perfect!)</li>
-</ul>
-<p>Medium-Impact, Low Complexity (Quick Wins)</p>
-<ol>
-<li>[ ] <strong>List Slicing (arr[1:], arr[:n], arr[start:end])</strong></li>
-</ol>
-<p>Why: Common Python pattern, clean syntax</p>
-<ul>
-<li>[x] <strong>Already working in Haskell</strong> (maps to <code>drop</code>/<code>take</code>)</li>
-<li>Backend mappings straightforward:</li>
-<li>C++: <code>std::vector(begin + start, begin + end)</code> or constructor</li>
-<li>Rust: <code>&amp;arr[start..end]</code> (slices) or <code>.iter().skip(n).take(m)</code></li>
-<li>Go: <code>arr[start:end]</code> (native support!)</li>
-<li>C: Manual copy or pointer arithmetic</li>
-<li>OCaml: <code>List.filteri</code> or recursive approach</li>
-<li>LLVM: Vector operations</li>
-<li><strong>Status</strong>: Haskell complete, other backends pending</li>
-<li><strong>Impact</strong>: Enables functional programming patterns, cleaner algorithm implementations</li>
-<li>
-<p><strong>Example</strong>: <code>rest = arr[1:]</code> instead of manual indexing loops</p>
-</li>
-<li>
-<p>[ ] String Formatting (% and .format())</p>
-</li>
-</ul>
-<p>Why: Legacy support for older codebases</p>
-<ul>
-<li>Similar to f-strings but easier (no expression parsing)</li>
-<li>"Hello %s" % name → string substitution</li>
-<li>
-<p>Less important than f-strings (f-strings preferred)</p>
-</li>
-<li>
-<p>[~] More Built-ins (Partial Support [x])</p>
-</li>
-</ul>
-<p>Why: Incremental improvements, well-defined semantics</p>
-<ul>
-<li>[x] <strong>any()</strong>: IMPLEMENTED in v0.1.87 (boolean reduction: returns True if any element is True)</li>
-<li>[x] <strong>all()</strong>: IMPLEMENTED in v0.1.87 (boolean reduction: returns True if all elements are True)</li>
-<li>[ ] enumerate(): Easy, just counter + loop (requires tuple support)</li>
-<li>[ ] zip(): Easy, parallel iteration (requires tuple support)</li>
-<li>[ ] reversed(): Easy, reverse iteration</li>
-<li>
-<p>Already have infrastructure for built-ins</p>
-</li>
-<li>
-<p>[ ] @property Decorator</p>
-</li>
-</ul>
-<p>Why: Common OOP pattern, syntactic sugar</p>
-<ul>
-<li>Maps to getter/setter methods</li>
-<li>C++: Member functions</li>
-<li>Rust: Impl methods</li>
-<li>Most backends already support methods</li>
-</ul>
-<p>Lower Priority (Post-v1.0 per roadmap)</p>
-<ol>
-<li>Context Managers (with statement)</li>
-</ol>
-<p>Why: Useful but complex (RAII, cleanup, exception integration)</p>
-<ul>
-<li>Requires: Resource cleanup semantics</li>
-<li>C++: RAII destructors</li>
-<li>Rust: Drop trait</li>
-<li>
-<p>Blocked until exception handling decision made</p>
-</li>
-<li>
-<p>Generators (yield, marked EXPERIMENTAL)</p>
-</li>
-</ul>
-<p>Why: Powerful but requires state machines</p>
-<ul>
-<li>Maps to: Iterator protocol, coroutines, state machines</li>
-<li>Significant backend work required</li>
-<li>See roadmap: post-v1.0</li>
-</ul>
-<p>My Recommendation</p>
-<p>Top 3 priorities for next implementation:</p>
-<ol>
-<li>~~F-strings~~ [x] <strong>COMPLETED in v0.1.86</strong></li>
-<li>Tuple support - Enables multiple returns, unlocks real-world patterns,
-clean backend mapping</li>
-<li>Pattern matching - Future-proof (Python 3.10+), perfect mapping to
-Rust/Haskell/OCaml, sets MultiGen apart</li>
-</ol>
-<p>Rationale:</p>
-<ul>
-<li>~~F-strings~~: [x] <strong>DONE</strong> - Working in 6/7 backends with smart type conversion</li>
-<li>Tuples: Essential for idiomatic Python (multiple returns, unpacking).
-Backend support is straightforward.</li>
-<li>Pattern matching: Differentiates MultiGen as a "modern Python" compiler.
-Rust/Haskell/OCaml backends would shine here.</li>
-</ul>
-<p>Avoid for now: Context managers, generators, async/await (as roadmap
-indicates - need more research, exception handling dependencies)</p>
-<p><strong>Updated Priority (Post v0.1.87):</strong></p>
-<ol>
-<li><strong>List slicing</strong> - Already working in Haskell, straightforward backend mappings, high-impact for algorithms</li>
-<li><strong>Tuple support</strong> - Enables multiple returns, unlocks real-world patterns</li>
-<li><strong>Pattern matching</strong> - Leverage backend strengths (Rust/Haskell/OCaml), future-proof for Python 3.10+</li>
-<li><strong>More built-ins</strong> (enumerate, zip, reversed) - Quick wins, requires tuple support for enumerate/zip</li>
-</ol>
+<p>Check a file against a profile with:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>multigen<span class="w"> </span>check<span class="w"> </span>--profile<span class="w"> </span>strict-static<span class="w"> </span>program.py
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>multigen<span class="w"> </span>check<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>program.py
+</code></pre></div>
+<p>The same profile applies during translation, via <code>--profile</code> on <code>convert</code> and
+<code>build</code>, or <code>PipelineConfig(validation_profile=...)</code>. Validation runs in phase 1,
+so a rejected construct never reaches a backend.</p>
+<h2 id="constructs-with-no-rule">Constructs with no rule<a class="headerlink" href="#constructs-with-no-rule" title="Permanent link">&para;</a></h2>
+<p>The validator is an allowlist. A construct that no rule classifies is rejected
+rather than passed through, because a backend given an unclassified construct
+may drop it silently. <code>async def</code>, <code>await</code>, <code>global</code> at module scope, <code>nonlocal</code>,
+the walrus operator and <code>del</code> are rejected on these grounds.</p>
+<h2 id="type-annotations-versus-values">Type annotations versus values<a class="headerlink" href="#type-annotations-versus-values" title="Permanent link">&para;</a></h2>
+<p>Some node types mean different things by position. <code>dict[str, int]</code> and
+<code>(3, 4)</code> are both tuples to Python's parser, but the first is type syntax every
+backend handles and the second is a runtime value that only the TypeScript
+backend builds. Rules that describe runtime constructs are not applied inside
+type annotations.</p>
+<!-- BEGIN GENERATED: feature-support -->
+
+<!-- Generated from the feature registry. Do not edit by hand:
+     run `make docs-syntax` after changing a rule or a profile. -->
+
+<h3 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Profile</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>portable</code></td>
+<td>The common subset across the supported targets. Reports weakly inferred types and experimental features without failing on them.</td>
+</tr>
+<tr>
+<td><code>strict-static</code></td>
+<td>The conservative statically translatable subset. Fails on anything whose type could not be established, on any construct that is only experimentally supported, and on generators and exceptions, whose semantics the backends do not fully model.</td>
+</tr>
+</tbody>
+</table>
+<p>A feature is <strong>accepted</strong> when a profile allows it, <strong>warned</strong> when it is
+reported but not fatal, and <strong>rejected</strong> when it fails validation.</p>
+<h3 id="feature-support">Feature support<a class="headerlink" href="#feature-support" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Tier</th>
+<th>Declared status</th>
+<th>portable</th>
+<th>strict-static</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Arithmetic Operations</td>
+<td>1 - fundamental</td>
+<td>FULLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>Basic arithmetic and comparison operations</td>
+</tr>
+<tr>
+<td>Basic Types</td>
+<td>1 - fundamental</td>
+<td>FULLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>Basic Python types: int, float, bool, str</td>
+</tr>
+<tr>
+<td>Control Flow</td>
+<td>1 - fundamental</td>
+<td>FULLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>Basic control flow: if/else, while, for with range/containers, assert statements</td>
+</tr>
+<tr>
+<td>F-Strings</td>
+<td>1 - fundamental</td>
+<td>FULLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>F-string literals for string formatting. Format specs: .Nf, d, x, X, o, e, E, %; No conversion flags (!r, !s, !a)</td>
+</tr>
+<tr>
+<td>Function Calls</td>
+<td>1 - fundamental</td>
+<td>FULLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>Static function calls (no eval/exec)</td>
+</tr>
+<tr>
+<td>Function Definitions</td>
+<td>1 - fundamental</td>
+<td>FULLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>Type-annotated function definitions. Must have type annotations; No decorators except allowed ones</td>
+</tr>
+<tr>
+<td>Variable Declarations</td>
+<td>1 - fundamental</td>
+<td>FULLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>Annotated variable declarations</td>
+</tr>
+<tr>
+<td>Context Managers</td>
+<td>2 - structured</td>
+<td>PARTIALLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>Basic with statement for file I/O (single context manager). Single context manager only; File operations only; Requires 'as' binding</td>
+</tr>
+<tr>
+<td>Data Classes</td>
+<td>2 - structured</td>
+<td>FULLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>Dataclasses mapped to C structs</td>
+</tr>
+<tr>
+<td>Enumerations</td>
+<td>2 - structured</td>
+<td>PLANNED</td>
+<td>rejected</td>
+<td>rejected</td>
+<td>Python enums mapped to C enums</td>
+</tr>
+<tr>
+<td>Exception Handling</td>
+<td>2 - structured</td>
+<td>PARTIALLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>try/except/else/finally for explicitly raised exceptions. Operations do not raise: a ZeroDivisionError or IndexError crashes instead of reaching the handler. No exception chaining (raise ... from ...)</td>
+</tr>
+<tr>
+<td>Generator Expressions</td>
+<td>2 - structured</td>
+<td>FULLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>Generator expressions normalized to list comprehensions (eager collection)</td>
+</tr>
+<tr>
+<td>Generator Functions</td>
+<td>2 - structured</td>
+<td>PARTIALLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>Generator functions with yield/yield from (eager collection to list). No .send() or .throw()</td>
+</tr>
+<tr>
+<td>Lists</td>
+<td>2 - structured</td>
+<td>PARTIALLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>Lists as arrays with size tracking. Fixed size or bounded growth; Homogeneous element types</td>
+</tr>
+<tr>
+<td>Named Tuples</td>
+<td>2 - structured</td>
+<td>FULLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>NamedTuple classes mapped to C structs</td>
+</tr>
+<tr>
+<td>Tuples</td>
+<td>2 - structured</td>
+<td>NOT_SUPPORTED</td>
+<td>rejected</td>
+<td>rejected</td>
+<td>Tuple values are not translatable; tuples in type annotations are</td>
+</tr>
+<tr>
+<td>Union Types</td>
+<td>2 - structured</td>
+<td>EXPERIMENTAL</td>
+<td>warned</td>
+<td>rejected</td>
+<td>Union types as tagged unions</td>
+</tr>
+<tr>
+<td>Yield From</td>
+<td>2 - structured</td>
+<td>PARTIALLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>yield from for extending accumulator with iterable (eager collection). Function calls, range(), and variables only; No .send() or .throw()</td>
+</tr>
+<tr>
+<td>Comprehensions</td>
+<td>3 - advanced</td>
+<td>FULLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>List, dict, and set comprehensions converted to C loops with STC containers</td>
+</tr>
+<tr>
+<td>Generic Types</td>
+<td>3 - advanced</td>
+<td>PARTIALLY_SUPPORTED</td>
+<td>accepted</td>
+<td>accepted</td>
+<td>Generic types via monomorphization (not supported by the LLVM backend)</td>
+</tr>
+<tr>
+<td>Pattern Matching</td>
+<td>3 - advanced</td>
+<td>PLANNED</td>
+<td>rejected</td>
+<td>rejected</td>
+<td>Python 3.10+ match statements</td>
+</tr>
+<tr>
+<td>Duck Typing</td>
+<td>4 - unsupported</td>
+<td>NOT_SUPPORTED</td>
+<td>rejected</td>
+<td>rejected</td>
+<td>Duck typing requires runtime type checks</td>
+</tr>
+<tr>
+<td>Lambda Functions</td>
+<td>4 - unsupported</td>
+<td>NOT_SUPPORTED</td>
+<td>rejected</td>
+<td>rejected</td>
+<td>Lambda functions require function pointer support</td>
+</tr>
+<tr>
+<td>Metaclasses</td>
+<td>4 - unsupported</td>
+<td>NOT_SUPPORTED</td>
+<td>rejected</td>
+<td>rejected</td>
+<td>Metaclasses require runtime introspection</td>
+</tr>
+</tbody>
+</table>
+<h3 id="diagnostic-identifiers">Diagnostic identifiers<a class="headerlink" href="#diagnostic-identifiers" title="Permanent link">&para;</a></h3>
+<p>These are stable and append-only: they appear in <code>--format json</code> output
+and are safe to filter on.</p>
+<table>
+<thead>
+<tr>
+<th>Identifier</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>STATIC.ANALYSIS_ERROR</code></td>
+<td>Analysis error</td>
+</tr>
+<tr>
+<td><code>STATIC.ANALYSIS_WARNING</code></td>
+<td>Analysis warning</td>
+</tr>
+<tr>
+<td><code>STATIC.BACKEND_UNSUPPORTED</code></td>
+<td>Backend unsupported</td>
+</tr>
+<tr>
+<td><code>STATIC.CONSTRAINT_VIOLATION</code></td>
+<td>Constraint violation</td>
+</tr>
+<tr>
+<td><code>STATIC.CONTEXT_MANAGER_BINDING</code></td>
+<td>Context manager binding</td>
+</tr>
+<tr>
+<td><code>STATIC.EXCEPTION_CHAINING</code></td>
+<td>Exception chaining</td>
+</tr>
+<tr>
+<td><code>STATIC.EXPERIMENTAL_FEATURE</code></td>
+<td>Experimental feature</td>
+</tr>
+<tr>
+<td><code>STATIC.FEATURE_NOT_IMPLEMENTED</code></td>
+<td>Feature not implemented</td>
+</tr>
+<tr>
+<td><code>STATIC.FSTRING_CONVERSION_FLAG</code></td>
+<td>Fstring conversion flag</td>
+</tr>
+<tr>
+<td><code>STATIC.FSTRING_FORMAT_SPEC</code></td>
+<td>Fstring format spec</td>
+</tr>
+<tr>
+<td><code>STATIC.LOW_CONFIDENCE_TYPE</code></td>
+<td>Low confidence type</td>
+</tr>
+<tr>
+<td><code>STATIC.MISSING_RETURN_ANNOTATION</code></td>
+<td>Missing return annotation</td>
+</tr>
+<tr>
+<td><code>STATIC.MULTIPLE_CONTEXT_MANAGERS</code></td>
+<td>Multiple context managers</td>
+</tr>
+<tr>
+<td><code>STATIC.SYNTAX_ERROR</code></td>
+<td>Syntax error</td>
+</tr>
+<tr>
+<td><code>STATIC.UNANNOTATED_PARAMETER</code></td>
+<td>Unannotated parameter</td>
+</tr>
+<tr>
+<td><code>STATIC.UNKNOWN_TYPE</code></td>
+<td>Unknown type</td>
+</tr>
+<tr>
+<td><code>STATIC.UNRECOGNIZED_CONSTRUCT</code></td>
+<td>Unrecognized construct</td>
+</tr>
+<tr>
+<td><code>STATIC.UNSUPPORTED_DECORATOR</code></td>
+<td>Unsupported decorator</td>
+</tr>
+<tr>
+<td><code>STATIC.UNSUPPORTED_FEATURE</code></td>
+<td>Unsupported feature</td>
+</tr>
+<tr>
+<td><code>STATIC.UNSUPPORTED_YIELD_FROM</code></td>
+<td>Unsupported yield from</td>
+</tr>
+</tbody>
+</table>
+<p>Universal constraint checks keep their own codes under the <code>CONSTRAINT.</code> prefix.</p>
+<!-- END GENERATED: feature-support -->
 
 
 

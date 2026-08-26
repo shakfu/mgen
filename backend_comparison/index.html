@@ -10,13 +10,9 @@
       
       
       
-        <link rel="canonical" href="https://multigen.readthedocs.io/backend_comparison/">
+        <link rel="canonical" href="https://shakfu.github.io/multigen/backend_comparison/">
       
       
-        <link rel="prev" href="../supported_syntax/">
-      
-      
-        <link rel="next" href="../backend_selection_guide/">
       
       
         
@@ -27,7 +23,7 @@
     
     
       
-        <title>Backend Comparison - MultiGen Documentation</title>
+        <title>MultiGen Backend Comprehensive Comparison - MultiGen Documentation</title>
       
     
     
@@ -116,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Backend Comparison
+              MultiGen Backend Comprehensive Comparison
             
           </span>
         </div>
@@ -461,8 +457,6 @@
       
   
   
-    
-  
   
   
     
@@ -475,11 +469,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -500,7 +496,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -543,37 +539,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Backend Comparison
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../BACKEND_COMPARISON.md" class="md-nav__link">
         
   
   
@@ -589,609 +558,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#executive-summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Executive Summary
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#container-type-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Container Type Support
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#container-methods-lists" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Container Methods - Lists
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Container Methods - Lists">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#missing-list-methods-all-backends" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Missing List Methods (All Backends)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#container-methods-dicts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Container Methods - Dicts
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Container Methods - Dicts">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#missing-dict-methods-most-backends" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Missing Dict Methods (Most Backends)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#container-methods-sets" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Container Methods - Sets
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Container Methods - Sets">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#missing-set-methods-most-backends" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Missing Set Methods (Most Backends)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#string-operations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        String Operations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="String Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#missing-string-methods-most-backends" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Missing String Methods (Most Backends)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#built-in-functions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Built-in Functions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Built-in Functions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#missing-built-in-functions-most-backends" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Missing Built-in Functions (Most Backends)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#comprehensions-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Comprehensions Support
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#performance-metrics-from-benchmark-suite" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Performance Metrics (from benchmark suite)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Performance Metrics (from benchmark suite)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#execution-time-average" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution Time (Average)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#compilation-time-average" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compilation Time (Average)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#binary-size-average" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Binary Size (Average)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#generated-code-size-lines-of-code" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Generated Code Size (Lines of Code)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#special-features-characteristics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Special Features &amp; Characteristics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Special Features &amp; Characteristics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#c-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        C++ Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#c-backend_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        C Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rust-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rust Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#go-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Go Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#haskell-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Haskell Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ocaml-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        OCaml Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#llvm-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        LLVM Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#benchmark-results-summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Benchmark Results Summary
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Benchmark Results Summary">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#overall-success-rates" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overall Success Rates
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#benchmark-breakdown" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Benchmark Breakdown
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#type-inference-capabilities" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Type Inference Capabilities
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#design-patterns-by-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Design Patterns by Backend
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#memory-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Memory Management
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advanced-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Advanced Features
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-limitations-all-backends" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Limitations (All Backends)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Limitations (All Backends)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#not-implemented" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Not Implemented
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#partially-implemented" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Partially Implemented
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#recommendations-by-use-case" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recommendations by Use Case
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Recommendations by Use Case">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#for-production-deployments" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Production Deployments
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#for-development-speed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Development Speed
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#for-safety-critical-systems" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Safety-Critical Systems
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#for-functional-programming" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Functional Programming
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#for-embeddedsystems" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Embedded/Systems
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#for-researchexperimentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Research/Experimentation
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#feature-completion-roadmap" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Feature Completion Roadmap
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Feature Completion Roadmap">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#near-term-v01x-v02x" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Near Term (v0.1.x - v0.2.x)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#long-term-v03x" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Long Term (v0.3.x+)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#conclusion" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Conclusion
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1204,7 +570,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../backend_selection_guide/" class="md-nav__link">
+      <a href="../BACKEND_SELECTION_GUIDE.md" class="md-nav__link">
         
   
   
@@ -1260,7 +626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../use_cases/" class="md-nav__link">
+      <a href="../USE_CASES.md" class="md-nav__link">
         
   
   
@@ -1751,7 +1117,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev/LLVM_BACKEND_ROADMAP/" class="md-nav__link">
+      <a href="../dev/LLVM_BACKEND_ROADMAP.md" class="md-nav__link">
         
   
   

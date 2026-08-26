@@ -10,13 +10,9 @@
       
       
       
-        <link rel="canonical" href="https://multigen.readthedocs.io/backend_selection_guide/">
+        <link rel="canonical" href="https://shakfu.github.io/multigen/backend_selection_guide/">
       
       
-        <link rel="prev" href="../backend_comparison/">
-      
-      
-        <link rel="next" href="../haskell_backend_limitations/">
       
       
         
@@ -461,8 +457,6 @@
       
   
   
-    
-  
   
   
     
@@ -475,11 +469,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -500,7 +496,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -546,7 +542,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../backend_comparison/" class="md-nav__link">
+      <a href="../BACKEND_COMPARISON.md" class="md-nav__link">
         
   
   
@@ -571,37 +567,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Backend Selection Guide
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../BACKEND_SELECTION_GUIDE.md" class="md-nav__link">
         
   
   
@@ -617,419 +586,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#quick-decision-tree" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Decision Tree
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#production-ready-backends-77-benchmarks-x" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Production-Ready Backends (7/7 Benchmarks [x])
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Production-Ready Backends (7/7 Benchmarks [x])">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#c-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        C++ Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#c-backend_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        C Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rust-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rust Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#go-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Go Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ocaml-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        OCaml Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#llvm-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        LLVM Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#functionally-complete-backend-67-benchmarks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Functionally Complete Backend (6/7 Benchmarks)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Functionally Complete Backend (6/7 Benchmarks)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#haskell-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Haskell Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#backend-comparison-matrix" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Backend Comparison Matrix
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#recommendation-by-use-case" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recommendation by Use Case
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Recommendation by Use Case">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#embedded-systems-iot" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Embedded Systems / IoT
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#web-services-apis" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Web Services / APIs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#performance-critical-applications" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Performance-Critical Applications
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cli-tools-devops" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CLI Tools / DevOps
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cross-platform-multi-target" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cross-Platform / Multi-Target
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#academic-research" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Academic / Research
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#integration-with-existing-code" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Integration with Existing Code
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#webassembly" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        WebAssembly
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#performance-benchmarks-all-77-backends" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Performance Benchmarks (All 7/7 Backends)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Performance Benchmarks (All 7/7 Backends)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#fibonacci-recursive" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fibonacci (Recursive)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#matrix-multiplication-2d-arrays" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Matrix Multiplication (2D Arrays)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#quicksort-lists" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quicksort (Lists)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#string-operations-wordcount" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        String Operations (Wordcount)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-start-examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Start Examples
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Quick Start Examples">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#c-small-binary-fast-execution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        C++ - Small Binary, Fast Execution
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#llvm-maximum-performance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        LLVM - Maximum Performance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#go-fast-iteration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Go - Fast Iteration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rust-memory-safety" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rust - Memory Safety
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#migration-path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Migration Path
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#getting-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Help
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1070,7 +626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../use_cases/" class="md-nav__link">
+      <a href="../USE_CASES.md" class="md-nav__link">
         
   
   
@@ -1561,7 +1117,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev/LLVM_BACKEND_ROADMAP/" class="md-nav__link">
+      <a href="../dev/LLVM_BACKEND_ROADMAP.md" class="md-nav__link">
         
   
   
