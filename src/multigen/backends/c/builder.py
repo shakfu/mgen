@@ -6,6 +6,12 @@ from typing import Any, Optional
 from ...common.makefilegen import MakefileGenerator
 from ..base import AbstractBuilder
 
+# The runtime uses strdup and other POSIX functions across a dozen headers.
+# Bare -std=c11 is strict ISO C, where those are not declared, so any generated
+# program touching a string-keyed map failed to build on an implicit
+# declaration. Requesting POSIX keeps ISO C11 semantics and declares them.
+_POSIX_FEATURE_TEST = "-D_POSIX_C_SOURCE=200809L"
+
 
 class CBuilder(AbstractBuilder):
     """C build system implementation with integrated runtime libraries."""
@@ -66,7 +72,7 @@ class CBuilder(AbstractBuilder):
         paths = self._resolve_paths(source_file, output_dir)
 
         # Build gcc command with base flags
-        cmd = ["gcc", "-Wall", "-Wextra", "-std=c11", "-O2"]
+        cmd = ["gcc", "-Wall", "-Wextra", "-std=c11", _POSIX_FEATURE_TEST, "-O2"]
 
         # Add MultiGen runtime support if available
         if self._runtime_dir:
@@ -84,7 +90,7 @@ class CBuilder(AbstractBuilder):
 
     def get_compile_flags(self) -> list[str]:
         """Get C compilation flags including MultiGen runtime support."""
-        flags = ["-Wall", "-Wextra", "-std=c11", "-O2"]
+        flags = ["-Wall", "-Wextra", "-std=c11", _POSIX_FEATURE_TEST, "-O2"]
 
         if self._runtime_dir:
             flags.append(f"-I{self._runtime_dir}")

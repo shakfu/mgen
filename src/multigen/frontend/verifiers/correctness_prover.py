@@ -6,6 +6,7 @@ preconditions, postconditions, loop invariants, and functional specifications.
 
 import ast
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
@@ -333,20 +334,15 @@ class CorrectnessProver:
                 z3_formula="mock_formula",
             )
 
-        # Create a simple ranking function based on loop variable
-        loop_var = loop_info.get("variable", "i")
-        ranking_var = z3.Int(f"ranking_{loop_var}")
-
-        # Ranking function must be non-negative and decrease each iteration
-        ranking_formula: Any = z3.And(
-            ranking_var >= 0,
-            # Additional constraints would be added based on loop analysis
-        )
+        # A ranking function requires a transition relation between loop
+        # iterations. The extractor does not provide one, so fail closed
+        # rather than claiming that non-negativity alone proves termination.
+        ranking_formula: Any = z3.BoolVal(False)
 
         return ProofProperty(
             name=f"ranking_function_loop_{loop_info.get('line', 'unknown')}",
             property_type=PropertyType.TERMINATION,
-            description="Ranking function ensures loop termination",
+            description="Ranking function could not be established from the available loop transition data",
             z3_formula=ranking_formula,
             context={"loop_info": loop_info},
         )
@@ -375,9 +371,111 @@ class CorrectnessProver:
         if not self.z3_available:
             return "mock_formula"
 
-        # Simplified parser - in practice, this would be more sophisticated
-        # For now, return a placeholder formula
-        return z3.Bool(f"condition_{hash(condition) % 1000}")
+        try:
+            expression = ast.parse(condition, mode="eval").body
+            formula = self._ast_expression_to_z3(expression, expect_bool=True, declared={})
+            if not z3.is_bool(formula):
+                raise ValueError("specification does not denote a Boolean condition")
+            return formula
+        except (SyntaxError, ValueError, TypeError, z3.Z3Exception):
+            # Never turn an unsupported specification into an unconstrained
+            # Boolean. A false formula makes the attempted proof fail closed.
+            # Z3Exception covers sort mismatches that only show up once the
+            # translated sub-expressions are combined.
+            return z3.BoolVal(False)
+
+    def _ast_expression_to_z3(
+        self,
+        expression: ast.AST,
+        expect_bool: bool = False,
+        declared: Optional[dict[str, str]] = None,
+    ) -> Any:
+        """Translate the supported Python expression subset to Z3.
+
+        ``expect_bool`` records whether the surrounding syntax requires a
+        Boolean, which decides the sort of a bare name. ``declared`` tracks the
+        sort already chosen for each name, so a specification that uses one name
+        as both an integer and a Boolean is rejected instead of being translated
+        into two unrelated Z3 constants that happen to share a printed name.
+        """
+        if declared is None:
+            declared = {}
+
+        if isinstance(expression, ast.Constant):
+            if isinstance(expression.value, bool):
+                return z3.BoolVal(expression.value)
+            if isinstance(expression.value, (int, float)):
+                return (
+                    z3.RealVal(expression.value) if isinstance(expression.value, float) else z3.IntVal(expression.value)
+                )
+            if isinstance(expression.value, str):
+                return z3.StringVal(expression.value)
+        if isinstance(expression, ast.Name):
+            # Specifications are written by hand and use both Python and
+            # SMT-style spellings of the Boolean constants.
+            if expression.id in ("True", "true"):
+                return z3.BoolVal(True)
+            if expression.id in ("False", "false"):
+                return z3.BoolVal(False)
+            sort = "bool" if expect_bool else "int"
+            if declared.setdefault(expression.id, sort) != sort:
+                raise ValueError(f"name '{expression.id}' is used with conflicting sorts")
+            return z3.Bool(expression.id) if expect_bool else z3.Int(expression.id)
+        if isinstance(expression, ast.UnaryOp):
+            if isinstance(expression.op, ast.Not):
+                return z3.Not(self._ast_expression_to_z3(expression.operand, True, declared))
+            operand = self._ast_expression_to_z3(expression.operand, False, declared)
+            if isinstance(expression.op, ast.USub):
+                return -operand
+            if isinstance(expression.op, ast.UAdd):
+                return operand
+        if isinstance(expression, ast.BoolOp):
+            values = [self._ast_expression_to_z3(value, True, declared) for value in expression.values]
+            if isinstance(expression.op, ast.And):
+                return z3.And(values)
+            if isinstance(expression.op, ast.Or):
+                return z3.Or(values)
+        if isinstance(expression, ast.BinOp):
+            left = self._ast_expression_to_z3(expression.left, False, declared)
+            right = self._ast_expression_to_z3(expression.right, False, declared)
+            operators: dict[type[ast.operator], Callable[[], Any]] = {
+                ast.Add: lambda: left + right,
+                ast.Sub: lambda: left - right,
+                ast.Mult: lambda: left * right,
+                ast.Div: lambda: left / right,
+                ast.FloorDiv: lambda: left / right,
+                ast.Mod: lambda: left % right,
+            }
+            for operator_type, operation in operators.items():
+                if isinstance(expression.op, operator_type):
+                    return operation()
+        if isinstance(expression, ast.Compare):
+            left = self._ast_expression_to_z3(expression.left, False, declared)
+            comparisons = []
+            for operator, comparator in zip(expression.ops, expression.comparators):
+                right = self._ast_expression_to_z3(comparator, False, declared)
+                # Distinct name from the binary-operator table above: reusing
+                # one name in the same scope conflates the two value types.
+                comparison_operators = {
+                    ast.Eq: left == right,
+                    ast.NotEq: left != right,
+                    ast.Lt: left < right,
+                    ast.LtE: left <= right,
+                    ast.Gt: left > right,
+                    ast.GtE: left >= right,
+                }
+                for comparison_type, comparison in comparison_operators.items():
+                    if isinstance(operator, comparison_type):
+                        comparisons.append(comparison)
+                        break
+                else:
+                    raise ValueError("unsupported comparison")
+                left = right
+            return z3.And(comparisons)
+        if isinstance(expression, ast.Call) and isinstance(expression.func, ast.Name) and expression.func.id == "len":
+            if len(expression.args) == 1 and isinstance(expression.args[0], ast.Name):
+                return z3.Int(f"len_{expression.args[0].id}")
+        raise ValueError("unsupported specification expression")
 
     def _extract_function_name(self, context: AnalysisContext) -> str:
         """Extract function name from context."""

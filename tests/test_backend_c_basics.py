@@ -60,6 +60,20 @@ def get_message() -> str:
         assert "char* get_message(void)" in c_code
         assert '"Hello, World!"' in c_code
 
+    def test_range_uses_direction_of_step(self):
+        """Negative-step ranges must count down rather than use a fixed '<'."""
+        python_code = """
+def count_down() -> int:
+    total: int = 0
+    for i in range(5, 0, -1):
+        total += i
+    return total
+"""
+        c_code = self.converter.convert_code(python_code)
+
+        assert ") > 0 ?" in c_code
+        assert "i > 0" in c_code
+
     def test_boolean_values(self):
         """Test boolean constant handling."""
         python_code = """

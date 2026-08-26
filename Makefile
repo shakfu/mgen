@@ -3,8 +3,8 @@ BENCHMARK_RESULTS_DIR := build/benchmark_results
 # Makefile for MultiGen development
 
 .PHONY: help install test test-unit test-integration test-translation \
-		test-py2c test-benchmark test-build test-memory-llvm clean lint format typecheck \
-		build docs docs-clean docs-serve docs-deploy benchmark benchmark-algorithms \
+		test-py2c test-benchmark test-build test-memory-llvm clean lint lint-fix format format-check typecheck \
+		build docs docs-clean docs-serve docs-deploy docs-syntax capabilities benchmark benchmark-algorithms \
 		benchmark-data-structures benchmark-report benchmark-clean qa snap \
 		check publish-test publish
 
@@ -37,7 +37,8 @@ help:
 	@echo "  benchmark-clean        Clean benchmark results"
 	@echo ""
 	@echo "Code Quality:"
-	@echo "  lint          Run ruff linting"
+	@echo "  lint          Run ruff linting (check only)"
+	@echo "  lint-fix      Run ruff linting and apply fixes"
 	@echo "  format        Format code with ruff and isort"
 	@echo "  format-check  Check code formatting without changes"
 	@echo "  typecheck     Run mypy type checking"
@@ -53,6 +54,8 @@ help:
 	@echo ""
 	@echo "Documentation:"
 	@echo "  docs          Build MkDocs documentation"
+	@echo "  docs-syntax   Regenerate docs/supported_syntax.md from the feature registry"
+	@echo "  capabilities  Re-measure what each backend supports"
 	@echo "  docs-clean    Clean documentation build"
 	@echo "  docs-serve    Serve documentation locally"
 	@echo "  docs-deploy   Deploy documentation to GitHub Pages"
@@ -103,9 +106,12 @@ snap:
 	@git add --all . && git commit -m 'snap' && git push
 
 # Code quality
-qa: test lint typecheck format
+qa: test lint typecheck format-check
 
 lint:
+	@uv run ruff check src
+
+lint-fix:
 	@uv run ruff check --fix src
 
 format:
@@ -156,6 +162,12 @@ publish: check
 	@echo "Install with: pip install multigen"
 
 # Documentation
+docs-syntax:
+	@uv run python scripts/generate_supported_syntax.py
+
+capabilities:
+	@uv run python scripts/generate_capability_matrix.py
+
 docs:
 	@echo "Building MkDocs documentation..."
 	@uv run mkdocs build

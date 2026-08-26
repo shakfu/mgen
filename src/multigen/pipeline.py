@@ -63,14 +63,18 @@ try:
         VectorizationDetector,
         analyze_python_code,
     )
-    from .frontend.base import AnalysisLevel
-    from .frontend.base import OptimizationLevel as FrontendOptimizationLevel
+    from .frontend.base import AnalysisLevel, OptimizationLevel as FrontendOptimizationLevel
     from .frontend.python_constraints import PythonConstraintChecker
+    from .frontend.static_profile import DEFAULT_PROFILE, get_profile
+    from .frontend.static_validation import StaticValidator
 
     FRONTEND_AVAILABLE = True
 except ImportError:
     # Fallback if frontend components not available
     FRONTEND_AVAILABLE = False
+
+# Named here so PipelineConfig has a default even without the frontend.
+DEFAULT_VALIDATION_PROFILE = DEFAULT_PROFILE.name if FRONTEND_AVAILABLE else "portable"
 
 # Import Z3 for formal verification (optional)
 try:
@@ -132,6 +136,8 @@ class PipelineConfig:
     libraries: Optional[list[str]] = None
     enable_advanced_analysis: bool = True
     enable_optimizations: bool = True
+    # Policy the source is judged against in Phase 1. See frontend.static_profile.
+    validation_profile: str = DEFAULT_VALIDATION_PROFILE
     enable_formal_verification: bool = False  # Z3-based formal verification (optional)
     strict_verification: bool = (
         False  # Halt code generation on verification failures (requires enable_formal_verification)
@@ -258,6 +264,10 @@ class MultiGenPipeline:
         # Initialize frontend analysis components if available
         if FRONTEND_AVAILABLE and self.config.enable_advanced_analysis:
             self.subset_validator = StaticPythonSubsetValidator()
+            # One pass over one parse, judged against the configured profile.
+            # An unknown name is a configuration error, so fail at construction
+            # rather than midway through a conversion.
+            self.static_validator = StaticValidator(get_profile(self.config.validation_profile))
             # Note: constraint_checker deprecated in v0.1.64 (replaced by PythonConstraintChecker + backend-specific checkers)
             self.ast_analyzer = ASTAnalyzer()
 
@@ -270,6 +280,12 @@ class MultiGenPipeline:
             # Flow-sensitive type inference
             self.type_inference_engine = TypeInferenceEngine(enable_flow_sensitive=True)
 
+            # Assign None first so these stay Optional: every later phase has
+            # to cope with optimizers that were never built.
+            self.compile_time_evaluator = None
+            self.loop_analyzer = None
+            self.function_specializer = None
+            self.vectorization_detector = None
             if self.config.enable_optimizations:
                 self.compile_time_evaluator = CompileTimeEvaluator()
                 self.loop_analyzer = LoopAnalyzer()
@@ -307,6 +323,16 @@ class MultiGenPipeline:
                 self.theorem_prover = None
         else:
             self.log.debug("Using simplified analysis pipeline")
+            # Optimizers and verification components are only built under
+            # advanced analysis, but later phases still probe them, so define
+            # them unconditionally instead of raising AttributeError.
+            self.compile_time_evaluator = None
+            self.loop_analyzer = None
+            self.function_specializer = None
+            self.vectorization_detector = None
+            self.bounds_prover = None
+            self.correctness_prover = None
+            self.theorem_prover = None
 
     def convert(self, input_path: Union[str, Path], output_path: Optional[Union[str, Path]] = None) -> PipelineResult:
         """Convert Python module through complete pipeline.
@@ -420,18 +446,56 @@ class MultiGenPipeline:
             # Parse AST for validation
             ast.parse(source_code)
 
-            if FRONTEND_AVAILABLE and self.config.enable_advanced_analysis:
-                # Validate Python subset compatibility
-                frontend_validation = self.subset_validator.validate_code(source_code)
+            # The verification pass below only runs under advanced analysis and
+            # only with Z3 present. Check both up front: otherwise strict mode
+            # generates code while verifying nothing.
+            if self.config.enable_formal_verification:
+                blockers = []
+                if not (FRONTEND_AVAILABLE and self.config.enable_advanced_analysis):
+                    blockers.append(
+                        "advanced analysis is required to run formal verification (set enable_advanced_analysis=True)"
+                    )
+                if not Z3_AVAILABLE:
+                    blockers.append("Z3 is required when formal verification is enabled")
 
-                if not frontend_validation.is_valid:
-                    violations = [str(v) for v in frontend_validation.violations]
+                for blocker in blockers:
+                    message = f"[FORMAL_VERIFICATION] {blocker}."
+                    if self.config.strict_verification:
+                        result.errors.append(message)
+                        self.log.error(message)
+                    else:
+                        result.warnings.append(message)
+
+                if blockers and self.config.strict_verification:
+                    result.success = False
+                    result.phase_results[PipelinePhase.VALIDATION] = ValidationPhaseResult(
+                        is_valid=False,
+                        parse_success=True,
+                    )
+                    return False
+
+            if FRONTEND_AVAILABLE and self.config.enable_advanced_analysis:
+                # One pass runs the subset rules, the AST analyzer, the universal
+                # constraints and type inference over a single parse.
+                static_report = self.static_validator.validate_code(source_code)
+                diagnostics = list(static_report.diagnostics)
+                warnings = list(static_report.warnings)
+                result.warnings.extend(warnings)
+
+                if not static_report.is_valid:
+                    # Blocking diagnostics stop the run here, before memory
+                    # safety, formal verification or any generation.
+                    violations = list(static_report.violations)
                     result.success = False
                     result.errors.extend(violations)
                     result.phase_results[PipelinePhase.VALIDATION] = ValidationPhaseResult(
                         is_valid=False,
                         parse_success=True,
+                        tier=str(static_report.tier.value),
                         violations=violations,
+                        warnings=warnings,
+                        profile=static_report.profile_name,
+                        diagnostics=diagnostics,
                     )
                     return False
 
@@ -521,10 +585,17 @@ class MultiGenPipeline:
                 result.phase_results[PipelinePhase.VALIDATION] = ValidationPhaseResult(
                     is_valid=True,
                     parse_success=True,
+                    tier=str(static_report.tier.value),
                     memory_safety_checked=memory_safety_checked,
                     memory_safety_errors=memory_safety_errors,
                     memory_safety_warnings=memory_safety_warnings,
                     warnings=warnings,
+                    supported_features=list(static_report.subset.supported_features) if static_report.subset else [],
+                    unsupported_features=list(static_report.subset.unsupported_features)
+                    if static_report.subset
+                    else [],
+                    profile=static_report.profile_name,
+                    diagnostics=diagnostics,
                 )
             else:
                 # Basic validation - just check if it parses
@@ -719,7 +790,20 @@ class MultiGenPipeline:
     def _python_optimization_phase(self, source_code: str, analysis_result: Any, result: PipelineResult) -> Any:
         """Phase 3: Python-level optimizations."""
         try:
-            if FRONTEND_AVAILABLE and self.config.enable_optimizations:
+            # These are only constructed under advanced analysis, so test the
+            # objects rather than the config flag that indirectly builds them.
+            compile_time_evaluator = self.compile_time_evaluator
+            loop_analyzer = self.loop_analyzer
+            function_specializer = self.function_specializer
+            vectorization_detector = self.vectorization_detector
+
+            if (
+                self.config.enable_optimizations
+                and compile_time_evaluator is not None
+                and loop_analyzer is not None
+                and function_specializer is not None
+                and vectorization_detector is not None
+            ):
                 # Create analysis context
                 context = AnalysisContext(
                     source_code=source_code,
@@ -731,19 +815,19 @@ class MultiGenPipeline:
                 optimizations = {}
 
                 # Compile-time evaluation
-                compile_time_result = self.compile_time_evaluator.optimize(context)
+                compile_time_result = compile_time_evaluator.optimize(context)
                 optimizations["compile_time"] = compile_time_result
 
                 # Loop analysis
-                loop_result = self.loop_analyzer.optimize(context)
+                loop_result = loop_analyzer.optimize(context)
                 optimizations["loops"] = loop_result
 
                 # Function specialization
-                specialization_result = self.function_specializer.optimize(context)
+                specialization_result = function_specializer.optimize(context)
                 optimizations["specialization"] = specialization_result
 
                 # Vectorization detection
-                vectorization_result = self.vectorization_detector.optimize(context)
+                vectorization_result = vectorization_detector.optimize(context)
                 optimizations["vectorization"] = vectorization_result
 
                 result.phase_results[PipelinePhase.PYTHON_OPTIMIZATION] = PythonOptimizationPhaseResult(
@@ -755,6 +839,16 @@ class MultiGenPipeline:
                     vectorization=vectorization_result,
                 )
             else:
+                if self.config.enable_optimizations:
+                    # Optimizations were asked for but nothing can run them.
+                    # Say so instead of reporting a silently unoptimized build.
+                    message = (
+                        "Python optimizations skipped: the optimizers require advanced analysis "
+                        "(set enable_advanced_analysis=True)."
+                    )
+                    self.log.warning(message)
+                    result.warnings.append(message)
+
                 result.phase_results[PipelinePhase.PYTHON_OPTIMIZATION] = PythonOptimizationPhaseResult(
                     enabled=False,
                 )

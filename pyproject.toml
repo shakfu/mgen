@@ -27,10 +27,10 @@ keywords = ["code-generation", "compiler", "metaprogramming"]
 dependencies = []
 
 [project.optional-dependencies]
-llvm = ["llvmlite>=0.43.0"]
+llvm = ["llvmlite>=0.43.0; python_version < '3.14'"]
 z3 = ["z3-solver>=4.13.0"]
 verification = ["z3-solver>=4.13.0"]  # Alias for backward compatibility
-all = ["llvmlite>=0.43.0", "z3-solver>=4.13.0"]
+all = ["llvmlite>=0.43.0; python_version < '3.14'", "z3-solver>=4.13.0"]
 
 [build-system]
 requires = ["uv_build>=0.8.19,<0.9.0"]
@@ -54,14 +54,14 @@ dev = [
     "mkdocstrings[python]>=0.25.0",
     "pytest-review>=0.1.1",
     "twine>=6.2.0",
-    "llvmlite>=0.43.0",
+    "llvmlite>=0.43.0; python_version < '3.14'",
     "z3-solver>=4.15.3.0",
 ]
 extra = [
     "z3-solver>=4.15.3.0",
 ]
 llvm = [
-    "llvmlite>=0.43.0",
+    "llvmlite>=0.43.0; python_version < '3.14'",
 ]
 
 
@@ -144,6 +144,8 @@ disallow_untyped_defs = false
 [tool.ruff]
 line-length = 120
 target-version = "py39"
+# Vendored third-party sources: never rewrite upstream code.
+extend-exclude = ["src/multigen/backends/c/ext"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "C90", "I", "N", "D", "UP", "B", "A", "S", "T20", "Q"]
@@ -177,11 +179,18 @@ ignore = [
 "src/multigen/backends/haskell/statement_visitor.py" = ["F821"]
 "src/multigen/backends/ocaml/loop_strategies.py" = ["F821"]
 
+[tool.ruff.lint.isort]
+# Must match [tool.isort] below: the two tools both sort imports and will
+# otherwise undo each other's work, leaving `make lint` permanently failing.
+combine-as-imports = true
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.isort]
 profile = "black"
+combine_as_imports = true
+extend_skip_glob = ["src/multigen/backends/c/ext/*"]
 line_length = 120
 multi_line_output = 3
 include_trailing_comma = true

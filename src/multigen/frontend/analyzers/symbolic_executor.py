@@ -191,6 +191,8 @@ class SymbolicExecutor(BaseAnalyzer):
 
             # Create initial symbolic state
             initial_state = SymbolicState()
+            self._next_nodes: dict[ast.AST, Optional[ast.AST]] = {}
+            self._register_continuations(context.ast_node)
 
             # Set up parameters if analyzing a function
             if isinstance(context.ast_node, ast.FunctionDef):
@@ -338,8 +340,31 @@ class SymbolicExecutor(BaseAnalyzer):
             # For simplicity, treat as path terminators
             return [(None, state, new_history)]
         else:
-            # Generic statement - continue to next
-            return [(None, state, new_history)]
+            # Generic statements continue with the next statement in their block.
+            return [(self._next_nodes.get(node), state, new_history)]
+
+    def _register_continuations(self, node: ast.AST) -> None:
+        """Register the next statement for each sequential AST block."""
+
+        def register_block(block: list[ast.stmt], continuation: Optional[ast.stmt]) -> None:
+            for index, statement in enumerate(block):
+                next_statement = block[index + 1] if index + 1 < len(block) else continuation
+                self._next_nodes[statement] = next_statement
+                if isinstance(statement, ast.If):
+                    register_block(statement.body, next_statement)
+                    register_block(statement.orelse, next_statement)
+                elif isinstance(statement, (ast.For, ast.While)):
+                    register_block(statement.body, next_statement)
+                    register_block(statement.orelse, next_statement)
+                elif isinstance(statement, ast.Try):
+                    register_block(statement.body, next_statement)
+                    register_block(statement.orelse, next_statement)
+                    register_block(statement.finalbody, next_statement)
+                    for handler in statement.handlers:
+                        register_block(handler.body, next_statement)
+
+        if isinstance(node, (ast.Module, ast.FunctionDef)):
+            register_block(node.body, None)
 
     def _execute_function(
         self, func_node: ast.FunctionDef, state: SymbolicState, path_history: list[int]
@@ -367,7 +392,7 @@ class SymbolicExecutor(BaseAnalyzer):
         if if_node.body:
             results.append((if_node.body[0], true_state, path_history))
         else:
-            results.append((None, true_state, path_history))
+            results.append((self._next_nodes.get(if_node), true_state, path_history))
 
         # False branch
         false_state = state.copy()
@@ -375,7 +400,7 @@ class SymbolicExecutor(BaseAnalyzer):
         if if_node.orelse:
             results.append((if_node.orelse[0], false_state, path_history))
         else:
-            results.append((None, false_state, path_history))
+            results.append((self._next_nodes.get(if_node), false_state, path_history))
 
         return results
 
@@ -449,7 +474,7 @@ class SymbolicExecutor(BaseAnalyzer):
             if isinstance(target, ast.Name):
                 new_state.set_variable(target.id, value)
 
-        return [(None, new_state, path_history)]
+        return [(self._next_nodes.get(assign_node), new_state, path_history)]
 
     def _execute_aug_assign(
         self, aug_assign_node: ast.AugAssign, state: SymbolicState, path_history: list[int]
@@ -474,7 +499,7 @@ class SymbolicExecutor(BaseAnalyzer):
             )
             new_state.set_variable(var_name, new_value)
 
-        return [(None, new_state, path_history)]
+        return [(self._next_nodes.get(aug_assign_node), new_state, path_history)]
 
     def _execute_return(
         self, return_node: ast.Return, state: SymbolicState, path_history: list[int]
@@ -494,7 +519,7 @@ class SymbolicExecutor(BaseAnalyzer):
         """Execute an expression statement."""
         new_state = state.copy()
         self._evaluate_expression(expr_stmt.value, new_state)
-        return [(None, new_state, path_history)]
+        return [(self._next_nodes.get(expr_stmt), new_state, path_history)]
 
     def _execute_simple_statement(self, stmt: ast.stmt, state: SymbolicState) -> SymbolicState:
         """Execute a simple statement and return the modified state."""

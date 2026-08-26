@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from .backends.optimizer import OptimizationInfo
     from .frontend.base import OptimizationResult
+    from .frontend.diagnostics import Diagnostic
 
 
 @dataclass
@@ -46,6 +47,10 @@ class ValidationPhaseResult:
         memory_safety_checked: Whether memory safety analysis was performed
         memory_safety_errors: Critical memory safety issues found
         memory_safety_warnings: Non-critical memory safety concerns
+        profile: Name of the validation profile the code was judged against
+        diagnostics: Structured findings, each with a rule id and a position.
+            `violations` and `warnings` remain the string forms of these, so
+            existing callers keep working.
     """
 
     is_valid: bool
@@ -58,6 +63,8 @@ class ValidationPhaseResult:
     memory_safety_checked: bool = False
     memory_safety_errors: list[str] = field(default_factory=list)
     memory_safety_warnings: list[str] = field(default_factory=list)
+    profile: Optional[str] = None
+    diagnostics: list["Diagnostic"] = field(default_factory=list)
 
 
 @dataclass

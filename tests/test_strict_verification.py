@@ -62,6 +62,58 @@ def add(x: int, y: int) -> int:
             for msg in caplog.messages
         )
 
+    def test_strict_mode_fails_without_z3(self, tmp_path, monkeypatch):
+        """Strict verification must not silently skip verification."""
+        import multigen.pipeline as pipeline_module
+
+        monkeypatch.setattr(pipeline_module, "Z3_AVAILABLE", False)
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def add(x: int, y: int) -> int:\n    return x + y\n")
+
+        config = PipelineConfig(
+            target_language="c",
+            enable_formal_verification=True,
+            strict_verification=True,
+        )
+        result = MultiGenPipeline(config=config).convert(test_file)
+
+        assert not result.success
+        assert any("Z3 is required" in error for error in result.errors)
+
+    def test_strict_mode_fails_without_advanced_analysis(self, tmp_path):
+        """Verification only runs under advanced analysis, so strict mode must refuse."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def add(x: int, y: int) -> int:\n    return x + y\n")
+
+        config = PipelineConfig(
+            target_language="c",
+            enable_formal_verification=True,
+            strict_verification=True,
+            enable_advanced_analysis=False,
+            output_dir=str(tmp_path / "out"),
+        )
+        result = MultiGenPipeline(config=config).convert(test_file)
+
+        assert not result.success
+        assert any("advanced analysis is required" in error for error in result.errors)
+
+    def test_non_strict_mode_warns_without_advanced_analysis(self, tmp_path):
+        """Without strict mode the same configuration proceeds with a warning."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def add(x: int, y: int) -> int:\n    return x + y\n")
+
+        config = PipelineConfig(
+            target_language="c",
+            enable_formal_verification=True,
+            strict_verification=False,
+            enable_advanced_analysis=False,
+            output_dir=str(tmp_path / "out"),
+        )
+        result = MultiGenPipeline(config=config).convert(test_file)
+
+        assert result.success
+        assert any("advanced analysis is required" in warning for warning in result.warnings)
+
     @pytest.mark.skipif(not Z3_AVAILABLE, reason="Z3 not available")
     def test_strict_mode_passes_safe_code(self, tmp_path):
         """Test that strict mode allows safe code to pass."""

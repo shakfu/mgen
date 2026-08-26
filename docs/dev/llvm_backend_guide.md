@@ -922,7 +922,7 @@ set[int]             %struct.set_int*    set_int*
 
 ### Documentation
 
-- [Backend Comparison](../backend_comparison.md) - Compare all 7 backends
+- [Backend Comparison](../BACKEND_COMPARISON.md) - Compare all 7 backends
 - [Memory Testing Guide](llvm_memory_testing.md) - ASAN usage
 - [JIT Mode Details](llvm_jit.md) - JIT compilation
 

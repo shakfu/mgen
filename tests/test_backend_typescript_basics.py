@@ -97,6 +97,17 @@ def test_annotated() -> int:
         assert "let count: number = 10;" in ts_code
         assert 'let name: string = "test";' in ts_code
 
+    def test_range_uses_direction_of_step(self):
+        """Negative-step ranges must count down rather than use a fixed '<'."""
+        python_code = """
+def count_down() -> None:
+    for i in range(5, 0, -1):
+        print(i)
+"""
+        ts_code = self.converter.convert_code(python_code)
+
+        assert "(-1) > 0 ? i < 0 : i > 0" in ts_code
+
     def test_if_else_statement(self):
         """Test if/else statement conversion."""
         python_code = """

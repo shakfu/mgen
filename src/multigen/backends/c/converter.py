@@ -186,7 +186,13 @@ class MultiGenPythonToCConverter:
         return "\n".join(parts)
 
     def _detect_string_methods(self, node: ast.AST) -> None:
-        """Pre-scan AST to detect string method usage for include generation."""
+        """Pre-scan AST to detect string usage for include generation.
+
+        Includes are emitted from this pre-scan, so anything discovered later
+        during expression conversion never reaches the generated file. F-strings
+        lower to multigen_sprintf_string and multigen_int_to_string, and were
+        relying on implicit declarations, which -std=c11 rejects.
+        """
         for child in ast.walk(node):
             if isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute):
                 method_name = child.func.attr
@@ -196,6 +202,12 @@ class MultiGenPythonToCConverter:
                     # For pre-scan, we're more liberal - assume any call to these methods is a string method
                     self.includes_needed.add('#include "multigen_string_ops.h"')
                     break  # Only need to add it once
+
+        for child in ast.walk(node):
+            if isinstance(child, ast.JoinedStr):
+                self.includes_needed.add('#include "multigen_string_ops.h"')
+                self.includes_needed.add("#include <string.h>")
+                break
 
     def _detect_asserts(self, node: ast.AST) -> bool:
         """Check if module uses assert statements.
@@ -1155,7 +1167,9 @@ class MultiGenPythonToCConverter:
         elif isinstance(expr, ast.JoinedStr):
             return self._convert_f_string(expr)
         else:
-            return f"/* Unsupported expression {type(expr).__name__} */"
+            # A comment where a value belongs produces C that does not compile,
+            # and the pipeline reported success for it. Refuse instead.
+            raise UnsupportedFeatureError(f"Unsupported expression {type(expr).__name__}")
 
     def _convert_constant(self, expr: ast.Constant) -> str:
         """Convert constant values."""
@@ -2019,7 +2033,16 @@ class MultiGenPythonToCConverter:
                 if converted:
                     body.extend(converted.split("\n"))
 
-            result = f"for (int {var_name} = {start}; {var_name} < {stop}; {var_name} += {step}) {{\n"
+            step_node = stmt.iter.args[2] if len(stmt.iter.args) == 3 else None
+            if step_node is None or (isinstance(step_node, ast.Constant) and step_node.value == 1):
+                result = f"for (int {var_name} = {start}; {var_name} < {stop}; {var_name} += {step}) {{\n"
+            elif isinstance(step_node, ast.Constant) and isinstance(step_node.value, int) and step_node.value > 0:
+                result = f"for (int {var_name} = {start}; {var_name} < {stop}; {var_name} += {step}) {{\n"
+            else:
+                result = (
+                    f"for (int {var_name} = {start}; ({step}) > 0 ? {var_name} < {stop} : {var_name} > {stop}; "
+                    f"{var_name} += {step}) {{\n"
+                )
             for line in body:
                 result += f"    {line}\n"
             result += "}"
@@ -3003,7 +3026,16 @@ class MultiGenPythonToCConverter:
             else:
                 raise UnsupportedFeatureError("Invalid range() arguments in comprehension")
 
-            loop_code = f"for (int {loop_var} = {start}; {loop_var} < {end}; {loop_var} += {step})"
+            step_node = range_args[2] if len(range_args) == 3 else None
+            if step_node is None or (
+                isinstance(step_node, ast.Constant) and isinstance(step_node.value, int) and step_node.value > 0
+            ):
+                loop_code = f"for (int {loop_var} = {start}; {loop_var} < {end}; {loop_var} += {step})"
+            else:
+                loop_code = (
+                    f"for (int {loop_var} = {start}; ({step}) > 0 ? {loop_var} < {end} : {loop_var} > {end}; "
+                    f"{loop_var} += {step})"
+                )
             loop_var_decl = None  # No separate variable declaration needed for range
 
         # Handle iteration over container variables (e.g., for x in numbers)

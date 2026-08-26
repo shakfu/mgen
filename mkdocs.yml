@@ -57,10 +57,10 @@ nav:
     - Formal Verification: guide/verification.md
   - Reference:
     - Supported Syntax: supported_syntax.md
-    - Backend Comparison: backend_comparison.md
-    - Backend Selection Guide: backend_selection_guide.md
+    - Backend Comparison: BACKEND_COMPARISON.md
+    - Backend Selection Guide: BACKEND_SELECTION_GUIDE.md
     - Haskell Limitations: haskell_backend_limitations.md
-    - Use Cases: use_cases.md
+    - Use Cases: USE_CASES.md
     - Assert Implementation: assert_implementation.md
     - Translation Tests: translation_test.md
   - API Reference:

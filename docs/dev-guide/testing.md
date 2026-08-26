@@ -1,12 +1,22 @@
 # Testing Guide
 
-MultiGen has a comprehensive test suite with 1353 tests covering all aspects of code generation.
+MultiGen has a comprehensive test suite covering all aspects of code generation.
+A count is deliberately not quoted here: it goes stale on the next commit.
 
 ## Running Tests
 
+`make test` runs the pytest suite but **excludes** `tests/translation`, which is
+driven through the CLI rather than pytest. Run both before calling a change done:
+
 ```bash
-# Run all tests
+# Unit and integration tests
 make test
+
+# End-to-end translation of the corpus in tests/translation
+make test-translation
+
+# Everything the CI target checks: tests, lint, types, formatting
+make qa
 
 # Or with uv
 uv run pytest

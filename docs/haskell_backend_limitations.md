@@ -217,7 +217,7 @@ def sum_recursive(arr: list) -> int:
 
 ## See Also
 
-- [Backend Selection Guide](backend_selection_guide.md) - Choosing the right backend
+- [Backend Selection Guide](BACKEND_SELECTION_GUIDE.md) - Choosing the right backend
 
 ---
 

@@ -171,26 +171,18 @@ const multigen_exception_t* multigen_get_exception(void);
         } \
     } while(0)
 
-/**
- * Python-style try/except simulation
+/*
+ * An MGEN_TRY / MGEN_EXCEPT / MGEN_END_TRY family used to live here. It shared
+ * two names with the setjmp-based family in multigen_error_handling.h but had a
+ * different shape: its MGEN_TRY opened no `if` block. Generated files include
+ * both headers, this one last, so its definitions won and then composed with
+ * the other header's MGEN_CATCH, whose leading `}` closed the `do` block and
+ * left `else` with no `if`. Every generated program containing try/except
+ * failed to compile, while the pipeline reported success.
+ *
+ * Nothing emitted MGEN_EXCEPT or MGEN_FINALLY, so the family is gone rather
+ * than renamed. Exception handling lives in multigen_error_handling.h.
  */
-#define MGEN_TRY \
-    do { \
-        multigen_clear_exception(); \
-
-#define MGEN_EXCEPT(error_type) \
-        if (multigen_has_exception() && multigen_get_exception()->type == (error_type)) {
-
-#define MGEN_EXCEPT_ANY \
-        if (multigen_has_exception()) {
-
-#define MGEN_FINALLY \
-        } \
-        if (1) {
-
-#define MGEN_END_TRY \
-        } \
-    } while(0)
 
 /**
  * Python-style truthiness testing

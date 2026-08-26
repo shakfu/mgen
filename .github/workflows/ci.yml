@@ -1,0 +1,177 @@
+name: CI
+
+# The repository had no CI, so every guard below depended on someone
+# remembering to run `make` locally. Three artifacts are generated from code
+# (the syntax reference, the backend capability matrix, the diagnostic
+# identifiers) and go stale in silence otherwise.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: "1"
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.14 has no llvmlite wheel, so the LLVM backend is not registered
+        # there. That is a supported configuration, not a broken one, and the
+        # suite must pass without it.
+        python-version: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Report backend availability
+        run: |
+          uv run python -c "
+          from multigen.backends.registry import registry
+          print('backends registered:', sorted(registry.list_backends()))"
+
+      - name: Lint
+        run: uv run ruff check src
+
+      - name: Formatting
+        run: uv run ruff format --check src tests
+
+      - name: Types
+        run: uv run mypy --strict src/multigen
+
+      - name: Unit and integration tests
+        run: uv run pytest tests/ --ignore=tests/test_demos.py --ignore=tests/translation
+
+  generated-artifacts:
+    name: Generated artifacts are current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      # Regenerating and diffing catches a stale artifact that the equivalent
+      # tests would miss if someone edited a generated file by hand.
+      # The matrix builds and runs each probe, so this needs whatever compilers
+      # the runner has. A backend whose toolchain is missing keeps its recorded
+      # verdicts rather than downgrading them, so the diff stays meaningful.
+      - name: Regenerate the syntax reference and capability matrix
+        run: |
+          uv run python scripts/generate_supported_syntax.py
+          uv run python scripts/generate_capability_matrix.py
+
+      - name: Fail if anything was out of date
+        run: |
+          if ! git diff --exit-code; then
+            echo "::error::Generated files are stale. Run 'make docs-syntax' and 'make capabilities'."
+            exit 1
+          fi
+
+  translation:
+    name: End-to-end translation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      # `make test` deliberately excludes this corpus, so nothing else covers it.
+      - name: Translate the corpus
+        run: uv run multigen batch --continue-on-error --source-dir tests/translation
+
+  profiles:
+    name: Validation profiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      # The portable profile is the default, so anything it rejects would block
+      # translation of code the backends handle today.
+      - name: Portable profile accepts the corpus
+        run: uv run multigen check --profile portable tests/translation/*.py
+
+      - name: Every profile runs and emits parseable JSON
+        run: |
+          uv run python - <<'PY'
+          import json, pathlib, subprocess, sys
+          from multigen.frontend.static_profile import profile_names
+
+          # Glob rather than name a file, so renaming a corpus entry cannot
+          # silently turn this job into a no-op or a false failure.
+          corpus = sorted(pathlib.Path("tests/translation").glob("*.py"))[0]
+          for name in profile_names():
+              result = subprocess.run(
+                  [sys.executable, "-m", "multigen.cli.main", "check",
+                   "--profile", name, "--format", "json", str(corpus)],
+                  capture_output=True, text=True,
+              )
+              if result.returncode not in (0, 1):
+                  sys.exit(f"profile {name}: unexpected exit {result.returncode}\n{result.stderr}")
+              payload = json.loads(result.stdout)
+              assert payload["profile"] == name, payload
+              print(f"{name:15} exit={result.returncode} valid={payload['files'][0]['valid']}")
+          PY
+
+  package:
+    name: Build and verify the package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build
+        run: uv build
+
+      - name: Check metadata
+        run: uv run --with twine twine check dist/*
+
+      - name: Install the built wheel into a clean environment
+        run: |
+          uv venv /tmp/clean-install
+          VIRTUAL_ENV=/tmp/clean-install uv pip install dist/*.whl
+          # --no-project, or uv re-syncs this repo and the wheel is never used.
+          VIRTUAL_ENV=/tmp/clean-install uv run --no-project multigen --version
+          VIRTUAL_ENV=/tmp/clean-install uv run --no-project multigen check --report

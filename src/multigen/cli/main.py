@@ -14,10 +14,11 @@ Usage:
 """
 
 import argparse
+import json
 import shutil
 import sys
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from .. import __version__
 from ..backends.preferences import BackendPreferences, PreferencesRegistry
@@ -25,6 +26,7 @@ from ..backends.registry import registry
 from ..common import log
 from ..error_formatter import print_error, set_color_mode
 from ..errors import MultiGenError
+from ..frontend.static_profile import DEFAULT_PROFILE, profile_names
 
 # Import the pipeline and backends
 from ..pipeline import BuildMode, MultiGenPipeline, OptimizationLevel, PipelineConfig, PipelinePhase
@@ -95,6 +97,12 @@ Optimization: -O0 (none), -O1 (basic), -O2 (moderate, default), -O3 (aggressive)
             help="Set backend preferences (e.g., --prefer use_native_comprehensions=true)",
         )
         convert_parser.add_argument(
+            "--profile",
+            choices=profile_names(),
+            default=DEFAULT_PROFILE.name,
+            help=f"Validation profile applied in phase 1 (default: {DEFAULT_PROFILE.name})",
+        )
+        convert_parser.add_argument(
             "--dry-run", action="store_true", help="Show what would be generated without actually writing files"
         )
         convert_parser.add_argument(
@@ -128,6 +136,12 @@ Optimization: -O0 (none), -O1 (basic), -O2 (moderate, default), -O3 (aggressive)
         )
         build_parser.add_argument("--compiler", help="Compiler to use (uses backend default if not specified)")
         build_parser.add_argument(
+            "--profile",
+            choices=profile_names(),
+            default=DEFAULT_PROFILE.name,
+            help=f"Validation profile applied in phase 1 (default: {DEFAULT_PROFILE.name})",
+        )
+        build_parser.add_argument(
             "--dry-run", action="store_true", help="Show what would be built without actually compiling"
         )
         build_parser.add_argument("--progress", action="store_true", help="Show progress indicators during build")
@@ -136,8 +150,27 @@ Optimization: -O0 (none), -O1 (basic), -O2 (moderate, default), -O3 (aggressive)
         check_parser = subparsers.add_parser(
             "check", help="Validate Python file(s) against the supported subset (no conversion)"
         )
-        check_parser.add_argument("input_files", nargs="+", help="Python file(s) to validate")
+        # Optional so `--report` can describe the subset with no file to validate.
+        check_parser.add_argument("input_files", nargs="*", help="Python file(s) to validate")
         check_parser.add_argument("--report", action="store_true", help="Show full feature support report")
+        check_parser.add_argument(
+            "--profile",
+            choices=profile_names(),
+            default=DEFAULT_PROFILE.name,
+            help=f"Validation profile (default: {DEFAULT_PROFILE.name})",
+        )
+        check_parser.add_argument(
+            "--format",
+            choices=["text", "json"],
+            default="text",
+            dest="output_format",
+            help="Diagnostic output format (default: text)",
+        )
+        check_parser.add_argument(
+            "--warnings-as-errors",
+            action="store_true",
+            help="Treat every non-fatal finding as a failure",
+        )
 
         # Clean command
         subparsers.add_parser("clean", help="Clean build directory")
@@ -368,6 +401,7 @@ Optimization: -O0 (none), -O1 (basic), -O2 (moderate, default), -O3 (aggressive)
             build_mode=BuildMode.NONE,
             target_language=target,
             backend_preferences=preferences,
+            validation_profile=getattr(args, "profile", None) or DEFAULT_PROFILE.name,
         )
 
         # Progress tracking
@@ -525,6 +559,7 @@ Optimization: -O0 (none), -O1 (basic), -O2 (moderate, default), -O3 (aggressive)
             compiler=getattr(args, "compiler", None),  # Use backend default if not specified
             include_dirs=include_dirs,
             backend_preferences=preferences,
+            validation_profile=getattr(args, "profile", None) or DEFAULT_PROFILE.name,
         )
 
         # Progress tracking
@@ -874,41 +909,82 @@ Optimization: -O0 (none), -O1 (basic), -O2 (moderate, default), -O3 (aggressive)
         return 0 if failed_translations == 0 else 1
 
     def check_command(self, args: argparse.Namespace) -> int:
-        """Execute check command -- validate files without converting."""
+        """Execute check command -- validate files without converting.
+
+        Exit codes: 0 when every input validates, 1 when any input is invalid,
+        missing, or when no input was given.
+        """
+        from ..frontend.static_profile import get_profile
+        from ..frontend.static_validation import StaticValidator
         from ..frontend.subset_validator import StaticPythonSubsetValidator
 
-        validator = StaticPythonSubsetValidator()
+        profile = get_profile(getattr(args, "profile", None))
+        as_json = getattr(args, "output_format", "text") == "json"
+        validator = StaticValidator(
+            profile,
+            warnings_are_errors=True if getattr(args, "warnings_as_errors", False) else None,
+        )
 
-        # Full report mode
-        if args.report:
-            self.log.info(validator.generate_subset_report())
-            return 0
+        # The report describes the profile and subset. It never says anything
+        # about an input file, so it must not stand in for validating one.
+        if args.report and not as_json:
+            self.log.info(f"Profile '{profile.name}': {profile.description}")
+            self.log.info(StaticPythonSubsetValidator().generate_subset_report())
+            if not args.input_files:
+                return 0
+
+        if not args.input_files:
+            self.log.error("No input files to validate. Pass one or more files, or use --report alone.")
+            return 1
 
         input_files = [Path(f) for f in args.input_files]
         all_valid = True
+        json_files: list[dict[str, Any]] = []
 
         for input_path in input_files:
             if not input_path.exists():
-                self.log.error(f"File not found: {input_path}")
                 all_valid = False
+                if as_json:
+                    json_files.append({"path": str(input_path), "valid": False, "error": "file not found"})
+                else:
+                    self.log.error(f"File not found: {input_path}")
                 continue
 
             result = validator.validate_file(str(input_path))
+            if not result.is_valid:
+                all_valid = False
+
+            if as_json:
+                json_files.append(
+                    {
+                        "path": str(input_path),
+                        "valid": result.is_valid,
+                        "tier": result.tier.value,
+                        "conversion_strategy": result.conversion_strategy,
+                        "diagnostics": [d.to_dict() for d in result.diagnostics],
+                    }
+                )
+                continue
 
             if result.is_valid:
                 strategy = result.conversion_strategy or "unknown"
                 self.log.info(f"{input_path}: valid (tier {result.tier.value}, {strategy})")
-                if result.warnings:
-                    for warning in result.warnings:
-                        self.log.warning(f"  {warning}")
             else:
-                all_valid = False
                 self.log.error(f"{input_path}: invalid")
-                for violation in result.violations:
-                    self.log.error(f"  - {violation}")
-                if result.warnings:
-                    for warning in result.warnings:
-                        self.log.warning(f"  {warning}")
+
+            # Diagnostics carry their own position, rule id and severity, and
+            # arrive in source order.
+            for diagnostic in result.diagnostics:
+                report = self.log.error if diagnostic.is_error else self.log.warning
+                report(f"  {diagnostic.format(str(input_path))}")
+                if diagnostic.remediation:
+                    self.log.info(f"      {diagnostic.remediation}")
+
+        if as_json:
+            # Straight to stdout: the logger decorates lines, which would make
+            # the output unparseable.
+            payload = {"profile": profile.name, "files": json_files}
+            sys.stdout.write(json.dumps(payload, indent=2) + "\n")
 
         return 0 if all_valid else 1
 

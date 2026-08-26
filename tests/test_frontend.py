@@ -1,5 +1,6 @@
 """Tests for the CGen Frontend - Static Python Analysis Layer."""
 
+import ast
 import sys
 from pathlib import Path
 
@@ -236,6 +237,144 @@ def simple(x: int) -> int:
         result = validator.validate_code(simple_code)
 
         assert result.conversion_strategy == "direct_conversion"
+
+    @pytest.mark.parametrize(
+        "construct,code",
+        [
+            ("AsyncFunctionDef", "async def f(x: int) -> int:\n    return x\n"),
+            ("NamedExpr", "def f(x: int) -> int:\n    if (y := x + 1) > 0:\n        return y\n    return 0\n"),
+            ("Global", "g: int = 0\n\n\ndef f() -> int:\n    global g\n    return g\n"),
+            (
+                "Nonlocal",
+                "def o() -> int:\n    x: int = 0\n\n    def i() -> int:\n        nonlocal x\n        return x\n\n    return i()\n",
+            ),
+            ("Delete", "def f() -> int:\n    a: list[int] = [1]\n    del a[0]\n    return 0\n"),
+        ],
+    )
+    def test_unrecognised_constructs_are_rejected(self, construct, code):
+        """A construct no rule classifies must not pass as valid Static Python.
+
+        These previously validated clean and reached a backend: `async def` was
+        silently dropped from the generated source while the pipeline reported
+        success.
+        """
+        result = StaticPythonSubsetValidator().validate_code(code)
+
+        assert not result.is_valid
+        assert any(f"Unsupported Python construct: {construct}" in v for v in result.violations)
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "def add(x: int, y: int) -> int:\n    return x + y\n",
+            "from dataclasses import dataclass\n\n\n@dataclass\nclass P:\n    x: int\n    y: int\n",
+            "def s(n: int) -> int:\n    t: int = 0\n    for i in range(n):\n        if i == 2:\n            continue\n        t += i\n    return t\n",
+            "def f() -> int:\n    d: dict[str, int] = {'a': 1}\n    s: set[int] = {1, 2}\n    return len(d) + len(s)\n",
+            "def f(x: int) -> int:\n    return 1 if x > 0 else 2\n",
+            "def f(xs: list[int]) -> list[int]:\n    return [x * 2 for x in xs if x > 0]\n",
+        ],
+    )
+    def test_supported_constructs_still_accepted(self, code):
+        """The allowlist must not reject code the backends already translate."""
+        result = StaticPythonSubsetValidator().validate_code(code)
+
+        assert result.is_valid, result.violations
+
+    @pytest.mark.parametrize(
+        "code,expected_rule",
+        [
+            ("from enum import Enum\n\n\nclass S(Enum):\n    IDLE = 0\n", "Enumerations"),
+            (
+                "def f(x: int) -> int:\n    match x:\n        case 1:\n            return 2\n    return 0\n",
+                "Pattern Matching",
+            ),
+        ],
+    )
+    def test_planned_features_are_rejected(self, code, expected_rule):
+        """PLANNED means no backend implements it, so it must not validate clean.
+
+        An Enum previously validated as supported and the C backend emitted an
+        empty struct, dropping every member.
+        """
+        result = StaticPythonSubsetValidator().validate_code(code)
+
+        assert not result.is_valid
+        assert any(f"Feature not yet implemented: {expected_rule}" in v for v in result.violations)
+
+    def test_class_forms_are_classified_once(self):
+        """Four rules claim ast.ClassDef; exactly one may govern a given class.
+
+        Rejecting PLANNED would otherwise reject every dataclass, because the
+        enum rule claims ClassDef too.
+        """
+        validator = StaticPythonSubsetValidator()
+        dataclass_code = "from dataclasses import dataclass\n\n\n@dataclass\nclass P:\n    x: int\n"
+        namedtuple_code = "from typing import NamedTuple\n\n\nclass P(NamedTuple):\n    x: int\n"
+
+        for code, expected in ((dataclass_code, "Data Classes"), (namedtuple_code, "Named Tuples")):
+            result = validator.validate_code(code)
+            assert result.is_valid, result.violations
+            assert expected in result.supported_features
+            assert "Enumerations" not in result.supported_features
+
+    def test_validator_holds_no_state_between_calls(self):
+        """Validation state is local to each call.
+
+        A detailed diagnostic used to be stashed on the instance and consumed by
+        whichever later node happened to fail next.
+        """
+        validator = StaticPythonSubsetValidator()
+
+        first = validator.validate_code("def f(x):\n    return x\n")
+        second = validator.validate_code("def g(y: int) -> int:\n    return y\n")
+        third = validator.validate_code("def f(x):\n    return x\n")
+
+        assert not first.is_valid
+        assert second.is_valid and second.violations == []
+        assert third.violations == first.violations
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "def f() -> int:\n    d: dict[str, int] = {}\n    return len(d)\n",
+            "def f(pairs: dict[str, int]) -> int:\n    return len(pairs)\n",
+            "def f() -> dict[str, int]:\n    return {}\n",
+            "def f() -> int:\n    r: dict[str, int] = {str(x): x for x in range(3)}\n    return len(r)\n",
+        ],
+    )
+    def test_tuples_in_annotations_are_accepted(self, code):
+        """`dict[str, int]` contains an ast.Tuple, but it is type syntax.
+
+        The backends handle these routinely, so a rule about tuple values must
+        not fire on them.
+        """
+        result = StaticPythonSubsetValidator().validate_code(code)
+
+        assert result.is_valid, result.violations
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "def f() -> int:\n    p: tuple[int, int] = (3, 4)\n    return p[0]\n",
+            "def f() -> int:\n    return (1, 2)[0]\n",
+        ],
+    )
+    def test_tuple_values_are_rejected(self, code):
+        """Only TypeScript builds a tuple value; C used to emit invalid C."""
+        result = StaticPythonSubsetValidator().validate_code(code)
+
+        assert not result.is_valid
+        assert any("Tuples" in v for v in result.violations)
+
+    def test_annotation_and_value_tuples_are_told_apart(self):
+        """Both forms in one function: the annotation passes, the value does not."""
+        code = "def f() -> tuple[int, int]:\n    return (1, 2)\n"
+
+        result = StaticPythonSubsetValidator().validate_code(code)
+
+        assert not result.is_valid
+        # One diagnostic, for the returned value, not two.
+        assert len([v for v in result.violations if "Tuples" in v]) == 1
 
 
 class TestStaticIR:
@@ -484,6 +623,28 @@ def max_value(x: int, y: int) -> int:
         assert report.execution_time_ms > 0
         # Should have path analysis information
         assert report.metadata is not None
+
+    def test_symbolic_executor_sequences_assignments(self):
+        """Assignments must continue to later statements in the same block."""
+        code = """
+def calculate(x: int) -> int:
+    y = x + 1
+    z = y + 1
+    return z
+"""
+        function = ast.parse(code).body[0]
+        context = AnalysisContext(
+            source_code=code,
+            ast_node=function,
+            analysis_result=analyze_python_code(code),
+            analysis_level=AnalysisLevel.INTERMEDIATE,
+        )
+
+        report = SymbolicExecutor().analyze(context)
+
+        assert report.success
+        assert any(path.visited_lines[-1] == 5 for path in report.execution_paths)
+        assert any("return_value" in path.final_state.metadata for path in report.execution_paths)
 
     def test_bounds_checker_basic(self):
         """Test BoundsChecker on simple code."""

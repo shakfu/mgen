@@ -1255,9 +1255,7 @@ def main() -> int:
 
         with open("/tmp/test_print.ll", "w") as f:
             f.write(llvm_ir)
-        result = subprocess.run(
-            ["/opt/homebrew/opt/llvm/bin/lli", "/tmp/test_print.ll"], capture_output=True, text=True
-        )
+        result = subprocess.run([LLVM_LLI_PATH, "/tmp/test_print.ll"], capture_output=True, text=True)
         # Should print "42" and return 0
         assert result.returncode == 0
         assert "42" in result.stdout
@@ -1276,9 +1274,7 @@ def main() -> int:
 
         with open("/tmp/test_string_print.ll", "w") as f:
             f.write(llvm_ir)
-        result = subprocess.run(
-            ["/opt/homebrew/opt/llvm/bin/lli", "/tmp/test_string_print.ll"], capture_output=True, text=True
-        )
+        result = subprocess.run([LLVM_LLI_PATH, "/tmp/test_string_print.ll"], capture_output=True, text=True)
         assert result.returncode == 0
         assert "Hello, World!" in result.stdout
 
@@ -1298,9 +1294,7 @@ def main() -> int:
 
         with open("/tmp/test_string_concat.ll", "w") as f:
             f.write(llvm_ir)
-        result = subprocess.run(
-            ["/opt/homebrew/opt/llvm/bin/lli", "/tmp/test_string_concat.ll"], capture_output=True, text=True
-        )
+        result = subprocess.run([LLVM_LLI_PATH, "/tmp/test_string_concat.ll"], capture_output=True, text=True)
         assert result.returncode == 0
         assert "Hello World" in result.stdout
 

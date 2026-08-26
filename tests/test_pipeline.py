@@ -124,6 +124,47 @@ class TestMultiGenPipeline:
         assert len(result.errors) > 0
 
 
+class TestPythonOptimizationPhase:
+    """Test that the Python optimization phase honours its prerequisites."""
+
+    SOURCE = "def add(x: int, y: int) -> int:\n    return x + y\n"
+
+    def _run(self, tmp_path, **config_kwargs):
+        from multigen.pipeline import PipelinePhase
+
+        source = tmp_path / "prog.py"
+        source.write_text(self.SOURCE)
+        config = PipelineConfig(target_language="c", output_dir=str(tmp_path / "out"), **config_kwargs)
+        result = MultiGenPipeline(config=config).convert(source)
+        return result, result.phase_results.get(PipelinePhase.PYTHON_OPTIMIZATION)
+
+    def test_optimizations_run_under_advanced_analysis(self, tmp_path):
+        """The default configuration applies every Python-level optimization."""
+        result, phase = self._run(tmp_path, enable_advanced_analysis=True, enable_optimizations=True)
+
+        assert result.success
+        assert phase.enabled
+        assert phase.optimizations_applied == ["compile_time", "loops", "specialization", "vectorization"]
+
+    def test_optimizations_skipped_without_advanced_analysis(self, tmp_path):
+        """Optimizers only exist under advanced analysis; skipping must be reported."""
+        result, phase = self._run(tmp_path, enable_advanced_analysis=False, enable_optimizations=True)
+
+        assert result.success
+        assert not phase.enabled
+        assert any("require advanced analysis" in warning for warning in result.warnings)
+        # The old behaviour surfaced an AttributeError as a phase warning.
+        assert not any("has no attribute" in warning for warning in result.warnings)
+
+    def test_optimizations_disabled_reports_no_warning(self, tmp_path):
+        """Explicitly disabling optimizations is not a problem to warn about."""
+        result, phase = self._run(tmp_path, enable_advanced_analysis=False, enable_optimizations=False)
+
+        assert result.success
+        assert not phase.enabled
+        assert result.warnings == []
+
+
 class TestPipelineIntegration:
     """Integration tests for pipeline functionality."""
 

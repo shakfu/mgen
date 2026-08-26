@@ -1,230 +1,115 @@
 # Supported Python Syntax
 
-> What python syntax is not yet implemented?
+MultiGen translates a statically analysable subset of Python. This page is the
+contract for that subset: what the frontend accepts, what it reports, and what
+it refuses.
 
-⏺ Explore(Explore Python syntax support)
-⎿  Done (29 tool uses · 58.5k tokens · 1m 32s)
+Two things decide the outcome for a given construct:
 
-⏺ Based on my comprehensive exploration of the MultiGen codebase, here's what
-Python syntax is NOT yet implemented:
+- **The feature rule** says what the construct means and how well the backends
+  support it. Rules are declared in `multigen.frontend.subset_validator`.
+- **The validation profile** says whether that level of support is good enough.
+  `portable` reports weakly supported constructs and continues; `strict-static`
+  fails on them.
 
-Tier 4: Fundamentally Unsupported (Won't be in v1.0)
+Check a file against a profile with:
 
-These features are incompatible with static compilation:
+```bash
+multigen check --profile strict-static program.py
+multigen check --format json program.py
+```
 
-1. Exception Handling (try/except/finally/raise)
-   - Requires runtime stack unwinding
-   - Explicitly marked as NOT_SUPPORTED in subset_validator.py:400-406
-2. Lambda Functions
-   - Requires function pointers and runtime closures
-   - Marked as NOT_SUPPORTED in subset_validator.py:392-398
-3. Metaclasses
-   - Requires runtime introspection
-   - Validated against in subset_validator.py:589
-4. Duck Typing
-   - Requires runtime type checks
-   - Fundamentally incompatible with static compilation
-5. Dynamic Code Execution (eval, exec, compile, **import**)
-   - Explicitly forbidden in subset_validator.py:596-601
+The same profile applies during translation, via `--profile` on `convert` and
+`build`, or `PipelineConfig(validation_profile=...)`. Validation runs in phase 1,
+so a rejected construct never reaches a backend.
 
-Tier 3: Experimental/Planned (Research Required)
+## Constructs with no rule
 
-1. Generators (yield)
-   - Marked EXPERIMENTAL in subset_validator.py:337-344
-   - Could be implemented as C state machines
-   - Listed in PRODUCTION_ROADMAP.md as post-v1.0
-2. Pattern Matching (match statement, Python 3.10+)
-   - Marked PLANNED in subset_validator.py:327-335
-   - Could map to switch statements with guards
-3. Generic Types (full parameterization)
-   - Partially supported for type annotations
-   - Full monomorphization not complete
+The validator is an allowlist. A construct that no rule classifies is rejected
+rather than passed through, because a backend given an unclassified construct
+may drop it silently. `async def`, `await`, `global` at module scope, `nonlocal`,
+the walrus operator and `del` are rejected on these grounds.
 
-Not Implemented (No Support)
+## Type annotations versus values
 
-1. Async/Await
-   - Not in validator at all
-   - Incompatible with synchronous C/Rust/Go
-   - Listed in PRODUCTION_ROADMAP.md:258 as post-v1.0
-2. Context Managers (with statement)
-   - Not implemented
-   - Listed in PRODUCTION_ROADMAP.md:256 as post-v1.0
-3. Decorators (limited support)
-   - [x] Supported: @staticmethod, @classmethod, @dataclass
-   - [X] Not supported: @property, user-defined decorators
-4. Imports (partial support)
-   - [x] Supported: import module, from module import name, import ... as alias
-   - [X] Not supported: Relative imports, star imports (from x import *)
-5. String Features
-   - [x] F-strings (basic expressions, no format specs in Phase 1)
-   - [X] String formatting (%, .format())
-   - [x] String methods: split, lower, upper, strip, replace, join, etc.
-6. Built-in Functions (partial)
-   - [X] Not supported: isinstance, type(), globals(), locals(), getattr, setattr, hasattr, dir
-7. Class Features (partial)
-   - [x] Supported: Basic classes, **init**, methods, single inheritance
-   - [X] Not supported: Multiple inheritance, @property, descriptors, magic methods (beyond **init**)
-8. Generator Expressions
-   - (x for x in items) - different from list comprehensions
-   - Not mentioned in supported features
-9. **List Slicing (partial support)**
-   - [x] **Haskell**: Full support via `drop`/`take` (arr[1:], arr[:n], arr[1:n])
-   - [X] **C, C++, Rust, Go, OCaml, LLVM**: Not yet implemented
-   - **Status**: On roadmap for future implementation
-   - **Workaround**: Use explicit loops or list comprehensions
-   - **Example**: Instead of `rest = arr[1:]`, use `rest = [arr[i] for i in range(1, len(arr))]`
+Some node types mean different things by position. `dict[str, int]` and
+`(3, 4)` are both tuples to Python's parser, but the first is type syntax every
+backend handles and the second is a runtime value that only the TypeScript
+backend builds. Rules that describe runtime constructs are not applied inside
+type annotations.
 
-Current Support Summary
+<!-- BEGIN GENERATED: feature-support -->
 
-Fully Supported:
+<!-- Generated from the feature registry. Do not edit by hand:
+     run `make docs-syntax` after changing a rule or a profile. -->
 
-- Functions, classes (basic), control flow (if/while/for/break/continue)
-- Type annotations (int, float, str, bool, List, Dict, Set)
-- Lists, dicts, sets with operations
-- List/dict/set comprehensions
-- Augmented assignment (+=, -=, etc.)
-- String methods (9+ methods)
-- File I/O, path operations
-- Module imports (basic)
-- OOP (constructors, methods, single inheritance)
+### Profiles
 
-Key Limitation: MultiGen focuses on a static, type-annotated subset of Python
-suitable for compilation to systems languages. Dynamic features requiring
-runtime introspection or exception handling are out of scope.
+| Profile | Description |
+|---|---|
+| `portable` | The common subset across the supported targets. Reports weakly inferred types and experimental features without failing on them. |
+| `strict-static` | The conservative statically translatable subset. Fails on anything whose type could not be established, on any construct that is only experimentally supported, and on generators and exceptions, whose semantics the backends do not fully model. |
 
-The roadmap (PRODUCTION_ROADMAP.md:253-282) explicitly states that
-exception handling, context managers, generators, and async/await are
-post-v1.0 features requiring significant research.
+A feature is **accepted** when a profile allows it, **warned** when it is
+reported but not fatal, and **rejected** when it fails validation.
 
-⏺ Based on my review of SUPPORTED_SYNTAX.md and the codebase, here are my
-thoughts on what syntax to implement next, prioritized by impact vs
-complexity:
+### Feature support
 
-High-Impact, Medium Complexity (Recommend These)
+| Feature | Tier | Declared status | portable | strict-static | Notes |
+|---|---|---|---|---|---|
+| Arithmetic Operations | 1 - fundamental | FULLY_SUPPORTED | accepted | accepted | Basic arithmetic and comparison operations |
+| Basic Types | 1 - fundamental | FULLY_SUPPORTED | accepted | accepted | Basic Python types: int, float, bool, str |
+| Control Flow | 1 - fundamental | FULLY_SUPPORTED | accepted | accepted | Basic control flow: if/else, while, for with range/containers, assert statements |
+| F-Strings | 1 - fundamental | FULLY_SUPPORTED | accepted | accepted | F-string literals for string formatting. Format specs: .Nf, d, x, X, o, e, E, %; No conversion flags (!r, !s, !a) |
+| Function Calls | 1 - fundamental | FULLY_SUPPORTED | accepted | accepted | Static function calls (no eval/exec) |
+| Function Definitions | 1 - fundamental | FULLY_SUPPORTED | accepted | accepted | Type-annotated function definitions. Must have type annotations; No decorators except allowed ones |
+| Variable Declarations | 1 - fundamental | FULLY_SUPPORTED | accepted | accepted | Annotated variable declarations |
+| Context Managers | 2 - structured | PARTIALLY_SUPPORTED | accepted | accepted | Basic with statement for file I/O (single context manager). Single context manager only; File operations only; Requires 'as' binding |
+| Data Classes | 2 - structured | FULLY_SUPPORTED | accepted | accepted | Dataclasses mapped to C structs |
+| Enumerations | 2 - structured | PLANNED | rejected | rejected | Python enums mapped to C enums |
+| Exception Handling | 2 - structured | PARTIALLY_SUPPORTED | accepted | accepted | try/except/else/finally for explicitly raised exceptions. Operations do not raise: a ZeroDivisionError or IndexError crashes instead of reaching the handler. No exception chaining (raise ... from ...) |
+| Generator Expressions | 2 - structured | FULLY_SUPPORTED | accepted | accepted | Generator expressions normalized to list comprehensions (eager collection) |
+| Generator Functions | 2 - structured | PARTIALLY_SUPPORTED | accepted | accepted | Generator functions with yield/yield from (eager collection to list). No .send() or .throw() |
+| Lists | 2 - structured | PARTIALLY_SUPPORTED | accepted | accepted | Lists as arrays with size tracking. Fixed size or bounded growth; Homogeneous element types |
+| Named Tuples | 2 - structured | FULLY_SUPPORTED | accepted | accepted | NamedTuple classes mapped to C structs |
+| Tuples | 2 - structured | NOT_SUPPORTED | rejected | rejected | Tuple values are not translatable; tuples in type annotations are |
+| Union Types | 2 - structured | EXPERIMENTAL | warned | rejected | Union types as tagged unions |
+| Yield From | 2 - structured | PARTIALLY_SUPPORTED | accepted | accepted | yield from for extending accumulator with iterable (eager collection). Function calls, range(), and variables only; No .send() or .throw() |
+| Comprehensions | 3 - advanced | FULLY_SUPPORTED | accepted | accepted | List, dict, and set comprehensions converted to C loops with STC containers |
+| Generic Types | 3 - advanced | PARTIALLY_SUPPORTED | accepted | accepted | Generic types via monomorphization (not supported by the LLVM backend) |
+| Pattern Matching | 3 - advanced | PLANNED | rejected | rejected | Python 3.10+ match statements |
+| Duck Typing | 4 - unsupported | NOT_SUPPORTED | rejected | rejected | Duck typing requires runtime type checks |
+| Lambda Functions | 4 - unsupported | NOT_SUPPORTED | rejected | rejected | Lambda functions require function pointer support |
+| Metaclasses | 4 - unsupported | NOT_SUPPORTED | rejected | rejected | Metaclasses require runtime introspection |
 
-1. [x] F-strings (Python 3.6+) [x] **IMPLEMENTED in v0.1.86**
+### Diagnostic identifiers
 
-Why: Ubiquitous in modern Python, relatively straightforward to implement
+These are stable and append-only: they appear in `--format json` output
+and are safe to filter on.
 
-- Maps cleanly to string concatenation + type conversion
-- C++: std::to_string() + operator+
-- Rust: format!() macro
-- Go: fmt.Sprintf()
-- All backends have string infrastructure already
-- **Status**: Working in 6/7 backends (C, C++, Rust, Go, Haskell, OCaml)
-- **Phase 1**: Basic expressions (no format specs)
-- **Phase 2**: Format specifications (`.2f`, `:03d`) - future work
+| Identifier | Meaning |
+|---|---|
+| `STATIC.ANALYSIS_ERROR` | Analysis error |
+| `STATIC.ANALYSIS_WARNING` | Analysis warning |
+| `STATIC.BACKEND_UNSUPPORTED` | Backend unsupported |
+| `STATIC.CONSTRAINT_VIOLATION` | Constraint violation |
+| `STATIC.CONTEXT_MANAGER_BINDING` | Context manager binding |
+| `STATIC.EXCEPTION_CHAINING` | Exception chaining |
+| `STATIC.EXPERIMENTAL_FEATURE` | Experimental feature |
+| `STATIC.FEATURE_NOT_IMPLEMENTED` | Feature not implemented |
+| `STATIC.FSTRING_CONVERSION_FLAG` | Fstring conversion flag |
+| `STATIC.FSTRING_FORMAT_SPEC` | Fstring format spec |
+| `STATIC.LOW_CONFIDENCE_TYPE` | Low confidence type |
+| `STATIC.MISSING_RETURN_ANNOTATION` | Missing return annotation |
+| `STATIC.MULTIPLE_CONTEXT_MANAGERS` | Multiple context managers |
+| `STATIC.SYNTAX_ERROR` | Syntax error |
+| `STATIC.UNANNOTATED_PARAMETER` | Unannotated parameter |
+| `STATIC.UNKNOWN_TYPE` | Unknown type |
+| `STATIC.UNRECOGNIZED_CONSTRUCT` | Unrecognized construct |
+| `STATIC.UNSUPPORTED_DECORATOR` | Unsupported decorator |
+| `STATIC.UNSUPPORTED_FEATURE` | Unsupported feature |
+| `STATIC.UNSUPPORTED_YIELD_FROM` | Unsupported yield from |
 
-Example: f"Result: {x}" → "Result: " + std::to_string(x)
+Universal constraint checks keep their own codes under the `CONSTRAINT.` prefix.
 
-2. [ ] Tuple Support
-
-Why: Fundamental data structure, enables multiple returns
-
-- Already have List/Dict/Set infrastructure
-- Enables: def foo() -> tuple[int, str]: return (1, "hello")
-- Maps to: C++ std::tuple, Rust tuples, Go structs, Haskell tuples
-- Unblocks many real-world patterns
-
-3. [ ] Pattern Matching (Python 3.10+, marked PLANNED)
-
-Why: Modern Python feature, maps well to switch/case
-
-- Backends already use switch in some places
-- C/C++: switch + guards
-- Rust: Native match (perfect mapping!)
-- Go: Type switches
-- Haskell/OCaml: Native pattern matching (perfect!)
-
-Medium-Impact, Low Complexity (Quick Wins)
-
-4. [ ] **List Slicing (arr[1:], arr[:n], arr[start:end])**
-
-Why: Common Python pattern, clean syntax
-
-- [x] **Already working in Haskell** (maps to `drop`/`take`)
-- Backend mappings straightforward:
-  - C++: `std::vector(begin + start, begin + end)` or constructor
-  - Rust: `&arr[start..end]` (slices) or `.iter().skip(n).take(m)`
-  - Go: `arr[start:end]` (native support!)
-  - C: Manual copy or pointer arithmetic
-  - OCaml: `List.filteri` or recursive approach
-  - LLVM: Vector operations
-- **Status**: Haskell complete, other backends pending
-- **Impact**: Enables functional programming patterns, cleaner algorithm implementations
-- **Example**: `rest = arr[1:]` instead of manual indexing loops
-
-5. [ ] String Formatting (% and .format())
-
-Why: Legacy support for older codebases
-
-- Similar to f-strings but easier (no expression parsing)
-- "Hello %s" % name → string substitution
-- Less important than f-strings (f-strings preferred)
-
-6. [~] More Built-ins (Partial Support [x])
-
-Why: Incremental improvements, well-defined semantics
-
-- [x] **any()**: IMPLEMENTED in v0.1.87 (boolean reduction: returns True if any element is True)
-- [x] **all()**: IMPLEMENTED in v0.1.87 (boolean reduction: returns True if all elements are True)
-- [ ] enumerate(): Easy, just counter + loop (requires tuple support)
-- [ ] zip(): Easy, parallel iteration (requires tuple support)
-- [ ] reversed(): Easy, reverse iteration
-- Already have infrastructure for built-ins
-
-6. [ ] @property Decorator
-
-Why: Common OOP pattern, syntactic sugar
-
-- Maps to getter/setter methods
-- C++: Member functions
-- Rust: Impl methods
-- Most backends already support methods
-
-Lower Priority (Post-v1.0 per roadmap)
-
-7. Context Managers (with statement)
-
-Why: Useful but complex (RAII, cleanup, exception integration)
-
-- Requires: Resource cleanup semantics
-- C++: RAII destructors
-- Rust: Drop trait
-- Blocked until exception handling decision made
-
-8. Generators (yield, marked EXPERIMENTAL)
-
-Why: Powerful but requires state machines
-
-- Maps to: Iterator protocol, coroutines, state machines
-- Significant backend work required
-- See roadmap: post-v1.0
-
-My Recommendation
-
-Top 3 priorities for next implementation:
-
-1. ~~F-strings~~ [x] **COMPLETED in v0.1.86**
-2. Tuple support - Enables multiple returns, unlocks real-world patterns,
-clean backend mapping
-3. Pattern matching - Future-proof (Python 3.10+), perfect mapping to
-Rust/Haskell/OCaml, sets MultiGen apart
-
-Rationale:
-
-- ~~F-strings~~: [x] **DONE** - Working in 6/7 backends with smart type conversion
-- Tuples: Essential for idiomatic Python (multiple returns, unpacking).
-Backend support is straightforward.
-- Pattern matching: Differentiates MultiGen as a "modern Python" compiler.
-Rust/Haskell/OCaml backends would shine here.
-
-Avoid for now: Context managers, generators, async/await (as roadmap
-indicates - need more research, exception handling dependencies)
-
-**Updated Priority (Post v0.1.87):**
-
-1. **List slicing** - Already working in Haskell, straightforward backend mappings, high-impact for algorithms
-2. **Tuple support** - Enables multiple returns, unlocks real-world patterns
-3. **Pattern matching** - Leverage backend strengths (Rust/Haskell/OCaml), future-proof for Python 3.10+
-4. **More built-ins** (enumerate, zip, reversed) - Quick wins, requires tuple support for enumerate/zip
+<!-- END GENERATED: feature-support -->

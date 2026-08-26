@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
 
+from ..errors import UnsupportedFeatureError
 from .ast_analyzer import StaticComplexity
 
 
@@ -980,6 +981,19 @@ class IRBuilder:
             # Replace the declaration with the full function
             self.current_module.functions[i] = ir_func
 
+        # Only globals and functions above are represented in the IR. A class or
+        # a match at module level would otherwise be dropped in silence, which
+        # is how enum members and dataclass fields disappeared from generated
+        # modules while the pipeline reported success.
+        for node in module_nodes:
+            if isinstance(node, (ast.FunctionDef, ast.Import, ast.ImportFrom, ast.Pass)):
+                continue
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                continue
+            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+                continue  # Module docstring.
+            raise UnsupportedFeatureError(f"LLVM backend does not support module-level {type(node).__name__}")
+
         return self.current_module
 
     def _build_function(self, node: ast.FunctionDef) -> IRFunction:
@@ -1043,8 +1057,17 @@ class IRBuilder:
             return self._build_try(node)
         elif isinstance(node, ast.Raise):
             return self._build_raise(node)
+        elif isinstance(node, (ast.Pass, ast.Import, ast.ImportFrom, ast.Global)):
+            # Nothing to emit, and nothing is lost by emitting nothing. `global`
+            # only restates where a name already lives: module variables are in
+            # the symbol table, so assignments resolve to them either way.
+            # `nonlocal` is deliberately absent, since the flat symbol table
+            # would silently bind the wrong variable.
+            return None
 
-        return None
+        # Anything else would vanish from the generated module while the
+        # pipeline reported success. Refuse instead of dropping it.
+        raise UnsupportedFeatureError(f"LLVM backend does not support statement type: {type(node).__name__}")
 
     def _build_annotated_assignment(self, node: ast.AnnAssign) -> IRStatement:
         """Build annotated assignment (variable declaration)."""
@@ -1243,8 +1266,9 @@ class IRBuilder:
         elif isinstance(node, ast.Subscript):
             return self._build_subscript(node)
 
-        # Fallback for unknown expressions
-        return IRLiteral(None, IRType(IRDataType.VOID), self._get_location(node))
+        # A null literal in a value position is how f"value={x}" became
+        # `ret i8* null`: the wrong answer, reported as success. Refuse instead.
+        raise UnsupportedFeatureError(f"LLVM backend does not support expression type: {type(node).__name__}")
 
     def _build_literal(self, node: ast.Constant) -> IRLiteral:
         """Build literal from constant."""

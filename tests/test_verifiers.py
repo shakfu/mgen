@@ -138,6 +138,61 @@ class TestCorrectnessProver:
         assert prover is not None
         assert hasattr(prover, "theorem_prover")
 
+    @pytest.mark.skipif(not Z3_AVAILABLE, reason="Z3 not available")
+    def test_condition_parser_creates_constraints(self):
+        """Text specifications must become actual constrained Z3 formulas."""
+        prover = CorrectnessProver()
+
+        formula = prover._parse_condition_to_z3("n >= 0 and n < 10")
+
+        assert str(formula) != "condition_0"
+        assert "n" in str(formula)
+        assert "0" in str(formula)
+        assert "10" in str(formula)
+
+    @pytest.mark.skipif(not Z3_AVAILABLE, reason="Z3 not available")
+    def test_condition_parser_handles_boolean_names(self):
+        """Names in Boolean position must be translated as Z3 Booleans."""
+        prover = CorrectnessProver()
+
+        assert str(prover._parse_condition_to_z3("not flag")) == "Not(flag)"
+        assert str(prover._parse_condition_to_z3("true")) == "True"
+
+    @pytest.mark.skipif(not Z3_AVAILABLE, reason="Z3 not available")
+    def test_condition_parser_fails_closed_on_sort_errors(self):
+        """A specification Z3 cannot build must become False, never an exception."""
+        prover = CorrectnessProver()
+
+        # 'a and 3' mixes an integer into a Boolean connective; 'x >= 0 and x'
+        # uses one name at two sorts. Both used to raise Z3Exception.
+        for condition in ["a and 3", "x >= 0 and x", "3", "x in y", "foo(1)"]:
+            assert str(prover._parse_condition_to_z3(condition)) == "False"
+
+    @pytest.mark.skipif(not Z3_AVAILABLE, reason="Z3 not available")
+    def test_correctness_proof_survives_unsupported_specification(self):
+        """An unsupported precondition must not crash the whole proof."""
+        from multigen.frontend.verifiers.correctness_prover import FormalSpecification
+
+        code = "def f(n: int) -> int:\n    return n\n"
+        context = AnalysisContext(
+            source_code=code,
+            ast_node=ast.parse(code),
+            analysis_result=None,
+            analysis_level=AnalysisLevel.INTERMEDIATE,
+        )
+        spec = FormalSpecification(
+            name="f",
+            preconditions=["not flag", "a and 3"],
+            postconditions=[],
+            loop_invariants={},
+            assertions=[],
+            termination_conditions=[],
+        )
+
+        proof = CorrectnessProver().verify_algorithm_correctness(context, spec)
+
+        assert not proof.is_correct
+
 
 class TestVerifierIntegration:
     """Test integration between verifiers and pipeline."""

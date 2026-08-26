@@ -70,6 +70,9 @@ from .base import (
     VerificationResult,
 )
 
+# Python Subset Validation
+from .diagnostics import Diagnostic, DiagnosticSeverity, RuleId, SourceSpan, diagnostics_to_json
+
 # Immutability Analysis
 from .immutability_analyzer import ImmutabilityAnalyzer, MutabilityClass
 
@@ -97,8 +100,8 @@ from .optimizers import (
 )
 
 # Python Constraint Checking
-from .python_constraints import ConstraintCategory as PythonConstraintCategory
 from .python_constraints import (
+    ConstraintCategory as PythonConstraintCategory,
     PythonConstraintChecker,
     PythonConstraintViolation,
 )
@@ -115,8 +118,8 @@ from .static_ir import (
     IRVariable,
     build_ir_from_code,
 )
-
-# Python Subset Validation
+from .static_profile import PORTABLE, PROFILES, STRICT_STATIC, StaticProfile, get_profile, profile_names
+from .static_validation import StaticValidationReport, StaticValidator
 from .subset_validator import FeatureRule, FeatureStatus, StaticPythonSubsetValidator, SubsetTier, ValidationResult
 
 # Type Inference System
@@ -159,6 +162,19 @@ __all__ = [
     "StaticPythonSubsetValidator",
     "ValidationResult",
     "FeatureRule",
+    "Diagnostic",
+    "DiagnosticSeverity",
+    "RuleId",
+    "SourceSpan",
+    "diagnostics_to_json",
+    "StaticProfile",
+    "PORTABLE",
+    "STRICT_STATIC",
+    "PROFILES",
+    "get_profile",
+    "profile_names",
+    "StaticValidator",
+    "StaticValidationReport",
     "SubsetTier",
     "FeatureStatus",
     # Static IR

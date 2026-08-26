@@ -9,6 +9,7 @@ from typing import Optional, Union
 
 from llvmlite import ir  # type: ignore[import-untyped]
 
+from ...errors import UnsupportedFeatureError
 from ...frontend.static_ir import (
     IRAssignment,
     IRBinaryOperation,
@@ -81,7 +82,16 @@ class IRToLLVMConverter(IRVisitor):
         for global_var in node.global_variables:
             global_var.accept(self)
 
-        # Generate functions
+        # Declare every function before emitting bodies so calls can reference
+        # functions that appear later in the Python module.
+        for func_node in node.functions:
+            ret_type = self._convert_type(func_node.return_type)
+            param_types = [self._convert_type(p.ir_type) for p in func_node.parameters]
+            self.func_symtab[func_node.name] = ir.Function(
+                self.module, ir.FunctionType(ret_type, param_types), func_node.name
+            )
+
+        # Generate function bodies
         for func in node.functions:
             func.accept(self)
 
@@ -102,7 +112,9 @@ class IRToLLVMConverter(IRVisitor):
 
         # Create LLVM function type and function
         func_type = ir.FunctionType(ret_type, param_types)
-        func = ir.Function(self.module, func_type, node.name)
+        func = self.func_symtab.get(node.name)
+        if func is None:
+            func = ir.Function(self.module, func_type, node.name)
 
         # Store in symbol table
         self.func_symtab[node.name] = func
@@ -2162,6 +2174,10 @@ class IRToLLVMConverter(IRVisitor):
         self.builder.position_at_end(cond_block)
         loop_var_val = self.builder.load(loop_var_ptr)
         end_val = node.end.accept(self)
+        if node.step:
+            step_val = node.step.accept(self)
+        else:
+            step_val = ir.Constant(loop_var_type, 1)
 
         # Determine comparison operator based on step value
         # For negative steps, use >, for positive steps use <
@@ -2180,8 +2196,17 @@ class IRToLLVMConverter(IRVisitor):
                         return step.right.value > 0
             return False
 
-        comparison_op = ">" if is_negative_step(node.step) else "<"
-        cond = self.builder.icmp_signed(comparison_op, loop_var_val, end_val, name="for.cond")
+        if is_negative_step(node.step):
+            cond = self.builder.icmp_signed(">", loop_var_val, end_val, name="for.cond")
+        elif node.step is not None and not isinstance(node.step, IRLiteral):
+            step_positive = self.builder.icmp_signed(
+                ">", step_val, ir.Constant(loop_var_type, 0), name="for.step.positive"
+            )
+            ascending = self.builder.icmp_signed("<", loop_var_val, end_val, name="for.cond.up")
+            descending = self.builder.icmp_signed(">", loop_var_val, end_val, name="for.cond.down")
+            cond = self.builder.select(step_positive, ascending, descending, name="for.cond")
+        else:
+            cond = self.builder.icmp_signed("<", loop_var_val, end_val, name="for.cond")
         self.builder.cbranch(cond, body_block, exit_block)
 
         # Body
@@ -2194,10 +2219,6 @@ class IRToLLVMConverter(IRVisitor):
         # Increment
         self.builder.position_at_end(inc_block)
         loop_var_val = self.builder.load(loop_var_ptr)
-        if node.step:
-            step_val = node.step.accept(self)
-        else:
-            step_val = ir.Constant(loop_var_type, 1)
         next_val = self.builder.add(loop_var_val, step_val, name="for.inc")
         self.builder.store(next_val, loop_var_ptr)
         self.builder.branch(cond_block)
@@ -2229,12 +2250,9 @@ class IRToLLVMConverter(IRVisitor):
         Args:
             node: IR try statement to convert
         """
-        # LLVM exception handling requires EH personality functions and
-        # landing pads which are complex to implement. For now, just
-        # execute the try body directly.
-        for stmt in node.body:
-            stmt.accept(self)
-        # TODO: Implement proper LLVM exception handling with invoke/landingpad
+        raise UnsupportedFeatureError(
+            "LLVM backend does not support try/except yet; refusing to discard exception handlers"
+        )
 
     def visit_raise(self, node: IRRaise) -> None:
         """Visit a raise statement node.

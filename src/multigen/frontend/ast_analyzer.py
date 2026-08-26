@@ -123,6 +123,7 @@ class ASTAnalyzer(ast.NodeVisitor):
 
     def analyze(self, source_code: str) -> AnalysisResult:
         """Analyze Python source code and return analysis results."""
+        self._reset()
         try:
             tree = ast.parse(source_code)
             self.visit(tree)
@@ -133,6 +134,18 @@ class ASTAnalyzer(ast.NodeVisitor):
             self.result.convertible = False
             self.result.conversion_confidence = 0.0
             return self.result
+
+    def _reset(self) -> None:
+        """Clear per-analysis state so one analyzer can be reused.
+
+        Without this, a second analyze() call reports the first call's functions
+        and diagnostics alongside its own.
+        """
+        self.result = AnalysisResult()
+        self.current_function = None
+        self.current_scope = "global"
+        self.type_hints = {}
+        self.node_types = {}
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         """Analyze function definitions."""

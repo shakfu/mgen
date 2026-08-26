@@ -685,8 +685,16 @@ class MultiGenPythonToOCamlConverter:
                     lines.append(f"  {field_name} : {field_type};")
                 lines.append("}")
                 lines.append("")
+        elif any(isinstance(item, ast.AnnAssign) for item in node.body):
+            # Fields declared in the class body rather than __init__: a
+            # dataclass or a NamedTuple. Emitting `unit` here silently discarded
+            # every field while the pipeline reported success.
+            raise UnsupportedFeatureError(
+                f"OCaml backend does not support class '{node.name}': fields declared in the class "
+                "body (dataclass or NamedTuple) are not yet mapped to a record type"
+            )
         else:
-            # Empty class
+            # Genuinely empty class.
             lines.append(f"type {class_name.lower()} = unit")
             lines.append("")
 

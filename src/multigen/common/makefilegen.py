@@ -25,8 +25,9 @@ TestFunc = Callable[[str], bool]
 PLATFORM = platform.system()
 
 try:
-    VERSION = float(subprocess.check_output(["make", "-v"]).decode().split("\n")[0].replace("GNU Make ", ""))
-except (subprocess.CalledProcessError, FileNotFoundError):
+    make_version = subprocess.check_output(["make", "-v"]).decode().split("\n")[0].replace("GNU Make ", "")
+    VERSION = float(".".join(make_version.split(".")[:2]))
+except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
     VERSION = 4.0  # Default fallback version
 
 

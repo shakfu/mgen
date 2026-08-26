@@ -763,14 +763,25 @@ class MultiGenPythonToTypeScriptConverter:
             var = stmt.target.id if isinstance(stmt.target, ast.Name) else "i"
             body = self._convert_statements(stmt.body)
             if len(range_args) == 1:
-                header = f"let {var} = 0; {var} < {range_args[0]}; {var}++"
+                start, stop, step = "0", range_args[0], "1"
             elif len(range_args) == 2:
-                header = f"let {var} = {range_args[0]}; {var} < {range_args[1]}; {var}++"
+                start, stop, step = range_args[0], range_args[1], "1"
             elif len(range_args) == 3:
-                header = f"let {var} = {range_args[0]}; {var} < {range_args[1]}; {var} += {range_args[2]}"
+                start, stop, step = range_args
             else:
-                header = f"let {var} = 0; {var} < 0; {var}++"
-            return f"    for ({header}) {{\n{body}\n    }}"
+                raise UnsupportedFeatureError("range() expects one to three arguments")
+            step_node = stmt.iter.args[2] if len(stmt.iter.args) == 3 else None
+            if step_node is None or (isinstance(step_node, ast.Constant) and step_node.value == 1):
+                header = f"let {var} = {start}; {var} < {stop}; {var}++"
+                return f"    for ({header}) {{\n{body}\n    }}"
+            if isinstance(step_node, ast.Constant) and isinstance(step_node.value, int) and step_node.value == 0:
+                return f"    if ({step} === 0) {{ throw new Error('range() step cannot be zero'); }}\n"
+            if isinstance(step_node, ast.Constant) and isinstance(step_node.value, int) and step_node.value > 0:
+                header = f"let {var} = {start}; {var} < {stop}; {var} += {step}"
+                return f"    for ({header}) {{\n{body}\n    }}"
+            zero_check = f"    if ({step} === 0) {{ throw new Error('range() step cannot be zero'); }}\n"
+            header = f"let {var} = {start}; ({step} > 0 ? {var} < {stop} : {var} > {stop}); {var} += {step}"
+            return f"{zero_check}    for ({header}) {{\n{body}\n    }}"
 
         # Iteration over container(s)
         body = self._convert_statements(stmt.body)

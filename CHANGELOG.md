@@ -17,6 +17,71 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Structured validation diagnostics** -- validation reported bare strings, which callers could print but not act on
+  - `Diagnostic` carries a stable rule id, severity, source span, offending node type, remediation, and supporting evidence
+  - 20 append-only identifiers (`STATIC.UNANNOTATED_PARAMETER`, `STATIC.BACKEND_UNSUPPORTED`, ...); universal constraint codes are namespaced under `CONSTRAINT.`
+  - `violations` and `warnings` are now derived views over the diagnostics, so the two cannot disagree
+  - Diagnostics are reported in source order; `ast.walk` is breadth-first, so nested findings previously preceded later top-level ones
+  - JSON serialisation via `to_dict()` / `diagnostics_to_json()`
+
+- **Validation profiles** -- policy separated from feature classification
+  - `portable` (default) reports weakly supported constructs; `strict-static` fails on them
+  - One profile per backend, derived from measured capability rather than hand-written, so a profile cannot claim support a backend lacks
+  - `--profile` on `check`, `convert`, and `build`; `PipelineConfig.validation_profile`
+  - `--format json` and `--warnings-as-errors` on `multigen check`, with documented exit codes
+
+- **`StaticValidator`** -- one pass over one parse, merging the subset rules, the AST analyzer, the universal constraint checker, and type inference into a single ordered report. Each previously parsed the source itself and reported in its own shape.
+
+- **Backend capability matrix** (`make capabilities`) -- what each backend actually does with each feature, measured rather than declared
+  - Every feature has a probe: a complete program that computes an answer and prints it
+  - Each probe is emitted, built through the pipeline, run, and compared with CPython's output
+  - Distinguishes refusing (safe) from silently discarding (dangerous) from building-but-diverging
+  - A per-backend baseline separates "this feature does not build" from "this machine has no toolchain"; unverifiable runs preserve prior verdicts instead of downgrading them
+
+- **Generated supported-syntax reference** (`make docs-syntax`) -- `docs/supported_syntax.md` is now the contract, with the feature table and diagnostic identifiers generated from the registry. A test regenerates and compares, so staleness is a build failure.
+
+- **Continuous integration** (`.github/workflows/ci.yml`) -- the repository had none. Tests on Python 3.13 and 3.14, generated-artifact freshness, end-to-end translation, every validation profile, and a clean-environment install of the built wheel.
+
+- `make lint-fix` for the rewriting form of linting, and `make capabilities` / `make docs-syntax` for the generated artifacts.
+
+### Changed
+
+- **The subset validator is an allowlist.** A construct no rule classifies is rejected rather than passed through. `async def`, `await`, the walrus operator, `nonlocal`, and `del` were previously accepted and handed to a backend.
+- **Each construct is classified by exactly one rule.** Four rules claimed `ast.ClassDef` and all four fired on every class; matchers now decide which rule governs a given node.
+- **`PLANNED` features are rejected.** They were grouped with supported ones, so `match` and `Enum` validated cleanly and failed later, or silently.
+- **Feature statuses corrected against measurement**: `Generic Types` `EXPERIMENTAL` -> `PARTIALLY_SUPPORTED` (works on 7/8 backends); `Tuples` `PARTIALLY_SUPPORTED` -> `NOT_SUPPORTED` (7/8 refuse; only TypeScript builds one); `Exception Handling` `FULLY_SUPPORTED` -> `PARTIALLY_SUPPORTED` (operations do not raise).
+- **`strict-static` excludes generators, `yield from`, and exceptions.** Settled by executing generated C against CPython: generators cannot be consumed, and a `try` around `10 // 0` dies of SIGFPE rather than reaching the handler. Context managers were measured to agree with CPython and are kept.
+- Rules that describe runtime constructs no longer apply inside type annotations, so `dict[str, int]` is accepted while a tuple value is not.
+- `make lint` validates instead of rewriting; `qa` uses `format-check`. Both targets silently rewrote the checkout.
+- ruff and isort agreed to disagree about one import block, each undoing the other; their `combine-as-imports` settings now match and vendored sources are excluded from both.
+- `ValidationPhaseResult` carries the profile and structured diagnostics alongside the existing fields.
+
+### Fixed
+
+- **Strict verification generated code without verifying anything** when Z3 was absent or advanced analysis was disabled -- it logged an error and continued.
+- **Python optimizations were silently skipped**: the optimizers are built only under advanced analysis, but the phase guarded on `enable_optimizations`, so every run swallowed an `AttributeError` and applied nothing.
+- **`try`/`except` generated C that never compiled.** `multigen_python_ops.h` defined a second `MGEN_TRY`/`MGEN_END_TRY` family sharing names with the setjmp-based one; included last, it won and then composed with the other header's `MGEN_CATCH`.
+- **Programs using `dict[str, int]` never built.** The C builder used bare `-std=c11`, where the runtime's `strdup` is undeclared. Now `-D_POSIX_C_SOURCE=200809L`.
+- **C f-strings emitted calls to functions they never included.** Includes are assembled from a pre-scan, so the missing header had to be detected there.
+- **C emitted `/* Unsupported expression ... */` where a value belonged**, producing source that could not compile while the pipeline reported success. Unsupported expressions are now refused.
+- **The LLVM backend silently discarded** exception handlers, module-level classes and `match` statements, and any unhandled statement or expression -- `f"value={x}"` compiled to `ret i8* null`. The IR builder now refuses what it cannot represent.
+- **The OCaml backend discarded dataclass and NamedTuple fields**, emitting `type pt = unit`.
+- **`range()` with negative or dynamic steps** produced no iterations in the C and TypeScript backends and used the wrong comparison in LLVM.
+- **LLVM could not call a function defined later** in the module; functions are now declared before bodies are emitted.
+- **`ASTAnalyzer` accumulated state between calls**, so a second `analyze()` reported the first call's functions and diagnostics.
+- **The symbolic executor terminated each path at its first ordinary statement**, so no function was analysed as a sequence.
+- **The correctness prover crashed** on specifications Z3 could not build (`z3.Z3Exception` was not caught) and turned every textual condition into an unconstrained boolean.
+- **`multigen check --report` exited 0** for a missing or invalid file, reporting success for something it never validated.
+- **`multigen.common.makefilegen` failed to import** against GNU Make 4.4.1: `float("4.4.1")` raised an uncaught `ValueError`.
+- Documentation links and `mkdocs.yml` navigation entries used lowercase filenames that do not resolve on case-sensitive systems; `mkdocs build --strict` now succeeds.
+
+### Removed
+
+- The duplicate `MGEN_TRY` / `MGEN_EXCEPT` / `MGEN_FINALLY` / `MGEN_END_TRY` family from `multigen_python_ops.h`. Nothing emitted it and it broke the family that is emitted.
+- `StaticPythonSubsetValidator.validation_cache` (never read) and `last_validation_error` (per-instance state consumed by whichever later node failed next).
+
 ## [0.2.0]
 
 ### Added

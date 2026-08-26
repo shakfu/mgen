@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Callable, Optional
 
 from ..common import log
+from .diagnostics import Diagnostic, DiagnosticSeverity, RuleId, SourceSpan
 
 
 class SubsetTier(Enum):
@@ -40,8 +41,22 @@ class FeatureRule:
     tier: SubsetTier
     status: FeatureStatus
     description: str
+    # Registry key, assigned at construction. Backend profiles reject by key.
+    key: str = ""
     ast_nodes: list[type] = field(default_factory=list)
     validator: Optional[Callable[..., bool]] = None
+    # Decides whether this rule governs a node, as opposed to whether the node
+    # satisfies it. Several rules claim ast.ClassDef; only one describes any
+    # given class. A rule with no matcher governs every node of its types.
+    matcher: Optional[Callable[..., bool]] = None
+    # Alternative to `validator` for rules with specific messages: returns None
+    # when the node is acceptable, otherwise the diagnostic describing why not.
+    diagnose: Optional[Callable[..., Optional["Diagnostic"]]] = None
+    # Order in which competing rules for one node type are consulted.
+    priority: int = 0
+    # Set for rules that describe a runtime construct, so they stay silent when
+    # the same node type appears inside a type annotation.
+    skip_in_annotations: bool = False
     constraints: list[str] = field(default_factory=list)
     examples: dict[str, str] = field(default_factory=dict)
     c_mapping: Optional[str] = None
@@ -49,15 +64,154 @@ class FeatureRule:
 
 @dataclass
 class ValidationResult:
-    """Result of subset validation."""
+    """Result of subset validation.
+
+    `diagnostics` is the store; `violations` and `warnings` are string views of
+    it, so the two can never disagree.
+    """
 
     is_valid: bool
     tier: SubsetTier
-    violations: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
+    diagnostics: list[Diagnostic] = field(default_factory=list)
     supported_features: list[str] = field(default_factory=list)
     unsupported_features: list[str] = field(default_factory=list)
+    # (rule key, where it was used). A profile that rejects a feature needs a
+    # position to report, and an accepted feature produces no diagnostic.
+    feature_uses: list[tuple[str, Optional[SourceSpan]]] = field(default_factory=list)
     conversion_strategy: Optional[str] = None
+
+    @property
+    def violations(self) -> list[str]:
+        """Error messages, in the order they were reported."""
+        return [d.message for d in self.diagnostics if d.is_error]
+
+    @property
+    def warnings(self) -> list[str]:
+        """Warning messages, in the order they were reported."""
+        return [d.message for d in self.diagnostics if not d.is_error]
+
+    def errors(self) -> list[Diagnostic]:
+        """Diagnostics that invalidate the source."""
+        return [d for d in self.diagnostics if d.is_error]
+
+
+def _ast_types(*names: str) -> frozenset[type]:
+    """Resolve AST node names, tolerating types absent on older Pythons."""
+    return frozenset(node for node in (getattr(ast, name, None) for name in names) if isinstance(node, type))
+
+
+# Node types that carry no policy of their own: syntax scaffolding, operators,
+# and statements whose meaning is already governed by an enclosing rule. The
+# validator is an allowlist, so any node reaching it that is neither here nor
+# claimed by a feature rule is rejected. That is deliberate: a construct nobody
+# has classified must not reach a backend on the strength of being unrecognised.
+STRUCTURAL_AST_NODES: frozenset[type] = _ast_types(
+    # Module scaffolding and simple statements
+    "Module",
+    "Expr",
+    "Assign",
+    "AugAssign",
+    "Return",
+    "Pass",
+    "Break",
+    "Continue",
+    "Import",
+    "ImportFrom",
+    # Expressions whose element types are checked by their own rules
+    "Name",
+    "Attribute",
+    "Dict",
+    "Set",
+    "IfExp",
+    "BoolOp",
+    "Slice",
+    # Syntax scaffolding
+    "Load",
+    "Store",
+    "alias",
+    "arg",
+    "arguments",
+    "keyword",
+    "comprehension",
+    "withitem",
+    "match_case",
+    # Binary operators
+    "Add",
+    "Sub",
+    "Mult",
+    "Div",
+    "FloorDiv",
+    "Mod",
+    "Pow",
+    "LShift",
+    "RShift",
+    "BitOr",
+    "BitXor",
+    "BitAnd",
+    # Unary and boolean operators
+    "Invert",
+    "Not",
+    "UAdd",
+    "USub",
+    "And",
+    "Or",
+    # Comparison operators
+    "Eq",
+    "NotEq",
+    "Lt",
+    "LtE",
+    "Gt",
+    "GtE",
+    "Is",
+    "IsNot",
+    "In",
+    "NotIn",
+    # Match patterns; the enclosing Match statement carries the rule
+    "MatchValue",
+    "MatchSingleton",
+    "MatchSequence",
+    "MatchMapping",
+    "MatchClass",
+    "MatchStar",
+    "MatchAs",
+    "MatchOr",
+)
+
+
+def _annotation_node_ids(tree: ast.AST) -> frozenset[int]:
+    """Identify every node that is part of a type annotation.
+
+    A tuple written as a value and a tuple written inside `dict[str, int]` are
+    the same ast.Tuple. The first is a runtime construct the backends mostly
+    cannot build; the second is type syntax they handle routinely. Without
+    knowing which is which, a rule about tuples has to be wrong about one of
+    them.
+    """
+    annotations: list[ast.AST] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AnnAssign):
+            annotations.append(node.annotation)
+        elif isinstance(node, ast.arg) and node.annotation is not None:
+            annotations.append(node.annotation)
+        elif isinstance(node, ast.FunctionDef) and node.returns is not None:
+            annotations.append(node.returns)
+
+    ids: set[int] = set()
+    for annotation in annotations:
+        for node in ast.walk(annotation):
+            ids.add(id(node))
+    return frozenset(ids)
+
+
+@dataclass(frozen=True)
+class ValidationContext:
+    """Where a node sits, for rules whose meaning depends on position."""
+
+    annotation_nodes: frozenset[int] = frozenset()
+
+    def in_annotation(self, node: ast.AST) -> bool:
+        """Whether this node is part of a type annotation."""
+        return id(node) in self.annotation_nodes
 
 
 class StaticPythonSubsetValidator:
@@ -66,8 +220,8 @@ class StaticPythonSubsetValidator:
     def __init__(self) -> None:
         self.log = log.config(self.__class__.__name__)
         self.feature_rules = self._initialize_feature_rules()
-        self.validation_cache: dict[str, ValidationResult] = {}
-        self.last_validation_error: Optional[str] = None  # Store detailed error from validators
+        for key, rule in self.feature_rules.items():
+            rule.key = key
 
     def validate_code(self, source_code: str) -> ValidationResult:
         """Validate that code conforms to the Static Python Subset."""
@@ -75,8 +229,18 @@ class StaticPythonSubsetValidator:
             tree = ast.parse(source_code)
             return self._validate_ast(tree)
         except SyntaxError as e:
+            span = SourceSpan(line=e.lineno, column=(e.offset or 1) - 1) if e.lineno else None
             return ValidationResult(
-                is_valid=False, tier=SubsetTier.TIER_4_UNSUPPORTED, violations=[f"Syntax error: {e}"]
+                is_valid=False,
+                tier=SubsetTier.TIER_4_UNSUPPORTED,
+                diagnostics=[
+                    Diagnostic(
+                        rule_id=RuleId.SYNTAX_ERROR,
+                        severity=DiagnosticSeverity.ERROR,
+                        message=f"Syntax error: {e}",
+                        span=span,
+                    )
+                ],
             )
 
     def validate_file(self, file_path: str) -> ValidationResult:
@@ -95,29 +259,39 @@ class StaticPythonSubsetValidator:
             rules = [r for r in rules if r.tier == tier]
         return [r for r in rules if r.status != FeatureStatus.NOT_SUPPORTED]
 
+    def validate_ast(self, tree: ast.AST) -> ValidationResult:
+        """Validate an already-parsed AST, so callers can parse once."""
+        return self._validate_ast(tree)
+
     def _validate_ast(self, tree: ast.AST) -> ValidationResult:
         """Validate an AST against the subset rules."""
         result = ValidationResult(is_valid=True, tier=SubsetTier.TIER_1_FUNDAMENTAL)
         max_tier = SubsetTier.TIER_1_FUNDAMENTAL
 
+        context = ValidationContext(annotation_nodes=_annotation_node_ids(tree))
+
         # Check each node against our rules
         for node in ast.walk(tree):
-            node_result = self._validate_node(node)
+            node_result = self._validate_node(node, context)
 
             # Merge results
             if not node_result.is_valid:
                 result.is_valid = False
 
-            result.violations.extend(node_result.violations)
-            result.warnings.extend(node_result.warnings)
+            result.diagnostics.extend(node_result.diagnostics)
             result.supported_features.extend(node_result.supported_features)
             result.unsupported_features.extend(node_result.unsupported_features)
+            result.feature_uses.extend(node_result.feature_uses)
 
             # Track highest tier used
             if node_result.tier.value > max_tier.value:
                 max_tier = node_result.tier
 
         result.tier = max_tier
+
+        # ast.walk is breadth-first, so report in source order instead. The sort
+        # is stable, so diagnostics at one position keep their discovery order.
+        result.diagnostics.sort(key=lambda d: (0, d.span.line, d.span.column) if d.span else (1, 0, 0))
 
         # Remove duplicates
         result.supported_features = list(set(result.supported_features))
@@ -128,68 +302,144 @@ class StaticPythonSubsetValidator:
 
         return result
 
-    def _validate_node(self, node: ast.AST) -> ValidationResult:
-        """Validate a single AST node."""
+    @staticmethod
+    def _diagnostic(
+        rule_id: str,
+        message: str,
+        node: ast.AST,
+        *,
+        severity: DiagnosticSeverity = DiagnosticSeverity.ERROR,
+        feature: Optional[str] = None,
+        remediation: Optional[str] = None,
+        **evidence: str,
+    ) -> Diagnostic:
+        """Build a diagnostic positioned at `node`."""
+        return Diagnostic(
+            rule_id=rule_id,
+            severity=severity,
+            message=message,
+            span=SourceSpan.from_node(node),
+            node_type=type(node).__name__,
+            feature=feature,
+            remediation=remediation,
+            evidence=evidence,
+        )
+
+    def _governing_rule(self, node: ast.AST) -> tuple[bool, Optional[FeatureRule]]:
+        """Find the single rule that classifies this node.
+
+        Returns whether any rule claims the node's type at all, and the one rule
+        that governs this particular node. A claimed type with no governing rule
+        is legal: a plain class is an ast.ClassDef that is neither an enum, a
+        dataclass, a named tuple, nor metaclass-based, and its body is validated
+        by the rules for the nodes it contains.
+        """
+        node_type = type(node)
+        candidates = [rule for rule in self.feature_rules.values() if node_type in rule.ast_nodes]
+        if not candidates:
+            return False, None
+
+        for rule in sorted(candidates, key=lambda r: r.priority):
+            if rule.matcher is None or rule.matcher(node):
+                return True, rule
+        return True, None
+
+    def _validate_node(self, node: ast.AST, context: Optional[ValidationContext] = None) -> ValidationResult:
+        """Validate a single AST node against the one rule that governs it."""
         node_type = type(node)
         result = ValidationResult(is_valid=True, tier=SubsetTier.TIER_1_FUNDAMENTAL)
+        context = context or ValidationContext()
 
-        # Check against feature rules
-        for _rule_name, rule in self.feature_rules.items():
-            if node_type in rule.ast_nodes:
-                # First run custom validator if present (for rules that need specific checking)
-                validator_passed = True
-                if rule.validator:
-                    validator_passed = rule.validator(node)
+        recognised, rule = self._governing_rule(node)
 
-                # Apply rule status based on validator result
-                if rule.status == FeatureStatus.NOT_SUPPORTED:
-                    # For NOT_SUPPORTED rules with validators, only fail if validator says so
-                    if rule.validator:
-                        if not validator_passed:
-                            result.is_valid = False
-                            result.tier = SubsetTier.TIER_4_UNSUPPORTED
-                            result.violations.append(f"Unsupported feature: {rule.name}")
-                            result.unsupported_features.append(rule.name)
-                        else:
-                            # Validator passed, treat as supported feature
-                            result.supported_features.append(rule.name)
-                            if rule.tier.value > result.tier.value:
-                                result.tier = rule.tier
-                    else:
-                        # No validator, unconditionally unsupported
-                        result.is_valid = False
-                        result.tier = SubsetTier.TIER_4_UNSUPPORTED
-                        result.violations.append(f"Unsupported feature: {rule.name}")
-                        result.unsupported_features.append(rule.name)
-                elif rule.status == FeatureStatus.EXPERIMENTAL:
-                    if validator_passed:
-                        result.warnings.append(f"Experimental feature: {rule.name}")
-                        result.supported_features.append(rule.name)
-                        if rule.tier.value > result.tier.value:
-                            result.tier = rule.tier
-                    else:
-                        result.is_valid = False
-                        result.violations.append(f"Validation failed for {rule.name}")
-                else:
-                    # FULLY_SUPPORTED, PARTIALLY_SUPPORTED, or PLANNED
-                    if validator_passed:
-                        result.supported_features.append(rule.name)
-                        if rule.tier.value > result.tier.value:
-                            result.tier = rule.tier
-                    else:
-                        result.is_valid = False
-                        if rule.name == "Function Calls":
-                            result.violations.append(
-                                "Dynamic code execution functions (eval, exec, compile) not supported"
-                            )
-                        else:
-                            # Use detailed error if available
-                            if self.last_validation_error:
-                                result.violations.append(self.last_validation_error)
-                                self.last_validation_error = None
-                            else:
-                                result.violations.append(f"Validation failed for {rule.name}")
+        if rule is not None and rule.skip_in_annotations and context.in_annotation(node):
+            # Type syntax, not a runtime construct: this rule has nothing to say.
+            return result
 
+        if not recognised:
+            if node_type not in STRUCTURAL_AST_NODES:
+                # Unrecognised construct: reject rather than let it reach a
+                # backend that will either fail late or silently drop it.
+                result.is_valid = False
+                result.tier = SubsetTier.TIER_4_UNSUPPORTED
+                result.diagnostics.append(
+                    self._diagnostic(
+                        RuleId.UNRECOGNIZED_CONSTRUCT,
+                        f"Unsupported Python construct: {node_type.__name__}",
+                        node,
+                        remediation="No rule classifies this construct, so no backend can be trusted with it.",
+                    )
+                )
+                result.unsupported_features.append(node_type.__name__)
+            return result
+
+        if rule is None:
+            return result
+
+        def reject(diagnostic: Diagnostic) -> ValidationResult:
+            result.is_valid = False
+            result.tier = SubsetTier.TIER_4_UNSUPPORTED
+            result.diagnostics.append(diagnostic)
+            result.unsupported_features.append(rule.name)
+            return result
+
+        def accept() -> None:
+            result.supported_features.append(rule.name)
+            result.feature_uses.append((rule.key, SourceSpan.from_node(node)))
+            if rule.tier.value > result.tier.value:
+                result.tier = rule.tier
+
+        if rule.status == FeatureStatus.NOT_SUPPORTED:
+            return reject(
+                self._diagnostic(
+                    RuleId.UNSUPPORTED_FEATURE,
+                    f"Unsupported feature: {rule.name}",
+                    node,
+                    feature=rule.name,
+                    remediation=rule.description,
+                )
+            )
+
+        if rule.status == FeatureStatus.PLANNED:
+            # Planned means the backends have no implementation. Accepting it
+            # here lets the construct reach a backend that drops it silently.
+            return reject(
+                self._diagnostic(
+                    RuleId.FEATURE_NOT_IMPLEMENTED,
+                    f"Feature not yet implemented: {rule.name}",
+                    node,
+                    feature=rule.name,
+                    remediation="Avoid this construct until the backends implement it.",
+                )
+            )
+
+        if rule.diagnose is not None:
+            diagnostic = rule.diagnose(node)
+            if diagnostic is not None:
+                return reject(diagnostic)
+        elif rule.validator is not None and not rule.validator(node):
+            return reject(
+                self._diagnostic(
+                    RuleId.CONSTRAINT_VIOLATION,
+                    f"Validation failed for {rule.name}",
+                    node,
+                    feature=rule.name,
+                    remediation="; ".join(rule.constraints) or None,
+                )
+            )
+
+        if rule.status == FeatureStatus.EXPERIMENTAL:
+            result.diagnostics.append(
+                self._diagnostic(
+                    RuleId.EXPERIMENTAL_FEATURE,
+                    f"Experimental feature: {rule.name}",
+                    node,
+                    severity=DiagnosticSeverity.WARNING,
+                    feature=rule.name,
+                )
+            )
+
+        accept()
         return result
 
     def _initialize_feature_rules(self) -> dict[str, FeatureRule]:
@@ -217,7 +467,7 @@ class StaticPythonSubsetValidator:
             status=FeatureStatus.FULLY_SUPPORTED,
             description="Type-annotated function definitions",
             ast_nodes=[ast.FunctionDef],
-            validator=self._validate_function_def,
+            diagnose=self._diagnose_function_def,
             constraints=["Must have type annotations", "No decorators except allowed ones"],
             c_mapping="C function declarations",
             examples={
@@ -261,7 +511,7 @@ class StaticPythonSubsetValidator:
             status=FeatureStatus.FULLY_SUPPORTED,
             description="F-string literals for string formatting",
             ast_nodes=[ast.JoinedStr, ast.FormattedValue],
-            validator=self._validate_f_string,
+            diagnose=self._diagnose_f_string,
             c_mapping="String concatenation with type conversion (std::to_string, sprintf, etc.)",
             examples={
                 "valid": 'f"Result: {x}"\nf"Pi: {pi:.2f}"\nf"Hex: {n:x}"',
@@ -278,6 +528,8 @@ class StaticPythonSubsetValidator:
             status=FeatureStatus.PLANNED,
             description="Python enums mapped to C enums",
             ast_nodes=[ast.ClassDef],
+            matcher=self._matches_enum,
+            priority=1,
             validator=self._validate_enum,
             c_mapping="C enum declarations",
             examples={
@@ -292,6 +544,8 @@ class StaticPythonSubsetValidator:
             status=FeatureStatus.FULLY_SUPPORTED,
             description="Dataclasses mapped to C structs",
             ast_nodes=[ast.ClassDef],
+            matcher=self._matches_dataclass,
+            priority=3,
             validator=self._validate_dataclass,
             c_mapping="C struct definitions with constructor functions",
         )
@@ -299,9 +553,14 @@ class StaticPythonSubsetValidator:
         rules["tuples"] = FeatureRule(
             name="Tuples",
             tier=SubsetTier.TIER_2_STRUCTURED,
-            status=FeatureStatus.PARTIALLY_SUPPORTED,
-            description="Fixed-size tuples as anonymous structs",
+            # Audited across the backends: only TypeScript builds a tuple value.
+            # C used to emit `tuple[int, int] p = /* Unsupported expression */`,
+            # and the rest refuse. The annotation form, as in dict[str, int], is
+            # handled everywhere, which is what skip_in_annotations preserves.
+            status=FeatureStatus.NOT_SUPPORTED,
+            description="Tuple values are not translatable; tuples in type annotations are",
             ast_nodes=[ast.Tuple],
+            skip_in_annotations=True,
             c_mapping="Anonymous C structs",
         )
 
@@ -311,6 +570,8 @@ class StaticPythonSubsetValidator:
             status=FeatureStatus.FULLY_SUPPORTED,
             description="NamedTuple classes mapped to C structs",
             ast_nodes=[ast.ClassDef],
+            matcher=self._matches_namedtuple,
+            priority=2,
             validator=self._validate_namedtuple,
             c_mapping="C struct definitions with field access",
         )
@@ -332,6 +593,8 @@ class StaticPythonSubsetValidator:
             status=FeatureStatus.EXPERIMENTAL,
             description="Union types as tagged unions",
             ast_nodes=[ast.Subscript],  # Union[int, str]
+            matcher=self._matches_union_type,
+            priority=0,
             validator=self._validate_union_type,
             c_mapping="Tagged unions in C",
         )
@@ -370,7 +633,7 @@ class StaticPythonSubsetValidator:
             status=FeatureStatus.PARTIALLY_SUPPORTED,
             description="yield from for extending accumulator with iterable (eager collection)",
             ast_nodes=[ast.YieldFrom],
-            validator=self._validate_yield_from,
+            diagnose=self._diagnose_yield_from,
             constraints=["Function calls, range(), and variables only", "No .send() or .throw()"],
             c_mapping="Extend accumulator with all elements from iterable",
             examples={
@@ -395,9 +658,14 @@ class StaticPythonSubsetValidator:
         rules["generics"] = FeatureRule(
             name="Generic Types",
             tier=SubsetTier.TIER_3_ADVANCED,
-            status=FeatureStatus.EXPERIMENTAL,
-            description="Generic types via monomorphization",
+            # Audited against every backend: list[int] and dict[str, int] map to
+            # vec_int, &Vec<i32>, number[] and []int respectively. Only the LLVM
+            # backend refuses. "Experimental" was stale, and made the strict
+            # profile reject most of the corpus over annotations that work.
+            status=FeatureStatus.PARTIALLY_SUPPORTED,
+            description="Generic types via monomorphization (not supported by the LLVM backend)",
             ast_nodes=[ast.Subscript],  # List[T], Dict[K, V]
+            priority=1,
             c_mapping="Template instantiation/monomorphization",
         )
 
@@ -409,7 +677,8 @@ class StaticPythonSubsetValidator:
             status=FeatureStatus.NOT_SUPPORTED,
             description="Metaclasses require runtime introspection",
             ast_nodes=[ast.ClassDef],
-            validator=self._validate_no_metaclasses,
+            matcher=self._matches_metaclass,
+            priority=0,
         )
 
         rules["duck_typing"] = FeatureRule(
@@ -449,10 +718,17 @@ class StaticPythonSubsetValidator:
         rules["exceptions"] = FeatureRule(
             name="Exception Handling",
             tier=SubsetTier.TIER_2_STRUCTURED,
-            status=FeatureStatus.FULLY_SUPPORTED,
-            description="try/except/else/finally with exception types",
+            # Measured by executing generated C against CPython: an explicit
+            # `raise` is caught and `finally` runs, but no operation raises.
+            # `10 // 0` inside a try is undefined behaviour in C, so the program
+            # dies of SIGFPE where Python returns from the except clause.
+            status=FeatureStatus.PARTIALLY_SUPPORTED,
+            description=(
+                "try/except/else/finally for explicitly raised exceptions. Operations do not raise: "
+                "a ZeroDivisionError or IndexError crashes instead of reaching the handler"
+            ),
             ast_nodes=[ast.Try, ast.Raise, ast.ExceptHandler],
-            validator=self._validate_exception_handling,
+            diagnose=self._diagnose_exception_handling,
             constraints=["No exception chaining (raise ... from ...)"],
             c_mapping="try/catch in C++, try/with in OCaml",
             examples={
@@ -467,7 +743,7 @@ class StaticPythonSubsetValidator:
             status=FeatureStatus.PARTIALLY_SUPPORTED,
             description="Basic with statement for file I/O (single context manager)",
             ast_nodes=[ast.With],
-            validator=self._validate_with_statement,
+            diagnose=self._diagnose_with_statement,
             constraints=["Single context manager only", "File operations only", "Requires 'as' binding"],
             c_mapping="RAII in C++, defer in Go, bracket in Haskell",
             examples={
@@ -480,34 +756,44 @@ class StaticPythonSubsetValidator:
 
     # Validator methods for specific features
 
-    def _validate_function_def(self, node: ast.FunctionDef) -> bool:
+    def _diagnose_function_def(self, node: ast.FunctionDef) -> Optional[Diagnostic]:
         """Validate function definition constraints."""
-        # Check return type annotation
         if not node.returns:
-            self.last_validation_error = (
-                f"Function '{node.name}' at line {node.lineno} is missing return type annotation"
+            return self._diagnostic(
+                RuleId.MISSING_RETURN_ANNOTATION,
+                f"Function '{node.name}' at line {node.lineno} is missing return type annotation",
+                node,
+                feature="Function Definitions",
+                remediation=f"Annotate the return type, for example `def {node.name}(...) -> int:`.",
+                function=node.name,
             )
-            return False
 
-        # Must have type annotations for all parameters
         for arg in node.args.args:
             if not arg.annotation:
-                self.last_validation_error = (
-                    f"Function '{node.name}' at line {node.lineno}: parameter '{arg.arg}' is missing type annotation"
+                return self._diagnostic(
+                    RuleId.UNANNOTATED_PARAMETER,
+                    f"Function '{node.name}' at line {node.lineno}: parameter '{arg.arg}' is missing type annotation",
+                    arg,
+                    feature="Function Definitions",
+                    remediation=f"Annotate the parameter, for example `{arg.arg}: int`.",
+                    function=node.name,
+                    parameter=arg.arg,
                 )
-                return False
 
-        # No complex decorators
         allowed_decorators = {"staticmethod", "classmethod"}
         for decorator in node.decorator_list:
-            if isinstance(decorator, ast.Name):
-                if decorator.id not in allowed_decorators:
-                    self.last_validation_error = (
-                        f"Function '{node.name}' at line {node.lineno}: decorator '@{decorator.id}' is not allowed"
-                    )
-                    return False
+            if isinstance(decorator, ast.Name) and decorator.id not in allowed_decorators:
+                return self._diagnostic(
+                    RuleId.UNSUPPORTED_DECORATOR,
+                    f"Function '{node.name}' at line {node.lineno}: decorator '@{decorator.id}' is not allowed",
+                    decorator,
+                    feature="Function Definitions",
+                    remediation=f"Remove '@{decorator.id}'. Supported: {', '.join(sorted(allowed_decorators))}.",
+                    function=node.name,
+                    decorator=decorator.id,
+                )
 
-        return True
+        return None
 
     def _validate_control_flow(self, node: ast.stmt) -> bool:
         """Validate control flow constraints."""
@@ -537,35 +823,16 @@ class StaticPythonSubsetValidator:
         return True
 
     def _validate_enum(self, node: ast.ClassDef) -> bool:
-        """Validate enum constraints."""
-        # Check if it's actually an enum
-        for base in node.bases:
-            if isinstance(base, ast.Name) and base.id == "Enum":
-                # Validate enum members have integer values
-                for stmt in node.body:
-                    if isinstance(stmt, ast.Assign):
-                        if len(stmt.targets) == 1 and isinstance(stmt.value, ast.Constant):
-                            if not isinstance(stmt.value.value, int):
-                                return False
-                return True
-        return True  # Not an enum, let other validators handle it
+        """Validate enum constraints. The matcher has established this is an enum."""
+        for stmt in node.body:
+            if isinstance(stmt, ast.Assign):
+                if len(stmt.targets) == 1 and isinstance(stmt.value, ast.Constant):
+                    if not isinstance(stmt.value.value, int):
+                        return False
+        return True
 
     def _validate_dataclass(self, node: ast.ClassDef) -> bool:
-        """Validate dataclass constraints."""
-        # Check for @dataclass decorator
-        has_dataclass_decorator = False
-        for decorator in node.decorator_list:
-            if isinstance(decorator, ast.Name) and decorator.id == "dataclass":
-                has_dataclass_decorator = True
-                break
-            elif isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Name):
-                if decorator.func.id == "dataclass":
-                    has_dataclass_decorator = True
-                    break
-
-        if not has_dataclass_decorator:
-            return True  # Not a dataclass
-
+        """Validate dataclass constraints. The matcher has established the decorator."""
         # Validate all fields have type annotations
         for stmt in node.body:
             if isinstance(stmt, ast.AnnAssign):
@@ -579,7 +846,7 @@ class StaticPythonSubsetValidator:
                 if stmt.name.startswith("__"):
                     continue  # Magic methods are OK
                 # Regular methods should be simple
-                if not self._validate_function_def(stmt):
+                if self._diagnose_function_def(stmt) is not None:
                     return False
             elif isinstance(stmt, ast.Pass):
                 continue  # Pass statements are OK
@@ -589,21 +856,7 @@ class StaticPythonSubsetValidator:
         return True
 
     def _validate_namedtuple(self, node: ast.ClassDef) -> bool:
-        """Validate namedtuple constraints."""
-        # Check if it inherits from NamedTuple
-        is_namedtuple = False
-        for base in node.bases:
-            if isinstance(base, ast.Name) and base.id == "NamedTuple":
-                is_namedtuple = True
-                break
-            elif isinstance(base, ast.Attribute):
-                if isinstance(base.value, ast.Name) and base.value.id == "typing" and base.attr == "NamedTuple":
-                    is_namedtuple = True
-                    break
-
-        if not is_namedtuple:
-            return True  # Not a namedtuple
-
+        """Validate namedtuple constraints. The matcher has established the base class."""
         # Validate all fields have type annotations and no methods
         for stmt in node.body:
             if isinstance(stmt, ast.AnnAssign):
@@ -622,6 +875,47 @@ class StaticPythonSubsetValidator:
                 return False  # Other statements not allowed
 
         return True
+
+    def _matches_metaclass(self, node: ast.ClassDef) -> bool:
+        """A class declaring `metaclass=` is governed by the metaclass rule."""
+        return any(keyword.arg == "metaclass" for keyword in node.keywords)
+
+    def _matches_enum(self, node: ast.ClassDef) -> bool:
+        """A class inheriting from Enum is governed by the enum rule."""
+        for base in node.bases:
+            if isinstance(base, ast.Name) and base.id == "Enum":
+                return True
+            if isinstance(base, ast.Attribute) and base.attr == "Enum":
+                return True
+        return False
+
+    def _matches_namedtuple(self, node: ast.ClassDef) -> bool:
+        """A class inheriting from NamedTuple is governed by the namedtuple rule."""
+        for base in node.bases:
+            if isinstance(base, ast.Name) and base.id == "NamedTuple":
+                return True
+            if isinstance(base, ast.Attribute) and base.attr == "NamedTuple":
+                return True
+        return False
+
+    def _matches_dataclass(self, node: ast.ClassDef) -> bool:
+        """A class carrying @dataclass is governed by the dataclass rule."""
+        for decorator in node.decorator_list:
+            if isinstance(decorator, ast.Name) and decorator.id == "dataclass":
+                return True
+            if isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Name):
+                if decorator.func.id == "dataclass":
+                    return True
+        return False
+
+    def _matches_union_type(self, node: ast.Subscript) -> bool:
+        """Union[...] and Optional[...] subscripts, as opposed to generics."""
+        target = node.value
+        if isinstance(target, ast.Name):
+            return target.id in ("Union", "Optional")
+        if isinstance(target, ast.Attribute):
+            return target.attr in ("Union", "Optional")
+        return False
 
     def _is_supported_type_annotation(self, node: ast.expr) -> bool:
         """Check if a type annotation is supported for struct fields."""
@@ -650,14 +944,13 @@ class StaticPythonSubsetValidator:
         return all(type(elt) is first_type for elt in node.elts)
 
     def _validate_union_type(self, node: ast.Subscript) -> bool:
-        """Validate union type constraints."""
-        if isinstance(node.value, ast.Name) and node.value.id == "Union":
-            # Union types should have reasonable number of alternatives
-            if isinstance(node.slice, ast.Tuple):
-                return len(node.slice.elts) <= 4  # Arbitrary limit
+        """Validate union type constraints. The matcher has established the form."""
+        # Union types should have a reasonable number of alternatives.
+        if isinstance(node.slice, ast.Tuple):
+            return len(node.slice.elts) <= 4
         return True
 
-    def _validate_f_string(self, node: ast.AST) -> bool:
+    def _diagnose_f_string(self, node: ast.AST) -> Optional[Diagnostic]:
         """Validate f-string constraints."""
         if isinstance(node, ast.JoinedStr):
             # Check each formatted value in the f-string
@@ -665,23 +958,30 @@ class StaticPythonSubsetValidator:
                 if isinstance(value, ast.FormattedValue):
                     # Conversion flags (!r, !s, !a) not supported
                     if value.conversion != -1:
-                        self.last_validation_error = (
-                            f"F-string conversion flags (!r, !s, !a) are not yet supported "
-                            f"at line {node.lineno if hasattr(node, 'lineno') else '?'}"
+                        return self._diagnostic(
+                            RuleId.FSTRING_CONVERSION_FLAG,
+                            "F-string conversion flags (!r, !s, !a) are not yet supported "
+                            f"at line {node.lineno if hasattr(node, 'lineno') else '?'}",
+                            value,
+                            feature="F-Strings",
+                            remediation="Format the value explicitly instead of using !r, !s or !a.",
                         )
-                        return False
                     # Validate format spec if present (only simple numeric specs supported)
                     if value.format_spec is not None and isinstance(value.format_spec, ast.JoinedStr):
                         spec_str = self._extract_format_spec_string(value.format_spec)
                         if spec_str is not None and not self._is_supported_format_spec(spec_str):
-                            self.last_validation_error = (
+                            return self._diagnostic(
+                                RuleId.FSTRING_FORMAT_SPEC,
                                 f"F-string format spec ':{spec_str}' is not supported "
                                 f"at line {node.lineno if hasattr(node, 'lineno') else '?'}. "
-                                f"Supported: numeric precision (.Nf), integer (d), hex (x/X), octal (o), "
-                                f"scientific (e/E), percentage (%)"
+                                "Supported: numeric precision (.Nf), integer (d), hex (x/X), octal (o), "
+                                "scientific (e/E), percentage (%)",
+                                value,
+                                feature="F-Strings",
+                                remediation="Use a supported format spec: .Nf, d, x, X, o, e, E or %.",
+                                format_spec=spec_str,
                             )
-                            return False
-        return True
+        return None
 
     def _extract_format_spec_string(self, format_spec: ast.JoinedStr) -> Optional[str]:
         """Extract a simple string from a format_spec JoinedStr node."""
@@ -710,13 +1010,6 @@ class StaticPythonSubsetValidator:
         pattern = r"^[<>^]?\d*\.?\d*[dfxXobeE%]?$"
         return bool(re.match(pattern, spec)) and len(spec) > 0
 
-    def _validate_no_metaclasses(self, node: ast.ClassDef) -> bool:
-        """Validate no metaclasses are used."""
-        for keyword in node.keywords:
-            if keyword.arg == "metaclass":
-                return False
-        return True
-
     def _validate_no_dynamic_execution(self, node: ast.Call) -> bool:
         """Validate no dynamic code execution."""
         if isinstance(node.func, ast.Name):
@@ -724,30 +1017,33 @@ class StaticPythonSubsetValidator:
             return node.func.id not in forbidden_functions
         return True
 
-    def _validate_exception_handling(self, node: ast.AST) -> bool:
+    def _diagnose_exception_handling(self, node: ast.AST) -> Optional[Diagnostic]:
         """Validate exception handling constraints.
 
         Supported: try/except with optional else and finally clauses. Rejects:
         - exception chaining (raise ... from ...)
         """
         if isinstance(node, ast.Try):
-            return True
+            return None
 
         elif isinstance(node, ast.Raise):
             # Check for exception chaining (raise ... from ...)
             if node.cause is not None:
-                self.last_validation_error = (
-                    f"Exception chaining (raise ... from ...) is not supported "
-                    f"at line {node.lineno if hasattr(node, 'lineno') else '?'}"
+                return self._diagnostic(
+                    RuleId.EXCEPTION_CHAINING,
+                    "Exception chaining (raise ... from ...) is not supported "
+                    f"at line {node.lineno if hasattr(node, 'lineno') else '?'}",
+                    node,
+                    feature="Exception Handling",
+                    remediation="Raise the exception without a `from` clause.",
                 )
-                return False
 
-            return True
+            return None
 
         # ExceptHandler nodes are always valid if we get here
-        return True
+        return None
 
-    def _validate_with_statement(self, node: ast.AST) -> bool:
+    def _diagnose_with_statement(self, node: ast.AST) -> Optional[Diagnostic]:
         """Validate with statement constraints.
 
         Only basic with statements are supported. Rejects:
@@ -757,24 +1053,30 @@ class StaticPythonSubsetValidator:
         if isinstance(node, ast.With):
             # Only allow single context manager
             if len(node.items) > 1:
-                self.last_validation_error = (
-                    f"Multiple context managers in single 'with' not supported "
-                    f"at line {node.lineno if hasattr(node, 'lineno') else '?'}"
+                return self._diagnostic(
+                    RuleId.MULTIPLE_CONTEXT_MANAGERS,
+                    "Multiple context managers in single 'with' not supported "
+                    f"at line {node.lineno if hasattr(node, 'lineno') else '?'}",
+                    node,
+                    feature="Context Managers",
+                    remediation="Use one nested `with` statement per context manager.",
                 )
-                return False
 
             # Require variable binding
             item = node.items[0]
             if item.optional_vars is None:
-                self.last_validation_error = (
-                    f"Context manager requires 'as' variable binding "
-                    f"at line {node.lineno if hasattr(node, 'lineno') else '?'}"
+                return self._diagnostic(
+                    RuleId.CONTEXT_MANAGER_BINDING,
+                    "Context manager requires 'as' variable binding "
+                    f"at line {node.lineno if hasattr(node, 'lineno') else '?'}",
+                    node,
+                    feature="Context Managers",
+                    remediation="Bind the context manager, for example `with open(p) as f:`.",
                 )
-                return False
 
-            return True
+            return None
 
-        return True
+        return None
 
     def _validate_yield(self, node: ast.AST) -> bool:
         """Validate yield statement constraints."""
@@ -782,22 +1084,25 @@ class StaticPythonSubsetValidator:
             return True
         return True
 
-    def _validate_yield_from(self, node: ast.AST) -> bool:
+    def _diagnose_yield_from(self, node: ast.AST) -> Optional[Diagnostic]:
         """Validate yield from statement constraints."""
         if isinstance(node, ast.YieldFrom):
             # Allow function calls, range(), and variable references
             value = node.value
             if isinstance(value, ast.Call):
-                return True
+                return None
             elif isinstance(value, ast.Name):
-                return True
+                return None
             else:
-                self.last_validation_error = (
-                    f"yield from only supports function calls, range(), and variables "
-                    f"at line {node.lineno if hasattr(node, 'lineno') else '?'}"
+                return self._diagnostic(
+                    RuleId.UNSUPPORTED_YIELD_FROM,
+                    "yield from only supports function calls, range(), and variables "
+                    f"at line {node.lineno if hasattr(node, 'lineno') else '?'}",
+                    node,
+                    feature="Yield From",
+                    remediation="Assign the iterable to a variable, then `yield from` that variable.",
                 )
-                return False
-        return True
+        return None
 
     def _determine_conversion_strategy(self, result: ValidationResult) -> str:
         """Determine the appropriate conversion strategy."""
