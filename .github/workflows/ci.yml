@@ -40,6 +40,14 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
+      # The runner image ships gcc, g++, rustc, go and ghc, but not ocamlc.
+      # Without this the OCaml compilation tests skip themselves and that
+      # backend loses its only end-to-end coverage on CI.
+      - name: Install the OCaml toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ocaml-nox
+
       - name: Install dependencies
         run: uv sync --all-extras --dev
 

@@ -7,6 +7,7 @@ It ensures that:
 3. Output matches expected results
 """
 
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -16,6 +17,44 @@ import pytest
 
 from multigen.backends.registry import registry
 from multigen.pipeline import BuildMode, MultiGenPipeline, PipelineConfig
+
+# A registered backend is not a usable one: registration only needs the Python
+# module, while compiling needs the target toolchain on PATH. CI runners ship
+# gcc/g++/rustc/go/ghc but not ocamlc, so these tests have to ask about the
+# compiler rather than the registry, the way the LLVM and Deno suites do.
+BACKEND_COMPILERS = {
+    "c": "gcc",
+    "cpp": "g++",
+    "rust": "rustc",
+    "go": "go",
+    "haskell": "ghc",
+    "ocaml": "ocamlc",
+}
+
+
+def _ocaml_toolchain_available() -> bool:
+    """Check for ocamlc directly or through an initialized opam switch."""
+    if shutil.which("ocamlc"):
+        return True
+    if not shutil.which("opam"):
+        return False
+    try:
+        result = subprocess.run(
+            ["opam", "exec", "--", "ocamlc", "-version"], capture_output=True, text=True, timeout=30
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
+def toolchain_available(backend: str) -> bool:
+    """Report whether the compiler this backend shells out to is installed."""
+    if backend == "ocaml":
+        return _ocaml_toolchain_available()
+    compiler = BACKEND_COMPILERS.get(backend)
+    if compiler is None:
+        return True
+    return shutil.which(compiler) is not None
 
 
 class CompilationTestHelper:
@@ -37,6 +76,9 @@ class CompilationTestHelper:
         """
         if not registry.has_backend(backend):
             pytest.skip(f"Backend {backend} not available")
+
+        if not toolchain_available(backend):
+            pytest.skip(f"Toolchain for backend {backend} not installed")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
@@ -238,6 +280,9 @@ class TestCrossBackendConsistency:
         if not registry.has_backend(backend):
             pytest.skip(f"Backend {backend} not available")
 
+        if not toolchain_available(backend):
+            pytest.skip(f"Toolchain for backend {backend} not installed")
+
         source = CompilationTestHelper.get_fixture_path("simple_math.py")
         success, stdout, stderr = CompilationTestHelper.compile_and_run(source, backend, "16")
 
@@ -249,6 +294,9 @@ class TestCrossBackendConsistency:
         """Test that all backends produce the same output for string operations."""
         if not registry.has_backend(backend):
             pytest.skip(f"Backend {backend} not available")
+
+        if not toolchain_available(backend):
+            pytest.skip(f"Toolchain for backend {backend} not installed")
 
         source = CompilationTestHelper.get_fixture_path("string_ops.py")
         success, stdout, stderr = CompilationTestHelper.compile_and_run(source, backend, "HELLO")
