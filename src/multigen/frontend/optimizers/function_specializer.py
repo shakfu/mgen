@@ -513,19 +513,13 @@ class FunctionSpecializer(BaseOptimizer):
         specialized_ast = self._copy_function_ast(base_func)
         specialized_ast.name = candidate.specialized_name
 
-        optimizations_applied = []
+        # Only transformations that actually rewrite the specialized body belong
+        # here. Constant folding and type specialization are not implemented, so
+        # listing them would report work that never happened.
+        optimizations_applied: list[str] = []
 
-        # Apply specialization transformations
-        if candidate.specialization_type == SpecializationType.CONSTANT_FOLDING:
-            self._apply_constant_folding(specialized_ast, candidate.parameter_bindings)
-            optimizations_applied.append("constant_folding")
-
-        elif candidate.specialization_type == SpecializationType.TYPE_SPECIALIZATION:
-            self._apply_type_specialization(specialized_ast, candidate.type_constraints)
-            optimizations_applied.append("type_specialization")
-
-        elif candidate.specialization_type == SpecializationType.INLINE_EXPANSION:
-            # Inlining is handled at call sites, not in function definition
+        if candidate.specialization_type == SpecializationType.INLINE_EXPANSION:
+            # Inlining is handled at call sites, not in the function definition
             optimizations_applied.append("inline_expansion")
 
         return SpecializationResult(
@@ -550,19 +544,6 @@ class FunctionSpecializer(BaseOptimizer):
             lineno=func.lineno,
         )
         return new_func
-
-    def _apply_constant_folding(self, func_ast: ast.FunctionDef, bindings: dict[str, Any]) -> None:
-        """Apply constant folding to a specialized function."""
-        # Note: Proper constant folding should use ast.NodeTransformer
-        # This is a simplified placeholder implementation
-        # In production, use ast.NodeTransformer to properly replace Name nodes with Constant nodes
-        pass  # TODO: Implement proper constant folding with ast.NodeTransformer
-
-    def _apply_type_specialization(self, func_ast: ast.FunctionDef, type_constraints: dict[str, str]) -> None:
-        """Apply type-specific optimizations to a function."""
-        # Add type-specific optimizations based on constraints
-        # This is a simplified implementation
-        pass
 
     def _apply_specializations(self, node: ast.AST, report: SpecializationReport) -> ast.AST:
         """Apply specializations to the AST."""

@@ -139,12 +139,15 @@ class TestPythonOptimizationPhase:
         return result, result.phase_results.get(PipelinePhase.PYTHON_OPTIMIZATION)
 
     def test_optimizations_run_under_advanced_analysis(self, tmp_path):
-        """The default configuration applies every Python-level optimization."""
+        """The default configuration runs every Python-level analysis pass."""
         result, phase = self._run(tmp_path, enable_advanced_analysis=True, enable_optimizations=True)
 
         assert result.success
         assert phase.enabled
-        assert phase.optimizations_applied == ["compile_time", "loops", "specialization", "vectorization"]
+        assert phase.analyses_run == ["compile_time", "loops", "specialization", "vectorization"]
+        # The passes are analysis-only: the unoptimized AST is what reaches
+        # generation, so nothing may be reported as applied.
+        assert phase.optimizations_applied == []
 
     def test_optimizations_skipped_without_advanced_analysis(self, tmp_path):
         """Optimizers only exist under advanced analysis; skipping must be reported."""

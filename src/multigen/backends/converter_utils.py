@@ -293,16 +293,121 @@ def get_standard_comparison_operator(op: ast.cmpop) -> Optional[str]:
 # ============================================================================
 
 
+_SHARED_ESCAPES = {
+    "\\": "\\\\",
+    '"': '\\"',
+    "\n": "\\n",
+    "\r": "\\r",
+    "\t": "\\t",
+}
+
+
+def _is_control(ch: str) -> bool:
+    """Report whether a character must never appear raw inside a string literal."""
+    return ord(ch) < 0x20 or ord(ch) == 0x7F
+
+
 def escape_string_for_c_family(s: str) -> str:
-    """Escape string for C-family language string literals.
+    r"""Escape a string for a C/C++/Go string literal body.
+
+    Control characters use three-digit octal rather than ``\\x``: hex escapes are
+    greedy in C, so ``"\\x0"`` followed by ``"a"`` would silently merge into one
+    character.
 
     Args:
-        s: Input string
+        s: Raw Python string value
 
     Returns:
-        Escaped string suitable for C/C++/Java/Go/Rust string literals
+        Escaped body, without the surrounding quotes
     """
-    return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+    out: list[str] = []
+    for ch in s:
+        escaped = _SHARED_ESCAPES.get(ch)
+        if escaped is not None:
+            out.append(escaped)
+        elif _is_control(ch):
+            out.append(f"\\{ord(ch):03o}")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def escape_string_for_rust(s: str) -> str:
+    r"""Escape a string for a Rust string literal body.
+
+    Rust has no octal escapes and restricts ``\\x`` to ASCII, so control
+    characters use the unambiguous ``\\u{..}`` form.
+
+    Args:
+        s: Raw Python string value
+
+    Returns:
+        Escaped body, without the surrounding quotes
+    """
+    out: list[str] = []
+    for ch in s:
+        escaped = _SHARED_ESCAPES.get(ch)
+        if escaped is not None:
+            out.append(escaped)
+        elif _is_control(ch):
+            out.append(f"\\u{{{ord(ch):x}}}")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def escape_string_for_haskell(s: str) -> str:
+    r"""Escape a string for a Haskell string literal body.
+
+    Haskell numeric escapes are decimal and variable length, so a ``\\&``
+    separator is needed whenever a digit follows one - otherwise ``\\1`` followed
+    by ``2`` reads as character 12.
+
+    Args:
+        s: Raw Python string value
+
+    Returns:
+        Escaped body, without the surrounding quotes
+    """
+    out: list[str] = []
+    after_numeric = False
+    for ch in s:
+        escaped = _SHARED_ESCAPES.get(ch)
+        if escaped is not None:
+            out.append(escaped)
+            after_numeric = False
+        elif _is_control(ch):
+            out.append(f"\\{ord(ch)}")
+            after_numeric = True
+        else:
+            if after_numeric and ch.isdigit():
+                out.append("\\&")
+            out.append(ch)
+            after_numeric = False
+    return "".join(out)
+
+
+def escape_string_for_ocaml(s: str) -> str:
+    """Escape a string for an OCaml string literal body.
+
+    OCaml decimal escapes are exactly three digits, so no separator is needed.
+
+    Args:
+        s: Raw Python string value
+
+    Returns:
+        Escaped body, without the surrounding quotes
+    """
+    out: list[str] = []
+    for ch in s:
+        escaped = _SHARED_ESCAPES.get(ch)
+        if escaped is not None:
+            out.append(escaped)
+        elif _is_control(ch):
+            out.append(f"\\{ord(ch):03d}")
+        else:
+            out.append(ch)
+    return "".join(out)
 
 
 def to_snake_case(camel_str: str) -> str:

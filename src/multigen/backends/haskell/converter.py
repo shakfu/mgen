@@ -4,6 +4,7 @@ import ast
 from typing import TYPE_CHECKING, Any, Optional
 
 from ..converter_utils import (
+    escape_string_for_haskell,
     extract_format_spec,
     format_spec_to_printf,
     get_standard_binary_operator,
@@ -737,7 +738,7 @@ main = printValue "Generated Haskell code executed successfully"'''
         elif isinstance(node.value, float):
             return str(node.value)
         elif isinstance(node.value, str):
-            return f'"{node.value}"'
+            return f'"{escape_string_for_haskell(node.value)}"'
         elif node.value is None:
             return "()"
         else:
@@ -1030,7 +1031,7 @@ main = printValue "Generated Haskell code executed successfully"'''
             if isinstance(value, ast.Constant):
                 # Literal string part
                 if isinstance(value.value, str):
-                    parts.append(f'"{value.value}"')
+                    parts.append(f'"{escape_string_for_haskell(value.value)}"')
             elif isinstance(value, ast.FormattedValue):
                 expr_code = self._convert_expression(value.value)
                 spec = extract_format_spec(value)

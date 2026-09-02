@@ -3,7 +3,23 @@
 from typing import Any, Optional
 
 from ..base import AbstractContainerSystem
+from ..converter_utils import escape_string_for_ocaml
 from ..preferences import BackendPreferences, OCamlPreferences
+
+
+def _ocaml_literal(value: Any, python_type: str) -> str:
+    """Render a container element as an OCaml literal.
+
+    Args:
+        value: Python value to render
+        python_type: Declared element type ("str"/"string" means a string literal)
+
+    Returns:
+        OCaml source for the literal
+    """
+    if python_type in ["str", "string"]:
+        return f'"{escape_string_for_ocaml(str(value))}"'
+    return str(value)
 
 
 class OCamlContainerSystem(AbstractContainerSystem):
@@ -114,7 +130,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
         ocaml_elements = []
         for element in elements:
             if isinstance(element, str) and element_type in ["str", "string"]:
-                ocaml_elements.append(f'"{element}"')
+                ocaml_elements.append(f'"{escape_string_for_ocaml(element)}"')
             else:
                 ocaml_elements.append(str(element))
 
@@ -133,16 +149,16 @@ class OCamlContainerSystem(AbstractContainerSystem):
             # Hashtbl approach
             pairs = []
             for key, value in items.items():
-                key_str = f'"{key}"' if key_type in ["str", "string"] else str(key)
-                value_str = f'"{value}"' if value_type in ["str", "string"] else str(value)
+                key_str = _ocaml_literal(key, key_type)
+                value_str = _ocaml_literal(value, value_type)
                 pairs.append(f"({key_str}, {value_str})")
             return f"let dict = Hashtbl.create {len(items)} in List.iter (fun (k, v) -> Hashtbl.add dict k v) [{'; '.join(pairs)}]; dict"
         else:
             # Map approach
             pairs = []
             for key, value in items.items():
-                key_str = f'"{key}"' if key_type in ["str", "string"] else str(key)
-                value_str = f'"{value}"' if value_type in ["str", "string"] else str(value)
+                key_str = _ocaml_literal(key, key_type)
+                value_str = _ocaml_literal(value, value_type)
                 pairs.append(f"Map.add {key_str} {value_str}")
             return f"({' ('.join(pairs)} Map.empty{')' * len(pairs)})"
 
@@ -155,7 +171,7 @@ class OCamlContainerSystem(AbstractContainerSystem):
         ocaml_elements = []
         for element in elements:
             if isinstance(element, str) and element_type in ["str", "string"]:
-                ocaml_elements.append(f'"{element}"')
+                ocaml_elements.append(f'"{escape_string_for_ocaml(element)}"')
             else:
                 ocaml_elements.append(str(element))
 

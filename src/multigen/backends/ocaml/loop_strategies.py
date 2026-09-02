@@ -7,6 +7,7 @@ like List.fold_left and mutable ref handling.
 import ast
 from typing import TYPE_CHECKING
 
+from ..errors import UnsupportedFeatureError
 from ..loop_conversion_strategies import ForLoopStrategy, LoopContext
 
 if TYPE_CHECKING:
@@ -35,6 +36,9 @@ class OCamlSimpleAssignmentStrategy(ForLoopStrategy):
         # Check for no mutations (simple case)
         mutated_vars = converter._has_mutations(node.body)
         if mutated_vars:
+            return False
+
+        if not isinstance(node.target, ast.Name):
             return False
 
         stmt = node.body[0]
@@ -88,6 +92,9 @@ class OCamlAccumulationStrategy(ForLoopStrategy):
         if len(mutated_vars) != 1:
             return False
 
+        if not isinstance(node.target, ast.Name):
+            return False
+
         stmt = node.body[0]
         return isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name)
 
@@ -116,6 +123,27 @@ class OCamlAccumulationStrategy(ForLoopStrategy):
             return f"let {updated_var} = List.fold_left (fun acc {target} -> acc {op} ({value_expr})) {updated_var} ({iter_expr}) in"
 
 
+def _loop_target_pattern(target: ast.expr, converter: "MultiGenPythonToOCamlConverter") -> str:
+    """Render a for-loop target as an OCaml function parameter pattern.
+
+    Args:
+        target: The loop target AST node
+        converter: Converter used for name mangling
+
+    Returns:
+        An OCaml pattern, e.g. ``i`` or ``(k, v)``
+
+    Raises:
+        UnsupportedFeatureError: If the target is not a name or tuple of names
+    """
+    if isinstance(target, ast.Name):
+        return converter._to_ocaml_var_name(target.id)
+    if isinstance(target, ast.Tuple) and all(isinstance(elt, ast.Name) for elt in target.elts):
+        names = [converter._to_ocaml_var_name(elt.id) for elt in target.elts if isinstance(elt, ast.Name)]
+        return "(" + ", ".join(names) + ")"
+    raise UnsupportedFeatureError(f"Unsupported for loop target: {type(target).__name__}")
+
+
 class OCamlGeneralLoopStrategy(ForLoopStrategy):
     """Strategy for general loop pattern using List.iter.
 
@@ -135,10 +163,7 @@ class OCamlGeneralLoopStrategy(ForLoopStrategy):
         """Convert general loop to List.iter."""
         converter: MultiGenPythonToOCamlConverter = context.converter  # type: ignore
 
-        if not isinstance(node.target, ast.Name):
-            return "(* Complex for loop target not supported *)"
-
-        target = converter._to_ocaml_var_name(node.target.id)
+        target = _loop_target_pattern(node.target, converter)
         iter_expr = converter._convert_expression(node.iter)
 
         # Convert body to let expressions

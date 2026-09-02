@@ -4,6 +4,7 @@ import ast
 from typing import Any, Optional
 
 from ..converter_utils import (
+    escape_string_for_c_family,
     extract_format_spec,
     format_spec_to_printf,
     get_augmented_assignment_operator,
@@ -45,6 +46,9 @@ class MultiGenPythonToGoConverter:
         self.current_function: Optional[str] = None  # Track current function context
         self.declared_vars: set[str] = set()  # Track declared variables in current function
         self.function_return_types: dict[str, str] = {}  # Track function return types
+        self._try_counter = 0  # Unique suffixes for try-block temporaries
+        # (result var, flag var, carries a value) for each enclosing try closure
+        self._try_return_stack: list[tuple[str, str, bool]] = []
         self.variable_types: dict[str, str] = {}  # Track variable types in current function scope
         self._type_inference_engine: Optional[Any] = None  # Lazy-initialized type inference engine
 
@@ -617,6 +621,7 @@ class MultiGenPythonToGoConverter:
         self.current_function = node.name
         self.declared_vars = set()  # Reset for new function
         self.variable_types = {}  # Reset variable type tracking for new function
+        self._try_return_stack = []
         self.nested_vars = nested_vars  # Store for use in type inference
         self.append_map = append_map
         self._is_generator = is_generator
@@ -688,6 +693,15 @@ class MultiGenPythonToGoConverter:
                 # Insert the unused markers
                 body_lines[insert_pos:insert_pos] = unused_statements
                 body = "\n".join(body_lines) + "\n"
+
+        # Go requires a terminating statement in a function with results. A body
+        # whose returns all sit inside if/else or a try closure ends without one.
+        stripped_return_type = return_type.strip()
+        if stripped_return_type:
+            body_lines = [line for line in body.rstrip().split("\n") if line.strip()]
+            last_line = body_lines[-1].strip() if body_lines else ""
+            if not last_line.startswith("return"):
+                body = body.rstrip() + f"\n    return {self._get_default_value(stripped_return_type)}"
 
         self.current_function = None
         self.nested_vars = set()  # Clear
@@ -1117,10 +1131,71 @@ class MultiGenPythonToGoConverter:
         else:
             return f'    if !({test_expr}) {{ panic("assertion failed") }}'
 
-    def _convert_try(self, stmt: ast.Try) -> str:
-        """Convert Python try/except to Go defer/recover pattern.
+    def _try_body_nodes(self, stmt: ast.Try) -> list[ast.AST]:
+        """Collect every node executed by a try statement's own blocks.
 
-        Python's try/except maps to Go's defer/recover for panic-based error handling.
+        Args:
+            stmt: The try statement
+
+        Returns:
+            All nodes in the try body, handler bodies, else and finally blocks
+        """
+        nodes: list[ast.AST] = []
+        blocks: list[list[ast.stmt]] = [list(stmt.body), list(stmt.orelse), list(stmt.finalbody)]
+        blocks.extend(list(handler.body) for handler in stmt.handlers)
+        for block in blocks:
+            for node in block:
+                nodes.extend(ast.walk(node))
+        return nodes
+
+    def _hoist_try_bindings(self, stmt: ast.Try) -> list[tuple[str, str]]:
+        """Pre-declare the variables a try statement binds.
+
+        The try body runs inside a closure, so a variable first bound there
+        would be invisible afterwards. Declaring it outside and marking it as
+        already declared turns the inner binding into a plain assignment.
+
+        Args:
+            stmt: The try statement
+
+        Returns:
+            (name, Go type) pairs that must be declared before the closure
+        """
+        hoisted: list[tuple[str, str]] = []
+        for node in self._try_body_nodes(stmt):
+            candidates: list[tuple[str, Optional[ast.expr], Optional[ast.expr]]]
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                candidates = [(node.target.id, node.annotation, node.value)]
+            elif isinstance(node, ast.Assign):
+                candidates = [(target.id, None, node.value) for target in node.targets if isinstance(target, ast.Name)]
+            else:
+                continue
+
+            for name, annotation, value in candidates:
+                if name in self.declared_vars:
+                    continue
+                if name in self.variable_types:
+                    var_type = self.variable_types[name]
+                elif annotation is not None:
+                    var_type = self._map_type_annotation(annotation)
+                elif value is not None:
+                    var_type = self._infer_type_from_value(value)
+                else:
+                    var_type = "int"
+                self.declared_vars.add(name)
+                self.variable_types[name] = var_type
+                hoisted.append((name, var_type))
+        return hoisted
+
+    def _convert_try(self, stmt: ast.Try) -> str:
+        """Convert Python try/except to Go's defer/recover pattern.
+
+        recover() only works inside a deferred function, so the try body must run
+        in an anonymous function. Two things would otherwise be trapped in that
+        closure: a `return` (which would exit only the closure - Go rejects it
+        outright when the closure has no results) and any variable the body binds
+        (invisible after the block). Returns are carried out through named
+        results and re-issued outside; bindings are hoisted ahead of the closure.
 
         Example:
             try:
@@ -1129,22 +1204,88 @@ class MultiGenPythonToGoConverter:
                 return 0
 
             Becomes:
-            func() int {
+            __mgen_try_value0, __mgen_try_returned0 := func() (__mgen_result0 int, __mgen_returned0 bool) {
                 defer func() {
                     if r := recover(); r != nil {
                         if _, ok := r.(multigen.ZeroDivisionError); ok {
-                            return 0
+                            __mgen_result0, __mgen_returned0 = 0, true
+                            return
                         }
                         panic(r)
                     }
                 }()
                 // try body
+                return
             }()
+            if __mgen_try_returned0 {
+                return __mgen_try_value0
+            }
+        """
+        # main() drops its return statements, so they need no plumbing.
+        in_main = self.current_function == "main"
+        return_type = self.function_return_types.get(self.current_function or "", "").strip()
+        has_return = not in_main and any(isinstance(node, ast.Return) for node in self._try_body_nodes(stmt))
+
+        suffix = str(self._try_counter)
+        self._try_counter += 1
+        outer_value = f"__mgen_try_value{suffix}"
+        outer_returned = f"__mgen_try_returned{suffix}"
+        inner_value = f"__mgen_result{suffix}"
+        inner_returned = f"__mgen_returned{suffix}"
+
+        hoisted = self._hoist_try_bindings(stmt)
+
+        if has_return:
+            self._try_return_stack.append((inner_value, inner_returned, bool(return_type)))
+        try:
+            body_lines = self._convert_try_blocks(stmt)
+        finally:
+            if has_return:
+                self._try_return_stack.pop()
+
+        lines: list[str] = [f"    var {name} {var_type}" for name, var_type in hoisted]
+
+        if has_return and return_type:
+            lines.append(
+                f"    {outer_value}, {outer_returned} := func() ({inner_value} {return_type}, {inner_returned} bool) {{"
+            )
+        elif has_return:
+            lines.append(f"    {outer_returned} := func() ({inner_returned} bool) {{")
+        else:
+            lines.append("    func() {")
+
+        lines.extend(body_lines)
+
+        if has_return:
+            # A func with results needs a terminating statement; the zero value
+            # of the flag means "the try block did not return".
+            lines.append("        return")
+        lines.append("    }()")
+
+        if has_return and return_type:
+            lines.append(f"    if {outer_returned} {{")
+            lines.append(f"        return {outer_value}")
+            lines.append("    }")
+        elif has_return:
+            lines.append(f"    if {outer_returned} {{")
+            lines.append("        return")
+            lines.append("    }")
+
+        # Go rejects a declared-and-unread variable; assignment alone is not a read.
+        lines.extend(f"    _ = {name}" for name, _ in hoisted)
+
+        return "\n".join(lines)
+
+    def _convert_try_blocks(self, stmt: ast.Try) -> list[str]:
+        """Emit the inside of the try closure: recover handlers, body and finally.
+
+        Args:
+            stmt: The try statement
+
+        Returns:
+            Lines for the closure body
         """
         lines: list[str] = []
-
-        # Start the anonymous function with defer/recover
-        lines.append("    func() {")
         lines.append("        defer func() {")
         lines.append("            if r := recover(); r != nil {")
 
@@ -1226,9 +1367,7 @@ class MultiGenPythonToGoConverter:
                         lines.append(f"            {line}")
             lines.append("        }()")
 
-        lines.append("    }()")
-
-        return "\n".join(lines)
+        return lines
 
     def _convert_raise(self, stmt: ast.Raise) -> str:
         """Convert Python raise to Go panic.
@@ -1304,6 +1443,15 @@ class MultiGenPythonToGoConverter:
         # Special case: in main(), ignore return statements
         if self.current_function == "main":
             return ""
+
+        if self._try_return_stack:
+            # Inside a try closure: record the value in the closure's named
+            # results and let the caller re-issue the return (see _convert_try).
+            result_var, flag_var, carries_value = self._try_return_stack[-1]
+            if stmt.value and carries_value:
+                value_expr = self._convert_expression(stmt.value)
+                return f"    {result_var}, {flag_var} = {value_expr}, true\n    return"
+            return f"    {flag_var} = true\n    return"
 
         if stmt.value:
             value_expr = self._convert_expression(stmt.value)
@@ -1417,8 +1565,13 @@ class MultiGenPythonToGoConverter:
             target_id = stmt.target.id if isinstance(stmt.target, ast.Name) else str(stmt.target)
             # Track this variable as declared with the inferred type
             if isinstance(stmt.target, ast.Name):
+                already_declared = stmt.target.id in self.declared_vars
                 self.declared_vars.add(stmt.target.id)
                 self.variable_types[stmt.target.id] = var_type
+                if already_declared:
+                    # Re-declaring in the same scope is a Go error, and hoisted
+                    # try bindings depend on this being a plain assignment.
+                    return f"    {target_id} = {value_expr}"
             return f"    var {target_id} {var_type} = {value_expr}"
         else:
             default_value = self._get_default_value(var_type)
@@ -1562,7 +1715,7 @@ class MultiGenPythonToGoConverter:
     def _convert_constant(self, expr: ast.Constant) -> str:
         """Convert constant values."""
         if isinstance(expr.value, str):
-            return f'"{expr.value}"'
+            return f'"{escape_string_for_c_family(expr.value)}"'
         elif isinstance(expr.value, bool):
             return "true" if expr.value else "false"
         elif expr.value is None:
@@ -1814,7 +1967,7 @@ class MultiGenPythonToGoConverter:
                     pairs.append(f"{key_str}: {value_str}")
                 # Note: actual unpacking (**dict) would need runtime handling
             pairs_str = ", ".join(pairs)
-            return f"map[interface{{}}]interface{{}}{{{{{pairs_str}}}}}"
+            return f"map[interface{{}}]interface{{}}{{{pairs_str}}}"
 
         # Try to infer common types for keys and values (all keys are non-None)
         key_types = [self._infer_type_from_value(key) for key in expr.keys if key is not None]
@@ -1836,7 +1989,7 @@ class MultiGenPythonToGoConverter:
                     value_str = self._convert_expression(value)
                     pairs.append(f"{key_str}: {value_str}")
             pairs_str = ", ".join(pairs)
-            return f"map[{key_type}]{value_type}{{{{{pairs_str}}}}}"
+            return f"map[{key_type}]{value_type}{{{pairs_str}}}"
         else:
             # Mixed types or interface{}, use interface{}
             pairs = []
@@ -1846,7 +1999,7 @@ class MultiGenPythonToGoConverter:
                     value_str = self._convert_expression(value)
                     pairs.append(f"{key_str}: {value_str}")
             pairs_str = ", ".join(pairs)
-            return f"map[interface{{}}]interface{{}}{{{{{pairs_str}}}}}"
+            return f"map[interface{{}}]interface{{}}{{{pairs_str}}}"
 
     def _convert_set_literal(self, expr: ast.Set) -> str:
         """Convert set literal to Go map literal (sets as map[T]bool)."""
@@ -1858,7 +2011,13 @@ class MultiGenPythonToGoConverter:
             elt_str = self._convert_expression(elt)
             elements.append(f"{elt_str}: true")
         elements_str = ", ".join(elements)
-        return f"map[interface{{}}]bool{{{{{elements_str}}}}}"
+
+        # A homogeneous set must keep its concrete element type: the declared
+        # variable type is map[T]bool, so an interface{} literal will not assign.
+        element_types = [self._infer_type_from_value(elt) for elt in expr.elts]
+        if element_types and all(t == element_types[0] and t != "interface{}" for t in element_types):
+            return f"map[{element_types[0]}]bool{{{elements_str}}}"
+        return f"map[interface{{}}]bool{{{elements_str}}}"
 
     def _convert_list_comprehension(self, expr: ast.ListComp) -> str:
         """Convert list comprehensions using Go 1.18+ generics."""
@@ -2076,9 +2235,10 @@ class MultiGenPythonToGoConverter:
 
         for value in expr.values:
             if isinstance(value, ast.Constant):
-                # Literal string part - escape % signs
+                # Literal string part: escape for the Go literal, then protect
+                # '%' from being read as a Sprintf verb.
                 if isinstance(value.value, str):
-                    literal = value.value.replace("%", "%%")
+                    literal = escape_string_for_c_family(value.value).replace("%", "%%")
                     format_parts.append(literal)
             elif isinstance(value, ast.FormattedValue):
                 expr_code = self._convert_expression(value.value)
@@ -2094,8 +2254,8 @@ class MultiGenPythonToGoConverter:
         format_string = "".join(format_parts)
 
         if len(args) == 0:
-            # No expressions, just return string literal
-            return f'"{format_string}"'
+            # Plain literal: no Sprintf involved, so '%' must not stay doubled.
+            return f'"{format_string.replace("%%", "%")}"'
         else:
             # Use fmt.Sprintf
             args_str = ", ".join(args)

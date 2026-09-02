@@ -23,6 +23,7 @@ import ast
 from typing import Any
 
 from ..converter_utils import (
+    escape_string_for_c_family,
     extract_format_spec,
     format_spec_to_printf,
     get_augmented_assignment_operator,
@@ -1174,7 +1175,7 @@ class MultiGenPythonToCConverter:
     def _convert_constant(self, expr: ast.Constant) -> str:
         """Convert constant values."""
         if isinstance(expr.value, str):
-            return f'"{expr.value}"'
+            return f'"{escape_string_for_c_family(expr.value)}"'
         elif isinstance(expr.value, bool):
             return "true" if expr.value else "false"
         else:
@@ -2544,9 +2545,10 @@ class MultiGenPythonToCConverter:
 
         for value in expr.values:
             if isinstance(value, ast.Constant):
-                # Literal string part
+                # Literal string part: escape for the C literal, then protect '%'
+                # from being read as a printf directive.
                 if isinstance(value.value, str):
-                    format_parts.append(value.value)
+                    format_parts.append(escape_string_for_c_family(value.value).replace("%", "%%"))
             elif isinstance(value, ast.FormattedValue):
                 expr_code = self._convert_expression(value.value)
                 spec = extract_format_spec(value)
@@ -2564,8 +2566,8 @@ class MultiGenPythonToCConverter:
         format_string = "".join(format_parts)
 
         if len(args) == 0:
-            # No interpolation, just return the string
-            return f'"{format_string}"'
+            # Plain literal: no printf involved, so '%' must not stay doubled.
+            return f'"{format_string.replace("%%", "%")}"'
         else:
             # Use multigen_sprintf_string helper (needs to be in runtime)
             args_str = ", ".join(args)

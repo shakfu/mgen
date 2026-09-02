@@ -3,6 +3,7 @@
 from typing import Any, Optional
 
 from ..base import AbstractFactory
+from ..converter_utils import escape_string_for_c_family
 
 
 class CppFactory(AbstractFactory):
@@ -58,7 +59,7 @@ class CppFactory(AbstractFactory):
     def create_literal(self, value: Any, literal_type: str) -> str:
         """Create a C++ literal."""
         if literal_type == "string":
-            return f'"{value}"'
+            return f'"{escape_string_for_c_family(str(value))}"'
         elif literal_type == "char":
             return f"'{value}'"
         elif literal_type == "bool":

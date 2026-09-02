@@ -486,7 +486,9 @@ def validate(x: int) -> int:
 """
         rust_code = self.converter.convert_code(python_code)
 
-        assert 'panic!(ValueError::new("negative value".to_string()));' in rust_code
+        # panic! needs a format literal, and downcast_ref in the handler only
+        # finds a typed payload, so a raise has to go through panic_any.
+        assert 'std::panic::panic_any(ValueError::new(&"negative value".to_string()));' in rust_code
 
     def test_raise_without_message(self) -> None:
         """Test raise statement without message."""
@@ -496,7 +498,7 @@ def always_fail() -> int:
 """
         rust_code = self.converter.convert_code(python_code)
 
-        assert "panic!(RuntimeError::new" in rust_code
+        assert "std::panic::panic_any(RuntimeError::new" in rust_code
 
     def test_reraise(self) -> None:
         """Test re-raise (bare raise)."""

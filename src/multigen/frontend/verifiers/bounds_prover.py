@@ -132,8 +132,9 @@ class BoundsProver:
         overflow_results = self._verify_buffer_overflow_safety()
         all_proof_results.extend(overflow_results)
 
-        # Determine overall safety status
-        is_safe = all(result.is_verified for result in all_proof_results)
+        # Safety means no counterexample was proved. Treating an undecided
+        # access as unsafe would reject correct code on missing information.
+        is_safe = not any(result.status == ProofStatus.DISPROVED for result in all_proof_results)
 
         # Find unsafe accesses
         for access in self.memory_accesses:
@@ -172,21 +173,72 @@ class BoundsProver:
 
         for access in self.memory_accesses:
             if access.access_type in ["read", "write"]:
+                if not self._is_decidable(access):
+                    # Neither the index nor the region size is known here. Asking
+                    # Z3 about unconstrained integers always yields a
+                    # counterexample, which would disprove every access.
+                    results.append(self._undecided_result(access))
+                    access.is_safe = None
+                    continue
+
                 # Create bounds checking property
                 prop = self._create_bounds_property(access)
                 result = self.theorem_prover.verify_property(prop)
                 results.append(result)
 
                 # Update access safety status
-                access.is_safe = result.is_verified
+                if result.status == ProofStatus.DISPROVED:
+                    access.is_safe = False
+                elif result.status == ProofStatus.PROVED:
+                    access.is_safe = True
+                else:
+                    access.is_safe = None
 
         return results
+
+    def _is_decidable(self, access: MemoryAccess) -> bool:
+        """Report whether an access has enough concrete information to decide.
+
+        Args:
+            access: The memory access to check
+
+        Returns:
+            True when both the offset and the region size are concrete
+        """
+        return isinstance(access.offset, int) and isinstance(access.region.size, int)
+
+    def _undecided_result(self, access: MemoryAccess) -> ProofResult:
+        """Build an UNKNOWN result for an access the prover cannot model.
+
+        Args:
+            access: The memory access that could not be decided
+
+        Returns:
+            A ProofResult recording why verification was inconclusive
+        """
+        region = access.region
+        prop = ProofProperty(
+            name=f"bounds_check_{region.name}_{access.line_number}",
+            property_type=PropertyType.BOUNDS_CHECKING,
+            description=f"Access to {region.name} at offset {access.offset} is within bounds",
+            z3_formula="undecided",
+            context={"access": access, "region": region},
+        )
+        unknown = "index" if not isinstance(access.offset, int) else "size"
+        return ProofResult(
+            proof_property=prop,
+            status=ProofStatus.UNKNOWN,
+            proof_time=0.0,
+            error_message=f"{region.name}: {unknown} is not statically known, bounds not decided",
+        )
 
     def _verify_null_pointer_safety(self) -> list[ProofResult]:
         """Verify null pointer dereference safety."""
         results = []
 
         for _region_name, region in self.memory_regions.items():
+            # Only a literal null is a provable null dereference; a symbolic
+            # base address carries no information either way.
             if region.base_address == 0 or region.base_address == "null":
                 # Create null pointer safety property
                 prop = self._create_null_pointer_property(region)
@@ -214,6 +266,9 @@ class BoundsProver:
             # Check for potential buffer overflows
             for access in accesses:
                 if access.access_type == "write":
+                    if not self._is_decidable(access):
+                        results.append(self._undecided_result(access))
+                        continue
                     prop = self._create_buffer_overflow_property(access)
                     result = self.theorem_prover.verify_property(prop)
                     results.append(result)
@@ -340,6 +395,10 @@ class BoundsProver:
 
         unknown_proofs = [r for r in proof_results if r.status == ProofStatus.UNKNOWN]
         if unknown_proofs:
+            recommendations.append(
+                f"{len(unknown_proofs)} memory accesses could not be decided statically "
+                "and were neither proved safe nor unsafe"
+            )
             recommendations.append("Add explicit bounds information to help verification")
             recommendations.append("Consider simplifying complex indexing expressions")
 
@@ -347,6 +406,12 @@ class BoundsProver:
             recommendations.append("Memory safety verification passed - code appears safe")
 
         return recommendations
+
+
+# Subscripts on these names are type expressions, never memory accesses.
+_TYPE_CONSTRUCTORS = frozenset(
+    {"list", "dict", "set", "tuple", "frozenset", "type", "Optional", "Union", "Callable", "Sequence", "Iterable"}
+)
 
 
 class MemoryOperationExtractor(ast.NodeVisitor):
@@ -358,9 +423,28 @@ class MemoryOperationExtractor(ast.NodeVisitor):
         self.current_function: Optional[str] = None
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        """Track function context."""
+        """Track function context, skipping type annotations.
+
+        A subscript in an annotation (``list[int]``) is a type expression, not a
+        memory access; visiting it would invent a region named "list".
+        """
         self.current_function = node.name
-        self.generic_visit(node)
+        for stmt in node.body:
+            self.visit(stmt)
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        for default in [*node.args.defaults, *[d for d in node.args.kw_defaults if d is not None]]:
+            self.visit(default)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        """Visit an annotated assignment without descending into its annotation."""
+        self.visit(node.target)
+        if node.value is not None:
+            self.visit(node.value)
+
+    def visit_arg(self, node: ast.arg) -> None:
+        """Skip a parameter's annotation."""
+        return
 
     def visit_Assign(self, node: ast.Assign) -> None:
         """Extract memory region declarations."""
@@ -400,7 +484,7 @@ class MemoryOperationExtractor(ast.NodeVisitor):
 
     def visit_Subscript(self, node: ast.Subscript) -> None:
         """Extract memory access operations."""
-        if isinstance(node.value, ast.Name):
+        if isinstance(node.value, ast.Name) and node.value.id not in _TYPE_CONSTRUCTORS:
             array_name = node.value.id
 
             # Ensure we have a memory region for this array

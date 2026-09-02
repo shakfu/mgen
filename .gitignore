@@ -228,3 +228,5 @@ __marimo__/
 # claude
 .claude
 CLAUDE.md
+REVIEW.md
+local/

@@ -5,6 +5,7 @@ from typing import Any, Optional
 
 from ...frontend.immutability_analyzer import ImmutabilityAnalyzer, MutabilityClass
 from ..converter_utils import (
+    escape_string_for_rust,
     extract_format_spec,
     get_augmented_assignment_operator,
     get_standard_binary_operator,
@@ -46,6 +47,8 @@ class MultiGenPythonToRustConverter:
         self.current_function_node: Optional[ast.FunctionDef] = None  # Track current function AST node
         self.declared_vars: set[str] = set()  # Track declared variables in current function
         self.function_return_types: dict[str, str] = {}  # Track function return types
+        self._try_counter = 0  # Unique suffixes for try-block temporaries
+        self._try_return_depth = 0  # Nesting depth of catch_unwind closures being emitted
         self.variable_types: dict[str, str] = {}  # Track variable types in current function scope
         self.function_mut_params: dict[str, set[str]] = {}  # Track mutable parameters for each function
         self.immutability_analyzer = ImmutabilityAnalyzer()  # Backend-agnostic immutability analysis
@@ -714,6 +717,7 @@ class MultiGenPythonToRustConverter:
         # Convert function body
         self.current_function = node.name
         self.current_function_node = node  # Store AST node for analysis
+        self._try_return_depth = 0
         self.declared_vars = set()  # Reset for new function
         self.variable_types = {}  # Reset variable type tracking for new function
         self._is_generator = is_generator
@@ -753,6 +757,15 @@ class MultiGenPythonToRustConverter:
             body_parts.append("    __mgen_result")
 
         full_body = "\n".join(body_parts)
+
+        # A body whose returns all sit inside an if/else or a try block ends
+        # without a value, which Rust rejects for a function with a result.
+        if actual_return_type != "()" and not is_generator:
+            body_lines = [line for line in full_body.rstrip().split("\n") if line.strip()]
+            last_line = body_lines[-1].strip() if body_lines else ""
+            if not last_line.startswith("return") and not last_line.startswith("panic!"):
+                full_body = full_body.rstrip() + f"\n    {self._get_default_value(actual_return_type)}"
+
         self.current_function = None
         self.current_function_node = None
         self._is_generator = False
@@ -870,10 +883,69 @@ class MultiGenPythonToRustConverter:
         else:
             return f"    assert!({test_expr});"
 
+    def _try_closure_nodes(self, stmt: ast.Try) -> list[ast.AST]:
+        """Collect the nodes that run inside the catch_unwind closure.
+
+        Handlers and the finally block are emitted outside the closure, so only
+        the try body and its else clause are included.
+
+        Args:
+            stmt: The try statement
+
+        Returns:
+            All nodes in the try body and else clause
+        """
+        nodes: list[ast.AST] = []
+        for block in (stmt.body, stmt.orelse):
+            for node in block:
+                nodes.extend(ast.walk(node))
+        return nodes
+
+    def _hoist_try_bindings(self, stmt: ast.Try) -> list[tuple[str, str]]:
+        """Pre-declare the variables the try closure binds.
+
+        A variable first bound inside the closure would be out of scope after
+        the block. Declaring it beforehand (and marking it declared) turns the
+        inner binding into a plain assignment that outlives the closure.
+
+        Args:
+            stmt: The try statement
+
+        Returns:
+            (name, Rust type) pairs to declare before the closure
+        """
+        hoisted: list[tuple[str, str]] = []
+        for node in self._try_closure_nodes(stmt):
+            candidates: list[tuple[str, Optional[ast.expr], Optional[ast.expr]]]
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                candidates = [(node.target.id, node.annotation, node.value)]
+            elif isinstance(node, ast.Assign):
+                candidates = [(target.id, None, node.value) for target in node.targets if isinstance(target, ast.Name)]
+            else:
+                continue
+
+            for name, annotation, value in candidates:
+                if name in self.declared_vars:
+                    continue
+                if value is not None:
+                    var_type = self._infer_type_from_value(value)
+                elif annotation is not None:
+                    var_type = self._map_type_annotation(annotation)
+                else:
+                    var_type = "i32"
+                self.declared_vars.add(name)
+                self.variable_types[name] = var_type
+                hoisted.append((name, var_type))
+        return hoisted
+
     def _convert_try(self, stmt: ast.Try) -> str:
         """Convert Python try/except to Rust std::panic::catch_unwind.
 
-        Python's try/except maps to Rust's catch_unwind for panic-based error handling.
+        The try body runs inside a closure, so a `return` in it would exit only
+        the closure and a variable bound in it would not survive the block. The
+        closure therefore yields Option<T>: a Python return becomes Some(value),
+        which the caller re-issues, and bound variables are hoisted ahead of it.
+        Handlers sit outside the closure, so their returns need no plumbing.
 
         Example:
             try:
@@ -882,39 +954,73 @@ class MultiGenPythonToRustConverter:
                 return 0
 
             Becomes:
-            match std::panic::catch_unwind(|| {
+            let v: Option<i32> = match std::panic::catch_unwind(... || -> Option<i32> {
                 ...
+                None
             }) {
                 Ok(v) => v,
                 Err(e) => {
                     if e.downcast_ref::<ZeroDivisionError>().is_some() {
                         return 0;
+                    } else {
+                        std::panic::resume_unwind(e);
                     }
-                    std::panic::resume_unwind(e);
+                    None
                 }
+            };
+            if let Some(value) = v {
+                return value;
             }
         """
-        lines: list[str] = []
+        # main() drops its return statements, so they need no plumbing.
+        in_main = self.current_function == "main"
+        return_type = self.function_return_types.get(self.current_function or "", "()")
+        body_returns = not in_main and any(isinstance(node, ast.Return) for node in self._try_closure_nodes(stmt))
+
+        suffix = str(self._try_counter)
+        self._try_counter += 1
+        result_var = f"__mgen_try_value{suffix}"
+        bound_var = f"__mgen_returned{suffix}"
+
+        hoisted = self._hoist_try_bindings(stmt)
+        lines: list[str] = [
+            f"    let mut {name}: {var_type} = {self._get_default_value(var_type)};" for name, var_type in hoisted
+        ]
 
         # Start the catch_unwind block
-        lines.append("    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {")
+        if body_returns:
+            lines.append(
+                f"    let {result_var}: Option<{return_type}> = "
+                f"match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Option<{return_type}> {{"
+            )
+            self._try_return_depth += 1
+        else:
+            lines.append("    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {")
 
-        # Convert try body
-        for s in stmt.body:
-            body_line = self._convert_statement(s)
-            if body_line:
-                # Add extra indentation for nested block
-                for line in body_line.split("\n"):
-                    lines.append(f"    {line}")
-
-        # else clause: runs if no exception (appended to try body)
-        if stmt.orelse:
-            lines.append("        // else (no exception)")
-            for s in stmt.orelse:
+        try:
+            # Convert try body
+            for s in stmt.body:
                 body_line = self._convert_statement(s)
                 if body_line:
+                    # Add extra indentation for nested block
                     for line in body_line.split("\n"):
                         lines.append(f"    {line}")
+
+            # else clause: runs if no exception (appended to try body)
+            if stmt.orelse:
+                lines.append("        // else (no exception)")
+                for s in stmt.orelse:
+                    body_line = self._convert_statement(s)
+                    if body_line:
+                        for line in body_line.split("\n"):
+                            lines.append(f"    {line}")
+        finally:
+            if body_returns:
+                self._try_return_depth -= 1
+
+        if body_returns:
+            # Falling off the end of the closure means the try block did not return.
+            lines.append("        None")
 
         lines.append("    })) {")
         lines.append("        Ok(v) => v,")
@@ -967,8 +1073,17 @@ class MultiGenPythonToRustConverter:
             # Close the else block from bare except
             pass
 
+        if body_returns:
+            # A handler that falls through has not returned either.
+            lines.append("            None")
+
         lines.append("        }")
-        lines.append("    }")
+        lines.append("    }" + (";" if body_returns else ""))
+
+        if body_returns:
+            lines.append(f"    if let Some({bound_var}) = {result_var} {{")
+            lines.append(f"        return {bound_var};")
+            lines.append("    }")
 
         # Convert finally clause if present
         if stmt.finalbody:
@@ -1000,10 +1115,11 @@ class MultiGenPythonToRustConverter:
             if stmt.exc.args:
                 # Exception with message
                 msg_expr = self._convert_expression(stmt.exc.args[0])
-                return f"    panic!({rust_exc_type}::new({msg_expr}));"
+                # The constructors take &str; & lets a String argument deref-coerce.
+                return f"    std::panic::panic_any({rust_exc_type}::new(&{msg_expr}));"
             else:
                 # Exception without message
-                return f'    panic!({rust_exc_type}::new(""));\n'
+                return f'    std::panic::panic_any({rust_exc_type}::new(""));'
 
         # Fallback for other raise patterns
         return '    panic!("Unknown exception");'
@@ -1057,6 +1173,14 @@ class MultiGenPythonToRustConverter:
         if self.current_function == "main":
             # Just omit the return statement in main
             return ""
+
+        if self._try_return_depth > 0:
+            # Inside a catch_unwind closure: hand the value back as Some(..) so
+            # _convert_try can re-issue the return outside the closure.
+            if stmt.value:
+                value_expr = self._convert_expression(stmt.value)
+                return f"    return Some({value_expr});"
+            return "    return Some(());"
 
         if stmt.value:
             value_expr = self._convert_expression(stmt.value)
@@ -1175,10 +1299,14 @@ class MultiGenPythonToRustConverter:
             value_expr = self._get_default_value(var_type)
 
         if isinstance(stmt.target, ast.Name):
+            already_declared = stmt.target.id in self.declared_vars
             # Track the variable as declared to prevent redeclaration
             self.declared_vars.add(stmt.target.id)
             # Track the variable type for later reference
             self.variable_types[stmt.target.id] = var_type
+            if already_declared:
+                # Re-binding would shadow; hoisted try bindings need the outer one.
+                return f"    {stmt.target.id} = {value_expr};"
             # Local variable with type annotation
             return f"    let mut {stmt.target.id}: {var_type} = {value_expr};"
 
@@ -1316,7 +1444,7 @@ class MultiGenPythonToRustConverter:
     def _convert_constant(self, expr: ast.Constant) -> str:
         """Convert constant values."""
         if isinstance(expr.value, str):
-            return f'"{expr.value}".to_string()'
+            return f'"{escape_string_for_rust(expr.value)}".to_string()'
         elif isinstance(expr.value, bool):
             return "true" if expr.value else "false"
         elif expr.value is None:
@@ -1531,10 +1659,11 @@ class MultiGenPythonToRustConverter:
 
         for value in expr.values:
             if isinstance(value, ast.Constant):
-                # Literal string part - escape braces
+                # Literal string part: double braces for format!, then escape
+                # for the Rust literal (escaping introduces no new braces).
                 if isinstance(value.value, str):
                     literal = value.value.replace("{", "{{").replace("}", "}}")
-                    format_parts.append(literal)
+                    format_parts.append(escape_string_for_rust(literal))
             elif isinstance(value, ast.FormattedValue):
                 expr_code = self._convert_expression(value.value)
                 spec = extract_format_spec(value)
@@ -1550,8 +1679,8 @@ class MultiGenPythonToRustConverter:
         format_string = "".join(format_parts)
 
         if len(args) == 0:
-            # No expressions, just return string literal
-            return f'"{format_string}".to_string()'
+            # Plain literal: no format! involved, so braces must not stay doubled.
+            return f'"{format_string.replace("{{", "{").replace("}}", "}")}".to_string()'
         else:
             # Use format! macro
             args_str = ", ".join(args)

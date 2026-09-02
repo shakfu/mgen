@@ -4,6 +4,7 @@ import ast
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from ..converter_utils import (
+    escape_string_for_ocaml,
     extract_format_spec,
     format_spec_to_printf,
     get_standard_binary_operator,
@@ -42,6 +43,7 @@ class MultiGenPythonToOCamlConverter:
         self.variables: dict[str, str] = {}
         self.current_class: Optional[str] = None
         self.mutable_vars: set[str] = set()  # Variables that need to be refs
+        self.declared_refs: set[str] = set()  # Refs already bound in the current function
 
         # Lazy-initialized loop converter
         self._loop_converter: Optional[ForLoopConverter] = None
@@ -453,6 +455,17 @@ class MultiGenPythonToOCamlConverter:
             # For loops with mutations - use _has_mutations helper to recursively check
             elif isinstance(child, ast.For):
                 mutable.update(self._has_mutations(child.body))
+            # While loops: the body has to be able to move the loop condition
+            # forward, so a plain name assignment counts as a mutation here.
+            elif isinstance(child, ast.While):
+                mutable.update(self._has_mutations(child.body))
+                for stmt in ast.walk(child):
+                    if isinstance(stmt, ast.Assign):
+                        for target in stmt.targets:
+                            if isinstance(target, ast.Name):
+                                mutable.add(target.id)
+                    elif isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
+                        mutable.add(stmt.target.id)
             # If statements with regular assignments (conditional mutations)
             elif isinstance(child, ast.If):
                 for stmt in ast.walk(child):
@@ -475,6 +488,7 @@ class MultiGenPythonToOCamlConverter:
 
         # Find mutable variables for this function
         self.mutable_vars = self._find_mutable_variables(node)
+        self.declared_refs = set()
 
         # Exclude function parameters from mutable vars (they're passed normally, not as refs)
         param_names = {name for name, _ in params}
@@ -604,6 +618,8 @@ class MultiGenPythonToOCamlConverter:
         self.mutable_vars = self.mutable_vars - param_names
         # Add __mgen_result to mutable vars so it uses ref semantics
         self.mutable_vars.add("__mgen_result")
+        # __mgen_result is bound by the signature above; everything else is not.
+        self.declared_refs = {"__mgen_result"}
 
         body_lines: list[str] = []
         for stmt in filtered_body:
@@ -887,9 +903,7 @@ class MultiGenPythonToOCamlConverter:
         elif isinstance(node.value, float):
             return str(node.value)
         elif isinstance(node.value, str):
-            # Escape quotes and backslashes
-            escaped = node.value.replace("\\", "\\\\").replace('"', '\\"')
-            return f'"{escaped}"'
+            return f'"{escape_string_for_ocaml(node.value)}"'
         elif node.value is None:
             return "()"
         else:
@@ -1019,12 +1033,14 @@ class MultiGenPythonToOCamlConverter:
                 else:
                     return 'print_value ""'
             else:
-                # Regular function call
+                # Regular function call. OCaml application binds tighter than
+                # nothing at all, so an unparenthesized `f x` used as an argument
+                # would be read as two separate arguments.
                 args = [self._convert_expression(arg) for arg in node.args]
                 if args:
-                    return f"{self._to_ocaml_var_name(func_name)} {' '.join(args)}"
+                    return f"({self._to_ocaml_var_name(func_name)} {' '.join(args)})"
                 else:
-                    return f"{self._to_ocaml_var_name(func_name)} ()"
+                    return f"({self._to_ocaml_var_name(func_name)} ())"
         elif isinstance(node.func, ast.Attribute):
             return self._convert_method_call(node)
         else:
@@ -1322,9 +1338,14 @@ class MultiGenPythonToOCamlConverter:
 
         if isinstance(target, ast.Name):
             var_name = self._to_ocaml_var_name(target.id)
-            # Check if this is a mutable variable (ref) - use := instead of let
+            # A mutable variable is a ref: the first assignment declares it,
+            # later ones update it. Without the declaration OCaml reports an
+            # unbound value.
             if target.id in self.mutable_vars:
-                return f"{var_name} := {value}"
+                if target.id in self.declared_refs:
+                    return f"{var_name} := {value}"
+                self.declared_refs.add(target.id)
+                return f"let {var_name} = ref ({value}) in"
             else:
                 return f"let {var_name} = {value} in"
         elif isinstance(target, ast.Subscript):
@@ -1400,6 +1421,7 @@ class MultiGenPythonToOCamlConverter:
 
             # Check if this variable is mutable (will be mutated later)
             if target.id in self.mutable_vars:
+                self.declared_refs.add(target.id)
                 return f"let {var_name} = ref ({value}) in"
             else:
                 return f"let {var_name} = {value} in"
@@ -1588,10 +1610,54 @@ class MultiGenPythonToOCamlConverter:
 
         return f"if {condition} then {then_part} else {else_part}"
 
+    def _sequence_ocaml_statements(self, body_lines: list[str]) -> list[str]:
+        """Join converted statements into an OCaml expression sequence.
+
+        ``let ... in`` bindings scope over what follows, so they must not be
+        separated by ``;``; every other statement must be.
+
+        Args:
+            body_lines: Converted statements, in order
+
+        Returns:
+            Lines with the separators an OCaml sequence needs
+        """
+        sequenced: list[str] = []
+        for i, line in enumerate(body_lines):
+            is_last = i == len(body_lines) - 1
+            if line.rstrip().endswith(" in"):
+                sequenced.append(line)
+                if is_last:
+                    sequenced.append("()")
+            else:
+                sequenced.append(line if is_last else f"{line};")
+        return sequenced
+
     def _convert_while_statement(self, node: ast.While) -> str:
-        """Convert while statement (simplified)."""
+        """Convert Python while loop to an OCaml while..done loop.
+
+        The loop condition and any variable the body assigns are refs (see
+        ``_find_mutable_variables``), so the body can be emitted as a plain
+        imperative statement sequence.
+        """
+        if node.orelse:
+            raise UnsupportedFeatureError("while/else is not supported")
+
         condition = self._convert_expression(node.test)
-        return f"(* while {condition} do ... done *)"
+
+        body_lines: list[str] = []
+        for stmt in node.body:
+            converted = self._convert_statement(stmt)
+            if isinstance(converted, list):
+                body_lines.extend(converted)
+            else:
+                body_lines.append(converted)
+
+        if not body_lines:
+            body_lines = ["()"]
+
+        body_str = " ".join(self._sequence_ocaml_statements(body_lines))
+        return f"while {condition} do {body_str} done"
 
     def _has_mutations(self, stmts: list[ast.stmt]) -> set[str]:
         """Detect variables that are mutated in a list of statements."""
@@ -1651,16 +1717,13 @@ class MultiGenPythonToOCamlConverter:
         This method handles complex patterns that don't fit the standard strategies.
         Since OCamlGeneralLoopStrategy is a catch-all, this should rarely be called.
         """
-        # Complex for loop targets not supported
-        if not isinstance(node.target, ast.Name):
-            return ["(* Complex for loop target not supported *)"]
-
         # Empty loops
         if not node.body:
             return ["(* Empty for loop *)"]
 
-        # This should rarely execute since OCamlGeneralLoopStrategy handles most cases
-        return ["(* Unsupported for loop pattern *)"]
+        # This should rarely execute since OCamlGeneralLoopStrategy handles most
+        # cases. Emitting a comment here would silently delete the loop, so fail.
+        raise UnsupportedFeatureError(f"Unsupported for loop pattern over {ast.dump(node.target)}")
 
     def _to_ocaml_var_name(self, name: str) -> str:
         """Convert Python variable name to OCaml style."""
@@ -1884,8 +1947,7 @@ class MultiGenPythonToOCamlConverter:
             if isinstance(value, ast.Constant):
                 # Literal string part - escape properly
                 if isinstance(value.value, str):
-                    escaped = value.value.replace("\\", "\\\\").replace('"', '\\"')
-                    parts.append(f'"{escaped}"')
+                    parts.append(f'"{escape_string_for_ocaml(value.value)}"')
             elif isinstance(value, ast.FormattedValue):
                 expr_code = self._convert_expression(value.value)
                 spec = extract_format_spec(value)

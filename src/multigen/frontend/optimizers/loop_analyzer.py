@@ -154,8 +154,8 @@ class LoopAnalyzer(BaseOptimizer):
             # Generate optimizations
             self._generate_optimizations(report)
 
-            # Create optimized AST
-            optimized_ast = self._apply_optimizations(context.ast_node, report)
+            # No loop transform is implemented yet, so this is the input tree.
+            optimized_ast = self._reparsed_ast(context.ast_node, report)
 
             # Calculate performance estimates
             performance_gain = self._estimate_performance_gain(report)
@@ -172,7 +172,7 @@ class LoopAnalyzer(BaseOptimizer):
                 metadata={
                     "optimization_level": self.optimization_level.value,
                     "loops_analyzed": len(report.loops_found),
-                    "optimizations_applied": len(report.optimizations),
+                    "optimizations_identified": len(report.optimizations),
                     "vectorizable_loops": report.vectorizable_loops,
                     "report": report,
                 },
@@ -675,10 +675,19 @@ class LoopAnalyzer(BaseOptimizer):
 
         return "/* C-style conversion not applicable */"
 
-    def _apply_optimizations(self, node: ast.AST, report: LoopAnalysisReport) -> ast.AST:
-        """Apply selected optimizations to the AST."""
-        # For now, return the original AST
-        # In a full implementation, we would transform the AST based on optimizations
+    def _reparsed_ast(self, node: ast.AST, report: LoopAnalysisReport) -> ast.AST:
+        """Return the tree unchanged, tagged with the opportunities found.
+
+        No loop transformation is implemented: the identified optimizations are
+        reported for downstream consumers, not applied here.
+
+        Args:
+            node: The tree that was analyzed
+            report: Analysis report to attach
+
+        Returns:
+            An equivalent tree, semantically identical to the input
+        """
         optimized = ast.copy_location(ast.parse(ast.unparse(node)), node)
 
         # Add metadata about applied optimizations
@@ -718,7 +727,7 @@ class LoopAnalyzer(BaseOptimizer):
             optimization_counts[opt_type] = optimization_counts.get(opt_type, 0) + 1
 
         for opt_type, count in optimization_counts.items():
-            transformations.append(f"Applied {count} {opt_type} optimizations")
+            transformations.append(f"Identified {count} {opt_type} opportunities")
 
         return transformations
 

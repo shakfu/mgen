@@ -6,6 +6,7 @@ simplification capabilities for static Python code optimization.
 
 import ast
 import operator as op
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional, cast
@@ -173,24 +174,94 @@ class CompileTimeEvaluator(BaseOptimizer):
         return optimized
 
     def _collect_constants(self, node: ast.AST, report: CompileTimeReport) -> None:
-        """Collect constant values from variable assignments."""
-        for child in ast.walk(node):
-            if isinstance(child, ast.AnnAssign) and child.value:
-                if isinstance(child.target, ast.Name):
-                    var_name = child.target.id
-                    constant_value = self._evaluate_expression(child.value)
-                    if constant_value is not None:
-                        self._constants[var_name] = constant_value
-                        report.constants_found[var_name] = constant_value
+        """Collect variables that are safe to substitute with a constant.
 
-            elif isinstance(child, ast.Assign) and len(child.targets) == 1:
-                target = child.targets[0]
-                if isinstance(target, ast.Name):
-                    var_name = target.id
+        A name only qualifies when the whole tree binds it exactly once and that
+        binding evaluates to a constant. Recording the last constant assignment
+        instead would substitute a stale value after a reassignment - e.g.
+        ``x = 5; x = n * 2; return x`` would fold to ``return 5``.
+        """
+        binding_counts: dict[str, int] = {}
+        for name in self._iter_bound_names(node):
+            binding_counts[name] = binding_counts.get(name, 0) + 1
+
+        for child in ast.walk(node):
+            if isinstance(child, (ast.AnnAssign, ast.Assign)) and child.value is not None:
+                if isinstance(child, ast.AnnAssign):
+                    targets: list[ast.expr] = [child.target]
+                elif len(child.targets) == 1:
+                    targets = [child.targets[0]]
+                else:
+                    continue
+
+                for target in targets:
+                    if not isinstance(target, ast.Name):
+                        continue
+                    if binding_counts.get(target.id, 0) != 1:
+                        continue
                     constant_value = self._evaluate_expression(child.value)
                     if constant_value is not None:
-                        self._constants[var_name] = constant_value
-                        report.constants_found[var_name] = constant_value
+                        self._constants[target.id] = constant_value
+                        report.constants_found[target.id] = constant_value
+
+    def _iter_bound_names(self, node: ast.AST) -> Iterator[str]:
+        """Yield a name for every binding site in the tree, including repeats.
+
+        Args:
+            node: Root of the tree to scan
+
+        Yields:
+            Each bound name, once per binding site
+        """
+        for child in ast.walk(node):
+            if isinstance(child, ast.Assign):
+                for target in child.targets:
+                    yield from self._target_names(target)
+            elif isinstance(child, (ast.AnnAssign, ast.AugAssign, ast.NamedExpr)):
+                yield from self._target_names(child.target)
+            elif isinstance(child, (ast.For, ast.AsyncFor)):
+                yield from self._target_names(child.target)
+            elif isinstance(child, ast.comprehension):
+                yield from self._target_names(child.target)
+            elif isinstance(child, ast.withitem):
+                if child.optional_vars is not None:
+                    yield from self._target_names(child.optional_vars)
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                yield child.name
+                args = child.args
+                for arg in [*args.posonlyargs, *args.args, *args.kwonlyargs]:
+                    yield arg.arg
+                if args.vararg:
+                    yield args.vararg.arg
+                if args.kwarg:
+                    yield args.kwarg.arg
+            elif isinstance(child, ast.ClassDef):
+                yield child.name
+            elif isinstance(child, ast.ExceptHandler):
+                if child.name:
+                    yield child.name
+            elif isinstance(child, (ast.Import, ast.ImportFrom)):
+                for alias in child.names:
+                    yield alias.asname or alias.name.split(".")[0]
+            elif isinstance(child, (ast.Global, ast.Nonlocal)):
+                yield from child.names
+
+    def _target_names(self, target: ast.expr) -> Iterator[str]:
+        """Yield the names bound by an assignment target.
+
+        Args:
+            target: An assignment target expression
+
+        Yields:
+            Every name the target binds
+        """
+        if isinstance(target, ast.Name):
+            yield target.id
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            for element in target.elts:
+                yield from self._target_names(element)
+        elif isinstance(target, ast.Starred):
+            yield from self._target_names(target.value)
 
     def _optimize_node(self, node: ast.AST, report: CompileTimeReport) -> ast.AST:
         """Recursively optimize AST nodes."""

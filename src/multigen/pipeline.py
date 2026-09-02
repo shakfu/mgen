@@ -308,8 +308,12 @@ class MultiGenPipeline:
                     self.theorem_prover = None
                 else:
                     mode = "strict mode" if self.config.strict_verification else "warning mode"
-                    self.log.info(f"Formal verification enabled in {mode} (Z3 available)")
+                    self.log.info(f"Formal verification enabled in {mode} (Z3 available): memory bounds only")
                     self.bounds_prover = BoundsProver()
+                    # Exposed for callers that supply their own specification.
+                    # The pipeline itself verifies memory bounds only - the
+                    # correctness prover cannot relate a spec to a function body,
+                    # so running it here would only report undecided properties.
                     self.correctness_prover = CorrectnessProver()
                     self.theorem_prover = TheoremProver()
             else:
@@ -381,6 +385,7 @@ class MultiGenPipeline:
             self._report_progress(PipelinePhase.VALIDATION, "Validating Python code")
             if not self._validation_phase(source_code, input_path, result):
                 self.log.error("Validation phase failed")
+                result.success = False
                 return result
 
             # Phase 2: Analysis
@@ -389,6 +394,7 @@ class MultiGenPipeline:
             analysis_result = self._analysis_phase(source_code, result)
             if analysis_result is None:
                 self.log.error("Analysis phase failed")
+                result.success = False
                 return result
 
             # Phase 3: Python Optimization
@@ -413,6 +419,7 @@ class MultiGenPipeline:
             self._report_progress(PipelinePhase.GENERATION, f"Generating {self.config.target_language.upper()} source")
             if not self._generation_phase(source_code, target_optimized, output_dir, result):
                 self.log.error("Generation phase failed")
+                result.success = False
                 return result
 
             # Phase 7: Build
@@ -422,6 +429,8 @@ class MultiGenPipeline:
                 self._report_progress(PipelinePhase.BUILD, build_msg)
                 if not self._build_phase(output_dir, result):
                     self.log.error("Build phase failed")
+                    # A phase that fails must never leave success=True (C-1).
+                    result.success = False
                     return result
 
             self.log.info(f"Pipeline conversion completed successfully for: {input_path}")
@@ -572,7 +581,9 @@ class MultiGenPipeline:
                                     self.log.error(f"Verification failed in strict mode: {proof.summary}")
                                     return False
 
-                            # Add verification recommendations
+                            # Add verification recommendations. Undecided
+                            # accesses land here as warnings: they were neither
+                            # proved safe nor shown to be violations.
                             for recommendation in proof.recommendations:
                                 if self.config.strict_verification and not proof.is_safe:
                                     result.errors.append(f"[FORMAL_VERIFICATION] {recommendation}")
@@ -830,9 +841,12 @@ class MultiGenPipeline:
                 vectorization_result = vectorization_detector.optimize(context)
                 optimizations["vectorization"] = vectorization_result
 
+                # These passes only report findings - the original analysis is
+                # what moves on to mapping - so nothing here was applied.
                 result.phase_results[PipelinePhase.PYTHON_OPTIMIZATION] = PythonOptimizationPhaseResult(
                     enabled=True,
-                    optimizations_applied=list(optimizations.keys()),
+                    analyses_run=list(optimizations.keys()),
+                    optimizations_applied=[],
                     compile_time=compile_time_result,
                     loops=loop_result,
                     specialization=specialization_result,
@@ -1091,6 +1105,7 @@ class MultiGenPipeline:
             source_key = f"{self.config.target_language}_source"
             source_file = result.output_files.get(source_key)
             if not source_file:
+                result.success = False
                 result.errors.append("No source file available for build phase")
                 return False
 
@@ -1124,7 +1139,13 @@ class MultiGenPipeline:
                     result.executable_path = str(executable_path)
                     result.output_files["executable"] = str(executable_path)
                 else:
+                    result.success = False
                     result.errors.append("Direct compilation failed")
+                    result.phase_results[PipelinePhase.BUILD] = BuildPhaseResult(
+                        success=False,
+                        mode=self.config.build_mode.value,
+                        outputs=dict(result.output_files),
+                    )
                     return False
 
             result.phase_results[PipelinePhase.BUILD] = BuildPhaseResult(

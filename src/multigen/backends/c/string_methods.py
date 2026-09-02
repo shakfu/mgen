@@ -9,6 +9,7 @@ from __future__ import annotations
 import ast
 from typing import TYPE_CHECKING
 
+from ..converter_utils import escape_string_for_c_family
 from ..errors import UnsupportedFeatureError
 
 if TYPE_CHECKING:
@@ -174,9 +175,10 @@ class CFStringConverter:
 
         for value in expr.values:
             if isinstance(value, ast.Constant):
-                # Literal string part
+                # Literal string part: escape for the C literal, then protect '%'
+                # from being read as a printf directive.
                 if isinstance(value.value, str):
-                    format_parts.append(value.value)
+                    format_parts.append(escape_string_for_c_family(value.value).replace("%", "%%"))
             elif isinstance(value, ast.FormattedValue):
                 # Expression - add placeholder
                 format_parts.append("%s")
@@ -187,8 +189,8 @@ class CFStringConverter:
         format_string = "".join(format_parts)
 
         if len(args) == 0:
-            # No interpolation, just return the string
-            return f'"{format_string}"'
+            # Plain literal: no printf involved, so '%' must not stay doubled.
+            return f'"{format_string.replace("%%", "%")}"'
         else:
             # Use multigen_sprintf_string helper (needs to be in runtime)
             args_str = ", ".join(args)

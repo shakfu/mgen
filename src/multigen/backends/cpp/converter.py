@@ -24,6 +24,7 @@ from typing import Any, Optional, Union
 
 from ..base import AbstractEmitter
 from ..converter_utils import (
+    escape_string_for_c_family,
     extract_format_spec,
     format_spec_to_printf,
     get_standard_binary_operator,
@@ -1369,7 +1370,7 @@ class MultiGenPythonToCppConverter:
         """Convert constant values."""
         value = expr.value
         if isinstance(value, str):
-            return f'"{value}"'
+            return f'"{escape_string_for_c_family(value)}"'
         elif isinstance(value, bool):
             return "true" if value else "false"
         elif isinstance(value, (int, float)):
@@ -1813,7 +1814,7 @@ class MultiGenPythonToCppConverter:
             if isinstance(value, ast.Constant):
                 # Literal string part
                 if isinstance(value.value, str):
-                    parts.append(f'"{value.value}"')
+                    parts.append(f'"{escape_string_for_c_family(value.value)}"')
             elif isinstance(value, ast.FormattedValue):
                 # Expression to be converted to string
                 expr_code = self._convert_expression(value.value)

@@ -12,14 +12,16 @@ finding number.
 
 ### Critical -- wrong output reported as success
 
-- [ ] **The pipeline reports `success=True` when direct compilation fails.**
-  `_build_phase` records `"Direct compilation failed"` in `errors` but the run
-  is still marked successful, so every build failure below is masked from
-  callers. Fixing this first makes the rest visible.
-- [ ] **C string literals are emitted without escaping** (R-12,
-  `backends/c/converter.py` `_convert_constant`). A quote, backslash, newline or
-  NUL produces invalid C or silently changes the value:
-  `return "he said \"hi\""` emits `return "he said "hi"";`.
+- [x] **The pipeline reports `success=True` when direct compilation fails.**
+  Fixed: `_build_phase` now clears `success` on both failure paths and records a
+  failed `BuildPhaseResult`, and `convert()` clears it for every phase that
+  returns False.
+- [x] **C string literals are emitted without escaping** (R-12). Fixed across
+  C, C++, Go, Rust, Haskell and OCaml: `converter_utils` now provides
+  per-language escapers (octal for C-family, `\u{..}` for Rust, decimal with
+  `\&` for Haskell) and every literal, f-string part and container literal
+  routes through them. TypeScript already used `json.dumps`; LLVM encodes bytes
+  through llvmlite.
 - [ ] **`--makefile` places the source where the generated Makefile cannot find
   it** (R-11). C generation writes `build/src/prog.c` but moves the Makefile to
   `build/`, whose `$(wildcard $(SRCDIR)/*.c)` then matches nothing; `make` fails
@@ -32,15 +34,19 @@ finding number.
 ### High -- analysis that does not analyse
 
 - [ ] **The bounds prover models no program state** (R-7,
-  `verifiers/bounds_prover.py`). Offsets and sizes are unconstrained `z3.Int`s
-  with no path conditions and no link to `len()`, so a guarded access can be
-  reported unsafe and the result is not a proof about the actual path.
-  `base_addr != 0` on an unconstrained integer is always disprovable.
-- [ ] **The correctness prover checks preconditions for validity rather than
-  assuming them** (R-6). `n >= 0` is reported `DISPROVED` with counterexample
-  `n = -1`. The specification parser now builds real formulas, but without an
-  assumption context the verdicts still cannot establish the advertised
-  properties.
+  `verifiers/bounds_prover.py`). Partly addressed: an access whose offset or
+  region size is not concrete is now reported UNKNOWN instead of being handed to
+  Z3 as unconstrained integers, so guarded and annotated code is no longer
+  reported unsafe, and annotation subscripts (`a: list[int]`) no longer invent a
+  region. Still outstanding: path conditions and a `len()` model, without which
+  only accesses with literal indices into literal-sized regions are decided.
+- [x] **The correctness prover checks preconditions for validity rather than
+  assuming them** (R-6). Fixed: preconditions are now checked for
+  satisfiability (a contradictory assumption makes the spec vacuous), and every
+  property that needs a model of the function body -- postconditions, loop
+  invariants, termination, ranking functions, functional correctness -- reports
+  UNKNOWN with the reason instead of DISPROVED. `failed_properties` lists only
+  genuine counterexamples.
 - [ ] **The symbolic executor stops at the first loop** (R-5). `_execute_for`
   and `_execute_while` return a `None` continuation, so a function containing a
   loop is never analysed past it and no return value is recorded.
@@ -48,6 +54,30 @@ finding number.
   `compiler_flags`, `include_dirs` and `libraries` on `PipelineConfig` are read
   nowhere outside `__post_init__`. `multigen build --compiler clang` still emits
   `CC = gcc`.
+
+### Critical -- fixed in this pass
+
+- [x] **Every non-empty dict literal generated invalid Go.** `_convert_dict_literal`
+  emitted doubled braces (`map[string]int{{...}}`). Set literals also lost their
+  element type; both now emit valid Go.
+- [x] **OCaml deleted while-loop bodies and never declared its refs.**
+  `_convert_while_statement` emitted a comment; it now emits a real
+  `while ... do ... done`. A plain (unannotated) assignment to a mutated
+  variable now binds `let x = ref (...) in` on first assignment, and a
+  non-`Name` for-loop target raises instead of silently dropping the loop.
+  Function applications used as arguments are parenthesized.
+- [x] **`return` and locals crossed closure scopes in Go and Rust try/except.**
+  Go's recover closure now carries returns out through named results re-issued
+  outside it, and Rust's `catch_unwind` closure yields `Option<T>`. Variables
+  bound in the try body are hoisted ahead of the closure so they survive it.
+  Rust raises now use `panic_any` so `downcast_ref` can find the payload.
+- [x] **The optimizer layer reported optimizations it never applied.** The
+  pipeline's Python-level passes are analysis-only, so the phase result now
+  reports `analyses_run` and leaves `optimizations_applied` empty; the loop
+  analyzer reports opportunities rather than "Applied N"; the function
+  specializer no longer lists its unimplemented placeholders; and the
+  compile-time evaluator only folds a name bound exactly once, so a reassigned
+  variable is no longer replaced with a stale constant.
 
 ### Medium -- narrower correctness gaps
 

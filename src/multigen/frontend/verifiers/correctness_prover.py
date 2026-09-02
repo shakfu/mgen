@@ -144,9 +144,10 @@ class CorrectnessProver:
         # Determine overall correctness
         is_correct = all(result.is_verified for result in all_proof_results)
 
-        # Collect failed properties
+        # A property is only "failed" when Z3 produced a counterexample. An
+        # undecided property is unproved, not violated.
         for result in all_proof_results:
-            if not result.is_verified:
+            if result.status == ProofStatus.DISPROVED:
                 failed_properties.append(result.proof_property.name)
 
         # Calculate confidence
@@ -166,25 +167,98 @@ class CorrectnessProver:
             confidence=confidence,
         )
 
+    def _undecided(self, prop: ProofProperty, reason: str) -> ProofResult:
+        """Record a property this prover cannot decide.
+
+        Every check below the precondition level needs a model of what the
+        function body does, which this prover does not build. Handing the bare
+        specification to Z3 instead would ask whether it holds for *all* values
+        of its free variables - almost never true - and report correct code as
+        disproved.
+
+        Args:
+            prop: The property that was not decided
+            reason: Why it could not be decided
+
+        Returns:
+            A ProofResult with UNKNOWN status
+        """
+        return ProofResult(
+            proof_property=prop,
+            status=ProofStatus.UNKNOWN,
+            proof_time=0.0,
+            error_message=reason,
+        )
+
     def _verify_preconditions(self, spec: FormalSpecification, context: AnalysisContext) -> list[ProofResult]:
-        """Verify that preconditions are satisfied."""
+        """Check that each precondition is satisfiable.
+
+        A precondition is an assumption, not a theorem: proving it outright would
+        ask whether it holds for every input. What can be checked is consistency
+        - an unsatisfiable precondition makes the whole specification vacuous.
+        """
         results = []
 
         for i, precondition in enumerate(spec.preconditions):
             prop = self._create_precondition_property(f"{spec.name}_pre_{i}", precondition)
-            result = self.theorem_prover.verify_property(prop)
-            results.append(result)
+            results.append(self._check_satisfiable(prop))
 
         return results
 
+    def _check_satisfiable(self, prop: ProofProperty) -> ProofResult:
+        """Check a property for satisfiability rather than validity.
+
+        Args:
+            prop: The property to check
+
+        Returns:
+            PROVED when a model exists, DISPROVED when the formula is
+            contradictory, UNKNOWN when Z3 cannot decide or is unavailable
+        """
+        if not self.z3_available:
+            return self._undecided(prop, "Z3 not available. Install with: pip install z3-solver")
+
+        start_time = time.time()
+        try:
+            solver = z3.Solver()
+            solver.add(prop.z3_formula)
+            outcome = solver.check()
+            proof_time = time.time() - start_time
+
+            if outcome == z3.sat:
+                return ProofResult(
+                    proof_property=prop,
+                    status=ProofStatus.PROVED,
+                    proof_time=proof_time,
+                    verification_steps=[f"Z3 found a model in {proof_time:.3f}s"],
+                )
+            if outcome == z3.unsat:
+                return ProofResult(
+                    proof_property=prop,
+                    status=ProofStatus.DISPROVED,
+                    proof_time=proof_time,
+                    error_message="assumption is contradictory, so the specification is vacuous",
+                )
+            return self._undecided(prop, "Z3 could not determine satisfiability")
+        except Exception as exc:  # pragma: no cover - defensive
+            return ProofResult(
+                proof_property=prop,
+                status=ProofStatus.ERROR,
+                proof_time=time.time() - start_time,
+                error_message=str(exc),
+            )
+
     def _verify_postconditions(self, spec: FormalSpecification, context: AnalysisContext) -> list[ProofResult]:
-        """Verify that postconditions are satisfied."""
+        """Record postconditions as undecided.
+
+        Proving a postcondition needs the function body's transition relation,
+        which this prover does not construct.
+        """
         results = []
 
         for i, postcondition in enumerate(spec.postconditions):
             prop = self._create_postcondition_property(f"{spec.name}_post_{i}", postcondition)
-            result = self.theorem_prover.verify_property(prop)
-            results.append(result)
+            results.append(self._undecided(prop, "postcondition needs a model of the function body"))
 
         return results
 
@@ -205,15 +279,19 @@ class CorrectnessProver:
                     entry_prop = self._create_loop_invariant_property(
                         f"{spec.name}_loop_{line_no}_entry_{i}", invariant, "entry", loop_info
                     )
-                    entry_result = self.theorem_prover.verify_property(entry_prop)
-                    results.append(entry_result)
+                    results.append(
+                        self._undecided(entry_prop, "loop invariant entry needs a model of the loop's state")
+                    )
 
                     # Verify invariant is maintained
                     maintenance_prop = self._create_loop_invariant_property(
                         f"{spec.name}_loop_{line_no}_maintenance_{i}", invariant, "maintenance", loop_info
                     )
-                    maintenance_result = self.theorem_prover.verify_property(maintenance_prop)
-                    results.append(maintenance_result)
+                    results.append(
+                        self._undecided(
+                            maintenance_prop, "loop invariant maintenance needs the loop's transition relation"
+                        )
+                    )
 
         return results, loop_analysis
 
@@ -226,14 +304,14 @@ class CorrectnessProver:
         # Verify termination conditions
         for i, termination_condition in enumerate(spec.termination_conditions):
             prop = self._create_termination_property(f"{spec.name}_termination_{i}", termination_condition)
-            result = self.theorem_prover.verify_property(prop)
-            results.append(result)
+            results.append(self._undecided(prop, "termination needs a model of how the loop variables change"))
 
         # Verify loop termination using ranking functions
         for loop_info in extractor.loops:
             ranking_prop = self._create_ranking_function_property(loop_info)
-            result = self.theorem_prover.verify_property(ranking_prop)
-            results.append(result)
+            results.append(
+                self._undecided(ranking_prop, "no transition relation is available to establish a ranking function")
+            )
 
         return results
 
@@ -241,8 +319,7 @@ class CorrectnessProver:
         """Verify functional correctness specification."""
         func_spec = spec.functional_spec if spec.functional_spec is not None else ""
         prop = self._create_functional_correctness_property(spec.name, func_spec)
-        result = self.theorem_prover.verify_property(prop)
-        return [result]
+        return [self._undecided(prop, "functional correctness needs a model of the function body")]
 
     def _create_precondition_property(self, name: str, precondition: str) -> ProofProperty:
         """Create a precondition verification property."""

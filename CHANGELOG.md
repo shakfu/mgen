@@ -44,6 +44,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **Continuous integration** (`.github/workflows/ci.yml`) -- the repository had none. Tests on Python 3.13 and 3.14, generated-artifact freshness, end-to-end translation, every validation profile, and a clean-environment install of the built wheel.
 
+- **Per-language string-literal escapers** (`backends/converter_utils.py`) -- `escape_string_for_c_family`, `escape_string_for_rust`, `escape_string_for_haskell`, `escape_string_for_ocaml`. Each encodes control characters in a form its target parses unambiguously: three-digit octal for C-family (a `\x` escape is greedy in C), `\u{..}` for Rust (which has no octal escapes), and decimal with a `\&` separator for Haskell (whose numeric escapes are variable-length).
+
+- `tests/test_review_critical_fixes.py` -- one test class per critical review finding, covering the build-success flag, escaping in six backends, Go map literals, OCaml loops and refs, try/except control flow in Go and Rust, prover verdicts, and optimizer reporting.
+
 - `make lint-fix` for the rewriting form of linting, and `make capabilities` / `make docs-syntax` for the generated artifacts.
 
 ### Changed
@@ -56,10 +60,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Rules that describe runtime constructs no longer apply inside type annotations, so `dict[str, int]` is accepted while a tuple value is not.
 - `make lint` validates instead of rewriting; `qa` uses `format-check`. Both targets silently rewrote the checkout.
 - ruff and isort agreed to disagree about one import block, each undoing the other; their `combine-as-imports` settings now match and vendored sources are excluded from both.
+- **The Python-level optimization phase reports what it did.** Its four passes are analysis-only -- the pipeline carries the original AST forward -- so `PythonOptimizationPhaseResult` gained `analyses_run` for the passes that ran and leaves `optimizations_applied` empty. The loop analyzer reports "Identified N ... opportunities" rather than "Applied N ... optimizations", and the function specializer no longer lists `constant_folding` / `type_specialization`, whose implementations were empty placeholders (now removed).
+- **Undecidable verification results are reported as undecided.** `BoundsProver` and `CorrectnessProver` distinguish PROVED, DISPROVED, and UNKNOWN: safety is now "no counterexample was proved", and `AlgorithmProof.failed_properties` lists only genuine counterexamples. Formal verification also logs the scope it actually covers (memory bounds).
 - `ValidationPhaseResult` carries the profile and structured diagnostics alongside the existing fields.
 
 ### Fixed
 
+- **A failed build was reported as a successful conversion.** `_build_phase` appended `"Direct compilation failed"` to `errors` and returned False without clearing `result.success`, and `convert()` ignored the return value -- so every compilation failure, including the 20 known `emit: ok` / `run: build_failed` capability cells, was invisible to callers. Both build failure paths now clear `success` and record a failed `BuildPhaseResult`, and `convert()` clears it for every phase that fails.
+- **String literals were emitted unescaped by six backends.** `msg = "he said \"hi\""` produced `char* msg = "he said "hi"";` -- source that cannot compile. C, C++, Go, Rust, Haskell and OCaml now route every constant, f-string literal part, and container literal through the new escapers. A literal `%` no longer reaches printf/Sprintf as a directive, and a non-interpolated f-string no longer keeps its doubled `%%` or `{{`.
+- **Every non-empty dict literal generated invalid Go.** `_convert_dict_literal` emitted `map[string]int{{"a": 1}}` (doubled braces, from an f-string escape), which `go build` rejects with `missing key in map literal`. Homogeneous set literals also lost their element type, emitting an unassignable `map[interface{}]bool`.
+- **OCaml deleted while-loop bodies.** `_convert_while_statement` returned a `(* while ... done *)` comment, dropping the body and leaving a stray `;` that made the file a syntax error. It now emits a real `while ... do ... done`.
+- **OCaml never declared its mutable refs.** A plain (unannotated) assignment to a variable the function later mutates emitted `total := 0` with nothing bound, so every accumulator failed with `Unbound value total`. The first assignment now binds `let total = ref (0) in`. While-loop mutations are recognised as requiring refs, and an unsupported for-loop target raises instead of silently deleting the loop.
+- **OCaml function applications used as arguments were unparenthesized**, so `print(double(5))` emitted `string_of_int double 5` -- two arguments to `string_of_int`.
+- **`return` inside `try` exited the closure, not the function, in Go and Rust.** Both wrap the try body in an anonymous closure for `recover` / `catch_unwind`; Go rejected the return outright (`too many return values`) and variables bound in the body were invisible afterwards (`undefined: y`). Go's closure now carries returns out through named results that the caller re-issues, Rust's yields `Option<T>`, and bindings are hoisted ahead of the closure in both.
+- **Rust `raise` produced code that could not compile, and handlers could never match it.** `panic!(ValueError::new(msg))` is rejected because `panic!` needs a format literal, and the `"{}", ...` form would panic with a `String` that `downcast_ref::<ValueError>` can never find. Raises now use `std::panic::panic_any`.
+- **Go and Rust functions whose returns all sit inside a branch or a try block emitted no terminating return**, which both languages reject.
+- **The bounds prover disproved every memory access.** It built `And(offset >= 0, offset < size)` over fresh unconstrained integers with no path conditions and no link to `len()`, then checked the negation -- trivially satisfiable, so a guarded `if n <= len(a): a[i]` was reported unsafe and strict mode rejected safe code. An access whose offset or region size is not concrete is now reported UNKNOWN rather than handed to Z3. Subscripts inside type annotations (`a: list[int]`) no longer invent a memory region named `list`.
+- **The correctness prover disproved correct algorithms.** Preconditions were checked for validity rather than assumed, so `n >= 0` was "disproved" by `n = -1`; postconditions, loop invariants, termination and functional correctness were checked against the bare specification with no model of the function body; and the ranking-function property was a hardcoded `BoolVal(False)`. A correct iterative factorial reported all six properties DISPROVED. Preconditions are now checked for satisfiability (a contradictory assumption makes the specification vacuous) and the body-dependent properties report UNKNOWN with the reason.
+- **The compile-time evaluator substituted stale constants.** `_collect_constants` recorded the last evaluable assignment per name and never invalidated on reassignment, so `x: int = 5; x = n * 2; return x` folded to `return 5`. A name is now folded only when the whole tree binds it exactly once.
 - **Strict verification generated code without verifying anything** when Z3 was absent or advanced analysis was disabled -- it logged an error and continued.
 - **Python optimizations were silently skipped**: the optimizers are built only under advanced analysis, but the phase guarded on `enable_optimizations`, so every run swallowed an `AttributeError` and applied nothing.
 - **`try`/`except` generated C that never compiled.** `multigen_python_ops.h` defined a second `MGEN_TRY`/`MGEN_END_TRY` family sharing names with the setjmp-based one; included last, it won and then composed with the other header's `MGEN_CATCH`.
@@ -81,6 +99,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - The duplicate `MGEN_TRY` / `MGEN_EXCEPT` / `MGEN_FINALLY` / `MGEN_END_TRY` family from `multigen_python_ops.h`. Nothing emitted it and it broke the family that is emitted.
 - `StaticPythonSubsetValidator.validation_cache` (never read) and `last_validation_error` (per-instance state consumed by whichever later node failed next).
+- `FunctionSpecializer._apply_constant_folding` and `_apply_type_specialization`: empty placeholders whose names were nonetheless reported in `optimizations_applied`.
 
 ## [0.2.0]
 

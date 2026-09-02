@@ -102,12 +102,15 @@ class AnalysisPhaseResult:
 class PythonOptimizationPhaseResult:
     """Result from Phase 3: Python Optimization.
 
-    Contains information about Python-level optimizations applied
-    before mapping to the target language.
+    Contains information about the Python-level passes run before mapping to
+    the target language. These passes are analysis-only today: the pipeline
+    carries the original AST forward, so ``optimizations_applied`` stays empty
+    and ``analyses_run`` names the passes that produced findings.
 
     Attributes:
         enabled: Whether optimization was enabled for this run
-        optimizations_applied: List of optimization passes that were applied
+        analyses_run: Names of the Python-level passes that ran
+        optimizations_applied: Passes whose transform reached code generation
         compile_time: Results from compile-time evaluation pass
         loops: Results from loop analysis and optimization
         specialization: Results from function specialization
@@ -115,6 +118,7 @@ class PythonOptimizationPhaseResult:
     """
 
     enabled: bool
+    analyses_run: list[str] = field(default_factory=list)
     optimizations_applied: list[str] = field(default_factory=list)
     compile_time: Optional["OptimizationResult"] = None
     loops: Optional["OptimizationResult"] = None
