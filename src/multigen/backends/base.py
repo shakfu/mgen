@@ -206,6 +206,30 @@ class AbstractBuilder(ABC):
     def get_compile_flags(self) -> list[str]:
         """Get compilation flags for the language."""
 
+    def apply_build_options(
+        self,
+        compiler: Optional[str] = None,
+        compiler_flags: Optional[list[str]] = None,
+        include_dirs: Optional[list[str]] = None,
+        libraries: Optional[list[str]] = None,
+    ) -> set[str]:
+        """Adopt the build configuration this builder can honour.
+
+        A builder that ignores an option must not report it as applied: the
+        pipeline refuses configuration a backend would silently drop.
+
+        Args:
+            compiler: Compiler executable to invoke
+            compiler_flags: Extra flags to pass to the compiler
+            include_dirs: Extra include search paths
+            libraries: Libraries to link against
+
+        Returns:
+            Names of the options that were applied, from {"compiler",
+            "compiler_flags", "include_dirs", "libraries"}
+        """
+        return set()
+
     # -------------------------------------------------------------------------
     # Common helper methods for subclasses
     # -------------------------------------------------------------------------

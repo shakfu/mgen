@@ -11,18 +11,46 @@ This script runs benchmarks across all backends and collects performance metrics
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from multigen.pipeline import MultiGenPipeline, PipelineConfig, BuildMode, OptimizationLevel
 from multigen.backends.registry import registry
+from multigen.frontend.backend_capabilities import python_answer
+
+
+_MISSING_TOOL_PATTERNS = (
+    re.compile(r"No such file or directory: '([^']+)'"),
+    re.compile(r"([\w.+-]+): command not found"),
+    re.compile(r"executable file not found.*?[`']([^`']+)[`']"),
+)
+
+
+def _missing_toolchain(error: str) -> Optional[str]:
+    """Name the build tool this machine lacks, if that is what went wrong.
+
+    A missing compiler is an environment gap, not a translation defect, and
+    must not be reported the same way.
+
+    Args:
+        error: The compiler or builder error text
+
+    Returns:
+        The missing executable's name, or None if the error is something else
+    """
+    for pattern in _MISSING_TOOL_PATTERNS:
+        match = pattern.search(error)
+        if match:
+            return match.group(1)
+    return None
 
 
 class BenchmarkMetrics:
@@ -36,7 +64,9 @@ class BenchmarkMetrics:
         self.binary_size: int = 0
         self.lines_of_code: int = 0
         self.success: bool = False
+        self.skipped: bool = False
         self.output: str = ""
+        self.expected_output: str = ""
         self.error: str = ""
 
 
@@ -47,6 +77,29 @@ class BenchmarkRunner:
         self.output_dir = output_dir
         self.output_dir.mkdir(exist_ok=True)
         self.results: list[BenchmarkMetrics] = []
+        self._references: dict[Path, str] = {}
+
+    def python_reference(self, source_file: Path) -> str:
+        """What CPython prints for a benchmark, as the answer to match.
+
+        Exit status alone says nothing about whether a translation is correct,
+        so every generated program is compared against this.
+
+        Args:
+            source_file: The canonical benchmark source
+
+        Returns:
+            CPython's stdout for the benchmark's main(), stripped
+
+        Raises:
+            RuntimeError: If the benchmark cannot be run under CPython
+        """
+        if source_file not in self._references:
+            try:
+                self._references[source_file] = python_answer(source_file.read_text())
+            except Exception as exc:
+                raise RuntimeError(f"{source_file} does not run under CPython: {exc}") from exc
+        return self._references[source_file]
 
     def get_backend_specific_file(self, source_file: Path, backend: str) -> Path:
         """Get backend-specific benchmark file if it exists.
@@ -450,6 +503,15 @@ class BenchmarkRunner:
         suffix = f" (using {actual_file.stem})" if actual_file != source_file else ""
         print(f"  [{backend}] {benchmark_name}{suffix}...", end=" ", flush=True)
 
+        # The answer to match comes from the canonical benchmark, so a
+        # backend-specific rewrite cannot quietly compute something else.
+        try:
+            expected_output = self.python_reference(source_file)
+        except RuntimeError as exc:
+            metrics.error = str(exc)
+            print("NO CPYTHON REFERENCE")
+            return metrics
+
         # Use the actual file for compilation
         source_file = actual_file
 
@@ -461,7 +523,14 @@ class BenchmarkRunner:
 
         if not success:
             metrics.error = error or "Compilation failed"
-            print(f"COMPILE FAILED ({comp_time:.2f}s)")
+            missing = _missing_toolchain(metrics.error)
+            if missing:
+                # This machine has no toolchain for the backend, which says
+                # nothing about the translation. Do not count it as a failure.
+                metrics.skipped = True
+                print(f"SKIPPED ({missing} not installed)")
+            else:
+                print(f"COMPILE FAILED ({comp_time:.2f}s)")
             return metrics
 
         # Count LOC
@@ -489,12 +558,18 @@ class BenchmarkRunner:
 
                 metrics.execution_time = exec_time
                 metrics.output = proc_result.stdout.strip()
-                metrics.success = proc_result.returncode == 0
+                metrics.expected_output = expected_output
 
-                if not metrics.success:
+                if proc_result.returncode != 0:
                     metrics.error = proc_result.stderr
                     print(f"RUN FAILED ({comp_time:.2f}s compile)")
+                elif metrics.output != expected_output:
+                    # A benchmark that exits 0 while printing the wrong answer
+                    # is not a passing translation.
+                    metrics.error = f"output {metrics.output!r} != CPython {expected_output!r}"
+                    print(f"OUTPUT MISMATCH (got {metrics.output!r}, want {expected_output!r})")
                 else:
+                    metrics.success = True
                     print(
                         f"OK ({comp_time:.2f}s compile, {exec_time:.3f}s run, {metrics.binary_size // 1024}KB)"
                     )
@@ -527,7 +602,11 @@ class BenchmarkRunner:
             "total_benchmarks": len(set(m.name for m in self.results)),
             "total_backends": len(set(m.backend for m in self.results)),
             "successful_runs": sum(1 for m in self.results if m.success),
-            "failed_runs": sum(1 for m in self.results if not m.success),
+            "failed_runs": sum(1 for m in self.results if not m.success and not m.skipped),
+            "skipped_runs": sum(1 for m in self.results if m.skipped),
+            "output_mismatches": sum(
+                1 for m in self.results if not m.success and m.output and m.output != m.expected_output
+            ),
             "by_backend": {},
         }
 
@@ -600,8 +679,20 @@ class BenchmarkRunner:
         )
         print(
             f"Success: {summary['successful_runs']} | Failed: {summary['failed_runs']}"
+            f" (of which {summary['output_mismatches']} built and ran but printed the wrong answer)"
+            f" | Skipped: {summary['skipped_runs']} (toolchain missing)"
         )
         print()
+
+        mismatches = [m for m in self.results if not m.success and m.output and m.output != m.expected_output]
+        if mismatches:
+            print("Output mismatches:")
+            for metrics in mismatches:
+                print(
+                    f"  {metrics.backend}/{metrics.name}: "
+                    f"got {metrics.output!r}, CPython prints {metrics.expected_output!r}"
+                )
+            print()
 
         # Print backend comparison table
         print(f"{'Backend':<12} {'Success':<8} {'Compile (s)':<12} {'Run (s)':<12} {'Binary (KB)':<12} {'LOC':<8}")
@@ -689,7 +780,9 @@ def main():
     runner.print_summary()
     runner.save_json_report(output_dir / "benchmark_results.json")
 
-    return 0
+    # A benchmark that does not reproduce CPython's answer is a failure, not a
+    # footnote: report it in the exit status so a caller can act on it.
+    return 1 if any(not m.success and not m.skipped for m in runner.results) else 0
 
 
 if __name__ == "__main__":

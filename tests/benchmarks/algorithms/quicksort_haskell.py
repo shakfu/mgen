@@ -46,6 +46,6 @@ def main() -> int:
     # Additional sorts for benchmarking (result used to avoid optimization)
     sorted2: list[int] = quicksort(sorted_arr)
     sorted3: list[int] = quicksort(sorted2)
-    print(sorted3[0])
+    total: int = sorted3[0] - sorted_arr[0]
 
-    return 0
+    return total

@@ -21,7 +21,7 @@ uv sync --group dev --group extra
 make test
 ```
 
-This runs 1353 tests and should complete in ~21 seconds.
+This runs 1559 tests and should complete in ~27 seconds.
 
 ## Development Workflow
 

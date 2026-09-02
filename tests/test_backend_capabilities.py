@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from multigen.backends.registry import registry
 from multigen.frontend.backend_capabilities import (
     BUILD_FAILED,
@@ -24,6 +22,90 @@ from multigen.frontend.diagnostics import RuleId
 from multigen.frontend.static_profile import get_profile, profile_names
 from multigen.frontend.static_validation import StaticValidator
 from multigen.frontend.subset_validator import StaticPythonSubsetValidator
+
+# Cells where a backend emits plausible source that does not build. Each is a
+# backend defect with a reproducer in frontend/capability_probes.py, recorded
+# here so a new one fails the build instead of being filed away. The list is
+# allowed to shrink and nothing else: removing an entry is the fix, and a
+# stale entry is a failure too (see TestNoNewBrokenEmissions).
+KNOWN_BUILD_FAILURES = frozenset(
+    {
+        "c/union_types",
+        "cpp/context_managers",
+        "cpp/dataclasses",
+        "cpp/namedtuples",
+        "go/context_managers",
+        "go/dataclasses",
+        "go/f_strings",
+        "go/namedtuples",
+        "haskell/basic_types",
+        "haskell/context_managers",
+        "haskell/dataclasses",
+        "haskell/exceptions",
+        "haskell/generator_expressions",
+        "haskell/namedtuples",
+        "ocaml/basic_types",
+        "ocaml/comprehensions",
+        "ocaml/context_managers",
+        "ocaml/f_strings",
+        "ocaml/generator_expressions",
+        "ocaml/generators",
+        "ocaml/generics",
+        "ocaml/yield_from",
+        "rust/dataclasses",
+        "rust/f_strings",
+        "rust/generics",
+        "rust/namedtuples",
+    }
+)
+
+
+def emitted_but_unbuildable(matrix: dict[str, dict[str, dict[str, str]]]) -> set[str]:
+    """Cells the backend emitted happily and that then failed to build.
+
+    Args:
+        matrix: The measured capability matrix
+
+    Returns:
+        ``backend/feature`` keys, the form used by KNOWN_BUILD_FAILURES
+    """
+    return {
+        f"{backend}/{key}"
+        for backend, outcomes in matrix.items()
+        for key, outcome in outcomes.items()
+        if outcome["emit"] == OK and outcome["run"] == BUILD_FAILED
+    }
+
+
+class TestNoNewBrokenEmissions:
+    """A backend that emits source it cannot build must fail the build.
+
+    Emission alone calls these cells fine; only building and running the probe
+    finds them. Recording them without failing on them let 20 such cells sit in
+    the matrix indefinitely, so the count is pinned here instead.
+    """
+
+    def test_no_unrecorded_backend_emits_source_it_cannot_build(self):
+        new_failures = sorted(emitted_but_unbuildable(load_matrix()) - KNOWN_BUILD_FAILURES)
+
+        assert new_failures == [], (
+            "these backends now emit source that does not build: "
+            f"{new_failures}. Fix the backend, or add the cell to "
+            "KNOWN_BUILD_FAILURES with a reason."
+        )
+
+    def test_the_known_failure_list_has_no_stale_entries(self):
+        """A fixed cell must leave the list, so it can only shrink."""
+        fixed = sorted(KNOWN_BUILD_FAILURES - emitted_but_unbuildable(load_matrix()))
+
+        assert fixed == [], f"these cells build now; remove them from KNOWN_BUILD_FAILURES: {fixed}"
+
+    def test_running_finds_what_emitting_cannot(self):
+        """Every recorded failure emitted cleanly: the run stage earns its keep."""
+        matrix = load_matrix()
+        for cell in KNOWN_BUILD_FAILURES:
+            backend, _, key = cell.partition("/")
+            assert matrix[backend][key]["emit"] == OK, f"{cell} is recorded as a build failure but does not emit"
 
 
 class TestMatrixIsCurrent:
@@ -140,21 +222,6 @@ class TestMeasurementDistinguishesSilence:
     def test_llvm_refuses_f_strings_rather_than_returning_null(self):
         """It used to compile f"..." to `ret i8* null`."""
         assert load_matrix()["llvm"]["f_strings"]["emit"] == REFUSES
-
-    def test_running_finds_what_emitting_cannot(self):
-        """Emission alone called these fine; the programs do not build.
-
-        This is the whole reason the matrix builds and runs each probe.
-        """
-        matrix = load_matrix()
-        emitted_but_broken = [
-            f"{backend}/{key}"
-            for backend, outcomes in matrix.items()
-            for key, outcome in outcomes.items()
-            if outcome["emit"] == OK and outcome["run"] == BUILD_FAILED
-        ]
-
-        assert emitted_but_broken, "expected the run stage to still be earning its keep"
 
     def test_measure_reports_ok_for_a_supported_feature(self):
         probe = PROBES["arithmetic_operations"]

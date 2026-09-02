@@ -69,7 +69,9 @@ make benchmark
 make benchmark-report
 ```
 
-Current status: 49/49 passing (100%) across all 7 backends.
+The harness compares each generated program's output with CPython's and exits non-zero on any
+mismatch, so its pass rate measures translation correctness rather than exit status. Current
+per-backend rates are in the README; open defects are tracked in TODO.md.
 
 ## Writing Tests
 

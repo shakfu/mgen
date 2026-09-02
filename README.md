@@ -14,7 +14,7 @@ MultiGen is a Python-to-multiple-languages code generator that translates Python
 - **Type-Safe Generation**: Leverages Python type annotations for accurate and safe code translation
 - **Runtime Libraries**: Enhanced C backend with 50KB+ runtime libraries providing Python-like semantics
 - **CLI Interface**: Simple command-line tool with conversion, building, validation (`mgen check`), and batch processing
-- **Production-Ready**: 1400 passing tests ensuring translation accuracy and code quality
+- **Production-Ready**: 1559 passing tests ensuring translation accuracy and code quality
 - **LLVM Backend**: Native compilation via LLVM IR with O0-O3 optimization levels
 - **TypeScript Backend**: Standalone binaries via the Deno toolchain (`deno compile`)
 
@@ -22,37 +22,49 @@ MultiGen is a Python-to-multiple-languages code generator that translates Python
 
 | Language | Status      | Extension | Build System      | Advanced Features | Benchmarks |
 |----------|-------------|-----------|-------------------|-------------------|------------|
-| C        | Production  | `.c`      | Makefile / gcc    | OOP, STC containers, string methods, comprehensions | 7/7 (100%) |
-| C++      | Production  | `.cpp`    | Makefile / g++    | OOP, STL containers, string methods, comprehensions | 7/7 (100%) |
-| Rust     | Production  | `.rs`     | Cargo / rustc     | OOP, ownership-aware, string methods, comprehensions | 7/7 (100%) |
-| Go       | Production  | `.go`     | go.mod / go build | OOP, defer pattern, string methods, comprehensions | 7/7 (100%) |
-| Haskell  | Production  | `.hs`     | Cabal / ghc       | Pure functional, comprehensions, type safety | 7/7 (100%) |
-| OCaml    | Production  | `.ml`     | dune / ocamlc     | Functional, pattern matching, mutable refs | 7/7 (100%) |
-| LLVM     | Production  | `.ll`     | llvmlite / clang  | Native compilation, O0-O3 optimization, multi-platform | 7/7 (100%) |
-| TypeScript | Production | `.ts`    | Deno / deno compile | Map/Set containers, native classes, template literals, comprehensions | 7/7 (100%) |
+| C        | Production  | `.c`      | Makefile / gcc    | OOP, STC containers, string methods, comprehensions | 6/7 |
+| C++      | Production  | `.cpp`    | Makefile / g++    | OOP, STL containers, string methods, comprehensions | 5/7 |
+| Rust     | Production  | `.rs`     | Cargo / rustc     | OOP, ownership-aware, string methods, comprehensions | 6/7 |
+| Go       | Production  | `.go`     | go.mod / go build | OOP, defer pattern, string methods, comprehensions | 6/7 |
+| Haskell  | Production  | `.hs`     | Cabal / ghc       | Pure functional, comprehensions, type safety | 4/7 |
+| OCaml    | Production  | `.ml`     | dune / ocamlc     | Functional, pattern matching, mutable refs | n/a (no toolchain) |
+| LLVM     | Production  | `.ll`     | llvmlite / clang  | Native compilation, O0-O3 optimization, multi-platform | 0/7 |
+| TypeScript | Production | `.ts`    | Deno / deno compile | Map/Set containers, native classes, template literals, comprehensions | n/a (no toolchain) |
 
 ## Benchmark Results
 
+The benchmark harness compares each generated program's output against CPython's,
+so a run only counts as a success when the translation computes the same answer.
+
 ```sh
-% make benchmark # ran on m1 macbook air 
+% make benchmark # x86_64 Linux; opam and deno not installed here
 ================================================================================
 BENCHMARK SUMMARY
 ================================================================================
 Total: 7 benchmarks × 8 backends = 56 runs
-Success: 56 | Failed: 0
+Success: 27 | Failed: 17 (of which 2 built and ran but printed the wrong answer) | Skipped: 12 (toolchain missing)
+
+Output mismatches:
+  haskell/set_ops: got '34', CPython prints '234'
+  cpp/quicksort: got '100', CPython prints '5'
 
 Backend      Success  Compile (s)  Run (s)      Binary (KB)  LOC
 --------------------------------------------------------------------------------
-c            7/7       0.390        0.275189     94.9         76
-cpp          7/7       0.435        0.251988     36.1         51
-go           7/7       0.190        0.265097     2365.4       38
-haskell      7/7       0.156        0.024035     19944.6      65
-llvm         7/7       0.310        0.251354     49.0         321
-ocaml        7/7       0.234        0.271373     826.3        27
-rust         7/7       0.266        0.250707     443.0        37
-typescript   7/7       0.660        0.803459     66815.6      38
+c            6/7       0.760        0.002528     78.1         73
+cpp          5/7       0.412        0.003551     21.3         49
+go           6/7       0.123        0.003077     2371.0       37
+haskell      4/7       0.109        0.003214     2719.2       24
+llvm         0/7       0.000        0.000000     0.0          0
+ocaml        0/7       0.000        0.000000     0.0          0
+rust         6/7       0.181        0.002043     4416.0       36
+typescript   0/7       0.000        0.000000     0.0          0
 ===============================================================================
 ```
+
+`dict_ops` is refused by the validator on every backend (`Unsupported feature: Tuples`),
+so no backend can reach 7/7 today. The `ocaml` and `typescript` rows are skips on this
+machine (no `opam`, no `deno`); the `llvm` rows are link failures. Open defects are
+tracked in TODO.md.
 
 ## Quick Start
 
@@ -215,7 +227,7 @@ let process_items items =
   |> List.map String.uppercase_ascii
 ```
 
-For complete preference documentation, see [PREFERENCES.md](PREFERENCES.md).
+The full set of keys per backend is declared in `src/multigen/backends/preferences.py`. Most are not yet read by the emitters; see TODO.md.
 
 ## Examples
 
@@ -638,7 +650,7 @@ multigen clean
 ### Running Tests
 
 ```bash
-make test           # Run all 1400 tests
+make test           # Run all 1559 tests
 make lint           # Run code linting with ruff
 make typecheck      # Run type checking with mypy
 ```
@@ -724,7 +736,7 @@ All backends support core Python features:
 
 MultiGen maintains test coverage ensuring translation accuracy:
 
-- **1400 total tests** across all components and backends
+- **1559 total tests** across all components and backends
 - **56/56 benchmarks passing** (100%) across all 8 backends
 - Comprehensive backend coverage testing all major Python features
 - Test categories: basics, OOP, comprehensions, string methods, augmented assignment, control flow, integration, exception handling, context managers, generators, slicing, f-string format specs
@@ -741,10 +753,10 @@ MultiGen maintains test coverage ensuring translation accuracy:
 - Advanced Python language features: comprehensions, string methods, augmented assignment
 - Complete STC library integration (864KB Smart Template Container library)
 - Architecture consolidation with unified C backend module
-- Professional test organization with 1400 tests in focused, single-responsibility files
+- Professional test organization with 1559 tests in focused, single-responsibility files
 - Universal preference system with language-specific customization
 - Production-ready code generation with clean, efficient output
-- 8 production-ready backends (C++, C, Rust, Go, Haskell, OCaml, LLVM, TypeScript) with 100% benchmark success
+- 8 backends (C++, C, Rust, Go, Haskell, OCaml, LLVM, TypeScript); see the benchmark table above for measured pass rates
 - Exception handling (try/except/else/finally/raise) across all backends
 - Context managers (with statement) across all backends
 - Generator/yield support (eager collection) across all backends

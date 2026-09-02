@@ -579,6 +579,6 @@ MultiGen offers **7 production-quality backends** with different trade-offs:
 - **Haskell/OCaml**: Best for functional programming
 - **LLVM**: Best for research/experimentation (JIT mode)
 
-**Overall Quality**: 98% benchmark success rate, 986 tests passing, strict type checking, design pattern implementations achieving 79% complexity reduction.
+**Overall Quality**: 1559 tests passing, strict type checking, design pattern implementations achieving 79% complexity reduction. Benchmark pass rates are measured against CPython's output; see the README.
 
-**Maturity Level**: 6 backends production-ready (100% benchmarks), 1 functionally complete (86% benchmarks).
+**Maturity Level**: see the benchmark table in the README and the open defects in TODO.md; no backend translates the full supported subset without known gaps.

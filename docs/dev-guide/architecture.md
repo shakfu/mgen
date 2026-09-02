@@ -171,7 +171,7 @@ Each backend includes a self-contained runtime:
 
 ## Code Quality
 
-- 1353 tests (100% passing)
+- 1559 tests (100% passing)
 - Strict mypy type checking
 - 79% complexity reduction (design patterns)
-- 49/49 benchmarks passing across all 7 backends
+- Benchmarks compared against CPython's output across 8 backends; see the README for current rates

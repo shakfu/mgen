@@ -204,7 +204,7 @@
       },
       "exceptions": {
         "emit": "ok",
-        "run": "build_failed"
+        "run": "matches"
       },
       "f_strings": {
         "emit": "ok",
@@ -434,23 +434,23 @@
     "ocaml": {
       "arithmetic_operations": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "matches"
       },
       "basic_types": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "build_failed"
       },
       "comprehensions": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "build_failed"
       },
       "context_managers": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "build_failed"
       },
       "control_flow": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "matches"
       },
       "dataclasses": {
         "emit": "refuses",
@@ -462,35 +462,35 @@
       },
       "exceptions": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "matches"
       },
       "f_strings": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "build_failed"
       },
       "function_calls": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "matches"
       },
       "function_definitions": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "matches"
       },
       "generator_expressions": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "build_failed"
       },
       "generators": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "build_failed"
       },
       "generics": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "build_failed"
       },
       "lists": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "matches"
       },
       "namedtuples": {
         "emit": "refuses",
@@ -506,15 +506,15 @@
       },
       "union_types": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "matches"
       },
       "variable_declarations": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "matches"
       },
       "yield_from": {
         "emit": "ok",
-        "run": "unverified"
+        "run": "build_failed"
       }
     },
     "rust": {
@@ -548,7 +548,7 @@
       },
       "exceptions": {
         "emit": "ok",
-        "run": "build_failed"
+        "run": "matches"
       },
       "f_strings": {
         "emit": "ok",

@@ -1,14 +1,15 @@
 # MultiGen Documentation
 
-**MultiGen** (Multi-Language Generator) translates Python code to C, C++, Rust, Go, Haskell, OCaml, and LLVM IR with zero external runtime dependencies.
+**MultiGen** (Multi-Language Generator) translates Python code to C, C++, Rust, Go, Haskell, OCaml, LLVM IR, and TypeScript with zero external runtime dependencies.
 
 ## Features
 
-- **7 Production Backends**: C, C++, Rust, Go, Haskell, OCaml, LLVM
+- **8 Backends**: C, C++, Rust, Go, Haskell, OCaml, LLVM, TypeScript
 - **Formal Verification**: Optional Z3-based memory safety proofs
 - **Type Inference**: Automatic type detection for containers and functions
 - **Zero Dependencies**: Self-contained runtime libraries
-- **1353 Tests**: Comprehensive test suite with 100% benchmark pass rate (49/49)
+- **1559 Tests**: Comprehensive test suite. The benchmark harness compares generated output
+  against CPython's; current pass rates per backend are in the README, and open defects in TODO.md
 
 ## Quick Start
 
