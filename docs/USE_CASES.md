@@ -716,7 +716,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
 
       - name: Install MultiGen
         run: pip install multigen
@@ -732,7 +732,7 @@ jobs:
           done
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v7
         with:
           name: compiled-binaries
           path: build/

@@ -249,7 +249,7 @@ Add to `.github/workflows/ci.yml`:
 
 - name: Upload Memory Test Logs
   if: failure()
-  uses: actions/upload-artifact@v3
+  uses: actions/upload-artifact@v7
   with:
     name: memory-test-logs
     path: build/memory_tests/
